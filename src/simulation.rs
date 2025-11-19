@@ -1,33 +1,74 @@
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 
-const PATH: &str = "/get_sim_status?object=simStatus";
+///
+/// Simulation instance.
+///
+/// Represents a simulation instance on a host.
+///
+/// # Examples
+///
+/// ```
+/// use iracing::simuation::Simulation
+///
+/// let local = Simulation { host: "127.0.0.1".to_string() }
+/// let remote = Simulation { host: "192.168.5.125".to_string() }
+/// ```
+#[derive(Debug)]
+pub struct Simulation {
+    pub host: String,
+}
 
-pub fn check_simulation_status(host: &str) -> bool {
-    let host_uri = format!("{}:32034", host);
-    println!("{}", host_uri);
+impl Simulation {
+    ///
+    /// The default port the iRacing simulation runs on.
+    pub const PORT: u16 = 32034;
 
-    let mut stream = match TcpStream::connect(host_uri) {
-        Ok(s) => s,
-        Err(e) => {
-            println!("Failed to connect to iRacing sim client: {}", e);
-            return false;
-        }
-    };
+    ///
+    /// The default path to retrieve sim status
+    pub const SIM_STATUS_PATH: &str = "/get_sim_status?object=simStatus";
 
-    // Raw HTTP request string
-    let http_request = format!(
-        "{} {} {}\r\nHost: {}\r\nConnection: close\r\n\r\n",
-        "GET", PATH, "HTTP/1.1", host
-    );
-
-    // Write the request to the stream
-    if let Err(e) = stream.write_all(http_request.as_bytes()) {
-        println!("Failed to send request: {}", e);
-        return false;
+    pub fn host_uri(&self) -> String {
+        format!("{}:{}", self.host, Simulation::PORT.to_string())
     }
 
-    false
+    ///
+    /// Checks if the sim is running
+    ///
+    /// Makes a request to {self.host}:{PORT}/{SIM_STATUS_PATH} to retrieve
+    /// the sim status and returns true if connected, false otherwise.
+    pub fn check_status(&self) -> bool {
+        let mut stream = match TcpStream::connect(self.host_uri()) {
+            Ok(s) => s,
+            Err(e) => {
+                println!("Failed to connect to iRacing sim client: {}", e);
+                return false;
+            }
+        };
+
+        // Raw HTTP request string
+        let http_request = format!(
+            "{} {} {}\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            "GET",
+            Simulation::SIM_STATUS_PATH,
+            "HTTP/1.1",
+            self.host
+        );
+
+        // Write the request to the stream
+        if let Err(e) = stream.write_all(http_request.as_bytes()) {
+            println!("Failed to send request: {}", e);
+            return false;
+        }
+
+        let mut response = String::new();
+        if let Err(e) = stream.read_to_string(&mut response) {
+            println!("Failed to read response: {}", e);
+            return false;
+        }
+
+        response.contains("running:1")
+    }
 }
 
 #[cfg(test)]
@@ -36,6 +77,10 @@ mod tests {
 
     #[test]
     fn check_status() {
-        assert!(check_simulation_status("192.168.5.126"));
+        let sim = Simulation {
+            host: "127.0.0.1".to_string(),
+        };
+
+        assert!(sim.check_status())
     }
 }
