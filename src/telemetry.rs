@@ -566,6 +566,26 @@ impl Blocking {
     }
 
     ///
+    /// Sample Telemetry Data FPS
+    ///
+    /// Same functionality as `sample`, but allows usage of the Fps struct.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use iracing::telemetry::Connection;
+    /// use iracing::fps::Fps;
+    ///
+    /// let sampler = Connection::new()?.blocking()?;
+    /// let _ = sampler.sample_fps(Fps::new(30))?;
+    /// let _ = sampler.sample_fps(Fps::MAX)?;
+    /// let _ = sampler.sample_fps(Fps::MIN)?;
+    /// ```
+    pub fn sample_fps(&self, fps: Fps) {
+        self.sample(fps.to_duration())
+    }
+
+    ///
     /// Sample Telemetry Data
     ///
     /// Waits for new telemetry data up to `timeout` and returns a safe copy of the telemetry data.
