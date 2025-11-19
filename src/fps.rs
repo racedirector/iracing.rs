@@ -16,9 +16,9 @@ use std::time::Duration;
 /// let sampler = Connection::new()?.block()?;
 ///
 /// let twice = Fps { value: 30 };
-/// let _ = sampler.sample(twice.to_duration())?;
-/// let _ = sampler.sample(Fps::MAX.to_duration())?;
-/// let _ = sampler.sample(Fps::MIN.to_duration())?;
+/// let _ = sampler.sample_fps(twice.to_duration())?;
+/// let _ = sampler.sample_fps(Fps::MAX.to_duration())?;
+/// let _ = sampler.sample_fps(Fps::MIN.to_duration())?;
 /// ```
 #[derive(Debug)]
 pub struct Fps {
