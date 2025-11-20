@@ -19,18 +19,18 @@ pub fn main() {
     broadcast.send_message(BroadcastMessage::ReloadAllTextures);
 
     // 4-tire change with pressure-adjustment
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LF(127)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RF(127)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LR(127)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RR(127)));
+    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LF(176)));
+    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RF(176)));
+    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LR(176)));
+    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RR(176)));
 
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::ClearTires));
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::ClearTires));
 
-    // 4-tire change with NO pressure-adjustment
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LF(0)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RF(0)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LR(0)));
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RR(0)));
+    // // 4-tire change with NO pressure-adjustment
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LF(0)));
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RF(0)));
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::LR(0)));
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::RR(0)));
 
-    broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::ClearTires));
+    // broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::ClearTires));
 }
