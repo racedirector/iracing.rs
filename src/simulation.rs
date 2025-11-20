@@ -14,22 +14,24 @@ use std::net::TcpStream;
 /// let local = Simulation { host: "127.0.0.1".to_string() }
 /// let remote = Simulation { host: "192.168.5.125".to_string() }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Simulation {
     pub host: String,
 }
 
 impl Simulation {
-    ///
     /// The default port the iRacing simulation runs on.
     pub const PORT: u16 = 32034;
 
-    ///
     /// The default path to retrieve sim status
     pub const SIM_STATUS_PATH: &str = "/get_sim_status?object=simStatus";
 
     pub fn host_uri(&self) -> String {
-        format!("{}:{}", self.host, Simulation::PORT.to_string())
+        format!("{}:{}", self.host, Self::PORT)
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.check_status()
     }
 
     ///
