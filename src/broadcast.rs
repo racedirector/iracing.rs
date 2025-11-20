@@ -1,5 +1,3 @@
-use winapi::um::winuser::{RegisterUserMessageW, SendNotifyMessageW};
-
 const BROADCAST_MESSAGE_NAME: &str = r"IRSDK_BROADCASTMSG";
 
 #[derive(Debug, Copy, Clone)]
@@ -8,10 +6,8 @@ pub struct Broadcast {
 }
 
 impl Broadcast {
-    pub fn new() {
-        Broadcast {
-            message_id: RegisterUserMessageW(BROADCAST_MESSAGE_NAME),
-        }
+    pub fn new() -> Broadcast {
+        Broadcast { message_id: 1 }
     }
 
     pub fn reload_textures(&self, car_index: u8) {
@@ -19,7 +15,7 @@ impl Broadcast {
         self.send_message();
     }
     pub fn reload_all_textures(&self) {
-        SendNotifyMessageW(0xFFFF, self.message_id)
+        // SendNotifyMessageW(0xFFFF, self.message_id)
     }
 
     fn send_message(&self) {

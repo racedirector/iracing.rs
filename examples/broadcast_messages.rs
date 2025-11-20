@@ -1,11 +1,11 @@
 use iracing::{broadcast::Broadcast, simulation::Simulation};
 
 pub fn main() {
-    let simuation = Simulation {
+    let simulation = Simulation {
         host: "127.0.0.1".to_string(),
     };
 
-    while !simuation.is_connected() {
+    while !simulation.is_connected() {
         std::thread::sleep(std::time::Duration::from_secs(1))
     }
 
