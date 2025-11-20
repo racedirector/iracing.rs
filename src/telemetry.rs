@@ -1,3 +1,4 @@
+use crate::fps::Fps;
 use crate::session::*;
 use encoding_rs::mem::decode_latin1;
 use serde::{Deserialize, Serialize};
@@ -581,7 +582,7 @@ impl Blocking {
     /// let _ = sampler.sample_fps(Fps::MAX)?;
     /// let _ = sampler.sample_fps(Fps::MIN)?;
     /// ```
-    pub fn sample_fps(&self, fps: Fps) {
+    pub fn sample_fps(&self, fps: Fps) -> Result<Sample, Box<dyn Error>> {
         self.sample(fps.to_duration())
     }
 
