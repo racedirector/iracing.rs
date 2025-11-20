@@ -18,13 +18,9 @@ pub enum ReplayPositionMode {
     End,
 }
 
-impl Into<u16> for ReplayPositionMode {
-    fn into(self) -> u16 {
-        match self {
-            Self::Begin => 0,
-            Self::Current => 1,
-            Self::End => 2,
-        }
+impl From<ReplayPositionMode> for u16 {
+    fn from(mode: ReplayPositionMode) -> Self {
+        mode as u16
     }
 }
 
