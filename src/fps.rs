@@ -12,7 +12,6 @@ use std::{num::NonZeroU8, time::Duration};
 /// ```
 /// use iracing::fps::Fps;
 /// use std::num::NonZeroU8;
-///
 /// let _ = Fps::new(30);
 /// let _ = Fps(NonZeroU8::new(30).unwrap());
 /// ```
