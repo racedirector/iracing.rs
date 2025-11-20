@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroU8, time::Duration};
 
 ///
 /// FPS for telemetry updates.
@@ -11,21 +11,14 @@ use std::time::Duration;
 ///
 /// ```
 /// use iracing::fps::Fps;
-/// use iracing::telemetry::Connection;
+/// use std::num::NonZeroU8;
 ///
-/// let sampler = Connection::new()?.block()?;
-///
-/// let twice = Fps { value: 30 };
-/// let _ = sampler.sample(twice.to_duration())?;
-/// let _ = sampler.sample(Fps::MAX.to_duration())?;
-/// let _ = sampler.sample(Fps::MIN.to_duration())?;
+/// let _ = Fps::new(30);
+/// let _ = Fps(NonZeroU8::new(30).unwrap());
 /// ```
-#[derive(Debug)]
-pub struct Fps {
-    //
-    // A value between 1 and 60 representing the number of times to check for updates per second.
-    pub value: u32,
-}
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct Fps(pub NonZeroU8);
 
 impl Fps {
     ///
@@ -34,13 +27,12 @@ impl Fps {
     /// # Examples
     ///
     /// ```
-    /// use std::time::Duration;
+    /// use std::{time::Duration, num::NonZeroU8};
     /// use iracing::fps::Fps;
-    /// assert_eq!(Fps::MAX.value, 60);
-    /// assert_eq!(Fps::MAX.to_ms().floor(), 16.0);
+    /// assert_eq!(Fps::MAX.0, NonZeroU8::new(60).unwrap());
     /// assert_eq!(Fps::MAX.to_duration(), Duration::from_millis(16));
     /// ```
-    pub const MAX: Fps = Fps::new(60);
+    pub const MAX: Fps = Fps(NonZeroU8::new(60).unwrap());
 
     ///
     /// The smallest number of times to check per second.
@@ -48,28 +40,24 @@ impl Fps {
     /// # Examples
     ///
     /// ```
-    /// use std::time::Duration;
+    /// use std::{time::Duration, num::NonZeroU8};
     /// use iracing::fps::Fps;
-    /// assert_eq!(Fps::MIN.value, 1);
-    /// assert_eq!(Fps::MIN.to_ms().floor(), 1000.0);
+    /// assert_eq!(Fps::MIN.0, NonZeroU8::new(1).unwrap());
     /// assert_eq!(Fps::MIN.to_duration(), Duration::from_millis(1000));
-    ///
-    pub const MIN: Fps = Fps::new(1);
+    /// ```
+    pub const MIN: Fps = Fps(NonZeroU8::new(1).unwrap());
 
-    pub const fn new(value: u32) -> Fps {
-        if value < 1 || value > 60 {
-            panic!("FPS value must be between 1 and 60.");
+    #[track_caller]
+    pub const fn new(value: u8) -> Fps {
+        match NonZeroU8::new(value) {
+            Some(v) if value <= 60 => Fps(v),
+            _ => panic!("FPS must be between 1 and 60"),
         }
-
-        Fps { value }
     }
 
-    pub fn to_ms(&self) -> f64 {
-        1000.0 / self.value as f64
-    }
-
+    #[inline]
     pub fn to_duration(&self) -> Duration {
-        Duration::from_millis(self.to_ms().floor() as u64)
+        Duration::from_millis(1000 / self.0.get() as u64)
     }
 }
 
