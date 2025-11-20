@@ -52,6 +52,13 @@ pub struct Header {
     buffers: [ValueBuffer; 4], // Data buffers
 }
 
+impl Header {
+    pub unsafe fn parse(from: *const c_void) -> Header {
+        let raw_header: *const Header = transmute(from);
+        *raw_header
+    }
+}
+
 /// Blocking telemetry interface
 ///
 /// Calling `sample()` on a Blocking interface will block until a new telemetry sample is made available.
@@ -686,16 +693,6 @@ impl Connection {
     }
 
     ///
-    /// Get the data header
-    ///
-    /// Reads the data header from the shared memory map and returns a copy of the header
-    /// which can be used safely elsewhere.
-    unsafe fn read_header(from: *const c_void) -> Header {
-        let raw_header: *const Header = transmute(from);
-        *raw_header
-    }
-
-    ///
     /// Get session information
     ///
     /// Get general session information - This data is mostly static and contains
@@ -712,7 +709,7 @@ impl Connection {
     /// };
     /// ```
     pub fn session_info(&mut self) -> Result<SessionDetails, Box<dyn std::error::Error>> {
-        let header = unsafe { Self::read_header(self.location) };
+        let header = unsafe { Header::parse(self.location) };
 
         let start = (self.location as usize + header.session_info_offset as usize) as *const u8;
         let size = header.session_info_length as usize;
@@ -742,7 +739,7 @@ impl Connection {
     /// # }
     /// ```
     pub fn telemetry(&self) -> Result<Sample, Box<dyn std::error::Error>> {
-        let header = unsafe { Self::read_header(self.location) };
+        let header = unsafe { Header::parse(self.location) };
         header.telemetry(self.location as *const std::ffi::c_void)
     }
 
@@ -765,7 +762,7 @@ impl Connection {
     /// # }
     /// ```
     pub fn blocking(&self) -> IOResult<Blocking> {
-        Blocking::new(self.location, unsafe { Self::read_header(self.location) })
+        Blocking::new(self.location, unsafe { Header::parse(self.location) })
     }
 
     pub fn close(&self) -> IOResult<()> {
