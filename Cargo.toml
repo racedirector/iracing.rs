@@ -2,8 +2,8 @@
 name = "iracing"
 version = "0.5.0"
 description = "Rust interface for Live Telemetry, Session Data, and Setup Files for iRacing"
-authors = ["Leo Adamek <iracing.rs@breakerofthings.tech>"]
-repository = "https://github.com/LeoAdamek/iracing.rs"
+authors = ["Leo Adamek <iracing.rs@breakerofthings.tech>", "Justin Makaila <justin@treehousetechnology.io>"]
+repository = "https://github.com/racedirector/iracing.rs"
 edition = "2018"
 license = "MIT"
 
