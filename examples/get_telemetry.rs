@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 pub fn main() {
+    let update_duration = Duration::from_millis(50);
     let mut conn = Connection::new().expect("Unable to open telemetry");
 
     let session = conn.session_info().expect("Invalid Session");
@@ -12,7 +13,7 @@ pub fn main() {
     let blocking = conn.blocking().expect("Couldn't create telem handle");
 
     loop {
-        let telem = match blocking.sample(Duration::from_millis(500)) {
+        let telem = match blocking.sample(update_duration) {
             Ok(sample) => sample,
             Err(err) => {
                 println!("Error: {:?}", err);
