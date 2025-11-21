@@ -2,7 +2,6 @@
 
 pub mod fps;
 pub mod replay;
-pub mod session;
 pub mod simulation;
 pub mod states;
 pub mod track_surface;

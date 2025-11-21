@@ -77,14 +77,6 @@ pub struct Blocking {
     event_handle: HANDLE,
 }
 
-#[derive(Copy, Clone, Debug)]
-#[repr(C)]
-struct ValueBuffer {
-    pub ticks: i32,        // Tick count
-    pub offset: i32,       // Offset
-    pub padding: [u32; 2], // (16-byte align) Padding
-}
-
 #[derive(Clone)]
 #[repr(C)]
 struct ValueHeader {
@@ -379,13 +371,6 @@ impl Header {
             value_header.to_vec(),
             value_buffer.to_vec(),
         ))
-    }
-}
-
-impl DiskSubHeader {
-    unsafe fn parse(from: *const c_void) -> DiskSubHeader {
-        let raw_header: *const DiskSubHeader = transmute(from.add(112));
-        *raw_header
     }
 }
 
