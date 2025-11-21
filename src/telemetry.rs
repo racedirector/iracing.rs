@@ -6,20 +6,24 @@ use serde_yaml::from_str as yaml_from;
 use std::convert::TryInto;
 use std::default::Default;
 use std::error::Error;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsStr};
 use std::fmt::{self, Display};
 use std::io::Result as IOResult;
 use std::mem::transmute;
 use std::os::raw::{c_char, c_void};
+use std::os::windows::ffi::OsStrExt;
 use std::os::windows::raw::HANDLE;
+use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 use std::time::Duration;
 use winapi::shared::minwindef::LPVOID;
 use winapi::um::errhandlingapi::GetLastError;
-use winapi::um::handleapi::CloseHandle;
-use winapi::um::memoryapi::{MapViewOfFile, OpenFileMappingW, FILE_MAP_READ};
+use winapi::um::fileapi::{CreateFileW, OPEN_EXISTING};
+use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
+use winapi::um::memoryapi::{CreateFileMappingW, MapViewOfFile, OpenFileMappingW, FILE_MAP_READ};
 use winapi::um::minwinbase::LPSECURITY_ATTRIBUTES;
 use winapi::um::synchapi::{CreateEventW, ResetEvent, WaitForSingleObject};
+use winapi::um::winnt::{FILE_SHARE_READ, GENERIC_READ, PAGE_READONLY};
 
 /// System path where the shared memory map is located.
 pub const TELEMETRY_PATH: &str = r"Local\IRSDKMemMapFileName";
@@ -52,11 +56,15 @@ pub struct Header {
     buffers: [ValueBuffer; 4], // Data buffers
 }
 
-impl Header {
-    pub unsafe fn parse(from: *const c_void) -> Header {
-        let raw_header: *const Header = transmute(from);
-        *raw_header
-    }
+/// A sub-header included in disk telemetry.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct DiskSubHeader {
+    pub session_start_date: u64,   // offset 0, 'Q'
+    pub session_start_time: f64,   // offset 8, 'd'
+    pub session_end_time: f64,     // offset 16, 'd'
+    pub session_lap_count: i32,    // offset 24, 'i'
+    pub session_record_count: i32, // offset 28, 'i'
 }
 
 /// Blocking telemetry interface
@@ -322,6 +330,15 @@ impl fmt::Debug for ValueHeader {
 }
 
 impl Header {
+    unsafe fn parse(from: *const c_void) -> Header {
+        let raw_header: *const Header = transmute(from);
+        *raw_header
+    }
+
+    fn is_connected(&self) -> bool {
+        self.status == 1
+    }
+
     fn latest_buffer(&self) -> (i32, ValueBuffer) {
         let mut latest_tick: i32 = 0;
         let mut buffer = self.buffers[0];
@@ -362,6 +379,13 @@ impl Header {
             value_header.to_vec(),
             value_buffer.to_vec(),
         ))
+    }
+}
+
+impl DiskSubHeader {
+    unsafe fn parse(from: *const c_void) -> DiskSubHeader {
+        let raw_header: *const DiskSubHeader = transmute(from.add(112));
+        *raw_header
     }
 }
 
@@ -545,6 +569,10 @@ impl Blocking {
         })
     }
 
+    pub fn is_connected(&self) -> bool {
+        self.header.is_connected()
+    }
+
     pub fn close(&self) -> std::io::Result<()> {
         if self.event_handle.is_null() {
             return Ok(());
@@ -657,8 +685,10 @@ pub struct Connection {
 
 impl Connection {
     pub fn new() -> IOResult<Connection> {
-        let mut path: Vec<u16> = TELEMETRY_PATH.encode_utf16().collect();
-        path.push(0);
+        let path: Vec<u16> = OsStr::new(TELEMETRY_PATH)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
 
         let mapping: HANDLE;
         let errno: i32;
@@ -690,6 +720,10 @@ impl Connection {
         }
 
         Ok(Connection { location: view })
+    }
+
+    pub fn is_connected(&self) -> bool {
+        unsafe { Header::parse(self.location) }.is_connected()
     }
 
     ///
@@ -766,13 +800,123 @@ impl Connection {
     }
 
     pub fn close(&self) -> IOResult<()> {
-        let succ = unsafe { CloseHandle(self.location) };
-
-        if succ != 0 {
+        if unsafe { CloseHandle(self.location) } != 0 {
             Ok(())
         } else {
             let errno: i32 = unsafe { GetLastError() as i32 };
+            Err(std::io::Error::from_raw_os_error(errno))
+        }
+    }
+}
 
+pub struct IBT {
+    location: *mut c_void,
+}
+
+impl IBT {
+    pub fn open(path_string: &str) -> IOResult<IBT> {
+        let mapping: HANDLE;
+        let errno: i32;
+        let path: Vec<u16> = OsStr::new(path_string)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let handle: HANDLE = unsafe {
+            CreateFileW(
+                path.as_ptr(),
+                GENERIC_READ,
+                FILE_SHARE_READ,
+                null_mut(),
+                OPEN_EXISTING,
+                0,
+                null_mut(),
+            )
+        };
+
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        mapping =
+            unsafe { CreateFileMappingW(handle, null_mut(), PAGE_READONLY, 0, 0, null_mut()) };
+
+        if mapping.is_null() {
+            unsafe {
+                errno = GetLastError() as i32;
+            }
+
+            return Err(std::io::Error::from_raw_os_error(errno));
+        }
+
+        unsafe { CloseHandle(handle) };
+
+        let view: LPVOID;
+        unsafe {
+            view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+        }
+
+        unsafe { CloseHandle(mapping) };
+
+        if view.is_null() {
+            unsafe {
+                errno = GetLastError() as i32;
+            }
+
+            return Err(std::io::Error::from_raw_os_error(errno));
+        }
+
+        Ok(IBT { location: view })
+    }
+
+    pub fn header(&self) -> Result<Header, Box<dyn std::error::Error>> {
+        unsafe { Ok(Header::parse(self.location)) }
+    }
+
+    pub fn sub_header(&self) -> Result<DiskSubHeader, Box<dyn std::error::Error>> {
+        unsafe { Ok(DiskSubHeader::parse(self.location)) }
+    }
+
+    pub fn session_info(&mut self) -> Result<SessionDetails, Box<dyn std::error::Error>> {
+        let header = unsafe { Header::parse(self.location) };
+
+        let start = (self.location as usize + header.session_info_offset as usize) as *const u8;
+        let size = header.session_info_length as usize;
+
+        let data: &[u8] = unsafe { from_raw_parts(start, size) };
+
+        // Decode the data as Latin-1 (Rust wants UTF-8)
+        let content = decode_latin1(data);
+        let details = yaml_from(&content)?;
+
+        Ok(details)
+    }
+
+    ///
+    /// Get latest telemetry.
+    ///
+    /// Get the latest live telemetry data, the telemetry is updated roughtly every 16ms
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use iracing::telemetry::Connection;
+    ///
+    /// let sample = Connection::new()?.telemetry()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn telemetry(&self) -> Result<Sample, Box<dyn std::error::Error>> {
+        let header = unsafe { Header::parse(self.location) };
+        header.telemetry(self.location as *const std::ffi::c_void)
+    }
+
+    pub fn close(&self) -> IOResult<()> {
+        if unsafe { CloseHandle(self.location) } != 0 {
+            Ok(())
+        } else {
+            let errno: i32 = unsafe { GetLastError() as i32 };
             Err(std::io::Error::from_raw_os_error(errno))
         }
     }
@@ -801,5 +945,11 @@ mod tests {
             .try_into()
             .unwrap();
         assert!(session_tick > 0);
+    }
+
+    #[test]
+    fn test_ibt() {
+        let ibt = IBT::open("./telemetry.ibt");
+        assert!(ibt.is_ok());
     }
 }
