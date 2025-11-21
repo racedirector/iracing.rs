@@ -62,8 +62,10 @@ pub struct Blocking {
 
 impl Blocking {
     pub fn new(location: *const c_void, head: Header) -> std::io::Result<Self> {
-        let mut event_name: Vec<u16> = DATA_EVENT_NAME.encode_utf16().collect();
-        event_name.push(0);
+        let event_name: Vec<u16> = OsStr::new(DATA_EVENT_NAME)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
 
         let sc: LPSECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };
 

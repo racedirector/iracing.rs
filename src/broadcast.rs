@@ -308,13 +308,13 @@ pub struct Broadcast {
 
 impl Broadcast {
     pub fn new() -> Broadcast {
-        let wide: Vec<u16> = OsStr::new(BROADCAST_MESSAGE_NAME)
+        let message: Vec<u16> = OsStr::new(BROADCAST_MESSAGE_NAME)
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
 
         Broadcast {
-            message_id: unsafe { RegisterWindowMessageW(wide.as_ptr()) },
+            message_id: unsafe { RegisterWindowMessageW(message.as_ptr()) },
         }
     }
 
