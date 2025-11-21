@@ -318,7 +318,7 @@ impl Broadcast {
         }
     }
 
-    pub fn send_message(&self, message: BroadcastMessage) {
+    pub fn send_message<M: BroadcastMessageProvider>(&self, message: M) {
         let (broadcast_type, var1, var2, var3) = message.to_message();
         // Pack the low/high words to match the Windows broadcast contract.
         let wparam: WPARAM = (broadcast_type as WPARAM) | ((var1 as WPARAM) << 16);
