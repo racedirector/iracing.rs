@@ -2,9 +2,7 @@ use iracing::simulation::Simulation;
 use std::{thread::sleep, time::Duration};
 
 pub fn main() {
-    let simulation = Simulation {
-        host: String::from("127.0.0.1"),
-    };
+    let simulation = Simulation::local();
 
     loop {
         println!("Waiting for iRacing simulation connection...");

@@ -11,12 +11,12 @@ use std::net::TcpStream;
 /// ```
 /// use iracing::simuation::Simulation
 ///
-/// let local = Simulation { host: "127.0.0.1".to_string() }
-/// let remote = Simulation { host: "192.168.5.125".to_string() }
+/// let local = Simulation::local()
+/// let remote = Simulation { host: "192.168.5.125" }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Simulation {
-    pub host: String,
+    host: &'static str,
 }
 
 impl Simulation {
@@ -25,6 +25,10 @@ impl Simulation {
 
     /// The default path to retrieve sim status
     pub const SIM_STATUS_PATH: &str = "/get_sim_status?object=simStatus";
+
+    pub fn local() -> Self {
+        Simulation { host: "127.0.0.1" }
+    }
 
     pub fn host_uri(&self) -> String {
         format!("{}:{}", self.host, Self::PORT)
@@ -79,10 +83,7 @@ mod tests {
 
     #[test]
     fn check_status() {
-        let sim = Simulation {
-            host: "127.0.0.1".to_string(),
-        };
-
+        let sim = Simulation::local();
         assert!(sim.check_status())
     }
 }

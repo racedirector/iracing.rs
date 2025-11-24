@@ -1,160 +1,21 @@
 use std::convert::TryInto;
 use std::ffi::OsStr;
+use std::io::{self, Result as IOResult};
+use std::num::NonZeroU32;
 use std::os::windows::ffi::OsStrExt;
 use winapi::shared::minwindef::{LPARAM, WPARAM};
 use winapi::um::winuser::{RegisterWindowMessageW, SendNotifyMessageW, HWND_BROADCAST};
 
+use crate::broadcast::message::{
+    BroadcastMessageType, ChatCommandMode, PitCommandMode, ReplayPositionMode, ReplaySearchMode,
+    TelemetryCommandMode, VideoCaptureMode,
+};
+use crate::broadcast::util::pad_car_number;
 use crate::states::CameraState;
 
 const BROADCAST_MESSAGE_NAME: &str = r"IRSDK_BROADCASTMSG";
 
-///
-/// Replay Position Mode
-///
-#[repr(u16)]
-pub enum ReplayPositionMode {
-    Begin = 0,
-    Current,
-    End,
-}
-
-impl From<ReplayPositionMode> for u16 {
-    fn from(mode: ReplayPositionMode) -> Self {
-        mode as u16
-    }
-}
-
-///
-/// Replay Search Mode
-///
-#[repr(u16)]
-pub enum ReplaySearchMode {
-    ToStart = 0,
-    ToEnd,
-    PreviousSession,
-    NextSession,
-    PreviousLap,
-    NextLap,
-    PreviousFrame,
-    NextFrame,
-    PreviousIncident,
-    NextIncident,
-}
-
-impl From<ReplaySearchMode> for u16 {
-    fn from(mode: ReplaySearchMode) -> Self {
-        mode as u16
-    }
-}
-
-///
-/// Telemetry Command Mode
-///
-#[repr(u16)]
-pub enum TelemetryCommandMode {
-    Stop = 0,
-    Start,
-    Restart,
-}
-
-impl From<TelemetryCommandMode> for u16 {
-    fn from(mode: TelemetryCommandMode) -> Self {
-        mode as u16
-    }
-}
-
-///
-/// Chat Command Mode
-///
-#[repr(u16)]
-pub enum ChatCommandMode {
-    Macro = 0,
-    Begin,
-    Reply,
-    Cancel,
-}
-
-impl From<ChatCommandMode> for u16 {
-    fn from(mode: ChatCommandMode) -> Self {
-        mode as u16
-    }
-}
-
-///
-/// Pit Command Mode
-///
-pub enum PitCommandMode {
-    Clear,
-    Tearoff,
-    Fuel(u8),
-    LF(u8),
-    RF(u8),
-    LR(u8),
-    RR(u8),
-    ClearTires,
-    FastRepair,
-    ClearTearoff,
-    ClearFastRepair,
-    ClearFuel,
-}
-
-impl PitCommandMode {
-    /// Encode into (var1, var2) words as expected by the broadcast API.
-    pub fn encode(self) -> (u16, u16) {
-        match self {
-            PitCommandMode::Clear => (0, 0),
-            PitCommandMode::Tearoff => (1, 0),
-            PitCommandMode::Fuel(level) => (2, level as u16),
-            PitCommandMode::LF(pressure) => (3, pressure as u16),
-            PitCommandMode::RF(pressure) => (4, pressure as u16),
-            PitCommandMode::LR(pressure) => (5, pressure as u16),
-            PitCommandMode::RR(pressure) => (6, pressure as u16),
-            PitCommandMode::ClearTires => (7, 0),
-            PitCommandMode::FastRepair => (8, 0),
-            PitCommandMode::ClearTearoff => (9, 0),
-            PitCommandMode::ClearFastRepair => (10, 0),
-            PitCommandMode::ClearFuel => (11, 0),
-        }
-    }
-}
-
-///
-/// Video Capture Mode
-///
-#[repr(u16)]
-pub enum VideoCaptureMode {
-    ScreenShot = 0,
-    StartCapture,
-    EndCapture,
-    ToggleCapture,
-    ShowTimer,
-    HideTimer,
-}
-
-impl From<VideoCaptureMode> for u16 {
-    fn from(mode: VideoCaptureMode) -> Self {
-        mode as u16
-    }
-}
-
-enum BroadcastMessageType {
-    CameraSwitchPosition = 0,
-    CameraSwitchNumber,
-    CameraSetState,
-    ReplaySetPlaySpeed,
-    ReplaySetPlayPosition,
-    ReplaySearch,
-    ReplaySetState,
-    ReloadTextures,
-    ChatCommand,
-    PitCommand,
-    TelemetryCommand,
-    FFBCommand,
-    ReplaySearchSessionTime,
-    VideoCapture,
-}
-
-trait BroadcastMessageProvider {
+pub trait BroadcastMessageProvider {
     fn to_message(self) -> (BroadcastMessageType, u16, u16, u16);
 }
 
@@ -171,7 +32,7 @@ trait BroadcastMessageProvider {
 /// ```
 pub enum BroadcastMessage {
     CameraSwitchPosition(u8, u8, u8),
-    CameraSwitchNumber(String, u8, u8),
+    CameraSwitchNumber(&'static str, u8, u8),
     CameraSetState(CameraState),
     ReplaySetPlaySpeed(u8, bool),
     ReplaySetPlayPosition(ReplayPositionMode, u16),
@@ -264,58 +125,21 @@ impl BroadcastMessageProvider for BroadcastMessage {
     }
 }
 
-fn pad_car_number(s: &str) -> u16 {
-    let bytes = s.as_bytes();
-    let len = bytes.len();
-
-    // Count leading zeros without allocating
-    let mut zeros = 0usize;
-    for &b in bytes {
-        if b == b'0' {
-            zeros += 1;
-        } else {
-            break;
-        }
-    }
-
-    // If the entire string was zeros, subtract 1
-    if zeros > 0 && zeros == len {
-        zeros -= 1;
-    }
-
-    // Parse the numeric value (leading zeros are fine)
-    let num: u16 = s.parse().unwrap();
-
-    if zeros > 0 {
-        let num_place = if num > 99 {
-            3
-        } else if num > 9 {
-            2
-        } else {
-            1
-        };
-
-        num + 1000 * (num_place + zeros as u16)
-    } else {
-        num
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
-pub struct Broadcast {
-    message_id: u32,
+pub struct Client {
+    message_id: NonZeroU32,
 }
 
-impl Broadcast {
-    pub fn new() -> Broadcast {
-        let wide: Vec<u16> = OsStr::new(BROADCAST_MESSAGE_NAME)
+impl Client {
+    pub fn new() -> IOResult<Client> {
+        let message: Vec<u16> = OsStr::new(BROADCAST_MESSAGE_NAME)
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
 
-        Broadcast {
-            message_id: unsafe { RegisterWindowMessageW(wide.as_ptr()) },
-        }
+        let id = unsafe { RegisterWindowMessageW(message.as_ptr()) };
+        let message_id = NonZeroU32::new(id).ok_or_else(io::Error::last_os_error)?;
+        Ok(Client { message_id })
     }
 
     pub fn send_message<M: BroadcastMessageProvider>(&self, message: M) {
@@ -323,6 +147,26 @@ impl Broadcast {
         // Pack the low/high words to match the Windows broadcast contract.
         let wparam: WPARAM = (broadcast_type as WPARAM) | ((var1 as WPARAM) << 16);
         let lparam: LPARAM = (var2 as LPARAM) | ((var3 as LPARAM) << 16);
-        unsafe { SendNotifyMessageW(HWND_BROADCAST, self.message_id, wparam, lparam) };
+        unsafe { SendNotifyMessageW(HWND_BROADCAST, self.message_id.into(), wparam, lparam) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::broadcast::message::PitCommandMode;
+
+    use super::*;
+    use crate::broadcast::BroadcastMessage;
+
+    #[test]
+    fn test_broadcast() {
+        let broadcast = Client::new();
+        assert!(broadcast.is_ok());
+    }
+
+    #[test]
+    fn test_message() {
+        let broadcast = Client::new().expect("Could not register broadcast client");
+        broadcast.send_message(BroadcastMessage::PitCommand(PitCommandMode::Tearoff));
     }
 }
