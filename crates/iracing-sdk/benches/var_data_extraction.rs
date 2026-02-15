@@ -9,20 +9,22 @@
 //! Platform: Cross-platform (uses real IBT test files, CI-safe)
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use pitwall::IbtReader;
-use pitwall::test_utils::get_smallest_ibt_test_file;
-use pitwall::types::{BitField, VarData};
+use iracing_sdk::IbtReader;
+use iracing_sdk::types::{BitField, VarData};
 use std::hint::black_box;
+use test_utils::get_smallest_ibt_test_file;
 
 /// Load real frame data and variable info for benchmarking
-fn load_test_data() -> (Vec<u8>, pitwall::VariableSchema) {
+fn load_test_data() -> (Vec<u8>, iracing_sdk::VariableSchema) {
     let ibt_file = get_smallest_ibt_test_file().expect("No IBT test files found");
     let mut reader = IbtReader::open(&ibt_file).expect("Failed to open IBT file");
 
     let schema = reader.variables().clone();
 
-    let (data, _tick, _session_version) =
-        reader.read_next_frame().expect("Failed to read frame").expect("No frames in IBT");
+    let (data, _tick, _session_version) = reader
+        .read_next_frame()
+        .expect("Failed to read frame")
+        .expect("No frames in IBT");
 
     (data, schema)
 }
@@ -120,8 +122,10 @@ fn bench_bitfield_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("bitfield_operations");
 
     // Find a real bitfield variable in the schema
-    let bitfield_var =
-        schema.variables.values().find(|v| matches!(v.data_type, pitwall::VariableType::BitField));
+    let bitfield_var = schema
+        .variables
+        .values()
+        .find(|v| matches!(v.data_type, iracing_sdk::VariableType::BitField));
 
     if let Some(bitfield_info) = bitfield_var {
         if let Ok(bitfield) = BitField::from_bytes(&data, bitfield_info) {

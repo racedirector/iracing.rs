@@ -317,8 +317,8 @@ mod tests {
 
         // The path should end with 'pitwall' (our project name)
         assert!(
-            repo_root.file_name().unwrap() == "pitwall",
-            "Repository root should be named 'pitwall'"
+            repo_root.file_name().unwrap() == "iracing-rs",
+            "Repository root should be named 'iracing-rs'"
         );
     }
 
