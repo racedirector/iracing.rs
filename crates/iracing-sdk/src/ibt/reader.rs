@@ -31,7 +31,7 @@
 //! - Seeking operations are O(1) as they only update internal position counters
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{Result, IRacingSDKError, VariableSchema, yaml_utils};
+use crate::{IRacingSDKError, Result, VariableSchema, yaml_utils};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -53,12 +53,17 @@ pub struct IbtReader {
 impl IbtReader {
     /// Open an IBT file for reading
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut file = File::open(&path)
-            .map_err(|e| IRacingSDKError::File { path: path.as_ref().to_path_buf(), source: e })?;
+        let mut file = File::open(&path).map_err(|e| IRacingSDKError::File {
+            path: path.as_ref().to_path_buf(),
+            source: e,
+        })?;
 
         let mut data = Vec::new();
         file.read_to_end(&mut data)
-            .map_err(|e| IRacingSDKError::File { path: path.as_ref().to_path_buf(), source: e })?;
+            .map_err(|e| IRacingSDKError::File {
+                path: path.as_ref().to_path_buf(),
+                source: e,
+            })?;
 
         Self::from_bytes_with_path(&data, path.as_ref().to_path_buf())
     }
@@ -93,22 +98,23 @@ impl IbtReader {
                 details: "Variable headers size calculation overflowed".to_string(),
             })?;
 
-        let var_headers_end =
-            header.var_header_offset.checked_add(var_headers_size).ok_or_else(|| {
-                IRacingSDKError::Parse {
-                    context: "Frame data calculation".to_string(),
-                    details: "Variable headers end calculation overflowed".to_string(),
-                }
+        let var_headers_end = header
+            .var_header_offset
+            .checked_add(var_headers_size)
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "Frame data calculation".to_string(),
+                details: "Variable headers end calculation overflowed".to_string(),
             })?;
 
         // 2. Session info comes after variable headers (if present)
         let session_info_end = if header.session_info_len > 0 {
-            header.session_info_offset.checked_add(header.session_info_len).ok_or_else(|| {
-                IRacingSDKError::Parse {
+            header
+                .session_info_offset
+                .checked_add(header.session_info_len)
+                .ok_or_else(|| IRacingSDKError::Parse {
                     context: "Frame data calculation".to_string(),
                     details: "Session info end calculation overflowed".to_string(),
-                }
-            })?
+                })?
         } else {
             var_headers_end
         };
@@ -118,10 +124,12 @@ impl IbtReader {
 
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes =
-            data.len().checked_sub(frame_data_start).ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame data calculation".to_string(),
-                details: "Frame data start position exceeds file size".to_string(),
-            })?;
+            data.len()
+                .checked_sub(frame_data_start)
+                .ok_or_else(|| IRacingSDKError::Parse {
+                    context: "Frame data calculation".to_string(),
+                    details: "Frame data start position exceeds file size".to_string(),
+                })?;
 
         let total_frames = if header.buf_len > 0 {
             remaining_bytes / header.buf_len as usize
@@ -231,24 +239,29 @@ impl IbtReader {
         if frame_number >= self.total_frames {
             return Err(IRacingSDKError::Parse {
                 context: "Frame seek".to_string(),
-                details: format!("Frame {} out of range (0..{})", frame_number, self.total_frames),
+                details: format!(
+                    "Frame {} out of range (0..{})",
+                    frame_number, self.total_frames
+                ),
             });
         }
 
         // Calculate position for frame with checked arithmetic
         let frame_size = self.header.buf_len as usize;
         let frame_byte_offset =
-            frame_number.checked_mul(frame_size).ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame seek".to_string(),
-                details: "Frame offset calculation overflowed".to_string(),
-            })?;
-
-        let frame_offset =
-            self.frame_data_start.checked_add(frame_byte_offset).ok_or_else(|| {
-                IRacingSDKError::Parse {
+            frame_number
+                .checked_mul(frame_size)
+                .ok_or_else(|| IRacingSDKError::Parse {
                     context: "Frame seek".to_string(),
-                    details: "Frame position calculation overflowed".to_string(),
-                }
+                    details: "Frame offset calculation overflowed".to_string(),
+                })?;
+
+        let frame_offset = self
+            .frame_data_start
+            .checked_add(frame_byte_offset)
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "Frame seek".to_string(),
+                details: "Frame position calculation overflowed".to_string(),
             })?;
 
         self.current_position = frame_offset;
@@ -301,8 +314,8 @@ impl IbtReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::require_smallest_ibt_fixture;
     use anyhow::{Context, Result, ensure};
+    use test_utils::require_smallest_ibt_fixture;
 
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
@@ -328,7 +341,10 @@ mod tests {
         if reader.total_frames() == 0 {
             println!("  This IBT file contains only session info (no telemetry data)");
         } else {
-            println!("  This IBT file contains {} frames of telemetry data", reader.total_frames());
+            println!(
+                "  This IBT file contains {} frames of telemetry data",
+                reader.total_frames()
+            );
         }
 
         Ok(())
@@ -357,7 +373,11 @@ mod tests {
         let (data, tick_count, _session_version) =
             first.expect("IBT fixtures should yield at least one frame");
 
-        ensure!(!data.is_empty(), "Expected non-empty frame data from {}", test_file.display());
+        ensure!(
+            !data.is_empty(),
+            "Expected non-empty frame data from {}",
+            test_file.display()
+        );
         ensure!(
             data.len() == reader.variables().frame_size,
             "Frame data length {} must match schema frame size {}",
@@ -399,7 +419,11 @@ mod tests {
 
         let last_index = total_frames - 1;
         reader.seek_to_frame(last_index).with_context(|| {
-            format!("Seeking to final frame {} in {}", last_index, test_file.display())
+            format!(
+                "Seeking to final frame {} in {}",
+                last_index,
+                test_file.display()
+            )
         })?;
 
         let last = reader
@@ -417,7 +441,10 @@ mod tests {
         let eof = reader
             .read_next_frame()
             .with_context(|| format!("Reading EOF sentinel from {}", test_file.display()))?;
-        ensure!(eof.is_none(), "read_next_frame should return None once EOF is reached");
+        ensure!(
+            eof.is_none(),
+            "read_next_frame should return None once EOF is reached"
+        );
 
         Ok(())
     }
@@ -439,7 +466,9 @@ mod tests {
         }
 
         let middle = total_frames / 2;
-        reader.seek_to_frame(middle).context("Seeking to middle frame")?;
+        reader
+            .seek_to_frame(middle)
+            .context("Seeking to middle frame")?;
 
         let frame = reader
             .read_next_frame()
@@ -472,10 +501,15 @@ mod tests {
         }
 
         let start = Instant::now();
-        let frame = reader.read_next_frame().context("Reading frame to measure latency")?;
+        let frame = reader
+            .read_next_frame()
+            .context("Reading frame to measure latency")?;
         let elapsed = start.elapsed();
 
-        ensure!(frame.is_some(), "Expected frame data on first call to read_next_frame()");
+        ensure!(
+            frame.is_some(),
+            "Expected frame data on first call to read_next_frame()"
+        );
         ensure!(
             elapsed < Duration::from_millis(100),
             "Frame retrieval should be fast (took {:?})",
@@ -506,8 +540,14 @@ mod tests {
         let (data, _, _) = frame;
         let schema = reader.variables();
 
-        ensure!(schema.variable_count() > 0, "Schema should contain telemetry variables");
-        ensure!(schema.has_variable("SessionTime"), "Schema should expose SessionTime variable");
+        ensure!(
+            schema.variable_count() > 0,
+            "Schema should contain telemetry variables"
+        );
+        ensure!(
+            schema.has_variable("SessionTime"),
+            "Schema should expose SessionTime variable"
+        );
         ensure!(
             schema.frame_size == data.len(),
             "Schema frame size {} must match data length {}",
@@ -531,10 +571,15 @@ mod tests {
         let reader = IbtReader::open(&test_file)
             .with_context(|| format!("Opening {}", test_file.display()))?;
 
-        println!("Testing session YAML extraction from {}", test_file.display());
+        println!(
+            "Testing session YAML extraction from {}",
+            test_file.display()
+        );
 
         // Extract session YAML
-        let yaml_result = reader.session_yaml().with_context(|| "Extracting session YAML")?;
+        let yaml_result = reader
+            .session_yaml()
+            .with_context(|| "Extracting session YAML")?;
 
         // Verify we got YAML
         let yaml = yaml_result.expect("IBT file should contain session YAML");
@@ -545,8 +590,14 @@ mod tests {
         println!("  Session YAML extracted: {} bytes", yaml.len());
 
         // Verify YAML structure - should contain expected top-level keys
-        ensure!(yaml.contains("WeekendInfo:"), "YAML should contain WeekendInfo section");
-        ensure!(yaml.contains("SessionInfo:"), "YAML should contain SessionInfo section");
+        ensure!(
+            yaml.contains("WeekendInfo:"),
+            "YAML should contain WeekendInfo section"
+        );
+        ensure!(
+            yaml.contains("SessionInfo:"),
+            "YAML should contain SessionInfo section"
+        );
 
         // Verify the YAML has been preprocessed (no control characters)
         for (i, ch) in yaml.chars().enumerate() {
@@ -567,8 +618,14 @@ mod tests {
         println!("  Sessions: {}", session.session_info.sessions.len());
 
         // Verify basic session info structure
-        ensure!(!session.weekend_info.track_name.is_empty(), "Track name should not be empty");
-        ensure!(!session.session_info.sessions.is_empty(), "Should have at least one session");
+        ensure!(
+            !session.weekend_info.track_name.is_empty(),
+            "Track name should not be empty"
+        );
+        ensure!(
+            !session.session_info.sessions.is_empty(),
+            "Should have at least one session"
+        );
 
         Ok(())
     }

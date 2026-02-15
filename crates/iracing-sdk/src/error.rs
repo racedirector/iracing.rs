@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use thiserror::Error;
 
 #[cfg(windows)]
@@ -10,6 +12,13 @@ pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum IRacingSDKError {
+    #[error("IBT file error: {path}")]
+    File {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("SDK version mismatch: expected {expected}, found {found}")]
     Version { expected: u32, found: u32 },
 
@@ -48,6 +57,7 @@ impl IRacingSDKError {
     pub fn is_retryable(&self) -> bool {
         match self {
             IRacingSDKError::Buffer { .. } => true,
+            IRacingSDKError::File { .. } => false,
             IRacingSDKError::Memory { .. } => false,
             IRacingSDKError::Version { .. } => false,
             IRacingSDKError::Parse { .. } => false,
@@ -64,6 +74,12 @@ impl IRacingSDKError {
                 "Check memory access bounds",
                 "Verify shared memory is still valid",
                 "Restart the application",
+            ],
+            IRacingSDKError::File { .. } => vec![
+                "Check file exists and is readable",
+                "Verify IBT file format and version",
+                "Ensure sufficient disk space",
+                "Check file permissions",
             ],
             IRacingSDKError::Version { .. } => vec![
                 "Update iRacing to latest version",
@@ -92,6 +108,11 @@ impl IRacingSDKError {
                 "Restart buffer management",
             ],
         }
+    }
+
+    /// Helper constructor for file errors with path context.
+    pub fn file_error(path: PathBuf, source: std::io::Error) -> Self {
+        IRacingSDKError::File { path, source }
     }
 
     /// Helper constructor for memory access errors.

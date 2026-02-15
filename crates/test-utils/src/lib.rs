@@ -3,8 +3,6 @@
 //! This module provides utilities for finding test data files and other testing helpers
 //! that are used across the pitwall workspace.
 
-#![cfg(any(test, feature = "benchmark"))]
-
 use std::path::{Path, PathBuf};
 
 /// Guidance shown when telemetry fixtures are missing from the repository checkout.
@@ -196,7 +194,7 @@ pub fn require_smallest_ibt_fixture() -> Result<PathBuf, FixtureError> {
 }
 
 /// Require a file inside `test-data/` by name.
-#[cfg(all(test, windows))]
+#[cfg(windows)]
 pub fn require_test_data_file(file_name: &str) -> Result<PathBuf, FixtureError> {
     let test_data_dir = get_test_data_dir().map_err(|err| {
         FixtureError::new(format!(
