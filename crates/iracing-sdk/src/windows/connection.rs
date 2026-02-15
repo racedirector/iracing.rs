@@ -3,7 +3,7 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::{Result, TelemetryError};
+use crate::{IRacingSDKError, Result};
 use std::ptr::NonNull;
 use std::time::Duration;
 use tracing::{debug, trace, warn};
@@ -136,7 +136,7 @@ impl Connection {
         let mapping = unsafe {
             let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
             OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
-                .map_err(|e| TelemetryError::windows_api_error("OpenFileMappingW", e))?
+                .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
         };
 
         // Map the view
@@ -144,7 +144,7 @@ impl Connection {
             let ptr = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
             NonNull::new(ptr.Value as *mut u8).ok_or_else(|| {
                 let win_err = windows::core::Error::from_thread();
-                TelemetryError::windows_api_error("MapViewOfFile", win_err)
+                IRacingSDKError::windows_api_error("MapViewOfFile", win_err)
             })?
         };
 
@@ -156,12 +156,17 @@ impl Connection {
                 false,
                 PCWSTR::from_raw(wide_name.as_ptr()),
             ) // SYNCHRONIZE
-            .map_err(|e| TelemetryError::windows_api_error("OpenEventW", e))?
+            .map_err(|e| IRacingSDKError::windows_api_error("OpenEventW", e))?
         };
 
         // Initialize with i32::MAX to match C++ SDK's INT_MAX
         // This ensures the first frame is always accepted as "new"
-        let connection = Self { mapping, base, event, last_tick_count: i32::MAX };
+        let connection = Self {
+            mapping,
+            base,
+            event,
+            last_tick_count: i32::MAX,
+        };
 
         // Validate the connection
         connection.validate_connection()?;
@@ -201,7 +206,10 @@ impl Connection {
             }
             _ => {
                 let win_err = windows::core::Error::from_thread();
-                Err(TelemetryError::windows_api_error("WaitForSingleObject", win_err))
+                Err(IRacingSDKError::windows_api_error(
+                    "WaitForSingleObject",
+                    win_err,
+                ))
             }
         }
     }
@@ -216,6 +224,7 @@ impl Connection {
     /// At 60Hz (16.67ms frames), the hot path (data already available) never reaches
     /// this method, so spawn_blocking overhead is only paid during startup, pauses,
     /// or frame drops - exactly when we want cooperative yielding anyway.
+    #[cfg(feature = "tokio")]
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
         // Convert HANDLE to raw pointer value (usize) to make it Send
         // SAFETY: Windows event handles are thread-safe kernel objects
@@ -241,13 +250,19 @@ impl Connection {
                 }
                 _ => {
                     let win_err = windows::core::Error::from_thread();
-                    Err(TelemetryError::windows_api_error("WaitForSingleObject", win_err))
+                    Err(IRacingSDKError::windows_api_error(
+                        "WaitForSingleObject",
+                        win_err,
+                    ))
                 }
             }
         })
         .await
         .map_err(|e| {
-            TelemetryError::buffer_operation_error(format!("Event wait task panicked: {}", e), None)
+            IRacingSDKError::buffer_operation_error(
+                format!("Event wait task panicked: {}", e),
+                None,
+            )
         })?
     }
 
@@ -294,7 +309,11 @@ impl Connection {
 
             if tick_before == tick_after {
                 self.last_tick_count = tick_before;
-                debug!("Returning new data: tick={}, size={} bytes", tick_before, data_slice.len());
+                debug!(
+                    "Returning new data: tick={}, size={} bytes",
+                    tick_before,
+                    data_slice.len()
+                );
                 return Some(data_slice);
             } else {
                 debug!(
@@ -322,7 +341,10 @@ impl Connection {
             let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
 
             // Find null terminator - iRacing YAML is null-terminated
-            let null_pos = info_slice.iter().position(|&b| b == 0).unwrap_or(info_slice.len());
+            let null_pos = info_slice
+                .iter()
+                .position(|&b| b == 0)
+                .unwrap_or(info_slice.len());
             let yaml_bytes = &info_slice[..null_pos];
 
             std::str::from_utf8(yaml_bytes).ok()
@@ -375,7 +397,7 @@ impl Connection {
 
         // Check SDK version
         if header.ver != IRSDK_VER {
-            return Err(TelemetryError::Version {
+            return Err(IRacingSDKError::Version {
                 expected: IRSDK_VER as u32,
                 found: header.ver as u32,
             });
@@ -406,7 +428,9 @@ impl Connection {
 impl Drop for Connection {
     fn drop(&mut self) {
         unsafe {
-            let addr = MEMORY_MAPPED_VIEW_ADDRESS { Value: self.base.as_ptr() as *mut _ };
+            let addr = MEMORY_MAPPED_VIEW_ADDRESS {
+                Value: self.base.as_ptr() as *mut _,
+            };
             let _ = UnmapViewOfFile(addr);
             let _ = CloseHandle(self.mapping);
             let _ = CloseHandle(self.event);
@@ -423,7 +447,10 @@ unsafe impl Sync for Connection {}
 fn wide_string(s: &str) -> Vec<u16> {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
-    OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(s)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 #[cfg(all(test, windows))]
@@ -457,7 +484,10 @@ mod tests {
 
         // Look for exact "RPM" match to verify variable schema
         let exact_rpm = variables.iter().find(|v| v.name == "RPM");
-        assert!(exact_rpm.is_some(), "RPM variable should be available in iRacing");
+        assert!(
+            exact_rpm.is_some(),
+            "RPM variable should be available in iRacing"
+        );
 
         assert!(!variables.is_empty(), "Should have some variables");
     }
@@ -469,7 +499,11 @@ mod tests {
         let header = connection.header();
 
         // Validate header structure sizes match expected C SDK layout
-        assert_eq!(std::mem::size_of::<IRSDKHeader>(), 112, "Header size must match C SDK");
+        assert_eq!(
+            std::mem::size_of::<IRSDKHeader>(),
+            112,
+            "Header size must match C SDK"
+        );
         assert!(header.tick_rate > 0, "Tick rate should be positive");
 
         assert_eq!(header.ver, IRSDK_VER);

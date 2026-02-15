@@ -20,7 +20,7 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::{Result, IRacingSDKError, VariableInfo, VariableSchema, VariableType};
+use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use tracing::{debug, trace};
@@ -72,10 +72,12 @@ impl IbtHeader {
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
         let mut header_data = [0u8; IRSDK_HEADER_SIZE];
-        reader.read_exact(&mut header_data).map_err(|e| IRacingSDKError::Parse {
-            context: "IBT header reading".to_string(),
-            details: format!("Failed to read {} header bytes: {}", IRSDK_HEADER_SIZE, e),
-        })?;
+        reader
+            .read_exact(&mut header_data)
+            .map_err(|e| IRacingSDKError::Parse {
+                context: "IBT header reading".to_string(),
+                details: format!("Failed to read {} header bytes: {}", IRSDK_HEADER_SIZE, e),
+            })?;
 
         // Parse header fields according to irsdk_header structure (little-endian format)
         // struct irsdk_header {
@@ -125,7 +127,10 @@ impl IbtHeader {
 
     pub fn validate(&self) -> Result<()> {
         if self.version != 2 {
-            return Err(IRacingSDKError::Version { expected: 2, found: self.version as u32 });
+            return Err(IRacingSDKError::Version {
+                expected: 2,
+                found: self.version as u32,
+            });
         }
 
         // Basic sanity checks for negative values
@@ -193,13 +198,15 @@ impl IbtDiskSubHeader {
 
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut disk_header_data = [0u8; IRSDK_DISK_SUBHEADER_SIZE];
-        reader.read_exact(&mut disk_header_data).map_err(|e| IRacingSDKError::Parse {
-            context: "IBT disk sub-header reading".to_string(),
-            details: format!(
-                "Failed to read {} disk sub-header bytes: {}",
-                IRSDK_DISK_SUBHEADER_SIZE, e
-            ),
-        })?;
+        reader
+            .read_exact(&mut disk_header_data)
+            .map_err(|e| IRacingSDKError::Parse {
+                context: "IBT disk sub-header reading".to_string(),
+                details: format!(
+                    "Failed to read {} disk sub-header bytes: {}",
+                    IRSDK_DISK_SUBHEADER_SIZE, e
+                ),
+            })?;
 
         // Parse disk sub-header fields (little-endian format)
         let start_date = parse_i64_le(&disk_header_data, 0)?;
@@ -208,7 +215,13 @@ impl IbtDiskSubHeader {
         let lap_count = parse_i32_le(&disk_header_data, 24)?;
         let record_count = parse_i32_le(&disk_header_data, 28)?;
 
-        Ok(Self { start_date, start_time, end_time, lap_count, record_count })
+        Ok(Self {
+            start_date,
+            start_time,
+            end_time,
+            lap_count,
+            record_count,
+        })
     }
 }
 
@@ -217,7 +230,10 @@ pub fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
     header: &IbtHeader,
 ) -> Result<VariableSchema> {
-    debug!("Extracting variable schema for {} variables", header.num_vars);
+    debug!(
+        "Extracting variable schema for {} variables",
+        header.num_vars
+    );
     // Handle IBT files with no telemetry data frames (bufLen = 0)
     if header.buf_len == 0 || header.num_vars <= 0 {
         // File contains only session info, no telemetry data
@@ -225,20 +241,23 @@ pub fn extract_variable_schema<R: Read + Seek>(
     }
 
     // Seek to the variable headers section and parse all variables
-    reader.seek(std::io::SeekFrom::Start(header.var_header_offset as u64)).map_err(|e| {
-        IRacingSDKError::Parse {
+    reader
+        .seek(std::io::SeekFrom::Start(header.var_header_offset as u64))
+        .map_err(|e| IRacingSDKError::Parse {
             context: "Variable headers seek".to_string(),
             details: format!(
                 "Failed to seek to variable headers at offset {}: {}",
                 header.var_header_offset, e
             ),
-        }
-    })?;
+        })?;
 
     // Convert num_vars to usize upfront to avoid i32-typed ranges
     let num_vars_usize = usize::try_from(header.num_vars).map_err(|_| IRacingSDKError::Parse {
         context: "Variable count conversion".to_string(),
-        details: format!("Number of variables {} cannot be converted to usize", header.num_vars),
+        details: format!(
+            "Number of variables {} cannot be converted to usize",
+            header.num_vars
+        ),
     })?;
 
     // Pre-allocate HashMap to minimize reallocation
@@ -247,10 +266,12 @@ pub fn extract_variable_schema<R: Read + Seek>(
     // Parse each variable header
     for i in 0..num_vars_usize {
         let mut var_header_bytes = [0u8; IRSDK_VAR_HEADER_SIZE];
-        reader.read_exact(&mut var_header_bytes).map_err(|e| IRacingSDKError::Parse {
-            context: format!("Variable header {} reading", i),
-            details: format!("Failed to read variable header {}: {}", i, e),
-        })?;
+        reader
+            .read_exact(&mut var_header_bytes)
+            .map_err(|e| IRacingSDKError::Parse {
+                context: format!("Variable header {} reading", i),
+                details: format!("Failed to read variable header {}: {}", i, e),
+            })?;
 
         // Parse variable header fields
         let var_type = parse_i32_le(&var_header_bytes, 0)?;
@@ -279,7 +300,10 @@ pub fn extract_variable_schema<R: Read + Seek>(
             5 => VariableType::Float64, // double
             _ => {
                 // Log unknown types for diagnostics
-                debug!("Skipping variable '{}' with unknown type {}", name, var_type);
+                debug!(
+                    "Skipping variable '{}' with unknown type {}",
+                    name, var_type
+                );
                 continue;
             }
         };
@@ -298,7 +322,11 @@ pub fn extract_variable_schema<R: Read + Seek>(
         );
     }
 
-    debug!("Extracted {} variables with frame size {}", variables.len(), header.buf_len);
+    debug!(
+        "Extracted {} variables with frame size {}",
+        variables.len(),
+        header.buf_len
+    );
     VariableSchema::new(variables, header.buf_len as usize)
 }
 
@@ -337,7 +365,12 @@ fn parse_i32_le(data: &[u8], offset: usize) -> Result<i32> {
             ),
         });
     }
-    Ok(i32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]))
+    Ok(i32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ]))
 }
 
 fn parse_i64_le(data: &[u8], offset: usize) -> Result<i64> {
@@ -396,13 +429,13 @@ fn extract_null_terminated_string(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    use crate::test_utils::{
-        FIXTURE_INSTALL_GUIDANCE, require_ibt_fixtures, require_named_ibt_fixture,
-        require_smallest_ibt_fixture,
-    };
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
     use std::path::{Path, PathBuf};
+    use test_utils::{
+        FIXTURE_INSTALL_GUIDANCE, require_ibt_fixtures, require_named_ibt_fixture,
+        require_smallest_ibt_fixture,
+    };
 
     fn collect_files() -> Result<Vec<PathBuf>> {
         Ok(require_ibt_fixtures()?)
@@ -486,7 +519,10 @@ mod tests {
         let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
         let reader = crate::ibt::IbtReader::open(&file_path)
             .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(reader.total_frames() > 0, "Fixture should contain telemetry frames");
+        ensure!(
+            reader.total_frames() > 0,
+            "Fixture should contain telemetry frames"
+        );
         assert_eq!(reader.total_frames(), 19873);
         Ok(())
     }
@@ -554,7 +590,10 @@ mod tests {
             find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
         let reader = crate::ibt::IbtReader::open(&file_path)
             .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(reader.total_frames() > 0, "Fixture should contain telemetry frames");
+        ensure!(
+            reader.total_frames() > 0,
+            "Fixture should contain telemetry frames"
+        );
         assert_eq!(reader.total_frames(), 31221);
         Ok(())
     }
@@ -622,7 +661,10 @@ mod tests {
             find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
         let reader = crate::ibt::IbtReader::open(&file_path)
             .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(reader.total_frames() > 0, "Fixture should contain telemetry frames");
+        ensure!(
+            reader.total_frames() > 0,
+            "Fixture should contain telemetry frames"
+        );
         assert_eq!(reader.total_frames(), 51183);
         Ok(())
     }
@@ -646,7 +688,14 @@ mod tests {
             let schema = extract_variable_schema(&mut buf_reader, &header)
                 .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
 
-            for key in ["Speed", "SessionTime", "LapDist", "LapCompleted", "Brake", "Throttle"] {
+            for key in [
+                "Speed",
+                "SessionTime",
+                "LapDist",
+                "LapCompleted",
+                "Brake",
+                "Throttle",
+            ] {
                 assert!(
                     schema.variables.contains_key(key),
                     "File {} missing {} variable",
@@ -693,11 +742,17 @@ mod tests {
             })?;
         let _supercars_disk = IbtDiskSubHeader::parse_from_reader(&mut supercars_reader)
             .with_context(|| {
-                format!("Parsing Supercars sub-header from {}", supercars_file.display())
+                format!(
+                    "Parsing Supercars sub-header from {}",
+                    supercars_file.display()
+                )
             })?;
         let supercars_schema = extract_variable_schema(&mut supercars_reader, &supercars_header)
             .with_context(|| {
-                format!("Extracting Supercars schema from {}", supercars_file.display())
+                format!(
+                    "Extracting Supercars schema from {}",
+                    supercars_file.display()
+                )
             })?;
 
         // Ford GT4 has more variables than Supercars
@@ -745,7 +800,10 @@ mod tests {
 
         if let Ok(header) = header_result {
             let result = header.validate();
-            assert!(matches!(result.unwrap_err(), IRacingSDKError::Version { .. }));
+            assert!(matches!(
+                result.unwrap_err(),
+                IRacingSDKError::Version { .. }
+            ));
         }
 
         Ok(())

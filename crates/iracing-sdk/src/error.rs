@@ -1,5 +1,8 @@
 use thiserror::Error;
 
+#[cfg(windows)]
+use windows_core as core;
+
 /// Result type alias for telemetry operations.
 pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 
@@ -22,16 +25,35 @@ pub enum IRacingSDKError {
 
     #[error("Type conversion error: {details}")]
     TypeConversion { details: String },
+
+    #[error("Windows API error: {operation}")]
+    #[cfg(windows)]
+    WindowsApi {
+        operation: String,
+        #[source]
+        source: core::Error,
+    },
+
+    #[error("Buffer operation failed: {context}")]
+    Buffer {
+        context: String,
+        buffer_index: Option<usize>,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
 }
 
 impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
         match self {
+            IRacingSDKError::Buffer { .. } => true,
             IRacingSDKError::Memory { .. } => false,
             IRacingSDKError::Version { .. } => false,
             IRacingSDKError::Parse { .. } => false,
             IRacingSDKError::TypeConversion { .. } => false,
+            #[cfg(windows)]
+            &IRacingSDKError::WindowsApi { .. } => true,
         }
     }
 
@@ -58,6 +80,17 @@ impl IRacingSDKError {
                 "Verify expected vs actual data types",
                 "Use appropriate conversion methods",
             ],
+            #[cfg(windows)]
+            IRacingSDKError::WindowsApi { .. } => vec![
+                "Check Windows API permissions",
+                "Verify system resources availability",
+                "Check Windows version compatibility",
+            ],
+            IRacingSDKError::Buffer { .. } => vec![
+                "Check buffer synchronization",
+                "Verify buffer access patterns",
+                "Restart buffer management",
+            ],
         }
     }
 
@@ -66,6 +99,34 @@ impl IRacingSDKError {
         IRacingSDKError::Memory {
             offset,
             source: None,
+        }
+    }
+
+    /// Helper constructor for Windows API errors.
+    #[cfg(windows)]
+    pub fn windows_api_error(operation: impl Into<String>, source: core::Error) -> Self {
+        IRacingSDKError::WindowsApi {
+            operation: operation.into(),
+            source,
+        }
+    }
+
+    /// Helper constructor for buffer operation errors.
+    pub fn buffer_operation_error(context: impl Into<String>, buffer_index: Option<usize>) -> Self {
+        IRacingSDKError::Buffer {
+            context: context.into(),
+            buffer_index,
+            source: None,
+        }
+    }
+}
+
+#[cfg(windows)]
+impl From<core::Error> for IRacingSDKError {
+    fn from(err: core::Error) -> Self {
+        IRacingSDKError::WindowsApi {
+            operation: "Unknown Windows operation".to_string(),
+            source: err,
         }
     }
 }
