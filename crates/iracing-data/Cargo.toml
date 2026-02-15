@@ -1,0 +1,28 @@
+[package]
+name = "iracing-data"
+version = "0.1.0"
+description = "iRacing SDK types"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_yaml_ng = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.7.0"
+test-utils = { path = "../test-utils" }
+
+[features]
+benchmark = []
+schema-discovery = []
+
+[[bench]]
+name = "var_data_extraction"
+harness = false
+required-features = ["benchmark"]

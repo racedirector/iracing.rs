@@ -1,0 +1,8 @@
+[package]
+name = "iracing-simulation"
+version = "0.1.0"
+description = "iRacing Simulation helpers"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true

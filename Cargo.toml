@@ -1,0 +1,25 @@
+[workspace]
+
+members = [
+  "crates/iracing-data",
+  "crates/iracing-simulation",
+  # "crates/iracing-sdk",
+  # "crates/iracing-ibt-parser",
+  "crates/test-utils",
+]
+
+resolver = "3"
+
+[workspace.package]
+authors = ["Justin Makaila <justin@treehousetechnology.io>"]
+repository = "https://github.com/racedirector/iracing.rs"
+license = "MIT"
+edition = "2024"
+
+[workspace.dependencies]
+anyhow = "1.0.99"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_yaml_ng = "0.10"
+thiserror = "2.0.16"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
