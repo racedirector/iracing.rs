@@ -20,7 +20,7 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::{Result, TelemetryError, VariableInfo, VariableSchema, VariableType};
+use crate::{Result, IRacingSDKError, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 use tracing::{debug, trace};
@@ -72,7 +72,7 @@ impl IbtHeader {
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
         let mut header_data = [0u8; IRSDK_HEADER_SIZE];
-        reader.read_exact(&mut header_data).map_err(|e| TelemetryError::Parse {
+        reader.read_exact(&mut header_data).map_err(|e| IRacingSDKError::Parse {
             context: "IBT header reading".to_string(),
             details: format!("Failed to read {} header bytes: {}", IRSDK_HEADER_SIZE, e),
         })?;
@@ -125,12 +125,12 @@ impl IbtHeader {
 
     pub fn validate(&self) -> Result<()> {
         if self.version != 2 {
-            return Err(TelemetryError::Version { expected: 2, found: self.version as u32 });
+            return Err(IRacingSDKError::Version { expected: 2, found: self.version as u32 });
         }
 
         // Basic sanity checks for negative values
         if self.num_vars < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Number of variables cannot be negative".to_string(),
             });
@@ -138,7 +138,7 @@ impl IbtHeader {
 
         // Note: buf_len can be 0 in IBT files that contain only session info without telemetry data
         if self.buf_len < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Buffer length cannot be negative".to_string(),
             });
@@ -146,21 +146,21 @@ impl IbtHeader {
 
         // Validate offset fields are non-negative (defensive correctness)
         if self.session_info_offset < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Session info offset cannot be negative".to_string(),
             });
         }
 
         if self.session_info_len < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Session info length cannot be negative".to_string(),
             });
         }
 
         if self.var_header_offset < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Variable header offset cannot be negative".to_string(),
             });
@@ -169,7 +169,7 @@ impl IbtHeader {
         // Check for extreme/invalid values that indicate corruption
         if self.buf_len > 100_000_000 {
             // 100MB frame size is unreasonable
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Buffer length is unreasonably large".to_string(),
             });
@@ -177,7 +177,7 @@ impl IbtHeader {
 
         if self.num_vars > 10_000 {
             // 10k variables is unreasonable
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: "Number of variables is unreasonably large".to_string(),
             });
@@ -193,7 +193,7 @@ impl IbtDiskSubHeader {
 
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut disk_header_data = [0u8; IRSDK_DISK_SUBHEADER_SIZE];
-        reader.read_exact(&mut disk_header_data).map_err(|e| TelemetryError::Parse {
+        reader.read_exact(&mut disk_header_data).map_err(|e| IRacingSDKError::Parse {
             context: "IBT disk sub-header reading".to_string(),
             details: format!(
                 "Failed to read {} disk sub-header bytes: {}",
@@ -226,7 +226,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
 
     // Seek to the variable headers section and parse all variables
     reader.seek(std::io::SeekFrom::Start(header.var_header_offset as u64)).map_err(|e| {
-        TelemetryError::Parse {
+        IRacingSDKError::Parse {
             context: "Variable headers seek".to_string(),
             details: format!(
                 "Failed to seek to variable headers at offset {}: {}",
@@ -236,7 +236,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
     })?;
 
     // Convert num_vars to usize upfront to avoid i32-typed ranges
-    let num_vars_usize = usize::try_from(header.num_vars).map_err(|_| TelemetryError::Parse {
+    let num_vars_usize = usize::try_from(header.num_vars).map_err(|_| IRacingSDKError::Parse {
         context: "Variable count conversion".to_string(),
         details: format!("Number of variables {} cannot be converted to usize", header.num_vars),
     })?;
@@ -247,7 +247,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
     // Parse each variable header
     for i in 0..num_vars_usize {
         let mut var_header_bytes = [0u8; IRSDK_VAR_HEADER_SIZE];
-        reader.read_exact(&mut var_header_bytes).map_err(|e| TelemetryError::Parse {
+        reader.read_exact(&mut var_header_bytes).map_err(|e| IRacingSDKError::Parse {
             context: format!("Variable header {} reading", i),
             details: format!("Failed to read variable header {}: {}", i, e),
         })?;
@@ -314,7 +314,7 @@ pub fn verify_min_length(file_len: u64, header: &IbtHeader, disk: &IbtDiskSubHea
         .saturating_add(frames_len);
 
     if file_len < min_end {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "IBT length verification".to_string(),
             details: format!(
                 "File too small: len={} < required_min={} (vars={}, records={}, buf_len={})",
@@ -328,7 +328,7 @@ pub fn verify_min_length(file_len: u64, header: &IbtHeader, disk: &IbtDiskSubHea
 /// Safe byte parsing helpers with bounds checking
 fn parse_i32_le(data: &[u8], offset: usize) -> Result<i32> {
     if offset + 4 > data.len() {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "Integer parsing".to_string(),
             details: format!(
                 "Insufficient data for i32 at offset {} (need 4 bytes, have {})",
@@ -342,7 +342,7 @@ fn parse_i32_le(data: &[u8], offset: usize) -> Result<i32> {
 
 fn parse_i64_le(data: &[u8], offset: usize) -> Result<i64> {
     if offset + 8 > data.len() {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "Long integer parsing".to_string(),
             details: format!(
                 "Insufficient data for i64 at offset {} (need 8 bytes, have {})",
@@ -365,7 +365,7 @@ fn parse_i64_le(data: &[u8], offset: usize) -> Result<i64> {
 
 fn parse_f64_le(data: &[u8], offset: usize) -> Result<f64> {
     if offset + 8 > data.len() {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "Double precision float parsing".to_string(),
             details: format!(
                 "Insufficient data for f64 at offset {} (need 8 bytes, have {})",
@@ -725,7 +725,7 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            TelemetryError::Parse { .. } => {}
+            IRacingSDKError::Parse { .. } => {}
             other => panic!("Expected Parse error, got {:?}", other),
         }
     }
@@ -745,7 +745,7 @@ mod tests {
 
         if let Ok(header) = header_result {
             let result = header.validate();
-            assert!(matches!(result.unwrap_err(), TelemetryError::Version { .. }));
+            assert!(matches!(result.unwrap_err(), IRacingSDKError::Version { .. }));
         }
 
         Ok(())

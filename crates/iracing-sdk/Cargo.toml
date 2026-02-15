@@ -1,5 +1,5 @@
 [package]
-name = "iracing-data"
+name = "iracing-sdk"
 version = "0.1.0"
 description = "iRacing SDK types"
 authors.workspace = true

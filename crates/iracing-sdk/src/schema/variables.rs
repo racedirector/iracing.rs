@@ -54,7 +54,7 @@
 //! - Comprehensive validation with early error detection
 //! - Efficient memory layout matching iRacing's C structures
 
-use crate::{Result, TelemetryError, VariableInfo, VariableSchema, VariableType};
+use crate::{Result, IRacingSDKError, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
 use tracing::{debug, trace, warn};
 
@@ -107,7 +107,7 @@ impl IRSDKVarHeader {
 
         // Validate we have enough bytes for a complete header
         if offset + VAR_HEADER_SIZE > memory.len() {
-            return Err(TelemetryError::Memory { offset, source: None });
+            return Err(IRacingSDKError::Memory { offset, source: None });
         }
 
         // Zero-copy parsing: directly read from memory
@@ -126,14 +126,14 @@ impl IRSDKVarHeader {
     fn validate(&self) -> Result<()> {
         // iRacing reserves count >= 0 and count_as_time <= 1
         if self.count < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Variable header validation".to_string(),
                 details: format!("Negative element count: {}", self.count),
             });
         }
 
         if self.count_as_time > 1 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Variable header validation".to_string(),
                 details: format!("Invalid count_as_time flag: {}", self.count_as_time),
             });
@@ -197,14 +197,14 @@ pub fn parse_variable_schema(
 
     // Validate input parameters
     if num_vars <= 0 {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "Schema parsing".to_string(),
             details: format!("Invalid variable count: {}", num_vars),
         });
     }
 
     if var_header_offset < 0 {
-        return Err(TelemetryError::Parse {
+        return Err(IRacingSDKError::Parse {
             context: "Schema parsing".to_string(),
             details: format!("Invalid variable header offset: {}", var_header_offset),
         });
@@ -217,7 +217,7 @@ pub fn parse_variable_schema(
 
     // Validate memory bounds
     if headers_end > memory.len() {
-        return Err(TelemetryError::Memory { offset: headers_end, source: None });
+        return Err(IRacingSDKError::Memory { offset: headers_end, source: None });
     }
 
     // Parse all variable headers

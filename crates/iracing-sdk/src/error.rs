@@ -1,12 +1,12 @@
 use thiserror::Error;
 
 /// Result type alias for telemetry operations.
-pub type Result<T, E = TelemetryError> = std::result::Result<T, E>;
+pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 
 /// Main error type for telemetry operations.
 #[derive(Error, Debug)]
 #[non_exhaustive]
-pub enum TelemetryError {
+pub enum IRacingSDKError {
     #[error("SDK version mismatch: expected {expected}, found {found}")]
     Version { expected: u32, found: u32 },
 
@@ -24,36 +24,36 @@ pub enum TelemetryError {
     TypeConversion { details: String },
 }
 
-impl TelemetryError {
+impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
         match self {
-            TelemetryError::Memory { .. } => false,
-            TelemetryError::Version { .. } => false,
-            TelemetryError::Parse { .. } => false,
-            TelemetryError::TypeConversion { .. } => false,
+            IRacingSDKError::Memory { .. } => false,
+            IRacingSDKError::Version { .. } => false,
+            IRacingSDKError::Parse { .. } => false,
+            IRacingSDKError::TypeConversion { .. } => false,
         }
     }
 
     /// Returns suggested recovery actions for this error.
     pub fn recovery_suggestions(&self) -> Vec<&'static str> {
         match self {
-            TelemetryError::Memory { .. } => vec![
+            IRacingSDKError::Memory { .. } => vec![
                 "Check memory access bounds",
                 "Verify shared memory is still valid",
                 "Restart the application",
             ],
-            TelemetryError::Version { .. } => vec![
+            IRacingSDKError::Version { .. } => vec![
                 "Update iRacing to latest version",
                 "Update library to compatible version",
                 "Check SDK compatibility matrix",
             ],
-            TelemetryError::Parse { .. } => vec![
+            IRacingSDKError::Parse { .. } => vec![
                 "Check data format compatibility",
                 "Verify source data integrity",
                 "Update parsing logic if needed",
             ],
-            TelemetryError::TypeConversion { .. } => vec![
+            IRacingSDKError::TypeConversion { .. } => vec![
                 "Check data type compatibility",
                 "Verify expected vs actual data types",
                 "Use appropriate conversion methods",
@@ -63,7 +63,7 @@ impl TelemetryError {
 
     /// Helper constructor for memory access errors.
     pub fn memory_access_error(offset: usize) -> Self {
-        TelemetryError::Memory {
+        IRacingSDKError::Memory {
             offset,
             source: None,
         }
@@ -89,7 +89,7 @@ impl TelemetryError {
 //             // Property: Error conversions work for all generated error variants
 
 //             // Test various error variant creations
-//             let memory_err = TelemetryError::memory_access_error(offset);
+//             let memory_err = IRacingSDKError::memory_access_error(offset);
 
 //             // Property: All variants should be constructible and display correctly
 //             prop_assert!(!memory_err.to_string().is_empty());
@@ -105,9 +105,9 @@ impl TelemetryError {
 //             details in ".*"
 //           ) {
 //             // Property: Error messages format correctly with arbitrary context strings
-//             let memory_error = TelemetryError::Memory { offset, source: None };
-//             let version_error = TelemetryError::Version { expected: expected_version, found: found_version };
-//             let conversion_error = TelemetryError::TypeConversion { details: details.clone() };
+//             let memory_error = IRacingSDKError::Memory { offset, source: None };
+//             let version_error = IRacingSDKError::Version { expected: expected_version, found: found_version };
+//             let conversion_error = IRacingSDKError::TypeConversion { details: details.clone() };
 
 //             // Property: All error messages should contain their context
 //             let memory_msg = memory_error.to_string();
@@ -139,14 +139,14 @@ impl TelemetryError {
 
 //             // Add intermediate layers
 //             for (i, reason) in intermediate_reasons.iter().enumerate().take(chain_depth.saturating_sub(1)) {
-//               current_error = Box::new(TelemetryError::Connection {
+//               current_error = Box::new(IRacingSDKError::Connection {
 //                 reason: format!("Level {}: {}", i, reason),
 //                 source: Some(current_error),
 //               });
 //             }
 
 //             // Create top-level error
-//             let top_error = TelemetryError::Connection {
+//             let top_error = IRacingSDKError::Connection {
 //               reason: "Top level".to_string(),
 //               source: Some(current_error),
 //             };
@@ -188,13 +188,13 @@ impl TelemetryError {
 //             // Property: Platform error handling works across generated failure modes
 
 //             // Test cross-platform error creation
-//             let generic_error = TelemetryError::connection_failed(operation.clone());
+//             let generic_error = IRacingSDKError::connection_failed(operation.clone());
 //             prop_assert!(generic_error.to_string().contains(&operation));
 
 //             #[cfg(not(windows))]
 //             {
 //               // On non-Windows platforms, ensure graceful degradation
-//               let fallback_error = TelemetryError::connection_failed(format!("Platform error: {}", _error_code));
+//               let fallback_error = IRacingSDKError::connection_failed(format!("Platform error: {}", _error_code));
 //               prop_assert!(!fallback_error.to_string().is_empty());
 //             }
 //           }
@@ -204,36 +204,36 @@ impl TelemetryError {
 //     #[test]
 //     fn error_constructors_validation() {
 //         // Unit test: Simple error constructor validation
-//         let file_error = TelemetryError::file_error(
+//         let file_error = IRacingSDKError::file_error(
 //             PathBuf::from("/test"),
 //             std::io::Error::new(std::io::ErrorKind::NotFound, "test"),
 //         );
-//         assert!(matches!(file_error, TelemetryError::File { .. }));
+//         assert!(matches!(file_error, IRacingSDKError::File { .. }));
 
-//         let conn_error = TelemetryError::connection_failed("test");
-//         assert!(matches!(conn_error, TelemetryError::Connection { .. }));
+//         let conn_error = IRacingSDKError::connection_failed("test");
+//         assert!(matches!(conn_error, IRacingSDKError::Connection { .. }));
 
-//         let mem_error = TelemetryError::memory_access_error(0x1000);
-//         assert!(matches!(mem_error, TelemetryError::Memory { .. }));
+//         let mem_error = IRacingSDKError::memory_access_error(0x1000);
+//         assert!(matches!(mem_error, IRacingSDKError::Memory { .. }));
 //     }
 
 //     #[test]
 //     fn error_traits_validation() {
-//         // Compile-time check: TelemetryError must be Send + Sync + 'static
+//         // Compile-time check: IRacingSDKError must be Send + Sync + 'static
 //         fn assert_send_sync_static<T: Send + Sync + 'static>() {}
-//         assert_send_sync_static::<TelemetryError>();
+//         assert_send_sync_static::<IRacingSDKError>();
 
 //         // Runtime check: Error trait is implemented
-//         let error = TelemetryError::connection_failed("test");
+//         let error = IRacingSDKError::connection_failed("test");
 //         let _: &dyn std::error::Error = &error;
 //     }
 
 //     #[test]
 //     fn recovery_methods_work() {
 //         // Test that recovery methods provide actionable guidance
-//         let connection_error = TelemetryError::connection_failed("test");
-//         let memory_error = TelemetryError::memory_access_error(0x1000);
-//         let version_error = TelemetryError::Version {
+//         let connection_error = IRacingSDKError::connection_failed("test");
+//         let memory_error = IRacingSDKError::memory_access_error(0x1000);
+//         let version_error = IRacingSDKError::Version {
 //             expected: 2,
 //             found: 1,
 //         };
@@ -263,10 +263,10 @@ impl TelemetryError {
 //     fn from_conversions_work() {
 //         // Test From trait implementations
 //         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "test file");
-//         let telemetry_err: TelemetryError = io_err.into();
+//         let telemetry_err: IRacingSDKError = io_err.into();
 
 //         match telemetry_err {
-//             TelemetryError::File { source, .. } => {
+//             IRacingSDKError::File { source, .. } => {
 //                 assert_eq!(source.to_string(), "test file");
 //             }
 //             _ => panic!("Expected File error variant"),

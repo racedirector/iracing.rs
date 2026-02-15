@@ -30,7 +30,7 @@ impl VariableSchema {
         for (name, var_info) in &self.variables {
             // Validate variable count
             if var_info.count == 0 {
-                return Err(crate::TelemetryError::Parse {
+                return Err(crate::IRacingSDKError::Parse {
                     context: "Schema validation".to_string(),
                     details: format!("Variable '{}' has count of 0", name),
                 });
@@ -38,7 +38,7 @@ impl VariableSchema {
 
             // Validate variable name matches info name
             if var_info.name != *name {
-                return Err(crate::TelemetryError::Parse {
+                return Err(crate::IRacingSDKError::Parse {
                     context: "Schema validation".to_string(),
                     details: format!(
                         "Variable map key '{}' doesn't match info name '{}'",
@@ -50,7 +50,7 @@ impl VariableSchema {
             // Validate that variable fits within frame
             let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
             if end_offset > self.frame_size {
-                return Err(crate::TelemetryError::Memory {
+                return Err(crate::IRacingSDKError::Memory {
                     offset: var_info.offset,
                     source: None,
                 });

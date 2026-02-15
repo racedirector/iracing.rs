@@ -75,7 +75,7 @@
 //! - Separate session parser task handles heavy YAML processing
 //! - Bounded channel prevents parser backlog from affecting telemetry loop
 
-use crate::{Result, TelemetryError};
+use crate::{Result, IRacingSDKError};
 use std::mem;
 use tracing::{debug, trace};
 
@@ -136,7 +136,7 @@ impl IRSDKHeader {
         // Fast path: validate minimum size first
         const HEADER_SIZE: usize = mem::size_of::<IRSDKHeader>();
         if memory.len() < HEADER_SIZE {
-            return Err(TelemetryError::Memory { offset: memory.len(), source: None });
+            return Err(IRacingSDKError::Memory { offset: memory.len(), source: None });
         }
 
         // Zero-copy parsing: directly read from memory without copying
@@ -163,7 +163,7 @@ impl IRSDKHeader {
     pub fn validate(&self) -> Result<()> {
         // Check SDK version
         if self.ver != IRSDK_VER {
-            return Err(TelemetryError::Version {
+            return Err(IRacingSDKError::Version {
                 expected: IRSDK_VER as u32,
                 found: self.ver as u32,
             });
@@ -171,28 +171,28 @@ impl IRSDKHeader {
 
         // Validate reasonable field ranges
         if self.tick_rate <= 0 || self.tick_rate > 1000 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid tick rate: {}", self.tick_rate),
             });
         }
 
         if self.num_vars < 0 || self.num_vars > 10000 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid num_vars: {}", self.num_vars),
             });
         }
 
         if self.num_buf < 3 || self.num_buf > 4 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Expected 3-4 buffers, found {}", self.num_buf),
             });
         }
 
         if self.buf_len <= 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid buffer length: {}", self.buf_len),
             });
@@ -200,14 +200,14 @@ impl IRSDKHeader {
 
         // Validate session info fields
         if self.session_info_len < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid session info length: {}", self.session_info_len),
             });
         }
 
         if self.session_info_offset < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid session info offset: {}", self.session_info_offset),
             });
@@ -215,7 +215,7 @@ impl IRSDKHeader {
 
         // Validate variable header offset
         if self.var_header_offset < 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Header validation".to_string(),
                 details: format!("Invalid var header offset: {}", self.var_header_offset),
             });
@@ -252,7 +252,7 @@ impl IRSDKHeader {
         if self.session_info_offset > 0 && self.session_info_len > 0 {
             let session_end = self.session_info_offset.saturating_add(self.session_info_len);
             if session_end < self.session_info_offset {
-                return Err(TelemetryError::Parse {
+                return Err(IRacingSDKError::Parse {
                     context: "Offset validation".to_string(),
                     details: "Session info offset + length causes integer overflow".to_string(),
                 });
@@ -267,7 +267,7 @@ impl IRSDKHeader {
             let var_headers_end = self.var_header_offset.saturating_add(var_headers_size);
 
             if var_headers_end < self.var_header_offset {
-                return Err(TelemetryError::Parse {
+                return Err(IRacingSDKError::Parse {
                     context: "Offset validation".to_string(),
                     details: "Variable headers size causes integer overflow".to_string(),
                 });
@@ -283,7 +283,7 @@ impl IRSDKHeader {
         let mut last_offset = 0;
         for (i, buf) in self.var_buf.iter().enumerate() {
             if buf.buf_offset < 0 {
-                return Err(TelemetryError::Parse {
+                return Err(IRacingSDKError::Parse {
                     context: "Buffer validation".to_string(),
                     details: format!("Buffer {} has negative offset: {}", i, buf.buf_offset),
                 });
@@ -293,7 +293,7 @@ impl IRSDKHeader {
             if buf.buf_offset < last_offset {
                 // This is actually OK for circular buffers, but check for reasonable values
                 if buf.buf_offset > 1_000_000 {
-                    return Err(TelemetryError::Parse {
+                    return Err(IRacingSDKError::Parse {
                         context: "Buffer validation".to_string(),
                         details: format!("Buffer {} offset too large: {}", i, buf.buf_offset),
                     });
@@ -303,7 +303,7 @@ impl IRSDKHeader {
             // Check for buffer size consistency
             let buffer_end = buf.buf_offset.saturating_add(self.buf_len);
             if buffer_end < buf.buf_offset {
-                return Err(TelemetryError::Parse {
+                return Err(IRacingSDKError::Parse {
                     context: "Buffer validation".to_string(),
                     details: format!("Buffer {} size causes overflow", i),
                 });
@@ -324,7 +324,7 @@ impl IRSDKHeader {
             && self.num_vars == 0
             && self.buf_len == 0;
         if all_zero {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Corruption detection".to_string(),
                 details: "Header appears to be all zeros (possible corruption)".to_string(),
             });
@@ -332,7 +332,7 @@ impl IRSDKHeader {
 
         // Check for suspiciously high values (possible corruption)
         if self.num_vars > 5000 || self.buf_len > 10_000_000 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Corruption detection".to_string(),
                 details: "Header contains suspiciously large values (possible corruption)"
                     .to_string(),
@@ -341,7 +341,7 @@ impl IRSDKHeader {
 
         // Check for negative values in unsigned-like fields (corruption indicator)
         if self.tick_rate < 0 || self.session_info_len < -1 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Corruption detection".to_string(),
                 details: "Header contains invalid negative values".to_string(),
             });
@@ -544,7 +544,7 @@ mod tests {
                 prop_assert!(header.validate().is_ok());
             } else {
                 prop_assert!(header.validate().is_err());
-                if let Err(TelemetryError::Version { expected, found }) = header.validate() {
+                if let Err(IRacingSDKError::Version { expected, found }) = header.validate() {
                     prop_assert_eq!(expected, IRSDK_VER as u32);
                     prop_assert_eq!(found, version as u32);
                 }
@@ -629,7 +629,7 @@ mod tests {
         let small_buffer = vec![0u8; 10]; // Too small for header
         let result = IRSDKHeader::parse_from_memory(&small_buffer);
         assert!(result.is_err());
-        assert!(matches!(result, Err(TelemetryError::Memory { .. })));
+        assert!(matches!(result, Err(IRacingSDKError::Memory { .. })));
     }
 
     #[test]

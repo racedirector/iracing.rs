@@ -4,7 +4,7 @@
 //! support for iRacing's non-standard YAML format.
 
 use super::SessionInfo;
-use crate::error::TelemetryError;
+use crate::error::IRacingSDKError;
 use anyhow::Result;
 use tracing::debug;
 
@@ -95,7 +95,7 @@ impl SessionInfoParser {
         length: i32,
     ) -> Result<String> {
         if offset < 0 || length <= 0 {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Session info extraction".to_string(),
                 details: format!("Invalid offset {} or length {}", offset, length),
             }
@@ -106,7 +106,7 @@ impl SessionInfoParser {
         let end = start + (length as usize);
 
         if end > memory.len() {
-            return Err(TelemetryError::Memory { offset: end, source: None }.into());
+            return Err(IRacingSDKError::Memory { offset: end, source: None }.into());
         }
 
         // Extract bytes and convert to string
@@ -119,7 +119,7 @@ impl SessionInfoParser {
         let yaml_str = String::from_utf8_lossy(&yaml_bytes[..null_pos]).to_string();
 
         if yaml_str.trim().is_empty() {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Session YAML extraction".to_string(),
                 details: "Extracted YAML string is empty".to_string(),
             }
@@ -206,7 +206,7 @@ impl SessionInfoParser {
                 self.validate_session_info(&session_info)?;
                 Ok(session_info)
             }
-            Err(e) => Err(TelemetryError::Parse {
+            Err(e) => Err(IRacingSDKError::Parse {
                 context: "Session YAML deserialization".to_string(),
                 details: format!("YAML parsing failed: {}", e),
             }
@@ -217,7 +217,7 @@ impl SessionInfoParser {
     /// Validate parsed session info for completeness
     pub fn validate_session_info(&self, session_info: &SessionInfo) -> Result<()> {
         if session_info.weekend_info.track_name.is_empty() {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Session validation".to_string(),
                 details: "Missing track name".to_string(),
             }
@@ -225,7 +225,7 @@ impl SessionInfoParser {
         }
 
         if session_info.weekend_info.track_display_name.is_empty() {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Session validation".to_string(),
                 details: "Missing track display name".to_string(),
             }
@@ -233,7 +233,7 @@ impl SessionInfoParser {
         }
 
         if session_info.session_info.sessions.is_empty() {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Session validation".to_string(),
                 details: "No sessions found".to_string(),
             }

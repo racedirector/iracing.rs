@@ -122,7 +122,7 @@ impl SessionInfo {
     /// The YAML should already be preprocessed to fix iRacing's non-standard format.
     /// This is a simple deserialization - preprocessing happens at lower levels.
     pub fn parse(yaml: &str) -> crate::Result<Self> {
-        serde_yaml_ng::from_str(yaml).map_err(|e| crate::TelemetryError::Parse {
+        serde_yaml_ng::from_str(yaml).map_err(|e| crate::IRacingSDKError::Parse {
             context: "SessionInfo deserialization".to_string(),
             details: e.to_string(),
         })

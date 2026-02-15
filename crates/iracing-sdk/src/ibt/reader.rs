@@ -31,7 +31,7 @@
 //! - Seeking operations are O(1) as they only update internal position counters
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{Result, TelemetryError, VariableSchema, yaml_utils};
+use crate::{Result, IRacingSDKError, VariableSchema, yaml_utils};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -54,11 +54,11 @@ impl IbtReader {
     /// Open an IBT file for reading
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = File::open(&path)
-            .map_err(|e| TelemetryError::File { path: path.as_ref().to_path_buf(), source: e })?;
+            .map_err(|e| IRacingSDKError::File { path: path.as_ref().to_path_buf(), source: e })?;
 
         let mut data = Vec::new();
         file.read_to_end(&mut data)
-            .map_err(|e| TelemetryError::File { path: path.as_ref().to_path_buf(), source: e })?;
+            .map_err(|e| IRacingSDKError::File { path: path.as_ref().to_path_buf(), source: e })?;
 
         Self::from_bytes_with_path(&data, path.as_ref().to_path_buf())
     }
@@ -88,14 +88,14 @@ impl IbtReader {
         let var_headers_size = header
             .num_vars
             .checked_mul(IRSDK_VAR_HEADER_SIZE as i32)
-            .ok_or_else(|| TelemetryError::Parse {
+            .ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame data calculation".to_string(),
                 details: "Variable headers size calculation overflowed".to_string(),
             })?;
 
         let var_headers_end =
             header.var_header_offset.checked_add(var_headers_size).ok_or_else(|| {
-                TelemetryError::Parse {
+                IRacingSDKError::Parse {
                     context: "Frame data calculation".to_string(),
                     details: "Variable headers end calculation overflowed".to_string(),
                 }
@@ -104,7 +104,7 @@ impl IbtReader {
         // 2. Session info comes after variable headers (if present)
         let session_info_end = if header.session_info_len > 0 {
             header.session_info_offset.checked_add(header.session_info_len).ok_or_else(|| {
-                TelemetryError::Parse {
+                IRacingSDKError::Parse {
                     context: "Frame data calculation".to_string(),
                     details: "Session info end calculation overflowed".to_string(),
                 }
@@ -118,7 +118,7 @@ impl IbtReader {
 
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes =
-            data.len().checked_sub(frame_data_start).ok_or_else(|| TelemetryError::Parse {
+            data.len().checked_sub(frame_data_start).ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame data calculation".to_string(),
                 details: "Frame data start position exceeds file size".to_string(),
             })?;
@@ -229,7 +229,7 @@ impl IbtReader {
     /// Seek to a specific frame (for random access)
     pub fn seek_to_frame(&mut self, frame_number: usize) -> Result<()> {
         if frame_number >= self.total_frames {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Frame seek".to_string(),
                 details: format!("Frame {} out of range (0..{})", frame_number, self.total_frames),
             });
@@ -238,14 +238,14 @@ impl IbtReader {
         // Calculate position for frame with checked arithmetic
         let frame_size = self.header.buf_len as usize;
         let frame_byte_offset =
-            frame_number.checked_mul(frame_size).ok_or_else(|| TelemetryError::Parse {
+            frame_number.checked_mul(frame_size).ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame seek".to_string(),
                 details: "Frame offset calculation overflowed".to_string(),
             })?;
 
         let frame_offset =
             self.frame_data_start.checked_add(frame_byte_offset).ok_or_else(|| {
-                TelemetryError::Parse {
+                IRacingSDKError::Parse {
                     context: "Frame seek".to_string(),
                     details: "Frame position calculation overflowed".to_string(),
                 }
@@ -275,7 +275,7 @@ impl IbtReader {
         let end_pos = start_pos + frame_size;
 
         if end_pos > self.data.len() {
-            return Err(TelemetryError::Parse {
+            return Err(IRacingSDKError::Parse {
                 context: "Frame reading".to_string(),
                 details: format!(
                     "Frame {} extends beyond data bounds ({} > {})",

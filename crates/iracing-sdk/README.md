@@ -1,3 +1,3 @@
-# iracing-sdk
+# iracing-data
 
-Crates for managing connections to iRacing.
+Crate for all iRacing telemetry and session related data structures and IBT parsing utilities.
