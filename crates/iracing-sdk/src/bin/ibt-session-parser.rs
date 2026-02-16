@@ -3,6 +3,7 @@ use clap::Parser;
 use iracing_sdk::IbtReader;
 use std::{fs, path::PathBuf};
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk session parser.
 ///
