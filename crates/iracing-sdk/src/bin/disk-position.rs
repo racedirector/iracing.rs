@@ -59,7 +59,7 @@ struct PositionArgs {
 
     /// Path where the output CSV should be written.
     #[arg(short, long)]
-    output_path: PathBuf,
+    csv_output_path: PathBuf,
 }
 
 /// CSV row representation of positional telemetry.
@@ -104,7 +104,9 @@ fn main() -> Result<()> {
     // Logging initialization
     // ------------------------------------------------------------
     tracing_subscriber::fmt()
-        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "position=info".to_string()))
+        .with_env_filter(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "disk-position=info".to_string()),
+        )
         .init();
 
     // ------------------------------------------------------------
@@ -112,7 +114,7 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     let PositionArgs {
         ibt_path,
-        output_path,
+        csv_output_path,
     } = PositionArgs::parse();
 
     info!(path = %ibt_path.display(), "Opening IBT file");
@@ -121,8 +123,7 @@ fn main() -> Result<()> {
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
     let mut reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
-
-    let mut writer = Writer::from_path(&output_path).expect("Could not create CSV output");
+    let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
     info!("Resolving telemetry schema");
 

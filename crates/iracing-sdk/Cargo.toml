@@ -46,3 +46,7 @@ required-features = ["benchmark"]
 [[bin]]
 name = "disk-position"
 path = "src/bin/disk-position.rs"
+
+[[bin]]
+name = "session-parser"
+path = "src/bin/session-parser.rs"
