@@ -70,7 +70,7 @@ use tracing_subscriber::EnvFilter;
 /// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct SessionParserArgs {
+struct Args {
     /// Path to the input `.ibt` telemetry file.
     #[arg(short, long)]
     ibt_path: PathBuf,
@@ -91,10 +91,10 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Parse CLI arguments.
     // ------------------------------------------------------------
-    let SessionParserArgs {
+    let Args {
         ibt_path,
         output_path,
-    } = SessionParserArgs::parse();
+    } = Args::parse();
 
     // ------------------------------------------------------------
     // Open telemetry reader.

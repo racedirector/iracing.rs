@@ -82,7 +82,7 @@ use tracing_subscriber::EnvFilter;
 /// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct LiveSessionParserArgs {
+struct Args {
     /// Path where the session YAML should be written.
     #[arg(short, long)]
     output_path: PathBuf,
@@ -105,11 +105,11 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Parse CLI arguments.
     // ------------------------------------------------------------
-    let LiveSessionParserArgs {
+    let Args {
         output_path,
         live_only,
         no_live_only,
-    } = LiveSessionParserArgs::parse();
+    } = Args::parse();
 
     let effective_live_only = if no_live_only { false } else { live_only };
 

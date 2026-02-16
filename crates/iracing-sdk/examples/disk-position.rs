@@ -1,4 +1,4 @@
-//! # position
+//! # disk-position
 //!
 //! Extracts positional telemetry from an iRacing `.ibt` file and writes it to CSV.
 //!
@@ -27,7 +27,7 @@
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example position -- \
+//! cargo run --example disk-position -- \
 //!   --ibt-path ./session.ibt \
 //!   --output-path ./positions.csv
 //! ```
@@ -37,7 +37,7 @@
 //! Logging is controlled via `RUST_LOG`. Example:
 //!
 //! ```bash
-//! RUST_LOG=position=info cargo run --example position -- ...
+//! RUST_LOG=disk-position=info cargo run --example disk-position -- ...
 //! ```
 
 use anyhow::Result;
@@ -48,12 +48,12 @@ use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-/// CLI arguments for the `position` extractor.
+/// CLI arguments for the `disk-position` extractor.
 ///
 /// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct PositionArgs {
+struct Args {
     /// Path to the input `.ibt` telemetry file.
     #[arg(short, long)]
     ibt_path: PathBuf,
@@ -111,10 +111,10 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Parse CLI arguments
     // ------------------------------------------------------------
-    let PositionArgs {
+    let Args {
         ibt_path,
         csv_output_path,
-    } = PositionArgs::parse();
+    } = Args::parse();
 
     info!(path = %ibt_path.display(), "Opening IBT file");
 
@@ -195,9 +195,8 @@ fn main() -> Result<()> {
         })?;
     }
 
-    info!("Finished processing frames");
-
     writer.flush()?;
+    info!("Finished processing frames");
 
     Ok(())
 }
