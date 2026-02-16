@@ -4,7 +4,7 @@ use iracing_sdk::IbtReader;
 use std::{fs, path::PathBuf};
 use tracing::info;
 
-/// CLI arguments for the `session` parser.
+/// CLI arguments for the disk session parser.
 ///
 /// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]
@@ -22,12 +22,10 @@ struct SessionParserArgs {
 fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
+    // Default to TRACE unless RUST_LOG is set.
     // ------------------------------------------------------------
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "session-parser=info".to_string()),
-        )
-        .init();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // ------------------------------------------------------------
     // Parse CLI arguments.

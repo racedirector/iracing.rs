@@ -46,6 +46,7 @@ use csv::Writer;
 use iracing_sdk::{IbtReader, types::VarData};
 use std::path::PathBuf;
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the `position` extractor.
 ///
@@ -101,13 +102,11 @@ struct Row {
 /// 6. Serialize CSV rows
 fn main() -> Result<()> {
     // ------------------------------------------------------------
-    // Logging initialization
+    // Logging initialization.
+    // Default to TRACE unless RUST_LOG is set.
     // ------------------------------------------------------------
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "disk-position=info".to_string()),
-        )
-        .init();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // ------------------------------------------------------------
     // Parse CLI arguments
