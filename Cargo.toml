@@ -16,6 +16,7 @@ edition = "2024"
 
 [workspace.dependencies]
 anyhow = "1.0.99"
+clap = { version = "4.5.58", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml_ng = "0.10"
 thiserror = "2.0.16"

@@ -9,11 +9,14 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+clap = { workspace = true }
+csv = "1.4.0"
 serde = { workspace = true }
 serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 
 # Windows-specific dependencies (for live telemetry)
 [target.'cfg(windows)'.dependencies]
@@ -39,3 +42,7 @@ tokio = ["dep:tokio"]
 name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
+
+[[bin]]
+name = "disk-position"
+path = "src/bin/disk-position.rs"

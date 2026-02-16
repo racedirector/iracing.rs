@@ -1,5 +1,6 @@
 [package]
 name = "test-utils"
+edition.workspace = true
 
 [features]
 benchmark = []
