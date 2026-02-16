@@ -27,7 +27,7 @@
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --bin position -- \
+//! cargo run --example position -- \
 //!   --ibt-path ./session.ibt \
 //!   --output-path ./positions.csv
 //! ```
@@ -37,7 +37,7 @@
 //! Logging is controlled via `RUST_LOG`. Example:
 //!
 //! ```bash
-//! RUST_LOG=position=info cargo run --bin position -- ...
+//! RUST_LOG=position=info cargo run --example position -- ...
 //! ```
 
 use anyhow::Result;
