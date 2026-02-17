@@ -2,7 +2,7 @@ mod error;
 pub mod ibt;
 pub mod schema;
 pub mod types;
-mod yaml_utils;
+pub mod yaml_utils;
 
 pub use error::*;
 pub use ibt::IbtReader;

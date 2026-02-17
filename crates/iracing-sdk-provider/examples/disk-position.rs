@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk_provider::{AdapterValidation, DynamicFrame, FrameAdapter, IbtProvider, Provider};
 use std::{fs, path::PathBuf};
-use tracing::{error, info};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -92,8 +92,8 @@ fn main() -> Result<()> {
         let is_on_pit_road = frame.get("OnPitRoad").unwrap();
         let is_in_pit_box = frame.get("PlayerCarInPitStall").unwrap();
 
-        if let _ = frame.get::<f32>("ThisFieldWill Never Exist") {
-            error!("This block will never hit!");
+        if let Some(_) = frame.get::<f32>("ThisFieldWill Never Exist") {
+            return Err(anyhow!("This will never happen"));
         }
 
         // Serialize row to CSV.
