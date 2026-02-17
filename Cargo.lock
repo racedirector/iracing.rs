@@ -412,6 +412,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "iracing-sdk-provider"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "csv",
+ "iracing-sdk",
+ "serde",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "iracing-simulation"
 version = "0.1.0"
 dependencies = [

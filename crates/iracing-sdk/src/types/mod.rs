@@ -56,7 +56,6 @@
 //! ```
 
 mod bitfield;
-mod frame;
 mod incident;
 pub mod irsdk_flags;
 mod schema;
@@ -69,7 +68,6 @@ pub use bitfield::{
     BitField, engine_mandatory_repair_needed, engine_optional_repair_needed,
     session_dq_scoring_invalid, tick_after_u32,
 };
-pub use frame::FramePacket;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
 pub use schema::{VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::VariableSchema;
+use iracing_sdk::VariableSchema;
 
 /// Raw telemetry frame packet for the stream-based architecture
 ///
@@ -31,6 +31,11 @@ impl FramePacket {
         session_version: u32,
         schema: Arc<VariableSchema>,
     ) -> Self {
-        Self { data: data.into(), tick, session_version, schema }
+        Self {
+            data: data.into(),
+            tick,
+            session_version,
+            schema,
+        }
     }
 }
