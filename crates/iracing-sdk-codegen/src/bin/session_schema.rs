@@ -54,8 +54,7 @@ fn main() -> Result<()> {
     let writer = BufWriter::new(output_file);
     serde_yaml_ng::to_writer(writer, &schema)?;
 
-    info!(path=%output_path.display(),"Wrote schema");
+    info!(path=%output_path.display(),"Wrote static session schema");
 
     Ok(())
 }
-
