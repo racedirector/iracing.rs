@@ -3,6 +3,8 @@
 //! This module contains driver-related data structures including driver lists,
 //! driver details, and tire compound information.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Driver information data containing current driver info + drivers list
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct DriverInfoData {
@@ -98,6 +101,7 @@ pub struct DriverInfoData {
 
 /// Driver tire compound information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct DriverTire {
@@ -114,6 +118,7 @@ pub struct DriverTire {
 
 /// Individual driver data (from Drivers list)
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Driver {

@@ -3,6 +3,8 @@
 //! This module contains radio communication structures including radio
 //! configurations and frequency details.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Radio information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct RadioInfo {
@@ -26,6 +29,7 @@ pub struct RadioInfo {
 
 /// Individual radio configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Radio {
@@ -50,6 +54,7 @@ pub struct Radio {
 
 /// Radio frequency configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Frequency {

@@ -78,6 +78,8 @@ pub use discovery::{
 };
 pub use driver::{Driver, DriverInfoData, DriverTire};
 pub use radio::{Frequency, Radio, RadioInfo};
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 pub use session_data::{QualifyResult, QualifyResultsInfo, Session, SessionInfoData};
 pub use timing::{Sector, SplitTimeInfo};
 pub use weekend::{TelemetryOptions, WeekendInfo, WeekendOptions};
@@ -85,6 +87,7 @@ pub use weekend::{TelemetryOptions, WeekendInfo, WeekendOptions};
 /// Session information extracted and parsed from iRacing's YAML session data
 /// This matches the actual structure that iRacing outputs
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 pub struct SessionInfo {
     /// Weekend and track information
@@ -102,6 +105,7 @@ pub struct SessionInfo {
     pub split_time_info: Option<SplitTimeInfo>,
     /// Car setup information
     #[serde(default)]
+    #[cfg_attr(feature = "codegen", schemars(with = "Option<serde_json::Value>"))]
     pub car_setup: Option<serde_yaml_ng::Value>,
     /// Camera information
     #[serde(default)]

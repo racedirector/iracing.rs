@@ -3,6 +3,8 @@
 //! This module contains weekend-related information from iRacing session data,
 //! including track details, weather conditions, and session configuration.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Weekend and track information from iRacing
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendInfo {
@@ -147,6 +150,7 @@ pub struct WeekendInfo {
 
 /// Telemetry recording options
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct TelemetryOptions {
@@ -161,6 +165,7 @@ pub struct TelemetryOptions {
 
 /// Weekend session options and configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendOptions {

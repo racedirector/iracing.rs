@@ -3,6 +3,8 @@
 //! This module contains timing-related structures for split times and
 //! sector information.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Split timing information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct SplitTimeInfo {
@@ -24,6 +27,7 @@ pub struct SplitTimeInfo {
 
 /// Individual sector timing information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Sector {

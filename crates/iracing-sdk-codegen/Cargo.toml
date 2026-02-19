@@ -1,0 +1,17 @@
+[package]
+name = "iracing-sdk-codegen"
+version = "0.1.0"
+description = "Code generation binaries for iracing-sdk"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+iracing-sdk = { path = "../iracing-sdk", features = ["codegen"] }
+schemars = { workspace = true }
+serde_yaml_ng = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }

@@ -1,4 +1,6 @@
 mod error;
+#[cfg(feature = "codegen")]
+mod codegen;
 pub mod ibt;
 pub mod schema;
 pub mod types;

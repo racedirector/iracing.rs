@@ -3,6 +3,8 @@
 //! This module contains camera-related information including camera groups
 //! and individual camera configurations.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Camera information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct CameraInfo {
@@ -24,6 +27,7 @@ pub struct CameraInfo {
 
 /// Camera group information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct CameraGroup {
@@ -44,6 +48,7 @@ pub struct CameraGroup {
 
 /// Individual camera information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Camera {

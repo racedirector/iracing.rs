@@ -1,7 +1,9 @@
 [workspace]
 
 members = [
-  "crates/iracing-sdk", "crates/iracing-sdk-provider",
+  "crates/iracing-sdk",
+  "crates/iracing-sdk-codegen",
+  "crates/iracing-sdk-provider",
   "crates/iracing-simulation",
   "crates/test-utils",
 ]
@@ -17,7 +19,9 @@ edition = "2024"
 [workspace.dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.58", features = ["derive"] }
+schemars = { version = "0.8", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { version = "1" }
 serde_yaml_ng = "0.10"
 thiserror = "2.0.16"
 tokio = { version = "1", features = ["rt", "macros"] }
