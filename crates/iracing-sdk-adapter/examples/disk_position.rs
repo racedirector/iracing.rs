@@ -1,7 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk_adapter::{AdapterValidation, DynamicFrame, FrameAdapter, IbtProvider, Provider};
+use iracing_sdk::IRacingSDKError;
+use iracing_sdk_adapter::{
+    AdapterValidation, FieldExtraction, FrameAdapter, IbtProvider, Provider,
+};
 use std::{fs, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -44,6 +47,124 @@ struct Row {
     is_in_pit_box: bool,
 }
 
+impl FrameAdapter for Row {
+    fn validate_schema(
+        schema: &iracing_sdk::VariableSchema,
+    ) -> iracing_sdk_adapter::Result<AdapterValidation> {
+        let mut extraction_plan = Vec::new();
+
+        let lap_distance_meters_info =
+            schema
+                .get_variable("LapDist")
+                .ok_or_else(|| IRacingSDKError::Parse {
+                    context: "Field validation".to_string(),
+                    details: "Missing required field 'LapDist'".to_string(),
+                })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "LapDist".to_string(),
+            var_info: lap_distance_meters_info.clone(),
+        });
+
+        let lap_distance_percentage_info =
+            schema
+                .get_variable("LapDistPct")
+                .ok_or_else(|| IRacingSDKError::Parse {
+                    context: "Field validation".to_string(),
+                    details: "Missing required field 'LapDistPct'".to_string(),
+                })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "LapDistPct".to_string(),
+            var_info: lap_distance_percentage_info.clone(),
+        });
+
+        let latitude_info = schema
+            .get_variable("Lat")
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "Field validation".to_string(),
+                details: "Missing required field 'Lat'".to_string(),
+            })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "Lat".to_string(),
+            var_info: latitude_info.clone(),
+        });
+
+        let longitude_info = schema
+            .get_variable("Lon")
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "Field validation".to_string(),
+                details: "Missing required field 'Lon'".to_string(),
+            })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "Lon".to_string(),
+            var_info: longitude_info.clone(),
+        });
+
+        let altitude_info = schema
+            .get_variable("Alt")
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "Field validation".to_string(),
+                details: "Missing required field 'Alt'".to_string(),
+            })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "Alt".to_string(),
+            var_info: altitude_info.clone(),
+        });
+
+        let is_on_pit_road_info =
+            schema
+                .get_variable("OnPitRoad")
+                .ok_or_else(|| IRacingSDKError::Parse {
+                    context: "Field validation".to_string(),
+                    details: "Missing required field 'OnPitRoad'".to_string(),
+                })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "OnPitRoad".to_string(),
+            var_info: is_on_pit_road_info.clone(),
+        });
+
+        let is_in_pit_box_info =
+            schema
+                .get_variable("PlayerCarInPitStall")
+                .ok_or_else(|| IRacingSDKError::Parse {
+                    context: "Field validation".to_string(),
+                    details: "Missing required field 'PlayerCarInPitStall'".to_string(),
+                })?;
+
+        extraction_plan.push(FieldExtraction::Required {
+            name: "PlayerCarInPitStall".to_string(),
+            var_info: is_in_pit_box_info.clone(),
+        });
+
+        Ok(AdapterValidation::new(extraction_plan))
+    }
+
+    fn adapt(packet: &iracing_sdk_adapter::FramePacket, validation: &AdapterValidation) -> Self {
+        let lap_distance_meters = validation.fetch_or_default::<f32>(packet, "LapDist");
+        let lap_distance_percentage = validation.fetch_or_default::<f32>(packet, "LapDistPct");
+        let latitude = validation.fetch_or_default::<f64>(packet, "Lat");
+        let longitude = validation.fetch_or_default::<f64>(packet, "Lon");
+        let altitude = validation.fetch_or_default::<f32>(packet, "Alt");
+        let is_on_pit_road = validation.fetch_or_default::<bool>(packet, "OnPitRoad");
+        let is_in_pit_box = validation.fetch_or_default::<bool>(packet, "PlayerCarInPitStall");
+
+        Self {
+            lap_distance_meters,
+            lap_distance_percentage,
+            latitude,
+            longitude,
+            altitude,
+            is_in_pit_box,
+            is_on_pit_road,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
@@ -62,6 +183,7 @@ fn main() -> Result<()> {
 
     let mut ibt_provider =
         IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
+    let schema = ibt_provider.schema();
 
     // ------------------------------------------------------------
     // Write session string to output path.
@@ -81,31 +203,11 @@ fn main() -> Result<()> {
         "Parsing frames from IBT provider"
     );
 
-    let shared_validation = AdapterValidation::new(vec![]);
+    let shared_validation = Row::validate_schema(&schema)?;
     while let Some(packet) = ibt_provider.next_frame()? {
-        let frame = DynamicFrame::adapt(&packet, &shared_validation);
-        let lap_distance_meters = frame.get("LapDist").unwrap();
-        let lap_distance_percentage = frame.get("LapDistPct").unwrap();
-        let latitude = frame.get("Lat").unwrap();
-        let longitude = frame.get("Lon").unwrap();
-        let altitude = frame.get("Alt").unwrap();
-        let is_on_pit_road = frame.get("OnPitRoad").unwrap();
-        let is_in_pit_box = frame.get("PlayerCarInPitStall").unwrap();
-
-        if let Some(_) = frame.get::<f32>("ThisFieldWill Never Exist") {
-            return Err(anyhow!("This will never happen"));
-        }
-
+        let frame = Row::adapt(&packet, &shared_validation);
         // Serialize row to CSV.
-        writer.serialize(Row {
-            lap_distance_meters,
-            lap_distance_percentage,
-            latitude,
-            longitude,
-            altitude,
-            is_in_pit_box,
-            is_on_pit_road,
-        })?;
+        writer.serialize(frame)?;
     }
 
     writer.flush()?;
