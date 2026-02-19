@@ -427,6 +427,7 @@ dependencies = [
  "clap",
  "iracing-sdk",
  "schemars",
+ "serde",
  "serde_yaml_ng",
  "tracing",
  "tracing-subscriber",

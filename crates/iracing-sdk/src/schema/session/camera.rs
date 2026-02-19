@@ -22,6 +22,10 @@ pub struct CameraInfo {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
@@ -43,6 +47,10 @@ pub struct CameraGroup {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
@@ -60,5 +68,9 @@ pub struct Camera {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }

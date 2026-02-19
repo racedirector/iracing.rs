@@ -1,21 +1,39 @@
-use anyhow::{Result, anyhow};
-use clap::{ArgAction, Parser};
-use iracing_sdk::{VariableSchema, WindowsConnection};
+//! Disk telemetry schema generator.
+//!
+//! Opens an iRacing `.ibt` file and emits telemetry variable JSON Schema
+//! (serialized as YAML) based on the embedded variable headers.
+//!
+//! # Behavior
+//! - Opens `--ibt-path` via `iracing_sdk::IbtReader`
+//! - Reads the telemetry variable schema from the file
+//! - Converts it to JSON Schema and writes YAML to `--output-path`
+//!
+//! # Usage
+//! ```text
+//! disk_telemetry_schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
+//! ```
+
+use anyhow::Result;
+use clap::Parser;
+use iracing_sdk::IbtReader;
 use schemars::schema::RootSchema;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the disk telemetry schema generator.
+///
+/// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Path where the session YAML should be written.
+    /// Path to the input `.ibt` telemetry file.
+    #[arg(short, long)]
+    ibt_path: PathBuf,
+
+    /// Path where the output schema YAML should be written.
     #[arg(short, long)]
     output_path: PathBuf,
-
-    /// Allow schema generation even if iRacing is disconnected (may be stale).
-    #[arg(long, action = ArgAction::SetTrue)]
-    allow_stale: bool,
 }
 
 pub fn main() -> Result<()> {
@@ -30,30 +48,18 @@ pub fn main() -> Result<()> {
     // Parse CLI arguments
     // ------------------------------------------------------------
     let Args {
+        ibt_path,
         output_path,
-        allow_stale,
     } = Args::parse();
 
+    info!(path = %ibt_path.display(), "Opening IBT file");
+
     // ------------------------------------------------------------
-    // Open iRacing connection
+    // Open telemetry reader
     // ------------------------------------------------------------
-    let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-    if !connection.is_connected() && !allow_stale {
-        return Err(anyhow!(
-            "iRacing is not connected (pass --allow-stale to continue)."
-        ));
-    }
+    let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
 
-    // Build schema from variables
-    let variables: Vec<_> = connection.get_variables();
-    let mut variable_map = std::collections::HashMap::new();
-
-    for var_info in variables {
-        variable_map.insert(var_info.name.clone(), var_info);
-    }
-
-    let frame_size = connection.header().buf_len as usize;
-    let variable_schema = VariableSchema::new(variable_map, frame_size)?;
+    let variable_schema = reader.variables().clone();
     let schema: RootSchema = variable_schema.into();
 
     let output_file = File::create(&output_path)?;
@@ -61,7 +67,8 @@ pub fn main() -> Result<()> {
 
     serde_yaml_ng::to_writer(writer, &schema)?;
 
-    info!(path=%output_path.display(),"Wrote live telemetry schema");
+    info!(path=%output_path.display(),"Wrote disk telemetry schema");
 
     Ok(())
 }
+
