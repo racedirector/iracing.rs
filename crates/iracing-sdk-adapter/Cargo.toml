@@ -16,7 +16,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 
 [dev-dependencies]
-criterion = "0.7.0"
+criterion = "0.8.2"
 proptest = "1.7.0"
 test-utils = { path = "../test-utils" }
 
