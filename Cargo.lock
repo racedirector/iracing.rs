@@ -425,9 +425,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "criterion",
  "csv",
  "iracing-sdk",
+ "proptest",
  "serde",
+ "test-utils",
  "tracing",
  "tracing-subscriber",
 ]
