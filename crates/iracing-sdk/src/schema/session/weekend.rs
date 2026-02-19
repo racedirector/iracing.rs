@@ -3,6 +3,8 @@
 //! This module contains weekend-related information from iRacing session data,
 //! including track details, weather conditions, and session configuration.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Weekend and track information from iRacing
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendInfo {
@@ -142,11 +145,13 @@ pub struct WeekendInfo {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Telemetry recording options
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct TelemetryOptions {
@@ -156,11 +161,13 @@ pub struct TelemetryOptions {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Weekend session options and configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendOptions {
@@ -224,5 +231,6 @@ pub struct WeekendOptions {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }

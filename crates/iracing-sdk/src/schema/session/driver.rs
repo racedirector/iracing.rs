@@ -3,6 +3,8 @@
 //! This module contains driver-related data structures including driver lists,
 //! driver details, and tire compound information.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Driver information data containing current driver info + drivers list
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct DriverInfoData {
@@ -93,11 +96,13 @@ pub struct DriverInfoData {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Driver tire compound information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct DriverTire {
@@ -109,11 +114,13 @@ pub struct DriverTire {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Individual driver data (from Drivers list)
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Driver {
@@ -247,5 +254,6 @@ pub struct Driver {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }

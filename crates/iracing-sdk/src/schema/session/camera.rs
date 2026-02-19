@@ -3,6 +3,8 @@
 //! This module contains camera-related information including camera groups
 //! and individual camera configurations.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Camera information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct CameraInfo {
@@ -19,11 +22,16 @@ pub struct CameraInfo {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Camera group information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct CameraGroup {
@@ -39,11 +47,16 @@ pub struct CameraGroup {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Individual camera information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Camera {
@@ -55,5 +68,9 @@ pub struct Camera {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(
+        feature = "codegen",
+        schemars(with = "std::collections::HashMap<String, serde_json::Value>")
+    )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }

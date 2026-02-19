@@ -1,11 +1,17 @@
 use anyhow::{Result, anyhow};
+#[cfg(windows)]
 use clap::Parser;
+#[cfg(windows)]
 use csv::Writer;
+#[cfg(windows)]
 use iracing_sdk::{VariableSchema, WaitResult, WindowsConnection, types::VarData};
+#[cfg(windows)]
 use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+#[cfg(windows)]
 use tracing::{debug, info, trace};
 use tracing_subscriber::EnvFilter;
 
+#[cfg(windows)]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -16,6 +22,7 @@ struct Args {
 /// CSV row representation of positional telemetry.
 ///
 /// This struct defines the output schema written per frame.
+#[cfg(windows)]
 #[derive(serde::Serialize)]
 struct Row {
     /// Distance traveled around the lap (meters).
@@ -39,6 +46,11 @@ fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    run()
+}
+
+#[cfg(windows)]
+fn run() -> Result<()> {
     // ------------------------------------------------------------
     // Parse CLI arguments
     // ------------------------------------------------------------
@@ -62,6 +74,25 @@ fn main() -> Result<()> {
 
     let frame_size = connection.header().buf_len as usize;
     let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
+
+    // ------------------------------------------------------------
+    // Resolve required variable metadata
+    // ------------------------------------------------------------
+    let lap_distance_meters_info = schema
+        .get_variable("LapDist")
+        .expect("No `LapDist` in schema");
+
+    let lap_distance_percentage_info = schema
+        .get_variable("LapDistPct")
+        .expect("No `LapDistPct` in schema");
+
+    let is_on_pit_road_info = schema
+        .get_variable("OnPitRoad")
+        .expect("No `OnPitRoad` in schema");
+
+    let is_in_pit_box_info = schema
+        .get_variable("PlayerCarInPitStall")
+        .expect("No `PlayerCarInPitStall` in schema");
 
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
@@ -105,37 +136,14 @@ fn main() -> Result<()> {
             let data = raw_data.to_vec();
 
             // Extract strongly-typed values from raw frame bytes.
-            let lap_distance_meters = f32::from_bytes(
-                &data,
-                schema
-                    .get_variable("LapDist")
-                    .expect("No `LapDist` in schema"),
-            )
-            .unwrap();
+            let lap_distance_meters = f32::from_bytes(&data, lap_distance_meters_info).unwrap();
 
-            let lap_distance_percentage = f32::from_bytes(
-                &data,
-                schema
-                    .get_variable("LapDistPct")
-                    .expect("No `LapDistPct` in schema"),
-            )
-            .unwrap();
+            let lap_distance_percentage =
+                f32::from_bytes(&data, lap_distance_percentage_info).unwrap();
 
-            let is_on_pit_road = bool::from_bytes(
-                &data,
-                schema
-                    .get_variable("OnPitRoad")
-                    .expect("No `OnPitRoad` in schema"),
-            )
-            .unwrap();
+            let is_on_pit_road = bool::from_bytes(&data, is_on_pit_road_info).unwrap();
 
-            let is_in_pit_box = bool::from_bytes(
-                &data,
-                schema
-                    .get_variable("PlayerCarInPitStall")
-                    .expect("No `PlayerCarInPitStall` in schema"),
-            )
-            .unwrap();
+            let is_in_pit_box = bool::from_bytes(&data, is_in_pit_box_info).unwrap();
 
             // Serialize row to CSV.
             writer.serialize(Row {
@@ -162,4 +170,12 @@ fn main() -> Result<()> {
     info!("Finished processing frames");
 
     Ok(())
+}
+
+#[cfg(not(windows))]
+fn run() -> Result<()> {
+    tracing::warn!(
+        "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+    );
+    Err(anyhow!("live-position example is only supported on Windows"))
 }

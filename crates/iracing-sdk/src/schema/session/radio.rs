@@ -3,6 +3,8 @@
 //! This module contains radio communication structures including radio
 //! configurations and frequency details.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "schema-discovery")]
@@ -10,6 +12,7 @@ use std::collections::HashMap;
 
 /// Radio information
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct RadioInfo {
@@ -21,11 +24,13 @@ pub struct RadioInfo {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Individual radio configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Radio {
@@ -45,11 +50,13 @@ pub struct Radio {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }
 
 /// Radio frequency configuration
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct Frequency {
@@ -80,5 +87,6 @@ pub struct Frequency {
     #[cfg(feature = "schema-discovery")]
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[cfg_attr(feature = "codegen", schemars(with = "std::collections::HashMap<String, serde_json::Value>"))]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
 }

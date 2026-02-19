@@ -70,16 +70,22 @@
 //! If you want guaranteed output, add handling for the `None` case from
 //! `connection.session_info()` (e.g., return an error or write a placeholder file).
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use anyhow::anyhow;
+#[cfg(windows)]
 use clap::Parser;
+#[cfg(windows)]
 use iracing_sdk::WindowsConnection;
+#[cfg(windows)]
 use std::{fs, path::PathBuf};
+#[cfg(windows)]
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live session parser.
 ///
 /// Uses `clap` derive API for parsing.
+#[cfg(windows)]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -102,9 +108,11 @@ fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // ------------------------------------------------------------
-    // Parse CLI arguments.
-    // ------------------------------------------------------------
+    run()
+}
+
+#[cfg(windows)]
+fn run() -> Result<()> {
     let Args {
         output_path,
         live_only,
@@ -112,11 +120,7 @@ fn main() -> Result<()> {
     } = Args::parse();
 
     let effective_live_only = if no_live_only { false } else { live_only };
-
     info!("Opening iRacing connection...");
-    // ------------------------------------------------------------
-    // Open telemetry connection
-    // ------------------------------------------------------------
     let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
     if effective_live_only && !connection.is_connected() {
         return Err(anyhow!("Live only is enabled."));
@@ -133,4 +137,12 @@ fn main() -> Result<()> {
     info!("Finished parsing session information.");
 
     Ok(())
+}
+
+#[cfg(not(windows))]
+fn run() -> Result<()> {
+    tracing::warn!(
+        "live-session-parser is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+    );
+    Err(anyhow!("live-session-parser is only supported on Windows"))
 }

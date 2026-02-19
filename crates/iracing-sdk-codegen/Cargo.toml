@@ -1,0 +1,42 @@
+[package]
+name = "iracing-sdk-codegen"
+version = "0.1.0"
+description = "Code generation binaries for iracing-sdk"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+iracing-sdk = { path = "../iracing-sdk", features = [
+  "codegen",
+  "schema-discovery",
+] }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_yaml_ng = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+
+[[bin]]
+name = "session-schema"
+path = "src/bin/session_schema.rs"
+
+[[bin]]
+name = "disk-telemetry-schema"
+path = "src/bin/disk_telemetry_schema.rs"
+
+[[bin]]
+name = "live-telemetry-schema"
+path = "src/bin/live_telemetry_schema.rs"
+
+[[bin]]
+name = "disk-session-schema"
+path = "src/bin/disk_session_schema.rs"
+
+[[bin]]
+name = "live-session-schema"
+path = "src/bin/live_session_schema.rs"
