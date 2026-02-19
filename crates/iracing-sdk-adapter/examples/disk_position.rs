@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk_provider::{AdapterValidation, DynamicFrame, FrameAdapter, IbtProvider, Provider};
+use iracing_sdk_adapter::{AdapterValidation, DynamicFrame, FrameAdapter, IbtProvider, Provider};
 use std::{fs, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;

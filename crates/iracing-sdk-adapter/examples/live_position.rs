@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
-use iracing_sdk_provider::{AdapterValidation, DynamicFrame, FrameAdapter, LiveProvider, Provider};
+use iracing_sdk_adapter::{AdapterValidation, DynamicFrame, FrameAdapter, LiveProvider, Provider};
 #[cfg(windows)]
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;

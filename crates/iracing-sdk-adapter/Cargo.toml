@@ -14,3 +14,11 @@ iracing-sdk = { path = "../iracing-sdk" }
 serde = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+
+[[example]]
+name = "disk-position"
+path = "examples/disk_position.rs"
+
+[[example]]
+name = "live-position"
+path = "examples/live_position.rs"
