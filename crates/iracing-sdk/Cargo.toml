@@ -46,6 +46,14 @@ name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
+[[example]]
+name = "disk-position"
+path = "examples/disk_position.rs"
+
+[[example]]
+name = "live-position"
+path = "examples/live_position.rs"
+
 [[bin]]
 name = "ibt-session-parser"
 path = "src/bin/ibt-session-parser.rs"

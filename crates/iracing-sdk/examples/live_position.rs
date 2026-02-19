@@ -177,5 +177,7 @@ fn run() -> Result<()> {
     tracing::warn!(
         "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
-    Err(anyhow!("live-position example is only supported on Windows"))
+    Err(anyhow!(
+        "live-position example is only supported on Windows"
+    ))
 }

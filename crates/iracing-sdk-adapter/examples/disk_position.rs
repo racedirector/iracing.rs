@@ -145,22 +145,14 @@ impl FrameAdapter for Row {
     }
 
     fn adapt(packet: &iracing_sdk_adapter::FramePacket, validation: &AdapterValidation) -> Self {
-        let lap_distance_meters = validation.fetch_or_default::<f32>(packet, "LapDist");
-        let lap_distance_percentage = validation.fetch_or_default::<f32>(packet, "LapDistPct");
-        let latitude = validation.fetch_or_default::<f64>(packet, "Lat");
-        let longitude = validation.fetch_or_default::<f64>(packet, "Lon");
-        let altitude = validation.fetch_or_default::<f32>(packet, "Alt");
-        let is_on_pit_road = validation.fetch_or_default::<bool>(packet, "OnPitRoad");
-        let is_in_pit_box = validation.fetch_or_default::<bool>(packet, "PlayerCarInPitStall");
-
         Self {
-            lap_distance_meters,
-            lap_distance_percentage,
-            latitude,
-            longitude,
-            altitude,
-            is_in_pit_box,
-            is_on_pit_road,
+            lap_distance_meters: validation.fetch_or_default::<f32>(packet, "LapDist"),
+            lap_distance_percentage: validation.fetch_or_default::<f32>(packet, "LapDistPct"),
+            latitude: validation.fetch_or_default::<f64>(packet, "Lat"),
+            longitude: validation.fetch_or_default::<f64>(packet, "Lon"),
+            altitude: validation.fetch_or_default::<f32>(packet, "Alt"),
+            is_in_pit_box: validation.fetch_or_default::<bool>(packet, "OnPitRoad"),
+            is_on_pit_road: validation.fetch_or_default::<bool>(packet, "PlayerCarInPitStall"),
         }
     }
 }
