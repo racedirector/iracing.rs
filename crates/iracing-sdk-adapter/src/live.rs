@@ -40,14 +40,10 @@ impl LiveProvider {
 
 impl Provider for LiveProvider {
     fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
-        // Track how long we've been waiting without a connection
-        let mut no_connection_count = 0u32;
-        const MAX_NO_CONNECTION_ATTEMPTS: u32 = 600; // 5 minutes at 500ms intervals
-
         Ok(None)
     }
 
-    fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
+    fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
         debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory

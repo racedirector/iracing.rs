@@ -420,6 +420,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "iracing-sdk-adapter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "csv",
+ "iracing-sdk",
+ "serde",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "iracing-sdk-codegen"
 version = "0.1.0"
 dependencies = [
@@ -429,19 +442,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_yaml_ng",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "iracing-sdk-provider"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "csv",
- "iracing-sdk",
- "serde",
  "tracing",
  "tracing-subscriber",
 ]

@@ -1,5 +1,5 @@
 [package]
-name = "iracing-sdk-provider"
+name = "iracing-sdk-adapter"
 version = "0.1.0"
 authors.workspace = true
 repository.workspace = true
