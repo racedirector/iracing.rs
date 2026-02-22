@@ -17,7 +17,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use pitwall::windows::Connection;
+//! use iracing_sdk::windows::{Connection, WaitResult};
 //! use std::time::Duration;
 //!
 //! // Connect to iRacing

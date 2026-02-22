@@ -1,12 +1,11 @@
 //! Core types for telemetry data representation.
 //!
 //! This module provides the foundational data structures for handling iRacing telemetry data,
-//! including frame representation, schema management, and type-safe data parsing.
+//! including schema management, bitfield helpers, and type-safe binary parsing.
 //!
 //! ## Architecture
 //!
 //! The type system maps directly to iRacing SDK structures:
-//! - [`FramePacket`] represents a complete telemetry frame with zero-copy binary data
 //! - [`VariableSchema`] describes the structure of telemetry variables with O(1) lookup
 //! - [`VariableType`] maps to iRacing's `irsdk_VarType` enum with size information
 //! - [`VarData`] trait provides type-safe parsing from binary telemetry data
@@ -15,16 +14,14 @@
 //! ## Performance Characteristics
 //!
 //! - O(1) variable lookup via HashMap
-//! - Zero-copy data sharing via Arc
 //! - Bounds checking on all memory operations
 //! - Tick count wraparound handling for proper frame ordering
 //!
 //! ## Usage Example
 //!
-//! ```rust
-//! use pitwall::types::{FramePacket, VariableSchema, VariableInfo, VariableType, VarData};
+//! ```rust,no_run
+//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, VariableType};
 //! use std::collections::HashMap;
-//! use std::sync::Arc;
 //!
 //! // Create a schema for RPM data
 //! let mut variables = HashMap::new();
@@ -38,21 +35,14 @@
 //!     description: "Engine RPM".to_string(),
 //! });
 //!
-//! let schema = Arc::new(VariableSchema { variables, frame_size: 4 });
-//! let data = vec![0x00, 0xA0, 0x8C, 0x45]; // 4500.0 as little-endian f32
-//!
-//! let packet = FramePacket::new(
-//!     data,
-//!     12345, // tick
-//!     1,     // session_version
-//!     schema
-//! );
+//! let schema = VariableSchema::new(variables, 4)?;
+//! let frame = vec![0x00, 0xA0, 0x8C, 0x45]; // 4500.0 as little-endian f32
 //!
 //! // Parse RPM value
-//! if let Some(rpm_info) = packet.schema.get_variable("RPM") {
-//!     let rpm: f32 = f32::from_bytes(packet.data.as_ref(), rpm_info).unwrap();
-//!     assert!((rpm - 4500.0).abs() < 1.0); // Allow for floating point precision
-//! }
+//! let rpm_info = schema.get_variable("RPM").expect("RPM variable");
+//! let rpm: f32 = f32::from_bytes(&frame, rpm_info)?;
+//! assert!((rpm - 4500.0).abs() < 1.0); // Allow for floating point precision
+//! # Ok::<(), iracing_sdk::IRacingSDKError>(())
 //! ```
 
 mod bitfield;

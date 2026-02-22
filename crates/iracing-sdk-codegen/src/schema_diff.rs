@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject, SingleOrVec};
+use schemars::Schema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SchemaDiffReport {
@@ -23,7 +24,7 @@ pub struct TypeChangeEntry {
     pub baseline_types: Vec<String>,
 }
 
-pub fn diff_schemas(current: &RootSchema, baseline: &RootSchema) -> SchemaDiffReport {
+pub fn diff_schemas(current: &Schema, baseline: &Schema) -> SchemaDiffReport {
     let current_paths = collect_schema_paths(current);
     let baseline_paths = collect_schema_paths(baseline);
 
@@ -75,23 +76,23 @@ pub fn summarize_diff(report: &SchemaDiffReport) -> String {
     )
 }
 
-fn collect_schema_paths(schema: &RootSchema) -> BTreeMap<String, BTreeSet<String>> {
+fn collect_schema_paths(schema: &Schema) -> BTreeMap<String, BTreeSet<String>> {
     let mut paths = BTreeMap::new();
-    collect_schema_object_paths(&schema.schema, "$", &mut paths);
+    collect_schema_paths_from_value(schema.as_value(), "$", &mut paths);
     paths
 }
 
 fn collect_schema_object_paths(
-    schema: &SchemaObject,
+    schema: &serde_json::Map<String, Value>,
     path: &str,
     out: &mut BTreeMap<String, BTreeSet<String>>,
 ) {
-    let mut types = normalize_instance_types(schema.instance_type.as_ref());
+    let mut types = normalize_instance_types(schema.get("type"));
 
-    if schema.object.is_some() {
+    if schema.get("properties").and_then(Value::as_object).is_some() {
         types.insert("object".to_string());
     }
-    if schema.array.is_some() {
+    if schema.get("items").is_some() {
         types.insert("array".to_string());
     }
 
@@ -99,38 +100,34 @@ fn collect_schema_object_paths(
         out.insert(path.to_string(), types);
     }
 
-    if let Some(object) = &schema.object {
-        for (property_name, property_schema) in &object.properties {
+    if let Some(properties) = schema.get("properties").and_then(Value::as_object) {
+        for (property_name, property_schema) in properties {
             let child_path = format!("{}.{}", path, property_name);
-            collect_schema_paths_from_schema(property_schema, &child_path, out);
+            collect_schema_paths_from_value(property_schema, &child_path, out);
         }
     }
 
-    if let Some(array) = &schema.array {
+    if let Some(items) = schema.get("items") {
         let array_path = format!("{}[]", path);
-        if let Some(items) = &array.items {
-            match items {
-                SingleOrVec::Single(item) => {
-                    collect_schema_paths_from_schema(item, &array_path, out);
-                }
-                SingleOrVec::Vec(items) => {
-                    for item in items {
-                        collect_schema_paths_from_schema(item, &array_path, out);
-                    }
+        match items {
+            Value::Array(items) => {
+                for item in items {
+                    collect_schema_paths_from_value(item, &array_path, out);
                 }
             }
+            item => collect_schema_paths_from_value(item, &array_path, out),
         }
     }
 }
 
-fn collect_schema_paths_from_schema(
-    schema: &Schema,
+fn collect_schema_paths_from_value(
+    schema: &Value,
     path: &str,
     out: &mut BTreeMap<String, BTreeSet<String>>,
 ) {
     match schema {
-        Schema::Object(obj) => collect_schema_object_paths(obj, path, out),
-        Schema::Bool(value) => {
+        Value::Object(obj) => collect_schema_object_paths(obj, path, out),
+        Value::Bool(value) => {
             let mut types = BTreeSet::new();
             types.insert(if *value {
                 "any".to_string()
@@ -139,38 +136,28 @@ fn collect_schema_paths_from_schema(
             });
             out.insert(path.to_string(), types);
         }
+        _ => {}
     }
 }
 
-fn normalize_instance_types(types: Option<&SingleOrVec<InstanceType>>) -> BTreeSet<String> {
+fn normalize_instance_types(types: Option<&Value>) -> BTreeSet<String> {
     let mut values = BTreeSet::new();
 
     match types {
-        Some(SingleOrVec::Single(ty)) => {
-            values.insert(instance_type_name(ty.as_ref()));
+        Some(Value::String(ty)) => {
+            values.insert(ty.clone());
         }
-        Some(SingleOrVec::Vec(items)) => {
+        Some(Value::Array(items)) => {
             for item in items {
-                values.insert(instance_type_name(item));
+                if let Some(ty) = item.as_str() {
+                    values.insert(ty.to_string());
+                }
             }
         }
-        None => {}
+        _ => {}
     }
 
     values
-}
-
-fn instance_type_name(instance_type: &InstanceType) -> String {
-    match instance_type {
-        InstanceType::Null => "null",
-        InstanceType::Boolean => "boolean",
-        InstanceType::Object => "object",
-        InstanceType::Array => "array",
-        InstanceType::Number => "number",
-        InstanceType::String => "string",
-        InstanceType::Integer => "integer",
-    }
-    .to_string()
 }
 
 fn to_vec(values: &BTreeSet<String>) -> Vec<String> {
@@ -234,10 +221,8 @@ mod tests {
         let mut current = schema_for!(Baseline);
 
         current
-            .schema
-            .metadata
-            .get_or_insert_with(Default::default)
-            .title = Some("Custom title".to_string());
+            .ensure_object()
+            .insert("title".into(), "Custom title".into());
 
         let diff = diff_schemas(&current, &baseline);
 

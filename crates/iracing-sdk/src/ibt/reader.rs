@@ -6,15 +6,15 @@
 //! ## Usage Example
 //!
 //! ```rust,no_run
-//! use pitwall::ibt::IbtReader;
+//! use iracing_sdk::IbtReader;
 //!
-//! fn read_frames() -> pitwall::Result<()> {
+//! fn read_frames() -> iracing_sdk::Result<()> {
 //!     // Open IBT file
 //!     let mut reader = IbtReader::open("telemetry.ibt")?;
 //!     println!("File contains {} frames", reader.total_frames());
 //!
 //!     // Read frames sequentially
-//!     while let Some((frame_data, tick, session_version)) = reader.read_next_frame()? {
+//!     while let Some((_frame_data, tick, session_version)) = reader.read_next_frame()? {
 //!         println!("Frame at tick {} with session version {}",
 //!             tick,
 //!             session_version);
@@ -27,7 +27,7 @@
 //! ## Performance Notes
 //!
 //! - File data is loaded into memory at construction time for fast random access
-//! - Frame reading is zero-allocation except for the returned `RawFrame`
+//! - Frame reading is allocation-minimal except for the returned frame bytes
 //! - Seeking operations are O(1) as they only update internal position counters
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
@@ -37,7 +37,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use tracing::warn;
 
-/// IBT file reader that implements FrameProvider for cross-platform replay
+/// IBT file reader for cross-platform replay.
 pub struct IbtReader {
     data: Vec<u8>,
     current_position: usize,
@@ -271,7 +271,7 @@ impl IbtReader {
 
     /// Read the next frame as raw bytes
     ///
-    /// Returns frame data, tick count, and session version for FramePacket construction
+    /// Returns frame data, tick count, and session version for downstream frame processing.
     pub fn read_next_frame(&mut self) -> Result<Option<(Vec<u8>, u32, u32)>> {
         // Check if we've reached the end
         if self.current_frame >= self.total_frames {
