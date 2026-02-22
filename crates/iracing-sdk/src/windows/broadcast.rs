@@ -44,9 +44,8 @@
 
 use crate::{
     BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, IRacingSDKError,
-    PitCommandMode, ReplayPositionMode, ReplaySearchMode, Result, TelemetryCommandMode,
-    VideoCaptureMode,
-    windows::utils::pad_car_number,
+    PitCommandMode, ReplayPositionMode, ReplaySearchMode, ReplayStateMode, Result,
+    TelemetryCommandMode, VideoCaptureMode, windows::utils::pad_car_number,
 };
 use {
     windows::Win32::{
@@ -68,13 +67,13 @@ pub enum PitCommand {
     /// Set fuel amount in gallons.
     Fuel(u8),
     /// Set left-front tire pressure in PSI.
-    LF(u8),
+    LF(u16),
     /// Set right-front tire pressure in PSI.
-    RF(u8),
+    RF(u16),
     /// Set left-rear tire pressure in PSI.
-    LR(u8),
+    LR(u16),
     /// Set right-rear tire pressure in PSI.
-    RR(u8),
+    RR(u16),
     /// Clear all tire pressure changes.
     ClearTires,
     /// Request fast repair.
@@ -95,10 +94,10 @@ impl PitCommand {
             PitCommand::Clear => (Id::Clear.into(), 0),
             PitCommand::Tearoff => (Id::Ws.into(), 0),
             PitCommand::Fuel(gal) => (Id::Fuel.into(), gal as u16),
-            PitCommand::LF(psi) => (Id::Lf.into(), psi as u16),
-            PitCommand::RF(psi) => (Id::Rf.into(), psi as u16),
-            PitCommand::LR(psi) => (Id::Lr.into(), psi as u16),
-            PitCommand::RR(psi) => (Id::Rr.into(), psi as u16),
+            PitCommand::LF(pressure) => (Id::Lf.into(), pressure),
+            PitCommand::RF(pressure) => (Id::Rf.into(), pressure),
+            PitCommand::LR(pressure) => (Id::Lr.into(), pressure),
+            PitCommand::RR(pressure) => (Id::Rr.into(), pressure),
             PitCommand::ClearTires => (Id::ClearTires.into(), 0),
             PitCommand::FastRepair => (Id::Fr.into(), 0),
             PitCommand::ClearTearoff => (Id::ClearWs.into(), 0),
@@ -122,22 +121,22 @@ impl PitCommand {
 /// let _ = BroadcastCommand::CameraSwitchPosition(0, 0, 0);
 /// let _ = BroadcastCommand::PitCommand(PitCommand::Fuel(8));
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BroadcastCommand {
     /// Switch to a specific camera group and camera index for a position.
     CameraSwitchPosition(u8, u8, u8),
     /// Switch to a specific camera group and camera index for a car number.
-    CameraSwitchNumber(&'static str, u8, u8),
+    CameraSwitchNumber(String, u8, u8),
     /// Apply a new [`CameraState`] bitfield.
     CameraSetState(CameraState),
     /// Set the replay play speed, with an optional slow-motion toggle.
-    ReplaySetPlaySpeed(u8, bool),
+    ReplaySetPlaySpeed(i16, bool),
     /// Jump to a replay position, with the frame number encoded in `var2`.
     ReplaySetPlayPosition(ReplayPositionMode, u16),
     /// Perform a replay search according to the provided mode.
     ReplaySearch(ReplaySearchMode),
     /// Toggle the replay state on or off.
-    ReplaySetState,
+    ReplaySetState(ReplayStateMode),
     /// Reload all textures.
     ReloadAllTextures,
     /// Reload textures for a specific car index.
@@ -151,9 +150,9 @@ pub enum BroadcastCommand {
     /// Control telemetry recording.
     TelemetryCommand(TelemetryCommandMode),
     /// Send a force-feedback command.
-    FFBCommand(u16),
+    FFBCommand(f32),
     /// Search a replay to a specific session time.
-    ReplaySearchSessionTime(u8, u16),
+    ReplaySearchSessionTime(u8, u32),
     /// Control video capture.
     VideoCapture(VideoCaptureMode),
 }
@@ -169,7 +168,7 @@ impl BroadcastCommand {
             ),
             BroadcastCommand::CameraSwitchNumber(car_number, group, camera) => (
                 RawBroadcastMessage::CamSwitchNum,
-                pad_car_number(car_number),
+                pad_car_number(&car_number),
                 group.into(),
                 camera.into(),
             ),
@@ -181,7 +180,7 @@ impl BroadcastCommand {
             ),
             BroadcastCommand::ReplaySetPlaySpeed(speed, slow_motion) => (
                 RawBroadcastMessage::ReplaySetPlaySpeed,
-                speed.into(),
+                speed as u16,
                 slow_motion.into(),
                 0,
             ),
@@ -194,7 +193,9 @@ impl BroadcastCommand {
             BroadcastCommand::ReplaySearch(mode) => {
                 (RawBroadcastMessage::ReplaySearch, mode.into(), 0, 0)
             }
-            BroadcastCommand::ReplaySetState => (RawBroadcastMessage::ReplaySetState, 0, 0, 0),
+            BroadcastCommand::ReplaySetState(mode) => {
+                (RawBroadcastMessage::ReplaySetState, mode.into(), 0, 0)
+            }
             BroadcastCommand::ReloadAllTextures => (RawBroadcastMessage::ReloadTextures, 0, 0, 0),
             BroadcastCommand::ReloadTextures(car_index) => {
                 (RawBroadcastMessage::ReloadTextures, car_index.into(), 0, 0)
@@ -215,17 +216,20 @@ impl BroadcastCommand {
             BroadcastCommand::TelemetryCommand(mode) => {
                 (RawBroadcastMessage::TelemCommand, mode.into(), 0, 0)
             }
-            BroadcastCommand::FFBCommand(_value) => (
-                RawBroadcastMessage::FfbCommand,
-                0,
-                0, // (value * 65536).into(),
-                0,
-            ),
+            BroadcastCommand::FFBCommand(value) => {
+                let bits = value.to_bits();
+                (
+                    RawBroadcastMessage::FfbCommand,
+                    0,
+                    (bits & 0xFFFF) as u16,
+                    ((bits >> 16) & 0xFFFF) as u16,
+                )
+            }
             BroadcastCommand::ReplaySearchSessionTime(session_number, session_time_ms) => (
                 RawBroadcastMessage::ReplaySearchSessionTime,
                 session_number.into(),
-                session_time_ms,
-                0,
+                (session_time_ms & 0xFFFF) as u16,
+                ((session_time_ms >> 16) & 0xFFFF) as u16,
             ),
             BroadcastCommand::VideoCapture(mode) => {
                 (RawBroadcastMessage::VideoCapture, mode.into(), 0, 0)
@@ -304,7 +308,7 @@ mod tests {
 
     #[test]
     fn encodes_camera_switch_number_with_padding() {
-        let encoded = BroadcastCommand::CameraSwitchNumber("001", 4, 5).encode();
+        let encoded = BroadcastCommand::CameraSwitchNumber("001".to_string(), 4, 5).encode();
         assert_eq!(encoded, (RawBroadcastMessage::CamSwitchNum, 3001, 4, 5));
     }
 
@@ -327,6 +331,10 @@ mod tests {
             (RawBroadcastMessage::ReplaySetPlaySpeed, 2, 1, 0)
         );
         assert_eq!(
+            BroadcastCommand::ReplaySetPlaySpeed(-2, false).encode(),
+            (RawBroadcastMessage::ReplaySetPlaySpeed, 0xFFFE, 0, 0)
+        );
+        assert_eq!(
             BroadcastCommand::ReplaySetPlayPosition(ReplayPositionMode::Current, 120).encode(),
             (
                 RawBroadcastMessage::ReplaySetPlayPosition,
@@ -338,6 +346,15 @@ mod tests {
         assert_eq!(
             BroadcastCommand::ReplaySearchSessionTime(1, 3400).encode(),
             (RawBroadcastMessage::ReplaySearchSessionTime, 1, 3400, 0)
+        );
+        assert_eq!(
+            BroadcastCommand::ReplaySearchSessionTime(1, 100_000).encode(),
+            (
+                RawBroadcastMessage::ReplaySearchSessionTime,
+                1,
+                0x86A0,
+                0x0001
+            )
         );
     }
 
@@ -367,7 +384,12 @@ mod tests {
     fn encodes_pit_commands() {
         assert_eq!(
             BroadcastCommand::PitCommand(PitCommand::Fuel(14)).encode(),
-            (RawBroadcastMessage::PitCommand, PitCommandMode::Fuel.into(), 14, 0)
+            (
+                RawBroadcastMessage::PitCommand,
+                PitCommandMode::Fuel.into(),
+                14,
+                0
+            )
         );
         assert_eq!(
             BroadcastCommand::PitCommand(PitCommand::ClearTearoff).encode(),
@@ -378,5 +400,27 @@ mod tests {
                 0
             )
         );
+    }
+
+    #[test]
+    fn encodes_replay_state() {
+        assert_eq!(
+            BroadcastCommand::ReplaySetState(ReplayStateMode::EraseTape).encode(),
+            (
+                RawBroadcastMessage::ReplaySetState,
+                ReplayStateMode::EraseTape.into(),
+                0,
+                0
+            )
+        );
+    }
+
+    #[test]
+    fn encodes_ffb_max_force_bits() {
+        let (_, var1, var2, var3) = BroadcastCommand::FFBCommand(20.9998).encode();
+        let bits = 20.9998f32.to_bits();
+        assert_eq!(var1, 0);
+        assert_eq!(var2, (bits & 0xFFFF) as u16);
+        assert_eq!(var3, ((bits >> 16) & 0xFFFF) as u16);
     }
 }

@@ -66,8 +66,12 @@ path = "examples/enum_bitfields_disk.rs"
 
 [[bin]]
 name = "ibt-session-parser"
-path = "src/bin/ibt-session-parser.rs"
+path = "src/bin/ibt_session_parser.rs"
 
 [[bin]]
 name = "live-session-parser"
-path = "src/bin/live-session-parser.rs"
+path = "src/bin/live_session_parser.rs"
+
+[[bin]]
+name = "broadcast-cli"
+path = "src/bin/broadcast_cli.rs"
