@@ -154,18 +154,21 @@ mod tests {
 
     #[test]
     fn builds_object_root_with_additional_properties_false() {
-        let schema = test_schema(vec![make_var("Speed", VariableType::Float32, 1, 0, false)], 4);
+        let schema = test_schema(
+            vec![make_var("Speed", VariableType::Float32, 1, 0, false)],
+            4,
+        );
         let root = TelemetrySchemaProvider::new(schema)
             .expect("provider init")
             .build_schema()
             .to_value();
 
         assert_eq!(root.get("type"), Some(&Value::String("object".to_string())));
+        assert_eq!(root.get("additionalProperties"), Some(&Value::Bool(false)));
         assert_eq!(
-            root.get("additionalProperties"),
-            Some(&Value::Bool(false))
+            root.get("title"),
+            Some(&Value::String("Telemetry".to_string()))
         );
-        assert_eq!(root.get("title"), Some(&Value::String("Telemetry".to_string())));
     }
 
     #[test]
@@ -234,7 +237,10 @@ mod tests {
 
     #[test]
     fn maps_char_buffers_to_string() {
-        let schema = test_schema(vec![make_var("TrackName", VariableType::Char, 64, 0, false)], 64);
+        let schema = test_schema(
+            vec![make_var("TrackName", VariableType::Char, 64, 0, false)],
+            64,
+        );
         let root = TelemetrySchemaProvider::new(schema)
             .expect("provider init")
             .build_schema()
@@ -251,7 +257,10 @@ mod tests {
 
     #[test]
     fn includes_expected_x_metadata_fields() {
-        let schema = test_schema(vec![make_var("Speed", VariableType::Float32, 1, 24, true)], 28);
+        let schema = test_schema(
+            vec![make_var("Speed", VariableType::Float32, 1, 24, true)],
+            28,
+        );
         let root = TelemetrySchemaProvider::new(schema)
             .expect("provider init")
             .build_schema()
@@ -262,7 +271,10 @@ mod tests {
             speed.get("description"),
             Some(&Value::String("Speed description".to_string()))
         );
-        assert_eq!(speed.get("x-units"), Some(&Value::String("unit".to_string())));
+        assert_eq!(
+            speed.get("x-units"),
+            Some(&Value::String("unit".to_string()))
+        );
         assert_eq!(
             speed.get("x-iracing-var-type"),
             Some(&Value::String("Float32".to_string()))

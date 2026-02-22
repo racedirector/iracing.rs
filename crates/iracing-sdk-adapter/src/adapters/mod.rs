@@ -14,8 +14,8 @@
 //! # Example Usage
 //!
 //! ```rust
-//! use std::sync::Arc;
-//! use pitwall::{types::FramePacket, VariableSchema, Result, TelemetryError, VarData, adapters::*};
+//! use iracing_sdk::{IRacingSDKError, VarData, VariableSchema};
+//! use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, FramePacket};
 //!
 //! // Manual adapter implementation
 //! struct CarData {
@@ -25,12 +25,12 @@
 //! }
 //!
 //! impl FrameAdapter for CarData {
-//!     fn validate_schema(schema: &VariableSchema) -> Result<AdapterValidation> {
+//!     fn validate_schema(schema: &VariableSchema) -> iracing_sdk_adapter::Result<AdapterValidation> {
 //!         let mut extraction_plan = Vec::new();
 //!
 //!         // Validate required fields exist
 //!         let speed_info = schema.get_variable("Speed")
-//!             .ok_or_else(|| TelemetryError::Parse {
+//!             .ok_or_else(|| IRacingSDKError::Parse {
 //!                 context: "Field validation".to_string(),
 //!                 details: "Missing required field 'Speed'".to_string(),
 //!             })?;

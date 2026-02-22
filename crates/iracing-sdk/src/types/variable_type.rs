@@ -1,7 +1,7 @@
 //! Telemetry variable type definitions
 
 #[cfg(feature = "codegen")]
-use schemars::{JsonSchema, Schema, json_schema};
+use schemars::{json_schema, JsonSchema, Schema};
 use serde::{Deserialize, Serialize};
 
 /// Supported telemetry data types.
