@@ -16,7 +16,7 @@
 use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::IbtReader;
-use schemars::schema::RootSchema;
+use schemars::schema_for_value;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -32,7 +32,7 @@ struct Args {
     ibt_path: PathBuf,
 
     /// Path where the output schema YAML should be written.
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "disk-telemetry-schema.yml")]
     output_path: PathBuf,
 }
 
@@ -60,7 +60,7 @@ pub fn main() -> Result<()> {
     let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
 
     let variable_schema = reader.variables().clone();
-    let schema: RootSchema = variable_schema.into();
+    let schema = schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
@@ -71,4 +71,3 @@ pub fn main() -> Result<()> {
 
     Ok(())
 }
-
