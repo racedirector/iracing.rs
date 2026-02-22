@@ -57,18 +57,18 @@ mod variable_type;
 
 // Re-export all public types
 pub use bitfield::{
-    engine_mandatory_repair_needed, engine_optional_repair_needed, session_dq_scoring_invalid,
-    tick_after_u32, BitField,
+    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed,
+    session_dq_scoring_invalid, tick_after_u32,
 };
 pub use incident::encode_incident;
-pub use incident::{decode_incident, IncidentClassification, IncidentPenalty, IncidentReport};
+pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
 pub use irsdk_bitflags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
 };
 pub use irsdk_enums::{
     BroadcastMessage, CameraSwitchFocus, CarLeftRight, ChatCommandMode, FfbCommandMode, PaceMode,
     PitCommandMode, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, SessionState, StatusField, TelemCommandMode, TrackLocation, TrackSurface,
+    ReplayStateMode, SessionState, StatusField, TelemetryCommandMode, TrackLocation, TrackSurface,
     TrackWetness, VideoCaptureMode,
 };
 pub use schema::{VariableInfo, VariableSchema};

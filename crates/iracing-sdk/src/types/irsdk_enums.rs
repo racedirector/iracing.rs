@@ -32,6 +32,18 @@ macro_rules! define_irsdk_enum {
             }
         }
 
+        impl From<$name> for u16 {
+            fn from(value: $name) -> Self {
+                value.to_raw() as u16
+            }
+        }
+
+        impl From<$name> for u32 {
+            fn from(value: $name) -> Self {
+                value.to_raw() as u32
+            }
+        }
+
         impl From<$name> for i32 {
             fn from(value: $name) -> Self {
                 value.to_raw()
@@ -221,8 +233,8 @@ define_irsdk_enum! {
 }
 
 define_irsdk_enum! {
-    /// `enum irsdk_TelemCommandMode`
-    pub enum TelemCommandMode {
+    /// `enum irsdk_TelemetryCommandMode`
+    pub enum TelemetryCommandMode {
         Stop = super::irsdk_flags::telem_command_mode::STOP,
         Start = super::irsdk_flags::telem_command_mode::START,
         Restart = super::irsdk_flags::telem_command_mode::RESTART,
@@ -331,7 +343,7 @@ mod tests {
         assert_enum_roundtrip!(BroadcastMessage, 3, 77);
         assert_enum_roundtrip!(ChatCommandMode, 1, 77);
         assert_enum_roundtrip!(PitCommandMode, 8, 77);
-        assert_enum_roundtrip!(TelemCommandMode, 1, 77);
+        assert_enum_roundtrip!(TelemetryCommandMode, 1, 77);
         assert_enum_roundtrip!(ReplayStateMode, 1, 77);
         assert_enum_roundtrip!(ReloadTexturesMode, 1, 77);
         assert_enum_roundtrip!(ReplaySearchMode, 5, 77);

@@ -251,7 +251,7 @@ pub mod pit_command_mode {
     pub const TC: i32 = 12;
 }
 
-/// `enum irsdk_TelemCommandMode`
+/// `enum irsdk_TelemetryCommandMode`
 pub mod telem_command_mode {
     pub const STOP: i32 = 0;
     pub const START: i32 = 1;

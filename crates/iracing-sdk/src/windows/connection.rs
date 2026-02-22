@@ -134,7 +134,7 @@ impl Connection {
 
         // Open the memory mapping
         let mapping = unsafe {
-            let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
+            let wide_name = crate::windows::wide_string(IRSDK_MEMMAPFILENAME);
             OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
                 .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
         };
@@ -150,7 +150,7 @@ impl Connection {
 
         // Open the data valid event
         let event = unsafe {
-            let wide_name = wide_string(IRSDK_DATAVALIDEVENTNAME);
+            let wide_name = crate::windows::wide_string(IRSDK_DATAVALIDEVENTNAME);
             OpenEventW(
                 SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000),
                 false,
@@ -442,16 +442,6 @@ impl Drop for Connection {
 // that are safe to send between threads for our read-only use case
 unsafe impl Send for Connection {}
 unsafe impl Sync for Connection {}
-
-/// Convert string to null-terminated wide string for Windows APIs
-fn wide_string(s: &str) -> Vec<u16> {
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-    OsStr::new(s)
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect()
-}
 
 #[cfg(all(test, windows))]
 mod tests {

@@ -68,4 +68,7 @@ pub mod windows;
 // Windows memory exports
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
-pub use windows::{Connection as WindowsConnection, WaitResult};
+pub use windows::{Broadcast, Connection as WindowsConnection, WaitResult};
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use windows::{BroadcastCommand, PitCommand};

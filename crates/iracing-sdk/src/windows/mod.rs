@@ -38,6 +38,8 @@
 
 mod broadcast;
 mod connection;
+mod utils;
 
-pub use broadcast::Broadcast;
+pub use broadcast::{Broadcast, BroadcastCommand, PitCommand};
 pub use connection::{Connection, IRSDKHeader, VarBuf, WaitResult};
+pub use utils::wide_string;
