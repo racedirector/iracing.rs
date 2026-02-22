@@ -12,6 +12,9 @@ pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum IRacingSDKError {
+    #[error("Failed to connect to iRacing: {reason}")]
+    Connection { reason: String },
+
     #[error("IBT file error: {path}")]
     File {
         path: PathBuf,
@@ -56,6 +59,7 @@ impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
         match self {
+            IRacingSDKError::Connection { .. } => true,
             IRacingSDKError::Buffer { .. } => true,
             IRacingSDKError::File { .. } => false,
             IRacingSDKError::Memory { .. } => false,
@@ -70,6 +74,12 @@ impl IRacingSDKError {
     /// Returns suggested recovery actions for this error.
     pub fn recovery_suggestions(&self) -> Vec<&'static str> {
         match self {
+            IRacingSDKError::Connection { .. } => vec![
+                "Ensure iRacing is running",
+                "Check Windows permissions for shared memory access",
+                "Verify iRacing SDK version compatibility",
+                "Try restarting iRacing",
+            ],
             IRacingSDKError::Memory { .. } => vec![
                 "Check memory access bounds",
                 "Verify shared memory is still valid",
@@ -107,6 +117,13 @@ impl IRacingSDKError {
                 "Verify buffer access patterns",
                 "Restart buffer management",
             ],
+        }
+    }
+
+    /// Helper constructor for connection errors.
+    pub fn connection_failed(reason: impl Into<String>) -> Self {
+        IRacingSDKError::Connection {
+            reason: reason.into(),
         }
     }
 
