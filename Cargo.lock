@@ -471,6 +471,7 @@ dependencies = [
  "iracing-sdk",
  "schemars",
  "serde",
+ "serde_json",
  "serde_yaml_ng",
  "tracing",
  "tracing-subscriber",
