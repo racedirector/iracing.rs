@@ -35,3 +35,7 @@ path = "examples/disk_position.rs"
 [[example]]
 name = "live-position"
 path = "examples/live_position.rs"
+
+[[example]]
+name = "enum-bitfields-live"
+path = "examples/enum_bitfields_live.rs"
