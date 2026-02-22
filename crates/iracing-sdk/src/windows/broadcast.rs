@@ -1,3 +1,47 @@
+//! iRacing broadcast message sender.
+//!
+//! This module wraps the iRacing broadcast window message contract used to
+//! control cameras, replay state, pit options, chat, and capture tools from an
+//! external process.
+//!
+//! # Overview
+//!
+//! - [`Broadcast`] registers the `IRSDK_BROADCASTMSG` message and sends packed
+//!   `WPARAM`/`LPARAM` payloads with `SendNotifyMessageW`.
+//! - [`BroadcastCommand`] is the typed command surface that maps to iRacing's
+//!   documented broadcast message IDs.
+//! - [`PitCommand`] provides typed pit-service subcommands for
+//!   [`BroadcastCommand::PitCommand`].
+//!
+//! # Examples
+//!
+//! Construct commands in a platform-safe doctest:
+//!
+//! ```rust
+//! # #[cfg(windows)] {
+//! use iracing_sdk::windows::{BroadcastCommand, PitCommand};
+//!
+//! let camera = BroadcastCommand::CameraSwitchPosition(0, 1, 2);
+//! let pit = BroadcastCommand::PitCommand(PitCommand::Fuel(8));
+//!
+//! assert!(matches!(camera, BroadcastCommand::CameraSwitchPosition(0, 1, 2)));
+//! assert!(matches!(pit, BroadcastCommand::PitCommand(PitCommand::Fuel(8))));
+//! # }
+//! ```
+//!
+//! Send a command to iRacing:
+//!
+//! ```rust,no_run
+//! # #[cfg(windows)] {
+//! use iracing_sdk::windows::{Broadcast, BroadcastCommand};
+//!
+//! let client = Broadcast::new().expect("register iRacing broadcast message");
+//! client
+//!     .send_message(BroadcastCommand::ReloadAllTextures)
+//!     .expect("send broadcast command");
+//! # }
+//! ```
+
 use crate::{
     BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, IRacingSDKError,
     PitCommandMode, ReplayPositionMode, ReplaySearchMode, Result, TelemetryCommandMode,
@@ -17,17 +61,29 @@ const BROADCAST_MESSAGE_NAME: &str = r"IRSDK_BROADCASTMSG";
 /// Commands that adjust pit service behavior for the player's car.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PitCommand {
+    /// Clear all pending pit service selections.
     Clear,
+    /// Request a windshield tearoff.
     Tearoff,
+    /// Set fuel amount in gallons.
     Fuel(u8),
+    /// Set left-front tire pressure in PSI.
     LF(u8),
+    /// Set right-front tire pressure in PSI.
     RF(u8),
+    /// Set left-rear tire pressure in PSI.
     LR(u8),
+    /// Set right-rear tire pressure in PSI.
     RR(u8),
+    /// Clear all tire pressure changes.
     ClearTires,
+    /// Request fast repair.
     FastRepair,
+    /// Clear windshield tearoff request.
     ClearTearoff,
+    /// Clear fast repair request.
     ClearFastRepair,
+    /// Clear fuel request.
     ClearFuel,
 }
 
@@ -187,6 +243,11 @@ pub struct Broadcast {
 }
 
 impl Broadcast {
+    /// Create a new broadcast client by registering the iRacing message ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IRacingSDKError`] if `RegisterWindowMessageW` fails.
     pub fn new() -> Result<Self> {
         let message: Vec<u16> = crate::windows::wide_string(BROADCAST_MESSAGE_NAME);
 
@@ -201,6 +262,14 @@ impl Broadcast {
         Ok(Self { message_id: id })
     }
 
+    /// Send a typed broadcast message to iRacing.
+    ///
+    /// The command is packed into the `WPARAM`/`LPARAM` format expected by the
+    /// official iRacing SDK and dispatched via `HWND_BROADCAST`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IRacingSDKError`] if `SendNotifyMessageW` reports a Win32 error.
     pub fn send_message(&self, message: BroadcastCommand) -> Result<()> {
         let (broadcast_type, var1, var2, var3) = message.encode();
         // Pack the low/high words to match the Windows broadcast contract.
