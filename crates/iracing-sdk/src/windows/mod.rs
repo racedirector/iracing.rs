@@ -36,6 +36,8 @@
 //! }
 //! ```
 
+mod broadcast;
 mod connection;
 
+pub use broadcast::Broadcast;
 pub use connection::{Connection, IRSDKHeader, VarBuf, WaitResult};
