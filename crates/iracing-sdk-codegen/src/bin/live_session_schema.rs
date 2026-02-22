@@ -22,7 +22,6 @@ use clap::{ArgAction, Parser};
 #[cfg(windows)]
 use iracing_sdk::{SessionInfoParser, WindowsConnection};
 use iracing_sdk_codegen::schema_diff::{diff_schemas, summarize_diff};
-use schemars::schema::RootSchema;
 use std::path::PathBuf;
 #[cfg(windows)]
 use std::{fs::File, io::BufWriter};
@@ -33,7 +32,7 @@ use tracing_subscriber::EnvFilter;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path where the output schema YAML should be written.
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "live-session-schema.yml")]
     output_path: PathBuf,
 
     /// Allow schema generation even if iRacing is disconnected (may be stale).
@@ -62,10 +61,12 @@ fn main() -> Result<()> {
 
 #[cfg(windows)]
 fn run() -> Result<()> {
+    use schemars::schema_for_value;
+
     let Args {
         output_path,
         allow_stale,
-        discover,
+        discover: _,
         diff,
         diff_output_path,
     } = Args::parse();
@@ -89,13 +90,17 @@ fn run() -> Result<()> {
 
     let parser = SessionInfoParser::new();
     let session = parser.parse(raw_session_yaml)?;
-    let schema = build_schema(&session, discover)?;
+    let schema = schema_for_value!(session);
 
-    write_schema(&schema, &output_path)?;
+    let output_file = File::create(&output_path)?;
+    let writer = BufWriter::new(output_file);
+    serde_yaml_ng::to_writer(writer, &schema)?;
+
     info!(path = %output_path.display(), "Wrote live session schema");
 
     if let Some(diff_path) = diff {
-        let baseline = read_schema(&diff_path)?;
+        let file = File::open(diff_path)?;
+        let baseline = serde_yaml_ng::from_reader(file)?;
         let report = diff_schemas(&schema, &baseline);
         info!("{}", summarize_diff(&report));
 
@@ -117,28 +122,3 @@ fn run() -> Result<()> {
     );
     Err(anyhow!("live_session_schema is only supported on Windows"))
 }
-
-#[cfg(windows)]
-fn build_schema(session: &iracing_sdk::SessionInfo, discover: bool) -> Result<RootSchema> {
-    if !discover {
-        return Ok(iracing_sdk::session_root_schema());
-    }
-
-    Ok(iracing_sdk::session_root_schema_with_discovery(session))
-}
-
-#[cfg(windows)]
-fn write_schema(schema: &RootSchema, output_path: &PathBuf) -> Result<()> {
-    let output_file = File::create(output_path)?;
-    let writer = BufWriter::new(output_file);
-    serde_yaml_ng::to_writer(writer, schema)?;
-    Ok(())
-}
-
-#[cfg(windows)]
-fn read_schema(path: &PathBuf) -> Result<RootSchema> {
-    let file = File::open(path)?;
-    let schema = serde_yaml_ng::from_reader(file)?;
-    Ok(schema)
-}
-

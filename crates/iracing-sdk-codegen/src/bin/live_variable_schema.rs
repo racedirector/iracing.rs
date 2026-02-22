@@ -17,7 +17,7 @@
 use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 use iracing_sdk::{VariableSchema, WindowsConnection};
-use schemars::schema::RootSchema;
+use schemars::schema_for_value;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -26,7 +26,7 @@ use tracing_subscriber::EnvFilter;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path where the output schema YAML should be written.
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "live-variable-schema.yml")]
     output_path: PathBuf,
 
     /// Allow schema generation even if iRacing is disconnected (may be stale).
@@ -70,7 +70,7 @@ pub fn main() -> Result<()> {
 
     let frame_size = connection.header().buf_len as usize;
     let variable_schema = VariableSchema::new(variable_map, frame_size)?;
-    let schema: RootSchema = variable_schema.into();
+    let schema = schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
@@ -81,4 +81,3 @@ pub fn main() -> Result<()> {
 
     Ok(())
 }
-

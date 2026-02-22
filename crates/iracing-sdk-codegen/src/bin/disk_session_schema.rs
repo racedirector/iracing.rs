@@ -21,7 +21,7 @@ use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 use iracing_sdk::{IbtReader, SessionInfo};
 use iracing_sdk_codegen::schema_diff::{diff_schemas, summarize_diff};
-use schemars::schema::RootSchema;
+use schemars::schema_for_value;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -34,7 +34,7 @@ struct Args {
     ibt_path: PathBuf,
 
     /// Path where the output schema YAML should be written.
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "disk-session-schema.yml")]
     output_path: PathBuf,
 
     /// Merge discovered session fields into the emitted schema.
@@ -57,7 +57,7 @@ fn main() -> Result<()> {
     let Args {
         ibt_path,
         output_path,
-        discover,
+        discover: _,
         diff,
         diff_output_path,
     } = Args::parse();
@@ -74,13 +74,17 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?;
 
     let session = SessionInfo::parse(&session_yaml)?;
-    let schema = build_schema(&session, discover)?;
+    let schema = schema_for_value!(session);
 
-    write_schema(&schema, &output_path)?;
+    let output_file = File::create(&output_path)?;
+    let writer = BufWriter::new(output_file);
+    serde_yaml_ng::to_writer(writer, &schema)?;
+
     info!(path = %output_path.display(), "Wrote disk session schema");
 
     if let Some(diff_path) = diff {
-        let baseline = read_schema(&diff_path)?;
+        let file = File::open(diff_path)?;
+        let baseline = serde_yaml_ng::from_reader(file)?;
         let report = diff_schemas(&schema, &baseline);
         info!("{}", summarize_diff(&report));
 
@@ -94,25 +98,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-
-fn build_schema(session: &SessionInfo, discover: bool) -> Result<RootSchema> {
-    if !discover {
-        return Ok(iracing_sdk::session_root_schema());
-    }
-
-    Ok(iracing_sdk::session_root_schema_with_discovery(session))
-}
-
-fn write_schema(schema: &RootSchema, output_path: &PathBuf) -> Result<()> {
-    let output_file = File::create(output_path)?;
-    let writer = BufWriter::new(output_file);
-    serde_yaml_ng::to_writer(writer, schema)?;
-    Ok(())
-}
-
-fn read_schema(path: &PathBuf) -> Result<RootSchema> {
-    let file = File::open(path)?;
-    let schema = serde_yaml_ng::from_reader(file)?;
-    Ok(schema)
-}
-

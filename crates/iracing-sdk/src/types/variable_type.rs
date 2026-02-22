@@ -1,10 +1,13 @@
 //! Telemetry variable type definitions
 
+#[cfg(feature = "codegen")]
+use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
 
 /// Supported telemetry data types.
 /// Maps to iRacing SDK's irsdk_VarType enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 pub enum VariableType {
     /// 8-bit character (maps to irsdk_char)
     Char,
@@ -47,6 +50,28 @@ impl VariableType {
     }
 }
 
+#[cfg(feature = "codegen")]
+impl From<VariableType> for Schema {
+    fn from(value: VariableType) -> Self {
+        let type_value = match value {
+            VariableType::Char => "string",
+            VariableType::Bool => "boolean",
+            VariableType::Float32 | VariableType::Float64 => "number",
+            VariableType::Int8
+            | VariableType::UInt8
+            | VariableType::Int16
+            | VariableType::UInt16
+            | VariableType::Int32
+            | VariableType::UInt32
+            | VariableType::BitField => "integer",
+        };
+
+        json_schema!({
+            "type": type_value
+        })
+    }
+}
+
 /// Runtime value type that can hold any telemetry data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
@@ -62,4 +87,36 @@ pub enum Value {
     Bool(bool),
     BitField(super::BitField),
     Array(Vec<Value>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "codegen")]
+    #[test]
+    fn from_variable_type_to_schema_maps_to_expected_json_type() {
+        let cases = [
+            (VariableType::Char, "string"),
+            (VariableType::Bool, "boolean"),
+            (VariableType::Float32, "number"),
+            (VariableType::Float64, "number"),
+            (VariableType::Int8, "integer"),
+            (VariableType::UInt8, "integer"),
+            (VariableType::Int16, "integer"),
+            (VariableType::UInt16, "integer"),
+            (VariableType::Int32, "integer"),
+            (VariableType::UInt32, "integer"),
+            (VariableType::BitField, "integer"),
+        ];
+
+        for (var_type, expected_type) in cases {
+            let schema = Schema::from(var_type);
+            assert_eq!(
+                schema,
+                json_schema!({ "type": expected_type }),
+                "{var_type:?} should map to JSON Schema type '{expected_type}'"
+            );
+        }
+    }
 }

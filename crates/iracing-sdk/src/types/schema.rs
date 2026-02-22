@@ -1,11 +1,14 @@
 //! Telemetry variable schema types
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::VariableType;
 
 /// Schema describing the structure and metadata of telemetry variables.
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableSchema {
     /// Map of variable names to their metadata (provides O(1) lookup)
@@ -77,6 +80,7 @@ impl VariableSchema {
 }
 
 /// Information about a specific telemetry variable.
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableInfo {
     /// Variable name as defined by iRacing
