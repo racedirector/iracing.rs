@@ -27,8 +27,12 @@ name = "session-schema"
 path = "src/bin/session_schema.rs"
 
 [[bin]]
-name = "disk-telemetry-schema"
-path = "src/bin/disk_telemetry_schema.rs"
+name = "disk-variable-schema"
+path = "src/bin/disk_variable_schema.rs"
+
+[[bin]]
+name = "live-variable-schema"
+path = "src/bin/live_variable_schema.rs"
 
 [[bin]]
 name = "live-telemetry-schema"
@@ -41,3 +45,7 @@ path = "src/bin/disk_session_schema.rs"
 [[bin]]
 name = "live-session-schema"
 path = "src/bin/live_session_schema.rs"
+
+[[bin]]
+name = "car-setup-schema"
+path = "src/bin/car_setup_schema.rs"
