@@ -39,15 +39,18 @@ pub fn tick_after_u32(a: u32, b: u32) -> bool {
 
 /// Convenience: check if EngineWarnings indicate mandatory repair needed (1.19)
 pub fn engine_mandatory_repair_needed(bits: BitField) -> bool {
-    bits.has_flag(super::irsdk_flags::engine_warnings::MAND_REP_NEEDED)
+    let warnings = super::irsdk_bitflags::EngineWarnings::from(bits);
+    warnings.contains(super::irsdk_bitflags::EngineWarnings::MANDATORY_REPAIR_NEEDED)
 }
 
 /// Convenience: check if EngineWarnings indicate optional repair needed (1.19)
 pub fn engine_optional_repair_needed(bits: BitField) -> bool {
-    bits.has_flag(super::irsdk_flags::engine_warnings::OPT_REP_NEEDED)
+    let warnings = super::irsdk_bitflags::EngineWarnings::from(bits);
+    warnings.contains(super::irsdk_bitflags::EngineWarnings::OPTIONAL_REPAIR_NEEDED)
 }
 
 /// Convenience: check if SessionFlags indicate disqualification scoring invalid (1.19)
 pub fn session_dq_scoring_invalid(flags: BitField) -> bool {
-    flags.has_flag(super::irsdk_flags::session_flags::DQ_SCORING_INVALID)
+    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
+    session_flags.contains(super::irsdk_bitflags::SessionFlags::DQ_SCORING_INVALID)
 }

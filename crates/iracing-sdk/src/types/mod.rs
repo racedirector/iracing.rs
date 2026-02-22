@@ -47,6 +47,8 @@
 
 mod bitfield;
 mod incident;
+mod irsdk_bitflags;
+mod irsdk_enums;
 pub mod irsdk_flags;
 mod schema;
 mod update_rate;
@@ -55,10 +57,20 @@ mod variable_type;
 
 // Re-export all public types
 pub use bitfield::{
-    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed,
-    session_dq_scoring_invalid, tick_after_u32,
+    engine_mandatory_repair_needed, engine_optional_repair_needed, session_dq_scoring_invalid,
+    tick_after_u32, BitField,
 };
-pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
+pub use incident::encode_incident;
+pub use incident::{decode_incident, IncidentClassification, IncidentPenalty, IncidentReport};
+pub use irsdk_bitflags::{
+    CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
+};
+pub use irsdk_enums::{
+    BroadcastMessage, CameraSwitchFocus, CarLeftRight, ChatCommandMode, FfbCommandMode, PaceMode,
+    PitCommandMode, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
+    ReplayStateMode, SessionState, StatusField, TelemCommandMode, TrackLocation, TrackSurface,
+    TrackWetness, VideoCaptureMode,
+};
 pub use schema::{VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;

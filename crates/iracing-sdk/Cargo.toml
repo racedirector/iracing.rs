@@ -60,6 +60,10 @@ path = "examples/disk_position.rs"
 name = "live-position"
 path = "examples/live_position.rs"
 
+[[example]]
+name = "enum-bitfields-disk"
+path = "examples/enum_bitfields_disk.rs"
+
 [[bin]]
 name = "ibt-session-parser"
 path = "src/bin/ibt-session-parser.rs"

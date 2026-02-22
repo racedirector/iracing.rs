@@ -75,7 +75,7 @@
 //! - Separate session parser task handles heavy YAML processing
 //! - Bounded channel prevents parser backlog from affecting telemetry loop
 
-use crate::{Result, IRacingSDKError};
+use crate::{IRacingSDKError, Result};
 use std::mem;
 use tracing::{debug, trace};
 
@@ -131,12 +131,18 @@ impl IRSDKHeader {
     /// Parse header from raw memory bytes with validation
     /// Optimized for <1ms latency requirement with zero-copy techniques
     pub fn parse_from_memory(memory: &[u8]) -> Result<Self> {
-        trace!(memory_len = memory.len(), "Parsing iRacing header from memory");
+        trace!(
+            memory_len = memory.len(),
+            "Parsing iRacing header from memory"
+        );
 
         // Fast path: validate minimum size first
         const HEADER_SIZE: usize = mem::size_of::<IRSDKHeader>();
         if memory.len() < HEADER_SIZE {
-            return Err(IRacingSDKError::Memory { offset: memory.len(), source: None });
+            return Err(IRacingSDKError::Memory {
+                offset: memory.len(),
+                source: None,
+            });
         }
 
         // Zero-copy parsing: directly read from memory without copying
@@ -250,7 +256,9 @@ impl IRSDKHeader {
     fn validate_offset_consistency(&self) -> Result<()> {
         // Check for reasonable offset values and prevent overflow
         if self.session_info_offset > 0 && self.session_info_len > 0 {
-            let session_end = self.session_info_offset.saturating_add(self.session_info_len);
+            let session_end = self
+                .session_info_offset
+                .saturating_add(self.session_info_len);
             if session_end < self.session_info_offset {
                 return Err(IRacingSDKError::Parse {
                     context: "Offset validation".to_string(),
@@ -368,7 +376,11 @@ impl IRSDKHeader {
 
     /// Get buffer information for buffer rotation management
     pub fn buffer_info(&self) -> BufferInfo {
-        BufferInfo { num_buffers: self.num_buf, buffer_length: self.buf_len, buffers: self.var_buf }
+        BufferInfo {
+            num_buffers: self.num_buf,
+            buffer_length: self.buf_len,
+            buffers: self.var_buf,
+        }
     }
 }
 
@@ -646,7 +658,11 @@ mod tests {
             num_buf: 4,
             buf_len: 2000,
             pad1: [0, 0],
-            var_buf: [IRSDKVarBuf { tick_count: 100, buf_offset: 3000, pad: [0, 0] }; 4],
+            var_buf: [IRSDKVarBuf {
+                tick_count: 100,
+                buf_offset: 3000,
+                pad: [0, 0],
+            }; 4],
         };
 
         assert!(header.validate().is_ok());
@@ -666,7 +682,11 @@ mod tests {
             num_buf: 4,
             buf_len: 1000,
             pad1: [0, 0],
-            var_buf: [IRSDKVarBuf { tick_count: 0, buf_offset: 3000, pad: [0, 0] }; 4],
+            var_buf: [IRSDKVarBuf {
+                tick_count: 0,
+                buf_offset: 3000,
+                pad: [0, 0],
+            }; 4],
         };
 
         assert!(header.session_info_changed(41)); // Different value
@@ -687,7 +707,11 @@ mod tests {
             num_buf: 4,
             buf_len: 2000,
             pad1: [0, 0],
-            var_buf: [IRSDKVarBuf { tick_count: 100, buf_offset: 3000, pad: [0, 0] }; 4],
+            var_buf: [IRSDKVarBuf {
+                tick_count: 100,
+                buf_offset: 3000,
+                pad: [0, 0],
+            }; 4],
         };
 
         let schema_info = header.schema_info();
@@ -716,10 +740,26 @@ mod tests {
             buf_len: 7817,             // Realistic based on live data
             pad1: [0, 0],
             var_buf: [
-                IRSDKVarBuf { tick_count: 100, buf_offset: 50000, pad: [0, 0] },
-                IRSDKVarBuf { tick_count: 101, buf_offset: 60000, pad: [0, 0] },
-                IRSDKVarBuf { tick_count: 102, buf_offset: 70000, pad: [0, 0] },
-                IRSDKVarBuf { tick_count: 103, buf_offset: 80000, pad: [0, 0] },
+                IRSDKVarBuf {
+                    tick_count: 100,
+                    buf_offset: 50000,
+                    pad: [0, 0],
+                },
+                IRSDKVarBuf {
+                    tick_count: 101,
+                    buf_offset: 60000,
+                    pad: [0, 0],
+                },
+                IRSDKVarBuf {
+                    tick_count: 102,
+                    buf_offset: 70000,
+                    pad: [0, 0],
+                },
+                IRSDKVarBuf {
+                    tick_count: 103,
+                    buf_offset: 80000,
+                    pad: [0, 0],
+                },
             ],
         };
 

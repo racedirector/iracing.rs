@@ -89,7 +89,11 @@ fn collect_schema_object_paths(
 ) {
     let mut types = normalize_instance_types(schema.get("type"));
 
-    if schema.get("properties").and_then(Value::as_object).is_some() {
+    if schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .is_some()
+    {
         types.insert("object".to_string());
     }
     if schema.get("items").is_some() {

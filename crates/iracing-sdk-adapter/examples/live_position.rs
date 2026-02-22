@@ -141,8 +141,8 @@ impl FrameAdapter for Row {
             // latitude: validation.fetch_or_default::<f64>(packet, "Lat"),
             // longitude: validation.fetch_or_default::<f64>(packet, "Lon"),
             // altitude: validation.fetch_or_default::<f32>(packet, "Alt"),
-            is_in_pit_box: validation.fetch_or_default::<bool>(packet, "OnPitRoad"),
-            is_on_pit_road: validation.fetch_or_default::<bool>(packet, "PlayerCarInPitStall"),
+            is_on_pit_road: validation.fetch_or_default::<bool>(packet, "OnPitRoad"),
+            is_in_pit_box: validation.fetch_or_default::<bool>(packet, "PlayerCarInPitStall"),
         }
     }
 }

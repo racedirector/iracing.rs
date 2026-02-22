@@ -22,7 +22,11 @@ pub struct SessionInfoCache {
 impl SessionInfoCache {
     /// Create new cache entry
     pub fn new(session_info: SessionInfo, version: u32) -> Self {
-        Self { session_info, version, parsed_at: std::time::SystemTime::now() }
+        Self {
+            session_info,
+            version,
+            parsed_at: std::time::SystemTime::now(),
+        }
     }
 
     /// Check if cache is valid for given version
@@ -106,14 +110,21 @@ impl SessionInfoParser {
         let end = start + (length as usize);
 
         if end > memory.len() {
-            return Err(IRacingSDKError::Memory { offset: end, source: None }.into());
+            return Err(IRacingSDKError::Memory {
+                offset: end,
+                source: None,
+            }
+            .into());
         }
 
         // Extract bytes and convert to string
         let yaml_bytes = &memory[start..end];
 
         // Find null terminator or use full length
-        let null_pos = yaml_bytes.iter().position(|&b| b == 0).unwrap_or(yaml_bytes.len());
+        let null_pos = yaml_bytes
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(yaml_bytes.len());
 
         // Convert to UTF-8 string
         let yaml_str = String::from_utf8_lossy(&yaml_bytes[..null_pos]).to_string();

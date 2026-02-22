@@ -54,7 +54,7 @@
 //! - Comprehensive validation with early error detection
 //! - Efficient memory layout matching iRacing's C structures
 
-use crate::{Result, IRacingSDKError, VariableInfo, VariableSchema, VariableType};
+use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
 use tracing::{debug, trace, warn};
 
@@ -107,7 +107,10 @@ impl IRSDKVarHeader {
 
         // Validate we have enough bytes for a complete header
         if offset + VAR_HEADER_SIZE > memory.len() {
-            return Err(IRacingSDKError::Memory { offset, source: None });
+            return Err(IRacingSDKError::Memory {
+                offset,
+                source: None,
+            });
         }
 
         // Zero-copy parsing: directly read from memory
@@ -161,7 +164,10 @@ impl IRSDKVarHeader {
             irsdk_var_type::IRSDK_FLOAT => VariableType::Float32,
             irsdk_var_type::IRSDK_DOUBLE => VariableType::Float64,
             _ => {
-                warn!(irsdk_type, "Unknown iRacing variable type, defaulting to Int32");
+                warn!(
+                    irsdk_type,
+                    "Unknown iRacing variable type, defaulting to Int32"
+                );
                 VariableType::Int32 // Safe default for unknown types
             }
         }
@@ -193,7 +199,10 @@ pub fn parse_variable_schema(
     var_header_offset: i32,
     buffer_length: i32,
 ) -> Result<VariableSchema> {
-    debug!(num_vars, var_header_offset, buffer_length, "Parsing variable schema from memory");
+    debug!(
+        num_vars,
+        var_header_offset, buffer_length, "Parsing variable schema from memory"
+    );
 
     // Validate input parameters
     if num_vars <= 0 {
@@ -217,7 +226,10 @@ pub fn parse_variable_schema(
 
     // Validate memory bounds
     if headers_end > memory.len() {
-        return Err(IRacingSDKError::Memory { offset: headers_end, source: None });
+        return Err(IRacingSDKError::Memory {
+            offset: headers_end,
+            source: None,
+        });
     }
 
     // Parse all variable headers
@@ -256,10 +268,18 @@ pub fn parse_variable_schema(
     }
 
     if failed_count > 0 {
-        warn!(failed_count, total = num_vars, "Some variable headers failed to parse");
+        warn!(
+            failed_count,
+            total = num_vars,
+            "Some variable headers failed to parse"
+        );
     }
 
-    debug!(parsed_count = variables.len(), expected_count = num_vars, "Variable parsing completed");
+    debug!(
+        parsed_count = variables.len(),
+        expected_count = num_vars,
+        "Variable parsing completed"
+    );
 
     // Build schema with validation
     let schema = VariableSchema::new(variables, buffer_length as usize)?;
