@@ -23,13 +23,13 @@
 //! # Usage
 //!
 //! ```text
-//! session-parser --ibt-path <PATH_TO_FILE.ibt> --output-path <OUTPUT_FILE.yaml>
+//! ibt-session-parser --ibt-path <PATH_TO_FILE.ibt> --output-path <OUTPUT_FILE.yaml>
 //! ```
 //!
 //! Short flags are also supported:
 //!
 //! ```text
-//! session-parser -i <PATH_TO_FILE.ibt> -o <OUTPUT_FILE.yaml>
+//! ibt-session-parser -i <PATH_TO_FILE.ibt> -o <OUTPUT_FILE.yaml>
 //! ```
 //!
 //! # Examples
@@ -37,7 +37,7 @@
 //! Parse an `.ibt` file and write session YAML:
 //!
 //! ```bash
-//! cargo run -p <YOUR_BIN_CRATE_NAME> -- \
+//! cargo run -p iracing-sdk --bin ibt-session-parser -- \
 //!   --ibt-path "C:\path\to\telemetry.ibt" \
 //!   --output-path "C:\path\to\session.yaml"
 //! ```
@@ -45,7 +45,7 @@
 //! Reduce log noise:
 //!
 //! ```bash
-//! RUST_LOG=info cargo run -p <YOUR_BIN_CRATE_NAME> -- \
+//! RUST_LOG=info cargo run -p iracing-sdk --bin ibt-session-parser -- \
 //!   -i "./telemetry.ibt" \
 //!   -o "./session.yaml"
 //! ```

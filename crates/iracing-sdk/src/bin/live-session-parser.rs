@@ -9,7 +9,7 @@
 //! - Quickly exporting session metadata while the sim is running
 //!
 //! # Platform
-//! This tool relies on [`iracing_sdk::WindowsConnection`], so it is typically only
+//! This tool relies on `iracing_sdk::WindowsConnection`, so it is typically only
 //! usable on **Windows**, and requires iRacing to be installed and (optionally) running.
 //!
 //! # Behavior
@@ -42,14 +42,14 @@
 //! Strict mode (default): requires iRacing to be connected:
 //!
 //! ```bash
-//! cargo run -p <YOUR_BIN_CRATE_NAME> -- \
+//! cargo run -p iracing-sdk --bin live-session-parser -- \
 //!   --output-path "C:\path\to\live-session.yaml"
 //! ```
 //!
 //! Best-effort mode: do not error if iRacing isn’t live (useful for quick checks):
 //!
 //! ```bash
-//! cargo run -p <YOUR_BIN_CRATE_NAME> -- \
+//! cargo run -p iracing-sdk --bin live-session-parser -- \
 //!   --output-path "C:\path\to\live-session.yaml" \
 //!   --no-live-only
 //! ```
@@ -57,7 +57,7 @@
 //! Reduce logging verbosity:
 //!
 //! ```bash
-//! RUST_LOG=info cargo run -p <YOUR_BIN_CRATE_NAME> -- \
+//! RUST_LOG=info cargo run -p iracing-sdk --bin live-session-parser -- \
 //!   --output-path ".\live-session.yaml"
 //! ```
 //!
