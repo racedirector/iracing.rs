@@ -1,0 +1,8 @@
+[alias]
+session-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "session-schema", "--"]
+disk-variable-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "disk-variable-schema", "--"]
+live-variable-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "live-variable-schema", "--"]
+disk-session-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "disk-session-schema", "--"]
+live-session-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "live-session-schema", "--"]
+car-setup-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "car-setup-schema", "--"]
+iracing-primitives-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "iracing-primitives-schema", "--"]

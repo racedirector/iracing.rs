@@ -55,3 +55,7 @@ path = "src/bin/live_session_schema.rs"
 [[bin]]
 name = "car-setup-schema"
 path = "src/bin/car_setup_schema.rs"
+
+[[bin]]
+name = "iracing-primitives-schema"
+path = "src/bin/iracing_primitives_schema.rs"

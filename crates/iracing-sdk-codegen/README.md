@@ -10,6 +10,20 @@ This crate provides binaries for generating telemetry and session schemas from:
 
 All schema outputs are YAML-serialized JSON Schema.
 
+## Cargo aliases
+
+The workspace root defines Cargo aliases in `.cargo/config.toml` for each codegen bin:
+
+- `cargo session-schema`
+- `cargo disk-variable-schema`
+- `cargo live-variable-schema`
+- `cargo disk-session-schema`
+- `cargo live-session-schema`
+- `cargo car-setup-schema`
+- `cargo iracing-primitives-schema`
+
+Each alias runs the corresponding `iracing-sdk-codegen` binary and forwards additional arguments.
+
 ## Binaries
 
 ### `session-schema`
@@ -96,6 +110,16 @@ cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
 # Parse from live iRacing (Windows)
 cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
   --output-dir ./out
+```
+
+### `iracing-primitives-schema`
+
+Generates a YAML schema for the `irsdk_*` primitive wrappers exported by
+`iracing-sdk::types` (enums and bitflags).
+
+```text
+cargo run -p iracing-sdk-codegen --bin iracing-primitives-schema -- \
+  --output-path ./iracing-primitives-schema.yml
 ```
 
 ## Notes

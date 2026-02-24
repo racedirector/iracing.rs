@@ -1,5 +1,7 @@
 //! Typed enum wrappers for IRSDK numeric enums.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 macro_rules! define_irsdk_enum {
@@ -11,6 +13,7 @@ macro_rules! define_irsdk_enum {
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[cfg_attr(feature = "codegen", derive(JsonSchema))]
         $vis enum $name {
             $($variant,)+
             Unknown(i32),

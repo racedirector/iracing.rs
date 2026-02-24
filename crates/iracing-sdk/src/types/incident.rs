@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{irsdk_bitflags::IncidentFlags, irsdk_flags, BitField};
+use super::{BitField, irsdk_bitflags::IncidentFlags, irsdk_flags};
 
 /// High-level classification of an incident as report + penalty code.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

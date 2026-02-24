@@ -1,5 +1,7 @@
 //! Typed wrappers for IRSDK bitfield families.
 
+#[cfg(feature = "codegen")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::BitField;
@@ -13,6 +15,7 @@ macro_rules! define_irsdk_bitflags {
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[cfg_attr(feature = "codegen", derive(JsonSchema))]
         $vis struct $name(u32);
 
         impl $name {
@@ -155,6 +158,7 @@ define_irsdk_bitflags! {
 
 /// `enum irsdk_IncidentFlags` as a combined report+penalty container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 pub struct IncidentFlags(u32);
 
 impl IncidentFlags {
