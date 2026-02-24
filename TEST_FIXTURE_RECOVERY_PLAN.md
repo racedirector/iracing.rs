@@ -61,7 +61,7 @@ Create and commit these under `test-data/`:
    - Keeps fixture generation diff-friendly.
 
 4. `scripts/generate_test_fixtures.(rs|py)`
-   - Deterministic generator (seeded).
+   - The generator is deterministic (seeded).
    - Should be runnable in CI and locally.
 
 5. `scripts/verify_test_fixtures.(rs|py)` (optional but recommended)
