@@ -10,7 +10,7 @@
 //!
 //! # Usage
 //! ```text
-//! disk_telemetry_schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
+//! disk-variable-schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
 //! ```
 
 use anyhow::Result;

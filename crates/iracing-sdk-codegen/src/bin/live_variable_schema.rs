@@ -11,17 +11,23 @@
 //!
 //! # Usage
 //! ```text
-//! live_telemetry_schema --output-path <SCHEMA.yml> [--allow-stale]
+//! live-variable-schema --output-path <SCHEMA.yml> [--allow-stale]
 //! ```
 
 use anyhow::{Result, anyhow};
+#[cfg(windows)]
 use clap::{ArgAction, Parser};
+#[cfg(windows)]
 use iracing_sdk::{VariableSchema, WindowsConnection};
+#[cfg(windows)]
 use schemars::schema_for_value;
+#[cfg(windows)]
 use std::{fs::File, io::BufWriter, path::PathBuf};
+#[cfg(windows)]
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+#[cfg(windows)]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -42,6 +48,11 @@ pub fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
+    run()
+}
+
+#[cfg(windows)]
+fn run() -> Result<()> {
     // ------------------------------------------------------------
     // Parse CLI arguments
     // ------------------------------------------------------------
@@ -80,4 +91,14 @@ pub fn main() -> Result<()> {
     info!(path=%output_path.display(),"Wrote live telemetry schema");
 
     Ok(())
+}
+
+#[cfg(not(windows))]
+fn run() -> Result<()> {
+    tracing::warn!(
+        "live-telemetry-schema is only supported on Windows because it depends on iRacing shared memory APIs."
+    );
+    Err(anyhow!(
+        "live-telemetry-schema is only supported on Windows"
+    ))
 }
