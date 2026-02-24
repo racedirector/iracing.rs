@@ -1,0 +1,495 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: IrsdkPrimitivesSchema
+type: object
+properties:
+  irsdk_BroadcastMsg:
+    $ref: '#/$defs/BroadcastMessage'
+  irsdk_CameraState:
+    $ref: '#/$defs/CameraState'
+  irsdk_CarLeftRight:
+    $ref: '#/$defs/CarLeftRight'
+  irsdk_ChatCommandMode:
+    $ref: '#/$defs/ChatCommandMode'
+  irsdk_EngineWarnings:
+    $ref: '#/$defs/EngineWarnings'
+  irsdk_FFBCommandMode:
+    $ref: '#/$defs/FfbCommandMode'
+  irsdk_Flags:
+    $ref: '#/$defs/SessionFlags'
+  irsdk_IncidentFlags:
+    $ref: '#/$defs/IncidentFlags'
+  irsdk_PaceFlags:
+    $ref: '#/$defs/PaceFlags'
+  irsdk_PaceMode:
+    $ref: '#/$defs/PaceMode'
+  irsdk_PitCommandMode:
+    $ref: '#/$defs/PitCommandMode'
+  irsdk_PitSvFlags:
+    $ref: '#/$defs/PitServiceFlags'
+  irsdk_PitSvStatus:
+    $ref: '#/$defs/PitServiceStatus'
+  irsdk_ReloadTexturesMode:
+    $ref: '#/$defs/ReloadTexturesMode'
+  irsdk_RpyPosMode:
+    $ref: '#/$defs/ReplayPositionMode'
+  irsdk_RpySrchMode:
+    $ref: '#/$defs/ReplaySearchMode'
+  irsdk_RpyStateMode:
+    $ref: '#/$defs/ReplayStateMode'
+  irsdk_SessionState:
+    $ref: '#/$defs/SessionState'
+  irsdk_StatusField:
+    $ref: '#/$defs/StatusField'
+  irsdk_TelemetryCommandMode:
+    $ref: '#/$defs/TelemetryCommandMode'
+  irsdk_TrackWetness:
+    $ref: '#/$defs/TrackWetness'
+  irsdk_TrkLoc:
+    $ref: '#/$defs/TrackLocation'
+  irsdk_TrkSurf:
+    $ref: '#/$defs/TrackSurface'
+  irsdk_VideoCaptureMode:
+    $ref: '#/$defs/VideoCaptureMode'
+  irsdk_csMode:
+    $ref: '#/$defs/CameraSwitchFocus'
+required:
+- irsdk_StatusField
+- irsdk_TrkLoc
+- irsdk_TrkSurf
+- irsdk_SessionState
+- irsdk_CarLeftRight
+- irsdk_PitSvStatus
+- irsdk_PaceMode
+- irsdk_TrackWetness
+- irsdk_BroadcastMsg
+- irsdk_ChatCommandMode
+- irsdk_PitCommandMode
+- irsdk_TelemetryCommandMode
+- irsdk_RpyStateMode
+- irsdk_ReloadTexturesMode
+- irsdk_RpySrchMode
+- irsdk_RpyPosMode
+- irsdk_FFBCommandMode
+- irsdk_csMode
+- irsdk_VideoCaptureMode
+- irsdk_EngineWarnings
+- irsdk_Flags
+- irsdk_CameraState
+- irsdk_PitSvFlags
+- irsdk_PaceFlags
+- irsdk_IncidentFlags
+$defs:
+  BroadcastMessage:
+    description: '`enum irsdk_BroadcastMsg`'
+    oneOf:
+    - type: string
+      enum:
+      - CamSwitchPos
+      - CamSwitchNum
+      - CamSetState
+      - ReplaySetPlaySpeed
+      - ReplaySetPlayPosition
+      - ReplaySearch
+      - ReplaySetState
+      - ReloadTextures
+      - ChatCommand
+      - PitCommand
+      - TelemCommand
+      - FfbCommand
+      - ReplaySearchSessionTime
+      - VideoCapture
+      - Last
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  CameraState:
+    description: '`enum irsdk_CameraState`'
+    type: integer
+    format: uint32
+    minimum: 0
+  CameraSwitchFocus:
+    description: '`enum irsdk_csMode`'
+    oneOf:
+    - type: string
+      enum:
+      - FocusAtIncident
+      - FocusAtLeader
+      - FocusAtExiting
+      - FocusAtDriver
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  CarLeftRight:
+    description: '`enum irsdk_CarLeftRight`'
+    oneOf:
+    - type: string
+      enum:
+      - Off
+      - Clear
+      - CarLeft
+      - CarRight
+      - CarLeftRight
+      - TwoCarsLeft
+      - TwoCarsRight
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  ChatCommandMode:
+    description: '`enum irsdk_ChatCommandMode`'
+    oneOf:
+    - type: string
+      enum:
+      - Macro
+      - BeginChat
+      - Reply
+      - Cancel
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  EngineWarnings:
+    description: '`enum irsdk_EngineWarnings`'
+    type: integer
+    format: uint32
+    minimum: 0
+  FfbCommandMode:
+    description: '`enum irsdk_FFBCommandMode`'
+    oneOf:
+    - type: string
+      enum:
+      - MaxForce
+      - Last
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  IncidentFlags:
+    description: '`enum irsdk_IncidentFlags` as a combined report+penalty container.'
+    type: integer
+    format: uint32
+    minimum: 0
+  PaceFlags:
+    description: '`enum irsdk_PaceFlags`'
+    type: integer
+    format: uint32
+    minimum: 0
+  PaceMode:
+    description: '`enum irsdk_PaceMode`'
+    oneOf:
+    - type: string
+      enum:
+      - SingleFileStart
+      - DoubleFileStart
+      - SingleFileRestart
+      - DoubleFileRestart
+      - NotPacing
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  PitCommandMode:
+    description: '`enum irsdk_PitCommandMode`'
+    oneOf:
+    - type: string
+      enum:
+      - Clear
+      - Ws
+      - Fuel
+      - Lf
+      - Rf
+      - Lr
+      - Rr
+      - ClearTires
+      - Fr
+      - ClearWs
+      - ClearFr
+      - ClearFuel
+      - Tc
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  PitServiceFlags:
+    description: '`enum irsdk_PitSvFlags`'
+    type: integer
+    format: uint32
+    minimum: 0
+  PitServiceStatus:
+    description: '`enum irsdk_PitSvStatus`'
+    oneOf:
+    - type: string
+      enum:
+      - None
+      - InProgress
+      - Complete
+      - TooFarLeft
+      - TooFarRight
+      - TooFarForward
+      - TooFarBack
+      - BadAngle
+      - CantFixThat
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  ReloadTexturesMode:
+    description: '`enum irsdk_ReloadTexturesMode`'
+    oneOf:
+    - type: string
+      enum:
+      - All
+      - CarIdx
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  ReplayPositionMode:
+    description: '`enum irsdk_RpyPosMode`'
+    oneOf:
+    - type: string
+      enum:
+      - Begin
+      - Current
+      - End
+      - Last
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  ReplaySearchMode:
+    description: '`enum irsdk_RpySrchMode`'
+    oneOf:
+    - type: string
+      enum:
+      - ToStart
+      - ToEnd
+      - PrevSession
+      - NextSession
+      - PrevLap
+      - NextLap
+      - PrevFrame
+      - NextFrame
+      - PrevIncident
+      - NextIncident
+      - Last
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  ReplayStateMode:
+    description: '`enum irsdk_RpyStateMode`'
+    oneOf:
+    - type: string
+      enum:
+      - EraseTape
+      - Last
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  SessionFlags:
+    description: '`enum irsdk_Flags`'
+    type: integer
+    format: uint32
+    minimum: 0
+  SessionState:
+    description: '`enum irsdk_SessionState`'
+    oneOf:
+    - type: string
+      enum:
+      - Invalid
+      - GetInCar
+      - Warmup
+      - ParadeLaps
+      - Racing
+      - Checkered
+      - CoolDown
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  StatusField:
+    description: '`enum irsdk_StatusField`'
+    oneOf:
+    - type: string
+      enum:
+      - Connected
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  TelemetryCommandMode:
+    description: '`enum irsdk_TelemetryCommandMode`'
+    oneOf:
+    - type: string
+      enum:
+      - Stop
+      - Start
+      - Restart
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  TrackLocation:
+    description: '`enum irsdk_TrkLoc`'
+    oneOf:
+    - type: string
+      enum:
+      - NotInWorld
+      - OffTrack
+      - InPitStall
+      - ApproachingPits
+      - OnTrack
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  TrackSurface:
+    description: '`enum irsdk_TrkSurf`'
+    oneOf:
+    - type: string
+      enum:
+      - SurfaceNotInWorld
+      - UndefinedMaterial
+      - Asphalt1Material
+      - Asphalt2Material
+      - Asphalt3Material
+      - Asphalt4Material
+      - Concrete1Material
+      - Concrete2Material
+      - RacingDirt1Material
+      - RacingDirt2Material
+      - Paint1Material
+      - Paint2Material
+      - Rumble1Material
+      - Rumble2Material
+      - Rumble3Material
+      - Rumble4Material
+      - Grass1Material
+      - Grass2Material
+      - Grass3Material
+      - Grass4Material
+      - Dirt1Material
+      - Dirt2Material
+      - Dirt3Material
+      - Dirt4Material
+      - SandMaterial
+      - Gravel1Material
+      - Gravel2Material
+      - GrasscreteMaterial
+      - AstroturfMaterial
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  TrackWetness:
+    description: '`enum irsdk_TrackWetness`'
+    oneOf:
+    - type: string
+      enum:
+      - UnknownWetness
+      - Dry
+      - MostlyDry
+      - VeryLightlyWet
+      - LightlyWet
+      - ModeratelyWet
+      - VeryWet
+      - ExtremelyWet
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+  VideoCaptureMode:
+    description: '`enum irsdk_VideoCaptureMode`'
+    oneOf:
+    - type: string
+      enum:
+      - TriggerScreenShot
+      - StartVideoCapture
+      - EndVideoCapture
+      - ToggleVideoCapture
+      - ShowVideoTimer
+      - HideVideoTimer
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
