@@ -17,6 +17,12 @@ rustdoc-args = ["--cfg", "docsrs"]
 [package.metadata.dist]
 dist = true
 
+[package.metadata.dist.bin.live-session-parser]
+targets = ["x86_64-pc-windows-msvc"]
+
+[package.metadata.dist.bin.broadcast-cli]
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }

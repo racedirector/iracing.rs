@@ -17,7 +17,7 @@ This repository uses standalone `dist` (not `cargo dist`) to publish binaries to
 
 - `HOMEBREW_TAP_TOKEN`
   - Personal access token with write access to `racedirector/homebrew-tap`.
-  - Used by `publish-homebrew-formula` job in [release.yml](/Users/justinmakaila/Developer/iracing.rs/.github/workflows/release.yml).
+  - Used by `publish-homebrew-formula` job in [release.yml](.github/workflows/release.yml).
 
 ## Local Validation Before Tagging
 

@@ -12,6 +12,12 @@ license.workspace = true
 dist = true
 
 
+[package.metadata.dist.bin.live-variable-schema]
+targets = ["x86_64-pc-windows-msvc"]
+
+[package.metadata.dist.bin.live-session-schema]
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
