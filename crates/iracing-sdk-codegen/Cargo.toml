@@ -4,8 +4,12 @@ version = "0.1.0"
 description = "Code generation binaries for iracing-sdk"
 authors.workspace = true
 repository.workspace = true
+homepage.workspace = true
 edition.workspace = true
 license.workspace = true
+
+[package.metadata.dist]
+dist = true
 
 
 [dependencies]

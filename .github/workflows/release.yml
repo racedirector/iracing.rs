@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example: v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      publishing: ${{ steps.plan.outputs.publishing }}
+      val: ${{ steps.plan.outputs.val }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dist
+        shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.4/cargo-dist-installer.sh | sh
+
+      - name: Compute release plan
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+
+          if [[ -z "${TAG}" ]]; then
+            echo "Release tag is required."
+            exit 1
+          fi
+
+          dist plan --allow-dirty --tag "${TAG}" --output-format=json > dist-manifest.json
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "publishing=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "val<<EOF"
+            cat dist-manifest.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload dist manifest
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-manifest
+          path: dist-manifest.json
+
+  build-local-artifacts:
+    name: Build Local Artifacts
+    needs:
+      - plan
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dist
+        shell: ${{ matrix.install_dist.shell }}
+        run: ${{ matrix.install_dist.run }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ join(matrix.targets, ',') }}
+
+      - name: Build local artifacts
+        shell: ${{ matrix.install_dist.shell }}
+        run: dist build --allow-dirty ${{ matrix.dist_args }} --tag "${{ needs.plan.outputs.tag }}"
+
+      - name: Upload local artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: artifacts-${{ matrix.host }}
+          path: target/distrib/*
+
+  build-global-artifacts:
+    name: Build Global Artifacts
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dist
+        shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.4/cargo-dist-installer.sh | sh
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build global artifacts
+        shell: bash
+        run: dist build --allow-dirty --artifacts=global --tag "${{ needs.plan.outputs.tag }}"
+
+      - name: Upload global artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: artifacts-global
+          path: target/distrib/*
+
+  host:
+    name: Host Artifacts
+    needs:
+      - plan
+      - build-local-artifacts
+      - build-global-artifacts
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dist
+        shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.4/cargo-dist-installer.sh | sh
+
+      - name: Download built artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+
+      - name: Host release artifacts
+        shell: bash
+        run: dist host --allow-dirty --steps=create --steps=upload --steps=release --steps=announce --tag "${{ needs.plan.outputs.tag }}"
+
+  publish-homebrew-formula:
+    name: Publish Homebrew Formula
+    needs:
+      - plan
+      - host
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PLAN: ${{ needs.plan.outputs.val }}
+      GITHUB_USER: "axo bot"
+      GITHUB_EMAIL: "admin+bot@axo.dev"
+    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+    steps:
+      - name: Checkout tap repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+          repository: racedirector/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Fetch generated formula files
+        uses: actions/download-artifact@v7
+        with:
+          pattern: artifacts-*
+          path: Formula/
+          merge-multiple: true
+
+      - name: Commit formula files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global user.name "${GITHUB_USER}"
+          git config --global user.email "${GITHUB_EMAIL}"
+
+          for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith(".rb")] | any)'); do
+            filename=$(echo "$release" | jq '.artifacts[] | select(endswith(".rb"))' --raw-output)
+            name=$(echo "$filename" | sed "s/\.rb$//")
+            version=$(echo "$release" | jq .app_version --raw-output)
+
+            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+            brew update
+            brew style --except-cops FormulaAudit/Homepage,FormulaAudit/Desc,FormulaAuditStrict --fix "Formula/${filename}" || true
+
+            git add "Formula/${filename}"
+            if git diff --cached --quiet; then
+              echo "No Homebrew formula changes for ${name} ${version}"
+              continue
+            fi
+
+            git commit -m "${name} ${version}"
+          done
+
+          git push

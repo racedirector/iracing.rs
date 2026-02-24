@@ -13,6 +13,7 @@ resolver = "3"
 [workspace.package]
 authors = ["Justin Makaila <justin@treehousetechnology.io>"]
 repository = "https://github.com/racedirector/iracing.rs"
+homepage = "https://github.com/racedirector/iracing.rs"
 license = "MIT"
 edition = "2024"
 
@@ -27,3 +28,22 @@ thiserror = "2.0.16"
 tokio = { version = "1", features = ["rt", "macros"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.30.4"
+ci = ["github"]
+installers = ["homebrew"]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+  "aarch64-apple-darwin",
+]
+hosting = ["github"]
+tap = "racedirector/homebrew-tap"
+publish-jobs = ["homebrew"]
+allow-dirty = ["ci"]
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

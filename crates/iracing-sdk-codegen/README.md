@@ -80,8 +80,27 @@ cargo run -p iracing-sdk-codegen --bin live-session-schema -- \
   --diff-output-path ./live_session_diff.yml
 ```
 
+### `car-setup-schema`
+
+Generates car setup schema from either:
+
+- `--ibt-path <FILE.ibt>` (all platforms)
+- live iRacing session data when `--ibt-path` is omitted (Windows only)
+
+```text
+# Parse from IBT
+cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
+  --ibt-path ./recording.ibt \
+  --output-dir ./out
+
+# Parse from live iRacing (Windows)
+cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
+  --output-dir ./out
+```
+
 ## Notes
 
-- `live_*` bins require Windows because they depend on iRacing shared memory APIs.
+- `live-*` bins (and live mode of `car-setup-schema`) require Windows because they depend on iRacing shared memory APIs.
+- On non-Windows platforms, Windows-only modes return an explicit unsupported-platform error.
 - This crate enables `iracing-sdk` features `codegen` and `schema-discovery` by default via dependency configuration.
 - Diff mode is path/type oriented and ignores metadata-only changes (title/description changes alone do not produce diffs).
