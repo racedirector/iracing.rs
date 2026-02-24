@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   plan:
@@ -76,8 +77,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install dist
-        shell: ${{ matrix.install_dist.shell }}
+      - name: Install dist (bash)
+        if: ${{ matrix.install_dist.shell == 'bash' }}
+        shell: bash
+        run: ${{ matrix.install_dist.run }}
+
+      - name: Install dist (pwsh)
+        if: ${{ matrix.install_dist.shell == 'pwsh' }}
+        shell: pwsh
         run: ${{ matrix.install_dist.run }}
 
       - name: Install Rust
@@ -85,8 +92,14 @@ jobs:
         with:
           targets: ${{ join(matrix.targets, ',') }}
 
-      - name: Build local artifacts
-        shell: ${{ matrix.install_dist.shell }}
+      - name: Build local artifacts (bash)
+        if: ${{ matrix.install_dist.shell == 'bash' }}
+        shell: bash
+        run: dist build --allow-dirty ${{ matrix.dist_args }} --tag "${{ needs.plan.outputs.tag }}"
+
+      - name: Build local artifacts (pwsh)
+        if: ${{ matrix.install_dist.shell == 'pwsh' }}
+        shell: pwsh
         run: dist build --allow-dirty ${{ matrix.dist_args }} --tag "${{ needs.plan.outputs.tag }}"
 
       - name: Upload local artifacts
@@ -132,6 +145,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
+      actions: read
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
