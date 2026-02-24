@@ -51,7 +51,8 @@ jobs:
           dist plan --allow-dirty --tag "${TAG}" --output-format=json > dist-manifest.json
 
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "publishing=true" >> "$GITHUB_OUTPUT"
+          echo "publishing=$(cat dist-manifest.json | jq -r '.publishing // "false"')" >> "$GITHUB_OUTPUT"
+
           {
             echo "val<<EOF"
             cat dist-manifest.json
@@ -167,56 +168,56 @@ jobs:
         shell: bash
         run: dist host --allow-dirty --steps=create --steps=upload --steps=release --steps=announce --tag "${{ needs.plan.outputs.tag }}"
 
-  publish-homebrew-formula:
-    name: Publish Homebrew Formula
-    needs:
-      - plan
-      - host
-    runs-on: ubuntu-22.04
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PLAN: ${{ needs.plan.outputs.val }}
-      GITHUB_USER: "axo bot"
-      GITHUB_EMAIL: "admin+bot@axo.dev"
-    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    steps:
-      - name: Checkout tap repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: true
-          repository: racedirector/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+  # publish-homebrew-formula:
+  #   name: Publish Homebrew Formula
+  #   needs:
+  #     - plan
+  #     - host
+  #   runs-on: ubuntu-22.04
+  #   env:
+  #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     PLAN: ${{ needs.plan.outputs.val }}
+  #     GITHUB_USER: "axo bot"
+  #     GITHUB_EMAIL: "admin+bot@axo.dev"
+  #   if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
+  #   steps:
+  #     - name: Checkout tap repository
+  #       uses: actions/checkout@v6
+  #       with:
+  #         persist-credentials: true
+  #         repository: racedirector/homebrew-tap
+  #         token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
-      - name: Fetch generated formula files
-        uses: actions/download-artifact@v7
-        with:
-          pattern: artifacts-*
-          path: Formula/
-          merge-multiple: true
+  #     - name: Fetch generated formula files
+  #       uses: actions/download-artifact@v7
+  #       with:
+  #         pattern: artifacts-*
+  #         path: Formula/
+  #         merge-multiple: true
 
-      - name: Commit formula files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config --global user.name "${GITHUB_USER}"
-          git config --global user.email "${GITHUB_EMAIL}"
+  #     - name: Commit formula files
+  #       shell: bash
+  #       run: |
+  #         set -euo pipefail
+  #         git config --global user.name "${GITHUB_USER}"
+  #         git config --global user.email "${GITHUB_EMAIL}"
 
-          for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith(".rb")] | any)'); do
-            filename=$(echo "$release" | jq '.artifacts[] | select(endswith(".rb"))' --raw-output)
-            name=$(echo "$filename" | sed "s/\.rb$//")
-            version=$(echo "$release" | jq .app_version --raw-output)
+  #         for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith(".rb")] | any)'); do
+  #           filename=$(echo "$release" | jq '.artifacts[] | select(endswith(".rb"))' --raw-output)
+  #           name=$(echo "$filename" | sed "s/\.rb$//")
+  #           version=$(echo "$release" | jq .app_version --raw-output)
 
-            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-            brew update
-            brew style --except-cops FormulaAudit/Homepage,FormulaAudit/Desc,FormulaAuditStrict --fix "Formula/${filename}" || true
+  #           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+  #           brew update
+  #           brew style --except-cops FormulaAudit/Homepage,FormulaAudit/Desc,FormulaAuditStrict --fix "Formula/${filename}" || true
 
-            git add "Formula/${filename}"
-            if git diff --cached --quiet; then
-              echo "No Homebrew formula changes for ${name} ${version}"
-              continue
-            fi
+  #           git add "Formula/${filename}"
+  #           if git diff --cached --quiet; then
+  #             echo "No Homebrew formula changes for ${name} ${version}"
+  #             continue
+  #           fi
 
-            git commit -m "${name} ${version}"
-          done
+  #           git commit -m "${name} ${version}"
+  #         done
 
-          git push
+  #         git push
