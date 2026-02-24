@@ -1,6 +1,7 @@
 # Test + Fixture Recovery Plan (Post-Git-LFS)
 
 ## Context
+
 The workspace currently assumes telemetry fixtures (`.ibt`) are available in `test-data/ibt` and downloaded via Git LFS. We no longer have access to the original LFS remote, so we need to:
 
 1. make tests runnable without external LFS access,
@@ -18,6 +19,7 @@ The workspace currently assumes telemetry fixtures (`.ibt`) are available in `te
 This must be fixed first or tests cannot complete on non-Windows CI.
 
 ### 2) Fixture dependency hotspots
+
 The strongest fixture coupling is in:
 
 - `crates/iracing-sdk/src/ibt/format.rs` tests:
@@ -44,6 +46,7 @@ The strongest fixture coupling is in:
 Add a deterministic fixture generation pipeline that creates synthetic but valid IBT files.
 
 ### Files to generate and commit
+
 Create and commit these under `test-data/`:
 
 1. `test-data/ibt/*.ibt`
@@ -70,6 +73,7 @@ Create and commit these under `test-data/`:
 ## Phase 2 — Reshape tests around invariants, not historical recordings
 
 ### `format.rs` tests
+
 Refactor from exact historical constants to fixture-manifest-driven assertions:
 
 - Keep parser correctness checks (header parse, schema parse, frame extraction).
@@ -78,6 +82,7 @@ Refactor from exact historical constants to fixture-manifest-driven assertions:
 - Preserve cross-fixture comparisons (e.g., fixture A has more vars than fixture B), but base them on generated fixture profiles.
 
 ### `reader.rs` tests
+
 Mostly reusable as-is. Add explicit checks that generated fixture invariants hold:
 
 - valid frame count semantics,
@@ -85,6 +90,7 @@ Mostly reusable as-is. Add explicit checks that generated fixture invariants hol
 - session YAML parse.
 
 ### `test-utils` updates
+
 - Change `FIXTURE_INSTALL_GUIDANCE` to generated-fixture language.
 - Add helper to load/validate manifest (`load_fixture_manifest()`).
 - Optionally support auto-generation in dev mode (not in CI by default).
@@ -102,6 +108,7 @@ Mostly reusable as-is. Add explicit checks that generated fixture invariants hol
    - expected deterministic behavior.
 
 ## Suggested fixture profiles
+
 Use profiles with distinct characteristics so tests still cover variation:
 
 1. `profile_small.ibt`
