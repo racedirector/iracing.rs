@@ -89,6 +89,7 @@ examples:
       name: CamCameraState
       offset: 6577
       units: irsdk_CameraState
+      x-irsdk-unit-ref: '#/$defs/CameraState'
     CamCarIdx:
       count: 1
       count_as_time: false
@@ -249,6 +250,7 @@ examples:
       name: CarIdxPaceFlags
       offset: 5203
       units: irsdk_PaceFlags
+      x-irsdk-unit-ref: '#/$defs/PaceFlags'
     CarIdxPaceLine:
       count: 64
       count_as_time: false
@@ -305,6 +307,7 @@ examples:
       name: CarIdxSessionFlags
       offset: 4431
       units: irsdk_Flags
+      x-irsdk-unit-ref: '#/$defs/SessionFlags'
     CarIdxSteer:
       count: 64
       count_as_time: false
@@ -329,6 +332,7 @@ examples:
       name: CarIdxTrackSurface
       offset: 975
       units: irsdk_TrkLoc
+      x-irsdk-unit-ref: '#/$defs/TrackLocation'
     CarIdxTrackSurfaceMaterial:
       count: 64
       count_as_time: false
@@ -337,6 +341,7 @@ examples:
       name: CarIdxTrackSurfaceMaterial
       offset: 1231
       units: irsdk_TrkSurf
+      x-irsdk-unit-ref: '#/$defs/TrackSurface'
     CarLeftRight:
       count: 1
       count_as_time: false
@@ -345,6 +350,7 @@ examples:
       name: CarLeftRight
       offset: 6465
       units: irsdk_CarLeftRight
+      x-irsdk-unit-ref: '#/$defs/CarLeftRight'
     ChanAvgLatency:
       count: 1
       count_as_time: false
@@ -465,6 +471,7 @@ examples:
       name: EngineWarnings
       offset: 6616
       units: irsdk_EngineWarnings
+      x-irsdk-unit-ref: '#/$defs/EngineWarnings'
     EnterExitReset:
       count: 1
       count_as_time: false
@@ -1249,6 +1256,7 @@ examples:
       name: PaceMode
       offset: 4687
       units: irsdk_PaceMode
+      x-irsdk-unit-ref: '#/$defs/PaceMode'
     PitOptRepairLeft:
       count: 1
       count_as_time: false
@@ -1273,6 +1281,7 @@ examples:
       name: PitSvFlags
       offset: 6624
       units: irsdk_PitSvFlags
+      x-irsdk-unit-ref: '#/$defs/PitServiceFlags'
     PitSvFuel:
       count: 1
       count_as_time: false
@@ -1425,6 +1434,7 @@ examples:
       name: PlayerCarPitSvStatus
       offset: 195
       units: irsdk_PitSvStatus
+      x-irsdk-unit-ref: '#/$defs/PitServiceStatus'
     PlayerCarPosition:
       count: 1
       count_as_time: false
@@ -1513,6 +1523,7 @@ examples:
       name: PlayerIncidents
       offset: 6472
       units: irsdk_IncidentFlags
+      x-irsdk-unit-ref: '#/$defs/IncidentFlags'
     PlayerTireCompound:
       count: 1
       count_as_time: false
@@ -1529,6 +1540,7 @@ examples:
       name: PlayerTrackSurface
       offset: 154
       units: irsdk_TrkLoc
+      x-irsdk-unit-ref: '#/$defs/TrackLocation'
     PlayerTrackSurfaceMaterial:
       count: 1
       count_as_time: false
@@ -1537,6 +1549,7 @@ examples:
       name: PlayerTrackSurfaceMaterial
       offset: 158
       units: irsdk_TrkSurf
+      x-irsdk-unit-ref: '#/$defs/TrackSurface'
     Precipitation:
       count: 1
       count_as_time: false
@@ -1961,6 +1974,7 @@ examples:
       name: SessionFlags
       offset: 24
       units: irsdk_Flags
+      x-irsdk-unit-ref: '#/$defs/SessionFlags'
     SessionJokerLapsRemain:
       count: 1
       count_as_time: false
@@ -2017,6 +2031,7 @@ examples:
       name: SessionState
       offset: 16
       units: irsdk_SessionState
+      x-irsdk-unit-ref: '#/$defs/SessionState'
     SessionTick:
       count: 1
       count_as_time: false
@@ -2337,6 +2352,7 @@ examples:
       name: TrackWetness
       offset: 6409
       units: irsdk_TrackWetness
+      x-irsdk-unit-ref: '#/$defs/TrackWetness'
     VelocityX:
       count: 1
       count_as_time: false
@@ -2689,3 +2705,506 @@ examples:
       name: dpWindshieldTearoff
       offset: 7356
       units: ''
+$defs:
+  CameraState:
+    description: '`enum irsdk_CameraState`'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 511
+    x-irsdk-values:
+    - name: IS_SESSION_SCREEN
+      value: 1
+    - name: IS_SCENIC_ACTIVE
+      value: 2
+    - name: CAM_TOOL_ACTIVE
+      value: 4
+    - name: UI_HIDDEN
+      value: 8
+    - name: USE_AUTO_SHOT_SELECTION
+      value: 16
+    - name: USE_TEMPORARY_EDITS
+      value: 32
+    - name: USE_KEY_ACCELERATION
+      value: 64
+    - name: USE_KEY_10X_ACCELERATION
+      value: 128
+    - name: USE_MOUSE_AIM_MODE
+      value: 256
+  CarLeftRight:
+    description: '`enum irsdk_CarLeftRight`'
+    oneOf:
+    - type: string
+      enum:
+      - Off
+      - Clear
+      - CarLeft
+      - CarRight
+      - CarLeftRight
+      - TwoCarsLeft
+      - TwoCarsRight
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Off
+      value: 0
+    - name: Clear
+      value: 1
+    - name: CarLeft
+      value: 2
+    - name: CarRight
+      value: 3
+    - name: CarLeftRight
+      value: 4
+    - name: TwoCarsLeft
+      value: 5
+    - name: TwoCarsRight
+      value: 6
+  EngineWarnings:
+    description: '`enum irsdk_EngineWarnings`'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 511
+    x-irsdk-values:
+    - name: WATER_TEMP_WARNING
+      value: 1
+    - name: FUEL_PRESSURE_WARNING
+      value: 2
+    - name: OIL_PRESSURE_WARNING
+      value: 4
+    - name: ENGINE_STALLED
+      value: 8
+    - name: PIT_SPEED_LIMITER
+      value: 16
+    - name: REV_LIMITER_ACTIVE
+      value: 32
+    - name: OIL_TEMP_WARNING
+      value: 64
+    - name: MANDATORY_REPAIR_NEEDED
+      value: 128
+    - name: OPTIONAL_REPAIR_NEEDED
+      value: 256
+  IncidentFlags:
+    description: '`enum irsdk_IncidentFlags` as a combined report+penalty container.'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: incident-flags
+    x-irsdk-masks:
+      penalty: 65280
+      report: 255
+    x-irsdk-penalty-codes:
+    - name: PEN_NONE
+      value: 0
+    - name: PEN_0X
+      value: 1
+    - name: PEN_1X
+      value: 2
+    - name: PEN_2X
+      value: 3
+    - name: PEN_4X
+      value: 4
+    x-irsdk-report-codes:
+    - name: REP_NO_REPORT
+      value: 0
+    - name: REP_OUT_OF_CONTROL
+      value: 1
+    - name: REP_OFF_TRACK
+      value: 2
+    - name: REP_OFF_TRACK_ONGOING
+      value: 3
+    - name: REP_CONTACT_WITH_WORLD
+      value: 4
+    - name: REP_COLLISION_WITH_WORLD
+      value: 5
+    - name: REP_COLLISION_WITH_WORLD_ONGOING
+      value: 6
+    - name: REP_CONTACT_WITH_CAR
+      value: 7
+    - name: REP_COLLISION_WITH_CAR
+      value: 8
+  PaceFlags:
+    description: '`enum irsdk_PaceFlags`'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 7
+    x-irsdk-values:
+    - name: END_OF_LINE
+      value: 1
+    - name: FREE_PASS
+      value: 2
+    - name: WAVED_AROUND
+      value: 4
+  PaceMode:
+    description: '`enum irsdk_PaceMode`'
+    oneOf:
+    - type: string
+      enum:
+      - SingleFileStart
+      - DoubleFileStart
+      - SingleFileRestart
+      - DoubleFileRestart
+      - NotPacing
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: SingleFileStart
+      value: 0
+    - name: DoubleFileStart
+      value: 1
+    - name: SingleFileRestart
+      value: 2
+    - name: DoubleFileRestart
+      value: 3
+    - name: NotPacing
+      value: 4
+  PitServiceFlags:
+    description: '`enum irsdk_PitSvFlags`'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 127
+    x-irsdk-values:
+    - name: LF_TIRE_CHANGE
+      value: 1
+    - name: RF_TIRE_CHANGE
+      value: 2
+    - name: LR_TIRE_CHANGE
+      value: 4
+    - name: RR_TIRE_CHANGE
+      value: 8
+    - name: FUEL_FILL
+      value: 16
+    - name: WINDSHIELD_TEAROFF
+      value: 32
+    - name: FAST_REPAIR
+      value: 64
+  PitServiceStatus:
+    description: '`enum irsdk_PitSvStatus`'
+    oneOf:
+    - type: string
+      enum:
+      - None
+      - InProgress
+      - Complete
+      - TooFarLeft
+      - TooFarRight
+      - TooFarForward
+      - TooFarBack
+      - BadAngle
+      - CantFixThat
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: None
+      value: 0
+    - name: InProgress
+      value: 1
+    - name: Complete
+      value: 2
+    - name: TooFarLeft
+      value: 100
+    - name: TooFarRight
+      value: 101
+    - name: TooFarForward
+      value: 102
+    - name: TooFarBack
+      value: 103
+    - name: BadAngle
+      value: 104
+    - name: CantFixThat
+      value: 105
+  SessionFlags:
+    description: '`enum irsdk_Flags`'
+    type: integer
+    format: uint32
+    minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 4030726143
+    x-irsdk-values:
+    - name: CHECKERED
+      value: 1
+    - name: WHITE
+      value: 2
+    - name: GREEN
+      value: 4
+    - name: YELLOW
+      value: 8
+    - name: RED
+      value: 16
+    - name: BLUE
+      value: 32
+    - name: DEBRIS
+      value: 64
+    - name: CROSSED
+      value: 128
+    - name: YELLOW_WAVING
+      value: 256
+    - name: ONE_LAP_TO_GREEN
+      value: 512
+    - name: GREEN_HELD
+      value: 1024
+    - name: TEN_TO_GO
+      value: 2048
+    - name: FIVE_TO_GO
+      value: 4096
+    - name: RANDOM_WAVING
+      value: 8192
+    - name: CAUTION
+      value: 16384
+    - name: CAUTION_WAVING
+      value: 32768
+    - name: BLACK
+      value: 65536
+    - name: DISQUALIFY
+      value: 131072
+    - name: SERVICIBLE
+      value: 262144
+    - name: FURLED
+      value: 524288
+    - name: REPAIR
+      value: 1048576
+    - name: DQ_SCORING_INVALID
+      value: 2097152
+    - name: START_HIDDEN
+      value: 268435456
+    - name: START_READY
+      value: 536870912
+    - name: START_SET
+      value: 1073741824
+    - name: START_GO
+      value: 2147483648
+  SessionState:
+    description: '`enum irsdk_SessionState`'
+    oneOf:
+    - type: string
+      enum:
+      - Invalid
+      - GetInCar
+      - Warmup
+      - ParadeLaps
+      - Racing
+      - Checkered
+      - CoolDown
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Invalid
+      value: 0
+    - name: GetInCar
+      value: 1
+    - name: Warmup
+      value: 2
+    - name: ParadeLaps
+      value: 3
+    - name: Racing
+      value: 4
+    - name: Checkered
+      value: 5
+    - name: CoolDown
+      value: 6
+  TrackLocation:
+    description: '`enum irsdk_TrkLoc`'
+    oneOf:
+    - type: string
+      enum:
+      - NotInWorld
+      - OffTrack
+      - InPitStall
+      - ApproachingPits
+      - OnTrack
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: NotInWorld
+      value: -1
+    - name: OffTrack
+      value: 0
+    - name: InPitStall
+      value: 1
+    - name: ApproachingPits
+      value: 2
+    - name: OnTrack
+      value: 3
+  TrackSurface:
+    description: '`enum irsdk_TrkSurf`'
+    oneOf:
+    - type: string
+      enum:
+      - SurfaceNotInWorld
+      - UndefinedMaterial
+      - Asphalt1Material
+      - Asphalt2Material
+      - Asphalt3Material
+      - Asphalt4Material
+      - Concrete1Material
+      - Concrete2Material
+      - RacingDirt1Material
+      - RacingDirt2Material
+      - Paint1Material
+      - Paint2Material
+      - Rumble1Material
+      - Rumble2Material
+      - Rumble3Material
+      - Rumble4Material
+      - Grass1Material
+      - Grass2Material
+      - Grass3Material
+      - Grass4Material
+      - Dirt1Material
+      - Dirt2Material
+      - Dirt3Material
+      - Dirt4Material
+      - SandMaterial
+      - Gravel1Material
+      - Gravel2Material
+      - GrasscreteMaterial
+      - AstroturfMaterial
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: SurfaceNotInWorld
+      value: -1
+    - name: UndefinedMaterial
+      value: 0
+    - name: Asphalt1Material
+      value: 1
+    - name: Asphalt2Material
+      value: 2
+    - name: Asphalt3Material
+      value: 3
+    - name: Asphalt4Material
+      value: 4
+    - name: Concrete1Material
+      value: 5
+    - name: Concrete2Material
+      value: 6
+    - name: RacingDirt1Material
+      value: 7
+    - name: RacingDirt2Material
+      value: 8
+    - name: Paint1Material
+      value: 9
+    - name: Paint2Material
+      value: 10
+    - name: Rumble1Material
+      value: 11
+    - name: Rumble2Material
+      value: 12
+    - name: Rumble3Material
+      value: 13
+    - name: Rumble4Material
+      value: 14
+    - name: Grass1Material
+      value: 15
+    - name: Grass2Material
+      value: 16
+    - name: Grass3Material
+      value: 17
+    - name: Grass4Material
+      value: 18
+    - name: Dirt1Material
+      value: 19
+    - name: Dirt2Material
+      value: 20
+    - name: Dirt3Material
+      value: 21
+    - name: Dirt4Material
+      value: 22
+    - name: SandMaterial
+      value: 23
+    - name: Gravel1Material
+      value: 24
+    - name: Gravel2Material
+      value: 25
+    - name: GrasscreteMaterial
+      value: 26
+    - name: AstroturfMaterial
+      value: 27
+  TrackWetness:
+    description: '`enum irsdk_TrackWetness`'
+    oneOf:
+    - type: string
+      enum:
+      - UnknownWetness
+      - Dry
+      - MostlyDry
+      - VeryLightlyWet
+      - LightlyWet
+      - ModeratelyWet
+      - VeryWet
+      - ExtremelyWet
+    - type: object
+      properties:
+        Unknown:
+          type: integer
+          format: int32
+      additionalProperties: false
+      required:
+      - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: UnknownWetness
+      value: 0
+    - name: Dry
+      value: 1
+    - name: MostlyDry
+      value: 2
+    - name: VeryLightlyWet
+      value: 3
+    - name: LightlyWet
+      value: 4
+    - name: ModeratelyWet
+      value: 5
+    - name: VeryWet
+      value: 6
+    - name: ExtremelyWet
+      value: 7

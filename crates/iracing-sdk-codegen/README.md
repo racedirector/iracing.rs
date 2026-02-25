@@ -42,8 +42,13 @@ Generates telemetry schema from an `.ibt` file's variable headers.
 ```text
 cargo run -p iracing-sdk-codegen --bin disk-telemetry-schema -- \
   --ibt-path ./recording.ibt \
-  --output-path ./disk_telemetry_schema.yml
+  --output-path ./disk_telemetry_schema.yml \
+  --annotate
 ```
+
+Options:
+
+- `--annotate`: annotate `irsdk_*` units with `x-irsdk-unit-ref` and inject referenced primitive defs.
 
 ### `live-telemetry-schema` (Windows)
 
@@ -52,8 +57,14 @@ Generates telemetry schema from live iRacing shared memory.
 ```text
 cargo run -p iracing-sdk-codegen --bin live-telemetry-schema -- \
   --output-path ./live_telemetry_schema.yml \
-  --allow-stale
+  --allow-stale \
+  --annotate
 ```
+
+Options:
+
+- `--allow-stale`: continue even when iRacing reports disconnected state.
+- `--annotate`: annotate `irsdk_*` units with `x-irsdk-unit-ref` and inject referenced primitive defs.
 
 ### `disk-session-schema`
 

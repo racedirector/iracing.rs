@@ -16,9 +16,10 @@
 use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::IbtReader;
+use iracing_sdk_codegen::primitive_annotations::annotate_variable_schema;
 use schemars::schema_for_value;
 use std::{fs::File, io::BufWriter, path::PathBuf};
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk telemetry schema generator.
@@ -34,6 +35,10 @@ struct Args {
     /// Path where the output schema YAML should be written.
     #[arg(short, long, default_value = "disk-variable-schema.yml")]
     output_path: PathBuf,
+
+    /// Annotate `irsdk_*` units with primitive enum/bitflag refs and inject used defs.
+    #[arg(long)]
+    annotate: bool,
 }
 
 pub fn main() -> Result<()> {
@@ -50,6 +55,7 @@ pub fn main() -> Result<()> {
     let Args {
         ibt_path,
         output_path,
+        annotate,
     } = Args::parse();
 
     info!(path = %ibt_path.display(), "Opening IBT file");
@@ -60,7 +66,20 @@ pub fn main() -> Result<()> {
     let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
 
     let variable_schema = reader.variables().clone();
-    let schema = schema_for_value!(variable_schema);
+    let mut schema = schema_for_value!(variable_schema);
+
+    if annotate {
+        let report = annotate_variable_schema(&mut schema)?;
+        info!(
+            annotated_variables = report.annotated_variables,
+            injected_defs = report.injected_defs,
+            "Annotated telemetry schema with primitive references"
+        );
+
+        for unit in report.unknown_units {
+            warn!(unit = %unit, "Unknown irsdk_* units token; skipping annotation");
+        }
+    }
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
