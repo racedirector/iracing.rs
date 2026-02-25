@@ -46,6 +46,15 @@ macro_rules! define_irsdk_bitflags {
             }
         }
 
+        #[cfg(feature = "codegen")]
+        impl $name {
+            pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
+                $((stringify!($flag), $value as i64),)+
+            ];
+
+            pub const SCHEMA_KNOWN_MASK: u32 = 0u32 $(| ($value as u32))+;
+        }
+
         impl From<u32> for $name {
             fn from(value: u32) -> Self {
                 Self::from_bits_retain(value)
@@ -164,6 +173,55 @@ pub struct IncidentFlags(u32);
 impl IncidentFlags {
     pub const REP_MASK: u32 = super::irsdk_flags::incident::REP_MASK;
     pub const PEN_MASK: u32 = super::irsdk_flags::incident::PEN_MASK;
+
+    #[cfg(feature = "codegen")]
+    pub const SCHEMA_REPORT_CODES: &'static [(&'static str, i64)] = &[
+        (
+            "REP_NO_REPORT",
+            super::irsdk_flags::incident::REP_NO_REPORT as i64,
+        ),
+        (
+            "REP_OUT_OF_CONTROL",
+            super::irsdk_flags::incident::REP_OUT_OF_CONTROL as i64,
+        ),
+        (
+            "REP_OFF_TRACK",
+            super::irsdk_flags::incident::REP_OFF_TRACK as i64,
+        ),
+        (
+            "REP_OFF_TRACK_ONGOING",
+            super::irsdk_flags::incident::REP_OFF_TRACK_ONGOING as i64,
+        ),
+        (
+            "REP_CONTACT_WITH_WORLD",
+            super::irsdk_flags::incident::REP_CONTACT_WITH_WORLD as i64,
+        ),
+        (
+            "REP_COLLISION_WITH_WORLD",
+            super::irsdk_flags::incident::REP_COLLISION_WITH_WORLD as i64,
+        ),
+        (
+            "REP_COLLISION_WITH_WORLD_ONGOING",
+            super::irsdk_flags::incident::REP_COLLISION_WITH_WORLD_ONGOING as i64,
+        ),
+        (
+            "REP_CONTACT_WITH_CAR",
+            super::irsdk_flags::incident::REP_CONTACT_WITH_CAR as i64,
+        ),
+        (
+            "REP_COLLISION_WITH_CAR",
+            super::irsdk_flags::incident::REP_COLLISION_WITH_CAR as i64,
+        ),
+    ];
+
+    #[cfg(feature = "codegen")]
+    pub const SCHEMA_PENALTY_CODES: &'static [(&'static str, i64)] = &[
+        ("PEN_NONE", super::irsdk_flags::incident::PEN_NONE as i64),
+        ("PEN_0X", super::irsdk_flags::incident::PEN_0X as i64),
+        ("PEN_1X", super::irsdk_flags::incident::PEN_1X as i64),
+        ("PEN_2X", super::irsdk_flags::incident::PEN_2X as i64),
+        ("PEN_4X", super::irsdk_flags::incident::PEN_4X as i64),
+    ];
 
     pub const fn from_bits_retain(bits: u32) -> Self {
         Self(bits)

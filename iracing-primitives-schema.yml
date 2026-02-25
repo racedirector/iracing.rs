@@ -107,11 +107,64 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: CamSwitchPos
+      value: 0
+    - name: CamSwitchNum
+      value: 1
+    - name: CamSetState
+      value: 2
+    - name: ReplaySetPlaySpeed
+      value: 3
+    - name: ReplaySetPlayPosition
+      value: 4
+    - name: ReplaySearch
+      value: 5
+    - name: ReplaySetState
+      value: 6
+    - name: ReloadTextures
+      value: 7
+    - name: ChatCommand
+      value: 8
+    - name: PitCommand
+      value: 9
+    - name: TelemCommand
+      value: 10
+    - name: FfbCommand
+      value: 11
+    - name: ReplaySearchSessionTime
+      value: 12
+    - name: VideoCapture
+      value: 13
+    - name: Last
+      value: 14
   CameraState:
     description: '`enum irsdk_CameraState`'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 511
+    x-irsdk-values:
+    - name: IS_SESSION_SCREEN
+      value: 1
+    - name: IS_SCENIC_ACTIVE
+      value: 2
+    - name: CAM_TOOL_ACTIVE
+      value: 4
+    - name: UI_HIDDEN
+      value: 8
+    - name: USE_AUTO_SHOT_SELECTION
+      value: 16
+    - name: USE_TEMPORARY_EDITS
+      value: 32
+    - name: USE_KEY_ACCELERATION
+      value: 64
+    - name: USE_KEY_10X_ACCELERATION
+      value: 128
+    - name: USE_MOUSE_AIM_MODE
+      value: 256
   CameraSwitchFocus:
     description: '`enum irsdk_csMode`'
     oneOf:
@@ -129,6 +182,16 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: FocusAtIncident
+      value: -3
+    - name: FocusAtLeader
+      value: -2
+    - name: FocusAtExiting
+      value: -1
+    - name: FocusAtDriver
+      value: 0
   CarLeftRight:
     description: '`enum irsdk_CarLeftRight`'
     oneOf:
@@ -149,6 +212,22 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Off
+      value: 0
+    - name: Clear
+      value: 1
+    - name: CarLeft
+      value: 2
+    - name: CarRight
+      value: 3
+    - name: CarLeftRight
+      value: 4
+    - name: TwoCarsLeft
+      value: 5
+    - name: TwoCarsRight
+      value: 6
   ChatCommandMode:
     description: '`enum irsdk_ChatCommandMode`'
     oneOf:
@@ -166,11 +245,42 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Macro
+      value: 0
+    - name: BeginChat
+      value: 1
+    - name: Reply
+      value: 2
+    - name: Cancel
+      value: 3
   EngineWarnings:
     description: '`enum irsdk_EngineWarnings`'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 511
+    x-irsdk-values:
+    - name: WATER_TEMP_WARNING
+      value: 1
+    - name: FUEL_PRESSURE_WARNING
+      value: 2
+    - name: OIL_PRESSURE_WARNING
+      value: 4
+    - name: ENGINE_STALLED
+      value: 8
+    - name: PIT_SPEED_LIMITER
+      value: 16
+    - name: REV_LIMITER_ACTIVE
+      value: 32
+    - name: OIL_TEMP_WARNING
+      value: 64
+    - name: MANDATORY_REPAIR_NEEDED
+      value: 128
+    - name: OPTIONAL_REPAIR_NEEDED
+      value: 256
   FfbCommandMode:
     description: '`enum irsdk_FFBCommandMode`'
     oneOf:
@@ -186,16 +296,65 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: MaxForce
+      value: 0
+    - name: Last
+      value: 1
   IncidentFlags:
     description: '`enum irsdk_IncidentFlags` as a combined report+penalty container.'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: incident-flags
+    x-irsdk-masks:
+      penalty: 65280
+      report: 255
+    x-irsdk-penalty-codes:
+    - name: PEN_NONE
+      value: 0
+    - name: PEN_0X
+      value: 1
+    - name: PEN_1X
+      value: 2
+    - name: PEN_2X
+      value: 3
+    - name: PEN_4X
+      value: 4
+    x-irsdk-report-codes:
+    - name: REP_NO_REPORT
+      value: 0
+    - name: REP_OUT_OF_CONTROL
+      value: 1
+    - name: REP_OFF_TRACK
+      value: 2
+    - name: REP_OFF_TRACK_ONGOING
+      value: 3
+    - name: REP_CONTACT_WITH_WORLD
+      value: 4
+    - name: REP_COLLISION_WITH_WORLD
+      value: 5
+    - name: REP_COLLISION_WITH_WORLD_ONGOING
+      value: 6
+    - name: REP_CONTACT_WITH_CAR
+      value: 7
+    - name: REP_COLLISION_WITH_CAR
+      value: 8
   PaceFlags:
     description: '`enum irsdk_PaceFlags`'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 7
+    x-irsdk-values:
+    - name: END_OF_LINE
+      value: 1
+    - name: FREE_PASS
+      value: 2
+    - name: WAVED_AROUND
+      value: 4
   PaceMode:
     description: '`enum irsdk_PaceMode`'
     oneOf:
@@ -214,6 +373,18 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: SingleFileStart
+      value: 0
+    - name: DoubleFileStart
+      value: 1
+    - name: SingleFileRestart
+      value: 2
+    - name: DoubleFileRestart
+      value: 3
+    - name: NotPacing
+      value: 4
   PitCommandMode:
     description: '`enum irsdk_PitCommandMode`'
     oneOf:
@@ -240,11 +411,56 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Clear
+      value: 0
+    - name: Ws
+      value: 1
+    - name: Fuel
+      value: 2
+    - name: Lf
+      value: 3
+    - name: Rf
+      value: 4
+    - name: Lr
+      value: 5
+    - name: Rr
+      value: 6
+    - name: ClearTires
+      value: 7
+    - name: Fr
+      value: 8
+    - name: ClearWs
+      value: 9
+    - name: ClearFr
+      value: 10
+    - name: ClearFuel
+      value: 11
+    - name: Tc
+      value: 12
   PitServiceFlags:
     description: '`enum irsdk_PitSvFlags`'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 127
+    x-irsdk-values:
+    - name: LF_TIRE_CHANGE
+      value: 1
+    - name: RF_TIRE_CHANGE
+      value: 2
+    - name: LR_TIRE_CHANGE
+      value: 4
+    - name: RR_TIRE_CHANGE
+      value: 8
+    - name: FUEL_FILL
+      value: 16
+    - name: WINDSHIELD_TEAROFF
+      value: 32
+    - name: FAST_REPAIR
+      value: 64
   PitServiceStatus:
     description: '`enum irsdk_PitSvStatus`'
     oneOf:
@@ -267,6 +483,26 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: None
+      value: 0
+    - name: InProgress
+      value: 1
+    - name: Complete
+      value: 2
+    - name: TooFarLeft
+      value: 100
+    - name: TooFarRight
+      value: 101
+    - name: TooFarForward
+      value: 102
+    - name: TooFarBack
+      value: 103
+    - name: BadAngle
+      value: 104
+    - name: CantFixThat
+      value: 105
   ReloadTexturesMode:
     description: '`enum irsdk_ReloadTexturesMode`'
     oneOf:
@@ -282,6 +518,12 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: All
+      value: 0
+    - name: CarIdx
+      value: 1
   ReplayPositionMode:
     description: '`enum irsdk_RpyPosMode`'
     oneOf:
@@ -299,6 +541,16 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Begin
+      value: 0
+    - name: Current
+      value: 1
+    - name: End
+      value: 2
+    - name: Last
+      value: 3
   ReplaySearchMode:
     description: '`enum irsdk_RpySrchMode`'
     oneOf:
@@ -323,6 +575,30 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: ToStart
+      value: 0
+    - name: ToEnd
+      value: 1
+    - name: PrevSession
+      value: 2
+    - name: NextSession
+      value: 3
+    - name: PrevLap
+      value: 4
+    - name: NextLap
+      value: 5
+    - name: PrevFrame
+      value: 6
+    - name: NextFrame
+      value: 7
+    - name: PrevIncident
+      value: 8
+    - name: NextIncident
+      value: 9
+    - name: Last
+      value: 10
   ReplayStateMode:
     description: '`enum irsdk_RpyStateMode`'
     oneOf:
@@ -338,11 +614,72 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: EraseTape
+      value: 0
+    - name: Last
+      value: 1
   SessionFlags:
     description: '`enum irsdk_Flags`'
     type: integer
     format: uint32
     minimum: 0
+    x-irsdk-kind: bitflags
+    x-irsdk-known-mask: 4030726143
+    x-irsdk-values:
+    - name: CHECKERED
+      value: 1
+    - name: WHITE
+      value: 2
+    - name: GREEN
+      value: 4
+    - name: YELLOW
+      value: 8
+    - name: RED
+      value: 16
+    - name: BLUE
+      value: 32
+    - name: DEBRIS
+      value: 64
+    - name: CROSSED
+      value: 128
+    - name: YELLOW_WAVING
+      value: 256
+    - name: ONE_LAP_TO_GREEN
+      value: 512
+    - name: GREEN_HELD
+      value: 1024
+    - name: TEN_TO_GO
+      value: 2048
+    - name: FIVE_TO_GO
+      value: 4096
+    - name: RANDOM_WAVING
+      value: 8192
+    - name: CAUTION
+      value: 16384
+    - name: CAUTION_WAVING
+      value: 32768
+    - name: BLACK
+      value: 65536
+    - name: DISQUALIFY
+      value: 131072
+    - name: SERVICIBLE
+      value: 262144
+    - name: FURLED
+      value: 524288
+    - name: REPAIR
+      value: 1048576
+    - name: DQ_SCORING_INVALID
+      value: 2097152
+    - name: START_HIDDEN
+      value: 268435456
+    - name: START_READY
+      value: 536870912
+    - name: START_SET
+      value: 1073741824
+    - name: START_GO
+      value: 2147483648
   SessionState:
     description: '`enum irsdk_SessionState`'
     oneOf:
@@ -363,6 +700,22 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Invalid
+      value: 0
+    - name: GetInCar
+      value: 1
+    - name: Warmup
+      value: 2
+    - name: ParadeLaps
+      value: 3
+    - name: Racing
+      value: 4
+    - name: Checkered
+      value: 5
+    - name: CoolDown
+      value: 6
   StatusField:
     description: '`enum irsdk_StatusField`'
     oneOf:
@@ -377,6 +730,10 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Connected
+      value: 1
   TelemetryCommandMode:
     description: '`enum irsdk_TelemetryCommandMode`'
     oneOf:
@@ -393,6 +750,14 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: Stop
+      value: 0
+    - name: Start
+      value: 1
+    - name: Restart
+      value: 2
   TrackLocation:
     description: '`enum irsdk_TrkLoc`'
     oneOf:
@@ -411,6 +776,18 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: NotInWorld
+      value: -1
+    - name: OffTrack
+      value: 0
+    - name: InPitStall
+      value: 1
+    - name: ApproachingPits
+      value: 2
+    - name: OnTrack
+      value: 3
   TrackSurface:
     description: '`enum irsdk_TrkSurf`'
     oneOf:
@@ -453,6 +830,66 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: SurfaceNotInWorld
+      value: -1
+    - name: UndefinedMaterial
+      value: 0
+    - name: Asphalt1Material
+      value: 1
+    - name: Asphalt2Material
+      value: 2
+    - name: Asphalt3Material
+      value: 3
+    - name: Asphalt4Material
+      value: 4
+    - name: Concrete1Material
+      value: 5
+    - name: Concrete2Material
+      value: 6
+    - name: RacingDirt1Material
+      value: 7
+    - name: RacingDirt2Material
+      value: 8
+    - name: Paint1Material
+      value: 9
+    - name: Paint2Material
+      value: 10
+    - name: Rumble1Material
+      value: 11
+    - name: Rumble2Material
+      value: 12
+    - name: Rumble3Material
+      value: 13
+    - name: Rumble4Material
+      value: 14
+    - name: Grass1Material
+      value: 15
+    - name: Grass2Material
+      value: 16
+    - name: Grass3Material
+      value: 17
+    - name: Grass4Material
+      value: 18
+    - name: Dirt1Material
+      value: 19
+    - name: Dirt2Material
+      value: 20
+    - name: Dirt3Material
+      value: 21
+    - name: Dirt4Material
+      value: 22
+    - name: SandMaterial
+      value: 23
+    - name: Gravel1Material
+      value: 24
+    - name: Gravel2Material
+      value: 25
+    - name: GrasscreteMaterial
+      value: 26
+    - name: AstroturfMaterial
+      value: 27
   TrackWetness:
     description: '`enum irsdk_TrackWetness`'
     oneOf:
@@ -474,6 +911,24 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: UnknownWetness
+      value: 0
+    - name: Dry
+      value: 1
+    - name: MostlyDry
+      value: 2
+    - name: VeryLightlyWet
+      value: 3
+    - name: LightlyWet
+      value: 4
+    - name: ModeratelyWet
+      value: 5
+    - name: VeryWet
+      value: 6
+    - name: ExtremelyWet
+      value: 7
   VideoCaptureMode:
     description: '`enum irsdk_VideoCaptureMode`'
     oneOf:
@@ -493,3 +948,17 @@ $defs:
       additionalProperties: false
       required:
       - Unknown
+    x-irsdk-kind: enum
+    x-irsdk-values:
+    - name: TriggerScreenShot
+      value: 0
+    - name: StartVideoCapture
+      value: 1
+    - name: EndVideoCapture
+      value: 2
+    - name: ToggleVideoCapture
+      value: 3
+    - name: ShowVideoTimer
+      value: 4
+    - name: HideVideoTimer
+      value: 5

@@ -35,6 +35,13 @@ macro_rules! define_irsdk_enum {
             }
         }
 
+        #[cfg(feature = "codegen")]
+        impl $name {
+            pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
+                $((stringify!($variant), $value as i64),)+
+            ];
+        }
+
         impl From<$name> for u16 {
             fn from(value: $name) -> Self {
                 value.to_raw() as u16
