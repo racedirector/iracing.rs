@@ -122,6 +122,12 @@ cargo run -p iracing-sdk-codegen --bin iracing-primitives-schema -- \
   --output-path ./iracing-primitives-schema.yml
 ```
 
+Output notes:
+
+- Primitive enum defs include `x-irsdk-kind: enum` and `x-irsdk-values` (name/value pairs).
+- Bitflag defs include `x-irsdk-kind: bitflags`, `x-irsdk-values`, and `x-irsdk-known-mask`.
+- `IncidentFlags` includes `x-irsdk-masks`, `x-irsdk-report-codes`, and `x-irsdk-penalty-codes`.
+
 ## Notes
 
 - `live-*` bins (and live mode of `car-setup-schema`) require Windows because they depend on iRacing shared memory APIs.

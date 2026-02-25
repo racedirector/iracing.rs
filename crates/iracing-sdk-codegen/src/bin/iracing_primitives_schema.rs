@@ -5,10 +5,11 @@
 
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use schemars::{JsonSchema, schema_for};
+use schemars::{JsonSchema, Schema, schema_for};
 use serde::Serialize;
+use serde_json::{Map, Value};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -74,13 +75,179 @@ struct IrsdkPrimitivesSchema {
     incident_flags: iracing_sdk::IncidentFlags,
 }
 
+fn schema_def_object_mut<'a>(
+    schema: &'a mut Schema,
+    def_name: &str,
+) -> Result<&'a mut Map<String, Value>> {
+    schema
+        .ensure_object()
+        .get_mut("$defs")
+        .and_then(Value::as_object_mut)
+        .and_then(|defs| defs.get_mut(def_name))
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| anyhow!("missing $defs.{def_name} while enriching primitive schema"))
+}
+
+fn named_value_entries(values: &[(&'static str, i64)]) -> Value {
+    Value::Array(
+        values
+            .iter()
+            .map(|(name, value)| {
+                let mut entry = Map::new();
+                entry.insert("name".into(), (*name).into());
+                entry.insert("value".into(), (*value).into());
+                Value::Object(entry)
+            })
+            .collect(),
+    )
+}
+
+fn annotate_named_values(
+    schema: &mut Schema,
+    def_name: &str,
+    kind: &str,
+    values: &[(&'static str, i64)],
+    known_mask: Option<u32>,
+) -> Result<()> {
+    let def = schema_def_object_mut(schema, def_name)?;
+    def.insert("x-irsdk-kind".into(), kind.into());
+    def.insert("x-irsdk-values".into(), named_value_entries(values));
+    if let Some(mask) = known_mask {
+        def.insert("x-irsdk-known-mask".into(), (mask as u64).into());
+    }
+    Ok(())
+}
+
+fn annotate_incident_values(schema: &mut Schema) -> Result<()> {
+    let def = schema_def_object_mut(schema, "IncidentFlags")?;
+    def.insert("x-irsdk-kind".into(), "incident-flags".into());
+
+    let mut masks = Map::new();
+    masks.insert(
+        "report".into(),
+        (iracing_sdk::IncidentFlags::REP_MASK as u64).into(),
+    );
+    masks.insert(
+        "penalty".into(),
+        (iracing_sdk::IncidentFlags::PEN_MASK as u64).into(),
+    );
+    def.insert("x-irsdk-masks".into(), Value::Object(masks));
+    def.insert(
+        "x-irsdk-report-codes".into(),
+        named_value_entries(iracing_sdk::IncidentFlags::SCHEMA_REPORT_CODES),
+    );
+    def.insert(
+        "x-irsdk-penalty-codes".into(),
+        named_value_entries(iracing_sdk::IncidentFlags::SCHEMA_PENALTY_CODES),
+    );
+    Ok(())
+}
+
+fn annotate_primitive_values(schema: &mut Schema) -> Result<()> {
+    type SchemaValues = &'static [(&'static str, i64)];
+
+    let enum_entries: [(&str, SchemaValues); 19] = [
+        ("StatusField", iracing_sdk::StatusField::SCHEMA_VALUES),
+        ("TrackLocation", iracing_sdk::TrackLocation::SCHEMA_VALUES),
+        ("TrackSurface", iracing_sdk::TrackSurface::SCHEMA_VALUES),
+        ("SessionState", iracing_sdk::SessionState::SCHEMA_VALUES),
+        ("CarLeftRight", iracing_sdk::CarLeftRight::SCHEMA_VALUES),
+        (
+            "PitServiceStatus",
+            iracing_sdk::PitServiceStatus::SCHEMA_VALUES,
+        ),
+        ("PaceMode", iracing_sdk::PaceMode::SCHEMA_VALUES),
+        ("TrackWetness", iracing_sdk::TrackWetness::SCHEMA_VALUES),
+        (
+            "BroadcastMessage",
+            iracing_sdk::BroadcastMessage::SCHEMA_VALUES,
+        ),
+        (
+            "ChatCommandMode",
+            iracing_sdk::ChatCommandMode::SCHEMA_VALUES,
+        ),
+        ("PitCommandMode", iracing_sdk::PitCommandMode::SCHEMA_VALUES),
+        (
+            "TelemetryCommandMode",
+            iracing_sdk::TelemetryCommandMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplayStateMode",
+            iracing_sdk::ReplayStateMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReloadTexturesMode",
+            iracing_sdk::ReloadTexturesMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplaySearchMode",
+            iracing_sdk::ReplaySearchMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplayPositionMode",
+            iracing_sdk::ReplayPositionMode::SCHEMA_VALUES,
+        ),
+        ("FfbCommandMode", iracing_sdk::FfbCommandMode::SCHEMA_VALUES),
+        (
+            "CameraSwitchFocus",
+            iracing_sdk::CameraSwitchFocus::SCHEMA_VALUES,
+        ),
+        (
+            "VideoCaptureMode",
+            iracing_sdk::VideoCaptureMode::SCHEMA_VALUES,
+        ),
+    ];
+
+    for (name, values) in enum_entries {
+        annotate_named_values(schema, name, "enum", values, None)?;
+    }
+
+    let bitflag_entries: [(&str, SchemaValues, u32); 5] = [
+        (
+            "EngineWarnings",
+            iracing_sdk::EngineWarnings::SCHEMA_VALUES,
+            iracing_sdk::EngineWarnings::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "SessionFlags",
+            iracing_sdk::SessionFlags::SCHEMA_VALUES,
+            iracing_sdk::SessionFlags::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "CameraState",
+            iracing_sdk::CameraState::SCHEMA_VALUES,
+            iracing_sdk::CameraState::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "PitServiceFlags",
+            iracing_sdk::PitServiceFlags::SCHEMA_VALUES,
+            iracing_sdk::PitServiceFlags::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "PaceFlags",
+            iracing_sdk::PaceFlags::SCHEMA_VALUES,
+            iracing_sdk::PaceFlags::SCHEMA_KNOWN_MASK,
+        ),
+    ];
+
+    for (name, values, mask) in bitflag_entries {
+        annotate_named_values(schema, name, "bitflags", values, Some(mask))?;
+    }
+
+    annotate_incident_values(schema)?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let Args { output_path } = Args::parse();
 
-    let schema = schema_for!(IrsdkPrimitivesSchema);
+    let mut schema = schema_for!(IrsdkPrimitivesSchema);
+    annotate_primitive_values(&mut schema)?;
+
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
     serde_yaml_ng::to_writer(writer, &schema)?;
@@ -91,4 +258,150 @@ fn main() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn enriched_schema() -> Schema {
+        let mut schema = schema_for!(IrsdkPrimitivesSchema);
+        annotate_primitive_values(&mut schema).expect("schema enrichment should succeed");
+        schema
+    }
+
+    fn def_object<'a>(schema: &'a Schema, name: &str) -> &'a Map<String, Value> {
+        schema
+            .as_value()
+            .get("$defs")
+            .and_then(Value::as_object)
+            .and_then(|defs| defs.get(name))
+            .and_then(Value::as_object)
+            .expect("definition should exist")
+    }
+
+    fn to_value_map(entries: &Value) -> BTreeMap<String, i64> {
+        entries
+            .as_array()
+            .expect("entries should be an array")
+            .iter()
+            .map(|entry| {
+                let obj = entry.as_object().expect("entry should be an object");
+                let name = obj
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .expect("entry.name should be a string")
+                    .to_string();
+                let value = obj
+                    .get("value")
+                    .and_then(Value::as_i64)
+                    .expect("entry.value should be an integer");
+                (name, value)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn enriches_bitflag_defs_with_known_values_and_mask() {
+        let schema = enriched_schema();
+        let session_flags = def_object(&schema, "SessionFlags");
+
+        assert_eq!(
+            session_flags.get("x-irsdk-kind"),
+            Some(&Value::String("bitflags".to_string()))
+        );
+
+        let values = to_value_map(
+            session_flags
+                .get("x-irsdk-values")
+                .expect("values metadata should exist"),
+        );
+        assert_eq!(
+            values.get("CHECKERED"),
+            Some(&(iracing_sdk::irsdk_flags::flags::CHECKERED as i64))
+        );
+        assert_eq!(
+            values.get("START_GO"),
+            Some(&(iracing_sdk::irsdk_flags::flags::START_GO as i64))
+        );
+        assert_eq!(
+            session_flags
+                .get("x-irsdk-known-mask")
+                .and_then(Value::as_u64),
+            Some(iracing_sdk::SessionFlags::SCHEMA_KNOWN_MASK as u64)
+        );
+    }
+
+    #[test]
+    fn enriches_enum_defs_with_raw_numeric_values() {
+        let schema = enriched_schema();
+        let trk_loc = def_object(&schema, "TrackLocation");
+
+        assert_eq!(
+            trk_loc.get("x-irsdk-kind"),
+            Some(&Value::String("enum".to_string()))
+        );
+
+        let values = to_value_map(
+            trk_loc
+                .get("x-irsdk-values")
+                .expect("values metadata should exist"),
+        );
+        assert_eq!(
+            values.get("NotInWorld"),
+            Some(&(iracing_sdk::irsdk_flags::trk_loc::NOT_IN_WORLD as i64))
+        );
+        assert_eq!(
+            values.get("OnTrack"),
+            Some(&(iracing_sdk::irsdk_flags::trk_loc::ON_TRACK as i64))
+        );
+    }
+
+    #[test]
+    fn enriches_incident_flags_with_masks_and_code_tables() {
+        let schema = enriched_schema();
+        let incident = def_object(&schema, "IncidentFlags");
+
+        assert_eq!(
+            incident.get("x-irsdk-kind"),
+            Some(&Value::String("incident-flags".to_string()))
+        );
+        assert_eq!(
+            incident
+                .get("x-irsdk-masks")
+                .and_then(Value::as_object)
+                .and_then(|masks| masks.get("report"))
+                .and_then(Value::as_u64),
+            Some(iracing_sdk::IncidentFlags::REP_MASK as u64)
+        );
+        assert_eq!(
+            incident
+                .get("x-irsdk-masks")
+                .and_then(Value::as_object)
+                .and_then(|masks| masks.get("penalty"))
+                .and_then(Value::as_u64),
+            Some(iracing_sdk::IncidentFlags::PEN_MASK as u64)
+        );
+
+        let report_codes = to_value_map(
+            incident
+                .get("x-irsdk-report-codes")
+                .expect("report code metadata should exist"),
+        );
+        assert_eq!(
+            report_codes.get("REP_COLLISION_WITH_CAR"),
+            Some(&(iracing_sdk::irsdk_flags::incident::REP_COLLISION_WITH_CAR as i64))
+        );
+
+        let penalty_codes = to_value_map(
+            incident
+                .get("x-irsdk-penalty-codes")
+                .expect("penalty code metadata should exist"),
+        );
+        assert_eq!(
+            penalty_codes.get("PEN_4X"),
+            Some(&(iracing_sdk::irsdk_flags::incident::PEN_4X as i64))
+        );
+    }
 }
