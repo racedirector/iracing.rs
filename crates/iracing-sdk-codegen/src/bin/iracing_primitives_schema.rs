@@ -144,175 +144,95 @@ fn annotate_incident_values(schema: &mut Schema) -> Result<()> {
 }
 
 fn annotate_primitive_values(schema: &mut Schema) -> Result<()> {
-    annotate_named_values(
-        schema,
-        "StatusField",
-        "enum",
-        iracing_sdk::StatusField::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "TrackLocation",
-        "enum",
-        iracing_sdk::TrackLocation::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "TrackSurface",
-        "enum",
-        iracing_sdk::TrackSurface::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "SessionState",
-        "enum",
-        iracing_sdk::SessionState::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "CarLeftRight",
-        "enum",
-        iracing_sdk::CarLeftRight::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "PitServiceStatus",
-        "enum",
-        iracing_sdk::PitServiceStatus::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "PaceMode",
-        "enum",
-        iracing_sdk::PaceMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "TrackWetness",
-        "enum",
-        iracing_sdk::TrackWetness::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "BroadcastMessage",
-        "enum",
-        iracing_sdk::BroadcastMessage::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "ChatCommandMode",
-        "enum",
-        iracing_sdk::ChatCommandMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "PitCommandMode",
-        "enum",
-        iracing_sdk::PitCommandMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "TelemetryCommandMode",
-        "enum",
-        iracing_sdk::TelemetryCommandMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "ReplayStateMode",
-        "enum",
-        iracing_sdk::ReplayStateMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "ReloadTexturesMode",
-        "enum",
-        iracing_sdk::ReloadTexturesMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "ReplaySearchMode",
-        "enum",
-        iracing_sdk::ReplaySearchMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "ReplayPositionMode",
-        "enum",
-        iracing_sdk::ReplayPositionMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "FfbCommandMode",
-        "enum",
-        iracing_sdk::FfbCommandMode::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "CameraSwitchFocus",
-        "enum",
-        iracing_sdk::CameraSwitchFocus::SCHEMA_VALUES,
-        None,
-    )?;
-    annotate_named_values(
-        schema,
-        "VideoCaptureMode",
-        "enum",
-        iracing_sdk::VideoCaptureMode::SCHEMA_VALUES,
-        None,
-    )?;
+    type SchemaValues = &'static [(&'static str, i64)];
 
-    annotate_named_values(
-        schema,
-        "EngineWarnings",
-        "bitflags",
-        iracing_sdk::EngineWarnings::SCHEMA_VALUES,
-        Some(iracing_sdk::EngineWarnings::SCHEMA_KNOWN_MASK),
-    )?;
-    annotate_named_values(
-        schema,
-        "SessionFlags",
-        "bitflags",
-        iracing_sdk::SessionFlags::SCHEMA_VALUES,
-        Some(iracing_sdk::SessionFlags::SCHEMA_KNOWN_MASK),
-    )?;
-    annotate_named_values(
-        schema,
-        "CameraState",
-        "bitflags",
-        iracing_sdk::CameraState::SCHEMA_VALUES,
-        Some(iracing_sdk::CameraState::SCHEMA_KNOWN_MASK),
-    )?;
-    annotate_named_values(
-        schema,
-        "PitServiceFlags",
-        "bitflags",
-        iracing_sdk::PitServiceFlags::SCHEMA_VALUES,
-        Some(iracing_sdk::PitServiceFlags::SCHEMA_KNOWN_MASK),
-    )?;
-    annotate_named_values(
-        schema,
-        "PaceFlags",
-        "bitflags",
-        iracing_sdk::PaceFlags::SCHEMA_VALUES,
-        Some(iracing_sdk::PaceFlags::SCHEMA_KNOWN_MASK),
-    )?;
+    let enum_entries: [(&str, SchemaValues); 19] = [
+        ("StatusField", iracing_sdk::StatusField::SCHEMA_VALUES),
+        ("TrackLocation", iracing_sdk::TrackLocation::SCHEMA_VALUES),
+        ("TrackSurface", iracing_sdk::TrackSurface::SCHEMA_VALUES),
+        ("SessionState", iracing_sdk::SessionState::SCHEMA_VALUES),
+        ("CarLeftRight", iracing_sdk::CarLeftRight::SCHEMA_VALUES),
+        (
+            "PitServiceStatus",
+            iracing_sdk::PitServiceStatus::SCHEMA_VALUES,
+        ),
+        ("PaceMode", iracing_sdk::PaceMode::SCHEMA_VALUES),
+        ("TrackWetness", iracing_sdk::TrackWetness::SCHEMA_VALUES),
+        (
+            "BroadcastMessage",
+            iracing_sdk::BroadcastMessage::SCHEMA_VALUES,
+        ),
+        (
+            "ChatCommandMode",
+            iracing_sdk::ChatCommandMode::SCHEMA_VALUES,
+        ),
+        ("PitCommandMode", iracing_sdk::PitCommandMode::SCHEMA_VALUES),
+        (
+            "TelemetryCommandMode",
+            iracing_sdk::TelemetryCommandMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplayStateMode",
+            iracing_sdk::ReplayStateMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReloadTexturesMode",
+            iracing_sdk::ReloadTexturesMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplaySearchMode",
+            iracing_sdk::ReplaySearchMode::SCHEMA_VALUES,
+        ),
+        (
+            "ReplayPositionMode",
+            iracing_sdk::ReplayPositionMode::SCHEMA_VALUES,
+        ),
+        ("FfbCommandMode", iracing_sdk::FfbCommandMode::SCHEMA_VALUES),
+        (
+            "CameraSwitchFocus",
+            iracing_sdk::CameraSwitchFocus::SCHEMA_VALUES,
+        ),
+        (
+            "VideoCaptureMode",
+            iracing_sdk::VideoCaptureMode::SCHEMA_VALUES,
+        ),
+    ];
+
+    for (name, values) in enum_entries {
+        annotate_named_values(schema, name, "enum", values, None)?;
+    }
+
+    let bitflag_entries: [(&str, SchemaValues, u32); 5] = [
+        (
+            "EngineWarnings",
+            iracing_sdk::EngineWarnings::SCHEMA_VALUES,
+            iracing_sdk::EngineWarnings::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "SessionFlags",
+            iracing_sdk::SessionFlags::SCHEMA_VALUES,
+            iracing_sdk::SessionFlags::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "CameraState",
+            iracing_sdk::CameraState::SCHEMA_VALUES,
+            iracing_sdk::CameraState::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "PitServiceFlags",
+            iracing_sdk::PitServiceFlags::SCHEMA_VALUES,
+            iracing_sdk::PitServiceFlags::SCHEMA_KNOWN_MASK,
+        ),
+        (
+            "PaceFlags",
+            iracing_sdk::PaceFlags::SCHEMA_VALUES,
+            iracing_sdk::PaceFlags::SCHEMA_KNOWN_MASK,
+        ),
+    ];
+
+    for (name, values, mask) in bitflag_entries {
+        annotate_named_values(schema, name, "bitflags", values, Some(mask))?;
+    }
 
     annotate_incident_values(schema)?;
 
