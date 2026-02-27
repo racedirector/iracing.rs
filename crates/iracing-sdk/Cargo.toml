@@ -85,3 +85,7 @@ path = "src/bin/live_session_parser.rs"
 [[bin]]
 name = "broadcast-cli"
 path = "src/bin/broadcast_cli.rs"
+
+[[bin]]
+name = "ibt-to-csv"
+path = "src/bin/ibt_to_csv.rs"

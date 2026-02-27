@@ -1,4 +1,8 @@
 [alias]
+ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
+ibt-session-parser = ["run", "-p", "iracing-sdk", "--bin", "ibt-session-parser", "--"]
+live-session-parser = ["run", "-p", "iracing-sdk", "--bin", "live-session-parser", "--"]
+broadcast-cli = ["run", "-p", "iracing-sdk", "--bin", "broadcast-cli", "--"]
 session-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "session-schema", "--"]
 disk-variable-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "disk-variable-schema", "--"]
 live-variable-schema = ["run", "-p", "iracing-sdk-codegen", "--bin", "live-variable-schema", "--"]
