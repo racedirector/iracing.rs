@@ -21,10 +21,12 @@ use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
 #[cfg(windows)]
 use iracing_sdk::{SessionInfoParser, WindowsConnection};
+#[cfg(windows)]
 use iracing_sdk_codegen::schema_diff::{diff_schemas, summarize_diff};
 use std::path::PathBuf;
 #[cfg(windows)]
 use std::{fs::File, io::BufWriter};
+#[cfg(windows)]
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
