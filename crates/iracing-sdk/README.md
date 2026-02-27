@@ -5,6 +5,7 @@ Low-level iRacing telemetry parsing utilities for Rust.
 This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
+- `.ibt` writing via `IbtWriter`
 - Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
@@ -27,7 +28,7 @@ iracing-sdk = "0.1"
 Basic import:
 
 ```rust
-use iracing_sdk::{IbtReader, SessionInfoParser, VarData};
+use iracing_sdk::{FrameProjection, IbtReader, IbtWriter, SessionInfoParser, VarData};
 ```
 
 ## Quick Start
@@ -88,6 +89,30 @@ fn main() -> iracing_sdk::Result<()> {
         }
         WaitResult::Timeout => {}
     }
+    Ok(())
+}
+```
+
+### Writing Subset `.ibt` Files
+
+```rust,no_run
+use iracing_sdk::{FrameProjection, IbtReader, IbtWriteOptions, IbtWriter};
+
+fn main() -> iracing_sdk::Result<()> {
+    let mut reader = IbtReader::open("source.ibt")?;
+    let projection = FrameProjection::from_variable_names(
+        reader.variables(),
+        ["SessionTime", "Speed", "RPM", "OnPitRoad"],
+    )?;
+
+    let options = IbtWriteOptions::from_reader(&reader)?;
+    let mut writer = IbtWriter::create("subset.ibt", projection.target_schema().clone(), options)?;
+
+    while let Some((frame, _, _)) = reader.read_next_frame()? {
+        writer.write_projected_frame(&frame, &projection)?;
+    }
+
+    writer.finish()?;
     Ok(())
 }
 ```

@@ -11,6 +11,7 @@
 //!
 //! - Replay/offline path (cross-platform):
 //!   - [`IbtReader`]
+//!   - [`IbtWriter`], [`FrameProjection`], [`IbtWriteOptions`]
 //!   - [`types::VariableSchema`], [`types::VarData`]
 //! - Session data path:
 //!   - [`SessionInfo`], [`SessionInfoParser`]
@@ -57,7 +58,7 @@ pub mod types;
 pub mod yaml_utils;
 
 pub use error::*;
-pub use ibt::IbtReader;
+pub use ibt::{FrameProjection, IbtReader, IbtWriteOptions, IbtWriter};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;
 
