@@ -45,7 +45,7 @@
 //! - Returns an error if the output file cannot be written
 //!
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{IbtReader, VariableInfo, VariableType};
