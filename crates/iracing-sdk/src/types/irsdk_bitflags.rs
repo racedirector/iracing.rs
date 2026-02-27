@@ -19,28 +19,37 @@ macro_rules! define_irsdk_bitflags {
         $vis struct $name(u32);
 
         impl $name {
-            $(pub const $flag: Self = Self($value);)+
+            $(
+                /// Bitflag constant — see the `irsdk_flags` module for the corresponding raw value.
+                pub const $flag: Self = Self($value);
+            )+
 
+            /// Returns the empty (zero) state with no flags set.
             pub const fn empty() -> Self {
                 Self(0)
             }
 
+            /// Constructs an instance from raw bits, retaining all set bits including unknown ones.
             pub const fn from_bits_retain(bits: u32) -> Self {
                 Self(bits)
             }
 
+            /// Returns the raw underlying `u32` bit pattern.
             pub const fn bits(self) -> u32 {
                 self.0
             }
 
+            /// Returns `true` if `self` contains all bits in `other`.
             pub const fn contains(self, other: Self) -> bool {
                 (self.0 & other.0) == other.0
             }
 
+            /// Returns `true` if `self` has any bits in common with `other`.
             pub const fn intersects(self, other: Self) -> bool {
                 (self.0 & other.0) != 0
             }
 
+            /// Returns the bitwise union (OR) of `self` and `other`.
             pub const fn union(self, other: Self) -> Self {
                 Self(self.0 | other.0)
             }
@@ -48,10 +57,12 @@ macro_rules! define_irsdk_bitflags {
 
         #[cfg(feature = "codegen")]
         impl $name {
+            /// Named `(flag-name, raw-value)` pairs for all defined flags, used for JSON Schema generation.
             pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
                 $((stringify!($flag), $value as i64),)+
             ];
 
+            /// Bitmask that covers all defined (named) flag bits.
             pub const SCHEMA_KNOWN_MASK: u32 = 0u32 $(| ($value as u32))+;
         }
 
@@ -171,10 +182,13 @@ define_irsdk_bitflags! {
 pub struct IncidentFlags(u32);
 
 impl IncidentFlags {
+    /// Bitmask covering the report code portion of an incident flag word (low byte, `0x0000_00FF`).
     pub const REP_MASK: u32 = super::irsdk_flags::incident::REP_MASK;
+    /// Bitmask covering the penalty code portion of an incident flag word (second byte, `0x0000_FF00`).
     pub const PEN_MASK: u32 = super::irsdk_flags::incident::PEN_MASK;
 
     #[cfg(feature = "codegen")]
+    /// Named `(code-name, raw-value)` pairs for incident report codes, used for JSON Schema generation.
     pub const SCHEMA_REPORT_CODES: &'static [(&'static str, i64)] = &[
         (
             "REP_NO_REPORT",
@@ -215,6 +229,7 @@ impl IncidentFlags {
     ];
 
     #[cfg(feature = "codegen")]
+    /// Named `(code-name, raw-value)` pairs for incident penalty codes, used for JSON Schema generation.
     pub const SCHEMA_PENALTY_CODES: &'static [(&'static str, i64)] = &[
         ("PEN_NONE", super::irsdk_flags::incident::PEN_NONE as i64),
         ("PEN_0X", super::irsdk_flags::incident::PEN_0X as i64),
@@ -223,18 +238,22 @@ impl IncidentFlags {
         ("PEN_4X", super::irsdk_flags::incident::PEN_4X as i64),
     ];
 
+    /// Constructs an `IncidentFlags` value from raw bits, retaining all set bits.
     pub const fn from_bits_retain(bits: u32) -> Self {
         Self(bits)
     }
 
+    /// Returns the raw `u32` bit pattern.
     pub const fn bits(self) -> u32 {
         self.0
     }
 
+    /// Extracts the incident report code from the low byte (`REP_MASK`).
     pub const fn report_code(self) -> i32 {
         (self.0 & Self::REP_MASK) as i32
     }
 
+    /// Extracts the penalty code from the second byte (`PEN_MASK >> 8`).
     pub const fn penalty_code(self) -> i32 {
         ((self.0 & Self::PEN_MASK) >> 8) as i32
     }

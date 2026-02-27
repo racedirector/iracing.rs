@@ -29,6 +29,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the live telemetry schema generator.
 #[cfg(windows)]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -57,6 +58,7 @@ pub fn main() -> Result<()> {
     run()
 }
 
+/// Connects to iRacing shared memory, generates the telemetry variable schema, and writes it to disk.
 #[cfg(windows)]
 fn run() -> Result<()> {
     // ------------------------------------------------------------
@@ -113,6 +115,7 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+/// Non-Windows stub — always returns an error explaining the platform requirement.
 #[cfg(not(windows))]
 fn run() -> Result<()> {
     tracing::warn!(

@@ -1,4 +1,5 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![warn(missing_docs)]
 //! Low-level iRacing telemetry parsing primitives.
 //!
 //! This crate is designed as a foundation for tools that consume iRacing data from:

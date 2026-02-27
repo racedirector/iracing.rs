@@ -7,26 +7,41 @@ use super::{BitField, irsdk_bitflags::IncidentFlags, irsdk_flags};
 /// High-level classification of an incident as report + penalty code.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IncidentClassification {
+    /// The incident report category decoded from the low byte of `IncidentFlags`.
     pub report: IncidentReport,
+    /// The penalty multiplier decoded from the second byte of `IncidentFlags`.
     pub penalty: IncidentPenalty,
 }
 
 /// Discrete incident report categories from the low byte of IncidentFlags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IncidentReport {
+    /// No incident was reported (code `0x00`).
     NoReport,
+    /// Driver lost control of the vehicle (code `0x01`).
     OutOfControl,
+    /// Driver went off the racing surface (code `0x02`).
     OffTrack,
+    /// Driver is continuing off the racing surface (code `0x03`).
     OffTrackOngoing,
+    /// Driver made minor contact with a world object (code `0x04`).
     ContactWithWorld,
+    /// Driver collided with a world object (code `0x05`).
     CollisionWithWorld,
+    /// Driver is in an ongoing collision with a world object (code `0x06`).
     CollisionWithWorldOngoing,
+    /// Driver made minor contact with another car (code `0x07`).
     ContactWithCar,
+    /// Driver collided with another car (code `0x08`).
     CollisionWithCar,
+    /// An unrecognised report code from the iRacing SDK.
     Unknown(i32),
 }
 
 impl IncidentReport {
+    /// Constructs the variant corresponding to the given raw report code.
+    ///
+    /// Returns [`IncidentReport::Unknown`] for any code not listed above.
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
             0x00 => Self::NoReport,
@@ -42,6 +57,7 @@ impl IncidentReport {
         }
     }
 
+    /// Returns the raw report code for this variant.
     pub const fn to_raw(self) -> i32 {
         match self {
             Self::NoReport => 0x00,
@@ -72,15 +88,24 @@ impl TryFrom<i32> for IncidentReport {
 /// Discrete incident penalty magnitudes from the second byte of IncidentFlags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IncidentPenalty {
+    /// No penalty assigned (code `0x00`).
     None,
+    /// 0x (zero-multiplier) penalty (code `0x01`).
     ZeroX,
+    /// 1x penalty (code `0x02`).
     OneX,
+    /// 2x penalty (code `0x03`).
     TwoX,
+    /// 4x penalty (code `0x04`).
     FourX,
+    /// An unrecognised penalty code from the iRacing SDK.
     Unknown(i32),
 }
 
 impl IncidentPenalty {
+    /// Constructs the variant corresponding to the given raw penalty code.
+    ///
+    /// Returns [`IncidentPenalty::Unknown`] for any code not listed above.
     pub const fn from_raw(raw: i32) -> Self {
         match raw {
             0x00 => Self::None,
@@ -92,6 +117,7 @@ impl IncidentPenalty {
         }
     }
 
+    /// Returns the raw penalty code for this variant.
     pub const fn to_raw(self) -> i32 {
         match self {
             Self::None => 0x00,

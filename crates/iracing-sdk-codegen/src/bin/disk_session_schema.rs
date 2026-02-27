@@ -26,6 +26,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the disk session schema generator.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {

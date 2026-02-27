@@ -12,44 +12,77 @@ pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum IRacingSDKError {
+    /// Failed to open or maintain a connection to the iRacing shared-memory API.
     #[error("Failed to connect to iRacing: {reason}")]
-    Connection { reason: String },
+    Connection {
+        /// Human-readable description of why the connection failed.
+        reason: String,
+    },
 
+    /// An I/O error occurred while reading or seeking an `.ibt` telemetry file.
     #[error("IBT file error: {path}")]
     File {
+        /// Path of the file that triggered the error.
         path: PathBuf,
+        /// Underlying I/O error.
         #[source]
         source: std::io::Error,
     },
 
+    /// The iRacing SDK header version does not match the expected version.
     #[error("SDK version mismatch: expected {expected}, found {found}")]
-    Version { expected: u32, found: u32 },
+    Version {
+        /// The SDK version this library requires.
+        expected: u32,
+        /// The SDK version found in the data source.
+        found: u32,
+    },
 
+    /// A memory access at the given offset was invalid or out of bounds.
     #[error("Memory access violation at offset {offset:#x}")]
     Memory {
+        /// Byte offset at which the access violation occurred.
         offset: usize,
+        /// Optional source error carrying additional context.
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    /// A structured or textual value could not be parsed.
     #[error("Parse error in {context}: {details}")]
-    Parse { context: String, details: String },
+    Parse {
+        /// Human-readable description of the parsing stage that failed.
+        context: String,
+        /// Detailed description of the parse failure.
+        details: String,
+    },
 
+    /// A value could not be converted to the expected type.
     #[error("Type conversion error: {details}")]
-    TypeConversion { details: String },
+    TypeConversion {
+        /// Description of the failed conversion.
+        details: String,
+    },
 
+    /// A Windows API call failed.
     #[error("Windows API error: {operation}")]
     #[cfg(windows)]
     WindowsApi {
+        /// Name or description of the Windows operation that failed.
         operation: String,
+        /// Underlying Windows error.
         #[source]
         source: core::Error,
     },
 
+    /// A buffer read or write operation failed.
     #[error("Buffer operation failed: {context}")]
     Buffer {
+        /// Description of the buffer operation that failed.
         context: String,
+        /// Index of the buffer involved, if known.
         buffer_index: Option<usize>,
+        /// Optional source error carrying additional context.
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },

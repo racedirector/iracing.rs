@@ -23,6 +23,9 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.broadcast-cli]
 targets = ["x86_64-pc-windows-msvc"]
 
+[package.metadata.dist.bin.live_to_csv]
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -89,3 +92,7 @@ path = "src/bin/broadcast_cli.rs"
 [[bin]]
 name = "ibt-to-csv"
 path = "src/bin/ibt_to_csv.rs"
+
+[[bin]]
+name = "live-to-csv"
+path = "src/bin/live_to_csv.rs"

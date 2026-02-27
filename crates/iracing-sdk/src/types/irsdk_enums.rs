@@ -15,11 +15,18 @@ macro_rules! define_irsdk_enum {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
         #[cfg_attr(feature = "codegen", derive(JsonSchema))]
         $vis enum $name {
-            $($variant,)+
+            $(
+                /// Named enum variant — see the `irsdk_flags` module for the raw constant value.
+                $variant,
+            )+
+            /// An unrecognised value from the iRacing SDK.
             Unknown(i32),
         }
 
         impl $name {
+            /// Constructs a typed variant from a raw `i32` value.
+            ///
+            /// Returns [`Self::Unknown`] for any value not covered by a named variant.
             pub const fn from_raw(raw: i32) -> Self {
                 match raw {
                     $($value => Self::$variant,)+
@@ -27,6 +34,7 @@ macro_rules! define_irsdk_enum {
                 }
             }
 
+            /// Returns the raw `i32` representation of this variant.
             pub const fn to_raw(self) -> i32 {
                 match self {
                     $(Self::$variant => $value,)+
@@ -37,6 +45,7 @@ macro_rules! define_irsdk_enum {
 
         #[cfg(feature = "codegen")]
         impl $name {
+            /// Exhaustive list of `(variant-name, raw-value)` pairs used for JSON Schema generation.
             pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
                 $((stringify!($variant), $value as i64),)+
             ];

@@ -28,6 +28,7 @@ use tracing::{debug, trace};
 // Size constants for IBT format structures
 const IRSDK_HEADER_SIZE: usize = 144;
 const IRSDK_DISK_SUBHEADER_SIZE: usize = 32;
+/// Size in bytes of a single variable header entry (`irsdk_varHeader`).
 pub const IRSDK_VAR_HEADER_SIZE: usize = 144;
 const IRSDK_VAR_NAME_SIZE: usize = 32;
 const IRSDK_VAR_DESC_SIZE: usize = 64;
@@ -36,39 +37,51 @@ const IRSDK_VAR_UNIT_SIZE: usize = 32;
 /// IBT file header structure (matches iRacing's irsdk_header)
 #[derive(Debug, Clone)]
 pub struct IbtHeader {
+    /// iRacing SDK version; must equal `2` for files this library supports.
     pub version: i32,
+    /// Bitmap of active connection flags (see `irsdk_StatusField`).
     pub status: i32,
+    /// Telemetry sample rate in Hz (typically 60).
     pub tick_rate: i32,
+    /// Monotonically-increasing counter incremented each time the session YAML changes.
     pub session_info_update: i32,
+    /// Byte length of the session YAML blob.
     pub session_info_len: i32,
+    /// File offset (bytes from the start) to the session YAML blob.
     pub session_info_offset: i32,
+    /// Number of telemetry variable definitions in the variable header array.
     pub num_vars: i32,
+    /// File offset to the first variable header entry.
     pub var_header_offset: i32,
+    /// Number of data buffers (always `1` in `.ibt` files).
     pub num_buf: i32,
+    /// Byte size of a single telemetry frame.
     pub buf_len: i32,
 }
 
-/// IBT disk sub-header (IBT-specific structure)
-/// struct irsdk_diskSubHeader {
-///   time_t sessionStartDate;   // 8 bytes (i64)
-///   double sessionStartTime;   // 8 bytes (f64)
-///   double sessionEndTime;     // 8 bytes (f64)
-///   int sessionLapCount;       // 4 bytes (i32)
-///   int sessionRecordCount;    // 4 bytes (i32)
-/// }
+/// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
+///
+/// Immediately follows the main [`IbtHeader`] and provides timing and record-count
+/// metadata specific to `.ibt` replay files.
 #[derive(Debug, Clone)]
 pub struct IbtDiskSubHeader {
-    pub start_date: i64,   // time_t (unix timestamp)
-    pub start_time: f64,   // session start time in seconds
-    pub end_time: f64,     // session end time in seconds
-    pub lap_count: i32,    // number of laps completed
-    pub record_count: i32, // number of telemetry records
+    /// Unix timestamp (`time_t`) of the session start date.
+    pub start_date: i64,
+    /// Session start time in seconds since session midnight.
+    pub start_time: f64,
+    /// Session end time in seconds since session midnight.
+    pub end_time: f64,
+    /// Number of laps completed during the recorded session.
+    pub lap_count: i32,
+    /// Total number of telemetry frames (records) in the file.
+    pub record_count: i32,
 }
 
 impl IbtHeader {
     /// Size of the irsdk_header structure in bytes
     pub const HEADER_SIZE: usize = IRSDK_HEADER_SIZE;
 
+    /// Parses an [`IbtHeader`] from the current position of `reader`.
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
         let mut header_data = [0u8; IRSDK_HEADER_SIZE];
@@ -125,6 +138,7 @@ impl IbtHeader {
         })
     }
 
+    /// Validates header fields for sanity, returning an error on obviously corrupt values.
     pub fn validate(&self) -> Result<()> {
         if self.version != 2 {
             return Err(IRacingSDKError::Version {
@@ -196,6 +210,7 @@ impl IbtDiskSubHeader {
     /// Size of the disk sub-header structure in bytes
     pub const DISK_HEADER_SIZE: usize = IRSDK_DISK_SUBHEADER_SIZE;
 
+    /// Parses an [`IbtDiskSubHeader`] from the current position of `reader`.
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut disk_header_data = [0u8; IRSDK_DISK_SUBHEADER_SIZE];
         reader

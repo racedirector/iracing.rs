@@ -32,24 +32,32 @@ impl DynamicFrame {
         T::from_bytes(self.data.as_ref(), info).ok()
     }
 
-    /// Convenience typed helpers
+    /// Look up a variable as `f32`, or `None` if missing or the wrong type.
     pub fn f32(&self, name: &str) -> Option<f32> {
         self.get(name)
     }
+
+    /// Look up a variable as `i32`, or `None` if missing or the wrong type.
     pub fn i32(&self, name: &str) -> Option<i32> {
         self.get(name)
     }
+
+    /// Look up a variable as `u32`, or `None` if missing or the wrong type.
     pub fn u32(&self, name: &str) -> Option<u32> {
         self.get(name)
     }
+
+    /// Look up a variable as `f64`, or `None` if missing or the wrong type.
     pub fn f64(&self, name: &str) -> Option<f64> {
         self.get(name)
     }
+
+    /// Look up a variable as `bool`, or `None` if missing or the wrong type.
     pub fn bool(&self, name: &str) -> Option<bool> {
         self.get(name)
     }
 
-    /// Accessors for metadata
+    /// Monotonic frame counter for this frame.
     pub fn tick_count(&self) -> u32 {
         self.tick_count
     }

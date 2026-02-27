@@ -2,18 +2,48 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration, Instant};
 
+/// Default host used by iRacing's HTTP status endpoint.
+pub const DEFAULT_HOST: &str = "127.0.0.1";
+
+/// Default port used by iRacing's HTTP status endpoint.
+pub const DEFAULT_PORT: u16 = 32034;
+
+/// HTTP path (including query string) for the iRacing sim-status endpoint.
+pub const SIM_STATUS_PATH: &str = "/get_sim_status?object=simStatus";
+
+/// Build the full URL for the iRacing sim-status endpoint.
+///
+/// Custom [`SimStatusClient`] implementations should use this instead of
+/// hardcoding the path so they stay in sync if it ever changes.
+///
+/// ```rust
+/// use iracing_simulation::{sim_status_url, DEFAULT_HOST, DEFAULT_PORT};
+///
+/// let url = sim_status_url(DEFAULT_HOST, DEFAULT_PORT);
+/// assert_eq!(url, "http://127.0.0.1:32034/get_sim_status?object=simStatus");
+/// ```
+pub fn sim_status_url(host: &str, port: u16) -> String {
+    format!("http://{}:{}{}", host, port, SIM_STATUS_PATH)
+}
+
 /// Minimal response surface area needed by Simulation.
 /// Consumers can implement `SimStatusClient` using any HTTP library,
 /// caching layer, or custom transport.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimStatusResponse {
+    /// HTTP status code returned by the server.
     pub status_code: u16,
+    /// Response body as a UTF-8 string.
     pub body: String,
 }
 
 /// Consumer-injectable HTTP logic.
 /// Keep this synchronous + dependency-free from this crate's perspective.
 pub trait SimStatusClient {
+    /// Send a GET request to the iRacing sim-status endpoint and return the response.
+    ///
+    /// Implementors should connect to `host:port`, issue the request within
+    /// `timeout`, and map transport or protocol errors to `Err(())`.
     fn get_sim_status(
         &self,
         host: &str,
@@ -33,8 +63,6 @@ impl SimStatusClient for StdSimStatusClient {
         port: u16,
         timeout: Duration,
     ) -> Result<SimStatusResponse, ()> {
-        const PATH: &str = "/get_sim_status?object=simStatus";
-
         let addr: SocketAddr = format!("{host}:{port}").parse().map_err(|_| ())?;
 
         let mut stream = TcpStream::connect_timeout(&addr, timeout).map_err(|_| ())?;
@@ -47,7 +75,7 @@ impl SimStatusClient for StdSimStatusClient {
              Connection: close\r\n\
              Accept: */*\r\n\
              \r\n",
-            path = PATH,
+            path = SIM_STATUS_PATH,
             host = host,
             port = port
         );
@@ -87,13 +115,29 @@ pub struct Simulation<C: SimStatusClient = StdSimStatusClient> {
 }
 
 impl Simulation<StdSimStatusClient> {
-    /// Dependency-free default.
+    /// Connect to the local iRacing instance using the dependency-free default client.
+    ///
+    /// This is the right choice for the common case: iRacing running on the
+    /// same machine. Uses [`DEFAULT_HOST`] and [`DEFAULT_PORT`].
+    pub fn local() -> Self {
+        Self::new(DEFAULT_HOST, DEFAULT_PORT)
+    }
+
+    /// Connect to an iRacing instance at `host:port` using the dependency-free
+    /// default client.
+    ///
+    /// Use this when the sim is running on a remote machine or a non-standard
+    /// port. For the local case, prefer [`Simulation::local`].
     pub fn new(host: impl Into<String>, port: u16) -> Self {
         Self::new_with_client(host, port, StdSimStatusClient)
     }
 }
 
 impl<C: SimStatusClient> Simulation<C> {
+    /// Create a `Simulation` using a custom [`SimStatusClient`].
+    ///
+    /// Use this when you need to inject a caching layer, retry logic, or an
+    /// alternate HTTP stack. For the common case, prefer [`Simulation::new`].
     pub fn new_with_client(host: impl Into<String>, port: u16, client: C) -> Self {
         Self {
             host: host.into(),

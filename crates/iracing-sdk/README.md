@@ -108,7 +108,7 @@ fn main() -> iracing_sdk::Result<()> {
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
 | Session parsing (`SessionInfoParser`) | Yes | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-session-parser` bin | No | Yes |
+| `live-position` example / `live-session-parser` and `live_to_csv` bins | No | Yes |
 
 ## Examples and Binaries
 
@@ -125,6 +125,8 @@ fn main() -> iracing_sdk::Result<()> {
   - `cargo run -p iracing-sdk --bin ibt-session-parser -- --ibt-path ./session.ibt --output-path ./session.yaml`
 - `live-session-parser` (Windows only):
   - `cargo run -p iracing-sdk --bin live-session-parser -- --output-path .\\live-session.yaml`
+- `live_to_csv` (Windows only):
+  - `cargo run -p iracing-sdk --bin live_to_csv -- --output-path .\\live.csv`
 
 ## Troubleshooting
 

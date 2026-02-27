@@ -8,7 +8,7 @@ use std::{
 };
 
 use clap::Parser;
-use iracing_simulation::Simulation;
+use iracing_simulation::{DEFAULT_HOST, DEFAULT_PORT, Simulation};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
@@ -21,11 +21,11 @@ use tracing_subscriber::EnvFilter;
 #[command(version, about)]
 struct Args {
     /// Host address of the iRacing simulation HTTP endpoint
-    #[arg(long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = DEFAULT_HOST)]
     host: String,
 
     /// Port of the iRacing simulation HTTP endpoint
-    #[arg(long, default_value_t = 32034)]
+    #[arg(long, default_value_t = DEFAULT_PORT)]
     port: u16,
 
     /// Timeout in seconds.

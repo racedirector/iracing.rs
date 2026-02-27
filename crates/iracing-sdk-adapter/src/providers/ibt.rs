@@ -3,30 +3,36 @@ use iracing_sdk::{IbtReader, VariableSchema};
 use std::{path::Path, sync::Arc};
 use tracing::{debug, trace};
 
+/// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 pub struct IbtProvider {
     reader: IbtReader,
     schema: Arc<VariableSchema>,
 }
 
 impl IbtProvider {
+    /// Opens an `.ibt` file at `path` and constructs an `IbtProvider`.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let reader = IbtReader::open(path)?;
         Self::with_reader(reader)
     }
 
+    /// Constructs an `IbtProvider` from an already-opened [`IbtReader`].
     pub fn with_reader(reader: IbtReader) -> Result<Self> {
         let schema = Arc::new(reader.variables().clone());
         Ok(Self { reader, schema })
     }
 
+    /// Returns a shared reference to the telemetry variable schema.
     pub fn schema(&self) -> Arc<VariableSchema> {
         Arc::clone(&self.schema)
     }
 
+    /// Returns the index of the next frame that will be read (0-based).
     pub fn current_frame(&self) -> usize {
         self.reader.current_frame()
     }
 
+    /// Returns the total number of telemetry frames in the file.
     pub fn total_frames(&self) -> usize {
         self.reader.total_frames()
     }

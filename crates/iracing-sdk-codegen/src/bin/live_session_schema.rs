@@ -28,6 +28,7 @@ use std::{fs::File, io::BufWriter};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the live session schema generator.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -59,6 +60,7 @@ fn main() -> Result<()> {
     run()
 }
 
+/// Connects to iRacing shared memory, generates the session schema, and writes it to disk.
 #[cfg(windows)]
 fn run() -> Result<()> {
     use schemars::schema_for_value;
@@ -115,6 +117,7 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+/// Non-Windows stub — always returns an error explaining the platform requirement.
 #[cfg(not(windows))]
 fn run() -> Result<()> {
     tracing::warn!(

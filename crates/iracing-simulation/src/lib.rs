@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Access to the state of the iRacing simulation on a host PC.
 //!
 //! # Features
@@ -9,4 +10,7 @@
 
 mod simulation;
 
-pub use simulation::Simulation;
+pub use simulation::{
+    Simulation, SimStatusClient, SimStatusResponse, StdSimStatusClient,
+    DEFAULT_HOST, DEFAULT_PORT, SIM_STATUS_PATH, sim_status_url,
+};

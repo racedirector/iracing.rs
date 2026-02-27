@@ -1,7 +1,15 @@
 //! iRacing primitive schema generator.
 //!
-//! Emits a JSON Schema (YAML-serialized) describing the exported `irsdk_*` primitive wrappers from
-//! `iracing_sdk::types` (enum and bitflag families).
+//! Emits a JSON Schema (YAML-serialized) describing every exported `irsdk_*` primitive wrapper
+//! from `iracing_sdk::types` — enumerations (e.g. `irsdk_SessionState`) and bitflag families
+//! (e.g. `irsdk_Flags`). The output is suitable as a shared `$defs` bank referenced by the
+//! variable schema when `--annotate` is passed to `disk_variable_schema` or
+//! `live_variable_schema`.
+//!
+//! # Usage
+//! ```text
+//! iracing_primitives_schema [--output-path <SCHEMA.yml>]
+//! ```
 
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
@@ -11,6 +19,7 @@ use iracing_sdk_codegen::primitive_annotations::build_primitive_schema;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the iRacing primitives schema generator.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {

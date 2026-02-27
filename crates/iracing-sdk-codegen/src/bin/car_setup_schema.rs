@@ -1,3 +1,18 @@
+//! Car setup schema generator.
+//!
+//! Reads a car setup from an iRacing `.ibt` telemetry file or live iRacing shared
+//! memory (Windows only), then emits a JSON Schema (serialized as YAML) describing
+//! the structure of `SessionInfo::car_setup`.
+//!
+//! The output filename is computed from `CarID` and `SeriesID` embedded in the
+//! session unless `--output-path` is given explicitly.
+//!
+//! # Usage
+//! ```text
+//! car_setup_schema --ibt-path <FILE.ibt> [--output-dir <DIR>] [--output-path <SCHEMA.yml>]
+//! car_setup_schema [--output-dir <DIR>] [--output-path <SCHEMA.yml>]   # live (Windows)
+//! ```
+
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::{Result, anyhow};
@@ -9,6 +24,10 @@ use schemars::schema_for_value;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+/// CLI arguments for the car setup schema generator.
+///
+/// Pass `--ibt-path` to source the setup from a replay file.
+/// Omit it on Windows to read from the live iRacing connection instead.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -25,6 +44,7 @@ struct Args {
     output_path: Option<PathBuf>,
 }
 
+/// Opens an `.ibt` file and parses session info from the embedded YAML.
 fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
     info!(path = %ibt_path.display(), "Opening IBT file");
     let reader = IbtReader::open(&ibt_path)?;
@@ -36,6 +56,7 @@ fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
     Ok(SessionInfo::parse(&session_yaml)?)
 }
 
+/// Connects to live iRacing shared memory and parses the current session info.
 #[cfg(windows)]
 fn parse_live_session() -> Result<SessionInfo> {
     info!("Opening iRacing connection");
@@ -56,6 +77,7 @@ fn parse_live_session() -> Result<SessionInfo> {
     Ok(parser.parse(raw_session_yaml)?)
 }
 
+/// Non-Windows stub — always returns an error directing the caller to use `--ibt-path`.
 #[cfg(not(windows))]
 fn parse_live_session() -> Result<SessionInfo> {
     Err(anyhow!(
@@ -63,6 +85,7 @@ fn parse_live_session() -> Result<SessionInfo> {
     ))
 }
 
+/// Computes a default output filename of the form `<CarID>-<SeriesID>-setup.yml`.
 fn output_file_name(session_info: &SessionInfo) -> Result<String> {
     let series_id = session_info
         .weekend_info
@@ -92,6 +115,7 @@ fn output_file_name(session_info: &SessionInfo) -> Result<String> {
     Ok(format!("{}-{}-setup.yml", driver_car_id, series_id))
 }
 
+/// Resolves the final output path, preferring an explicit `--output-path` when provided.
 fn resolve_output_path(args: &Args, session_info: &SessionInfo) -> Result<PathBuf> {
     if let Some(path) = args.output_path.as_ref() {
         // If they passed a relative path, interpret it under output_dir.
