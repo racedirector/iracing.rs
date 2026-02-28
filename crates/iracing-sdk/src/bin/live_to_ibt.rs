@@ -9,15 +9,22 @@
 //! # Usage
 //!
 //! ```text
-//! live_to_ibt --output-path <OUTPUT_FILE.csv>
+//! live-to-ibt --output-path <OUTPUT_FILE.ibt>
 //! ```
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
+#[cfg(windows)]
+use iracing_sdk::{
+    FrameProjection, IbtWriteOptions, IbtWriter, VariableSchema, WaitResult, WindowsConnection,
+};
 use std::path::PathBuf;
+#[cfg(windows)]
+use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+#[cfg(windows)]
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -39,6 +46,8 @@ fn main() -> Result<()> {
 
 #[cfg(windows)]
 fn run() -> Result<()> {
+    let Args { output_path } = Args::parse();
+
     info!("Opening iRacing connection");
     let mut connection =
         WindowsConnection::try_connect().context("Failed to connect to iRacing shared memory")?;
@@ -47,14 +56,82 @@ fn run() -> Result<()> {
         return Err(anyhow!("iRacing is not connected."));
     }
 
+    // Build schema from variables
+    let variables: Vec<_> = connection.get_variables();
+    let mut variable_map = std::collections::HashMap::new();
+
+    for var_info in variables {
+        variable_map.insert(var_info.name.clone(), var_info);
+    }
+
+    let frame_size = connection.header().buf_len as usize;
+    let schema = VariableSchema::new(variable_map, frame_size)?;
+
     // ------------------------------------------------------------
     // Create a projection of the variables you want from the
     // source connection
     // ------------------------------------------------------------
     let projection = FrameProjection::from_variable_names(
-        reader.variables(),
-        ["SessionTime", "Speed", "RPM", "OnPitRoad"],
+        &schema,
+        [
+            "CarIdxBestLapNum",
+            "CarIdxBestLapTime",
+            "CarIdxClass",
+            "CarIdxClassPosition",
+            "CarIdxEstTime",
+            "CarIdxF2Time",
+            "CarIdxFastRepairsUsed",
+            "CarIdxGear",
+            "CarIdxLap",
+            "CarIdxLapCompleted",
+            "CarIdxLapDistPct",
+            "CarIdxLastLapTime",
+            "CarIdxOnPitRoad",
+            "CarIdxP2P_Count",
+            "CarIdxP2P_Status",
+            "CarIdxPaceFlags",
+            "CarIdxPaceLine",
+            "CarIdxPosition",
+            "CarIdxQualTireCompound",
+            "CarIdxQualTireCompoundLocked",
+            "CarIdxRPM",
+            "CarIdxSessionFlags",
+            "CarIdxSteer",
+            "CarIdxTireCompound",
+            "CarIdxTrackSurface",
+            "CarIdxTrackSurfaceMaterial",
+        ],
     )?;
+
+    let options = IbtWriteOptions::from_connection(&connection)?;
+    let mut writer = IbtWriter::create(&output_path, projection.target_schema().clone(), options)?;
+    let mut target_buffer = vec![0u8; projection.target_schema().frame_size];
+
+    info!("Recording to {:?}", output_path);
+
+    loop {
+        match connection.wait_for_update(Duration::from_millis(100))? {
+            WaitResult::Signaled => {
+                if let Some(frame_data) = connection.get_new_data() {
+                    writer.write_projected_frame_with_buffer(
+                        frame_data,
+                        &projection,
+                        &mut target_buffer,
+                    )?;
+                }
+            }
+            WaitResult::Timeout => {
+                if !connection.is_connected() {
+                    info!("iRacing disconnected, stopping recording");
+                    break;
+                }
+            }
+        }
+    }
+
+    info!("Wrote {} frames, finalizing", writer.frame_count());
+    writer.finish()?;
+    info!("Recording complete: {:?}", output_path);
 
     Ok(())
 }
@@ -62,8 +139,8 @@ fn run() -> Result<()> {
 #[cfg(not(windows))]
 fn run() -> Result<()> {
     tracing::warn!(
-        "live_to_csv is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        "live_to_ibt is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
 
-    Err(anyhow!("live_to_csv is only supported on Windows"))
+    Err(anyhow!("live_to_ibt is only supported on Windows"))
 }

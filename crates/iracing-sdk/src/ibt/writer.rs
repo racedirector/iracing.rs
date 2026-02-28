@@ -6,7 +6,9 @@
 //! - [`IbtWriteOptions`] for controlling header/session metadata
 
 use super::{format::IRSDK_VAR_HEADER_SIZE, reader::IbtReader};
-use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
+use crate::{
+    IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType, WindowsConnection,
+};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Seek, SeekFrom, Write};
@@ -57,6 +59,33 @@ impl Default for IbtWriteOptions {
 }
 
 impl IbtWriteOptions {
+    /// Build write options from a live Windows connection.
+    ///
+    /// `start_date` is set to the current wall-clock time. `start_time`, `end_time`,
+    /// and `lap_count` are left at their defaults (`0.0`, `None`, `0`) because
+    /// those values are not available from shared memory before recording begins.
+    #[cfg(windows)]
+    pub fn from_connection(connection: &WindowsConnection) -> Result<Self> {
+        let header = connection.header();
+        let raw_session_yaml = connection.session_info();
+
+        let start_date = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        Ok(Self {
+            status: header.status,
+            tick_rate: header.tick_rate,
+            session_info_update: header.session_info_update,
+            session_yaml: raw_session_yaml.map(|s| s.to_string()),
+            start_date,
+            start_time: 0.0,
+            end_time: None,
+            lap_count: 0,
+        })
+    }
+
     /// Build write options from an existing reader's metadata.
     pub fn from_reader(reader: &IbtReader) -> Result<Self> {
         let header = reader.header();
