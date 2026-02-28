@@ -45,7 +45,7 @@
 //! - Returns an error if the output file cannot be written
 //!
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{IbtReader, VariableInfo, VariableType};
@@ -349,6 +349,168 @@ mod tests {
         append_variable_values(&mut row, &frame, &flags)?;
 
         assert_eq!(row, vec!["10", "true", "2", "3"]);
+        Ok(())
+    }
+
+    #[test]
+    fn expanded_column_count_handles_zero_count() {
+        let variables = vec![
+            variable("Speed", VariableType::Float32, 0, 0),
+            variable("RPM", VariableType::Float32, 4, 1),
+        ];
+
+        let count = expanded_column_count(&variables);
+        assert_eq!(count, 2); // Both should count as 1
+    }
+
+    #[test]
+    fn expanded_column_count_sums_array_elements() {
+        let variables = vec![
+            variable("Speed", VariableType::Float32, 0, 1),
+            variable("CarIdxLapDistPct", VariableType::Float32, 4, 64),
+            variable("Gear", VariableType::Int32, 260, 1),
+        ];
+
+        let count = expanded_column_count(&variables);
+        assert_eq!(count, 66); // 1 + 64 + 1
+    }
+
+    #[test]
+    fn variable_label_returns_name_for_scalar() {
+        let var = variable("Speed", VariableType::Float32, 0, 1);
+        assert_eq!(variable_label(&var, 0), "Speed");
+    }
+
+    #[test]
+    fn variable_label_returns_indexed_name_for_array() {
+        let var = variable("CarIdxLapDistPct", VariableType::Float32, 0, 64);
+        assert_eq!(variable_label(&var, 0), "CarIdxLapDistPct[0]");
+        assert_eq!(variable_label(&var, 32), "CarIdxLapDistPct[32]");
+        assert_eq!(variable_label(&var, 63), "CarIdxLapDistPct[63]");
+    }
+
+    #[test]
+    fn variable_offset_calculates_correct_offset_for_arrays() -> Result<()> {
+        let var = variable("CarIdxLapDistPct", VariableType::Float32, 100, 3);
+
+        assert_eq!(variable_offset(&var, 0)?, 100);
+        assert_eq!(variable_offset(&var, 1)?, 104); // Float32 is 4 bytes
+        assert_eq!(variable_offset(&var, 2)?, 108);
+
+        Ok(())
+    }
+
+    #[test]
+    fn variable_offset_handles_different_type_sizes() -> Result<()> {
+        let var_f64 = variable("SessionTime", VariableType::Float64, 0, 2);
+        assert_eq!(variable_offset(&var_f64, 0)?, 0);
+        assert_eq!(variable_offset(&var_f64, 1)?, 8); // Float64 is 8 bytes
+
+        let var_i32 = variable("Gear", VariableType::Int32, 50, 3);
+        assert_eq!(variable_offset(&var_i32, 0)?, 50);
+        assert_eq!(variable_offset(&var_i32, 2)?, 58); // Int32 is 4 bytes
+
+        Ok(())
+    }
+
+    #[test]
+    fn read_scalar_as_string_handles_all_types() -> Result<()> {
+        let frame = vec![
+            b'A', // Char
+            0xFF, // Int8 = -1
+            0x42, // UInt8 = 66
+            0x10, 0x00, // Int16 = 16
+            0xFF, 0x0F, // UInt16 = 4095
+            0x00, 0x10, 0x00, 0x00, // Int32 = 4096
+            0xFF, 0xFF, 0x00, 0x00, // UInt32 = 65535
+            0x00, 0x00, 0xC8, 0x42, // Float32 = 100.0
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x59, 0x40, // Float64 = 100.0
+            0x01, // Bool = true
+            0x05, 0x00, 0x00, 0x00, // BitField = 5
+        ];
+
+        let tests = vec![
+            (variable("c", VariableType::Char, 0, 1), "A"),
+            (variable("i8", VariableType::Int8, 1, 1), "-1"),
+            (variable("u8", VariableType::UInt8, 2, 1), "66"),
+            (variable("i16", VariableType::Int16, 3, 1), "16"),
+            (variable("u16", VariableType::UInt16, 5, 1), "4095"),
+            (variable("i32", VariableType::Int32, 7, 1), "4096"),
+            (variable("u32", VariableType::UInt32, 11, 1), "65535"),
+            (variable("f32", VariableType::Float32, 15, 1), "100"),
+            (variable("f64", VariableType::Float64, 19, 1), "100"),
+            (variable("bool", VariableType::Bool, 27, 1), "true"),
+            (variable("bitfield", VariableType::BitField, 28, 1), "5"),
+        ];
+
+        for (var, expected) in tests {
+            let result = read_scalar_as_string(&frame, &var, 0)?;
+            assert_eq!(result, expected, "Failed for type {:?}", var.data_type);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn read_scalar_as_string_handles_false_bool() -> Result<()> {
+        let frame = vec![0x00]; // false
+        let var = variable("OnPitRoad", VariableType::Bool, 0, 1);
+        let result = read_scalar_as_string(&frame, &var, 0)?;
+        assert_eq!(result, "false");
+        Ok(())
+    }
+
+    #[test]
+    fn read_bytes_returns_error_on_overflow() {
+        let frame = vec![0u8; 10];
+        let result = read_bytes(&frame, 8, 4, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_bytes_returns_error_on_offset_overflow() {
+        let frame = vec![0u8; 10];
+        let result = read_bytes(&frame, usize::MAX - 1, 10, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn variable_offset_returns_error_on_multiplication_overflow() {
+        let var = variable("Test", VariableType::Float64, 0, usize::MAX);
+        let result = variable_offset(&var, usize::MAX);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn variable_offset_returns_error_on_addition_overflow() {
+        let var = variable("Test", VariableType::Float32, usize::MAX - 1, 1);
+        let result = variable_offset(&var, 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn build_headers_handles_empty_variables() {
+        let variables = vec![];
+        let headers = build_headers(&variables);
+        assert_eq!(headers, vec!["tick", "session_version"]);
+    }
+
+    #[test]
+    fn build_headers_handles_single_variable() {
+        let variables = vec![variable("Speed", VariableType::Float32, 0, 1)];
+        let headers = build_headers(&variables);
+        assert_eq!(headers, vec!["tick", "session_version", "Speed"]);
+    }
+
+    #[test]
+    fn append_variable_values_handles_zero_count_as_scalar() -> Result<()> {
+        let frame = vec![0x00, 0x00, 0x20, 0x41]; // 10.0f32
+        let var = variable("Speed", VariableType::Float32, 0, 0);
+
+        let mut row = Vec::new();
+        append_variable_values(&mut row, &frame, &var)?;
+
+        assert_eq!(row, vec!["10"]);
         Ok(())
     }
 }
