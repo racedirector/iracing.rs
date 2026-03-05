@@ -60,7 +60,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload dist manifest
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-manifest
           path: dist-manifest.json
@@ -104,7 +104,7 @@ jobs:
         run: dist build --allow-dirty ${{ matrix.dist_args }} --tag "${{ needs.plan.outputs.tag }}"
 
       - name: Upload local artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.host }}
           path: target/distrib/*
@@ -131,7 +131,7 @@ jobs:
         run: dist build --allow-dirty --artifacts=global --tag "${{ needs.plan.outputs.tag }}"
 
       - name: Upload global artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-global
           path: target/distrib/*
