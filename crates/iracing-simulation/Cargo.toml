@@ -17,7 +17,7 @@ dist = false
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["blocking"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
-ureq = "2"
+ureq = "3"
 
 [dependencies]
 clap = { workspace = true }
