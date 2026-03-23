@@ -1,13 +1,29 @@
-//! Print frame/time ranges for each indexed player lap in an iRacing `.ibt` file.
+//! # ibt-lap-ranges
+//!
+//! Prints frame and session-time ranges for each indexed player lap in an iRacing `.ibt` file.
+//!
+//! ## Usage
+//!
+//! ```bash
+//! cargo run --example ibt_lap_ranges -- --ibt-path ./session.ibt
+//! ```
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use clap::Parser;
 use iracing_sdk::{IbtReader, IndexedIbt};
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
+
+/// CLI arguments for the `ibt-lap-ranges` example.
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Path to the input `.ibt` telemetry file.
+    #[arg(short, long)]
+    ibt_path: PathBuf,
+}
 
 fn main() -> Result<()> {
-    let ibt_path = env::args_os().nth(1).map(PathBuf::from).ok_or_else(|| {
-        anyhow!("usage: cargo run --example ibt_lap_ranges -- <path-to-file.ibt>")
-    })?;
+    let Args { ibt_path } = Args::parse();
 
     let mut reader = IbtReader::open(&ibt_path)?;
     let indexed = IndexedIbt::build(&mut reader)?;
