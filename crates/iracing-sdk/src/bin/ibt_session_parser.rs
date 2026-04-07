@@ -77,7 +77,7 @@ struct Args {
 
     /// Path where the session YAML should be written.
     #[arg(short, long)]
-    output_path: PathBuf,
+    output_path: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -106,7 +106,11 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     info!("Parsing session information");
     if let Some(session) = reader.session_yaml()? {
-        fs::write(output_path, session)?;
+        if let Some(output_path) = output_path {
+            fs::write(output_path, session)?;
+        } else {
+            info!("\n{}", session);
+        }
     }
 
     info!("Finished parsing session information.");

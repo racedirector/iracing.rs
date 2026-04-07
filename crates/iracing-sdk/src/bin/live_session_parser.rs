@@ -91,7 +91,7 @@ use tracing_subscriber::EnvFilter;
 struct Args {
     /// Path where the session YAML should be written.
     #[arg(short, long)]
-    output_path: PathBuf,
+    output_path: Option<PathBuf>,
 
     #[arg(long, default_value_t = true)]
     live_only: bool,
@@ -131,7 +131,11 @@ fn run() -> Result<()> {
     // ------------------------------------------------------------
     info!("Parsing session information");
     if let Some(session) = connection.session_info() {
-        fs::write(output_path, session)?;
+        if let Some(output_path) = output_path {
+            fs::write(output_path, session)?;
+        } else {
+            info!("\n{}", session);
+        }
     }
 
     info!("Finished parsing session information.");
