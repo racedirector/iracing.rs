@@ -8,6 +8,7 @@
 //! This module provides low-level YAML cleaning without parsing.
 
 use crate::{IRacingSDKError, Result};
+use encoding_rs::WINDOWS_1252;
 
 /// Preprocess iRacing YAML to fix known issues
 ///
@@ -88,18 +89,24 @@ pub fn extract_yaml_from_memory(data: &[u8], offset: i32, length: i32) -> Result
 
     // Extract the substring
     let yaml_data = &data[offset..offset + length];
-
     // Find null terminator or use entire length
     let yaml_len = yaml_data.iter().position(|&b| b == 0).unwrap_or(length);
+    let candidate = &yaml_data[..yaml_len];
 
-    // Convert to string
-    let yaml_str =
-        std::str::from_utf8(&yaml_data[..yaml_len]).map_err(|e| IRacingSDKError::Parse {
-            context: "YAML UTF-8 conversion".to_string(),
-            details: e.to_string(),
-        })?;
+    if let Ok(s) = std::str::from_utf8(candidate) {
+        return Ok(s.to_string());
+    }
 
-    Ok(yaml_str.to_string())
+    let (decoded, _, had_errors) = WINDOWS_1252.decode(candidate);
+
+    if had_errors {
+        return Err(IRacingSDKError::Parse {
+            context: "YAML decoding".to_string(),
+            details: "Failed to decode as UTF-8 or Windows-1252".to_string(),
+        });
+    }
+
+    Ok(decoded.into_owned())
 }
 
 #[cfg(test)]

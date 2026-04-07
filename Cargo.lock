@@ -890,6 +890,7 @@ dependencies = [
  "clap",
  "criterion",
  "csv",
+ "encoding_rs",
  "proptest",
  "schemars",
  "serde",
