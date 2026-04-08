@@ -32,11 +32,12 @@
 //! cargo run -p iracing-sdk --bin live_headers
 //! ```
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+#[cfg(windows)]
+use iracing_sdk::WindowsConnection;
 #[cfg(windows)]
 use iracing_sdk::schema::header::IRSDKHeader;
 #[cfg(windows)]
-use iracing_sdk::WindowsConnection;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -58,9 +59,8 @@ fn run() -> Result<()> {
 
     info!("Reading live header bytes");
     let header_ptr = connection.header() as *const iracing_sdk::windows::IRSDKHeader as *const u8;
-    let header_bytes = unsafe {
-        std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>())
-    };
+    let header_bytes =
+        unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
 
     info!("Parsing live header");
     let header = IRSDKHeader::parse_from_memory(header_bytes)?;
