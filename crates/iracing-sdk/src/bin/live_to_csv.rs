@@ -14,7 +14,7 @@
 //! # Usage
 //!
 //! ```text
-//! live_to_csv --output-path <OUTPUT_FILE.csv>
+//! live-to-csv --output-path <OUTPUT_FILE.csv>
 //! ```
 
 #[cfg(any(windows, test))]
