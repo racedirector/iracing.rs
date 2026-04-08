@@ -1,7 +1,9 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
+#[cfg(windows)]
 use iracing_sdk::IRacingSDKError;
+#[cfg(windows)]
 use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
 #[cfg(windows)]
 use std::path::PathBuf;
@@ -36,6 +38,7 @@ struct Row {
     is_in_pit_box: bool,
 }
 
+#[cfg(windows)]
 impl FrameAdapter for Row {
     fn validate_schema(
         schema: &iracing_sdk::VariableSchema,

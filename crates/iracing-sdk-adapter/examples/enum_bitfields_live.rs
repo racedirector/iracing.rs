@@ -1,7 +1,9 @@
 use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
+#[cfg(windows)]
 use iracing_sdk::{BitField, IRacingSDKError, VarData};
+#[cfg(windows)]
 use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
 
 #[cfg(windows)]
@@ -12,6 +14,7 @@ struct Args {
     max_frames: usize,
 }
 
+#[cfg(windows)]
 #[derive(Debug)]
 struct TelemetryRow {
     session_state: iracing_sdk::SessionState,
@@ -20,6 +23,7 @@ struct TelemetryRow {
     engine_warnings: iracing_sdk::EngineWarnings,
 }
 
+#[cfg(windows)]
 impl FrameAdapter for TelemetryRow {
     fn validate_schema(
         schema: &iracing_sdk::VariableSchema,
