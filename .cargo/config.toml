@@ -1,5 +1,7 @@
 [alias]
+ibt-headers = ["run", "-p", "iracing-sdk", "--bin", "ibt-headers", "--"]
 ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
+live-headers = ["run", "-p", "iracing-sdk", "--bin", "live-headers", "--"]
 live-to-csv = ["run", "-p", "iracing-sdk", "--bin", "live-to-csv", "--"]
 ibt-session-parser = ["run", "-p", "iracing-sdk", "--bin", "ibt-session-parser", "--"]
 live-session-parser = ["run", "-p", "iracing-sdk", "--bin", "live-session-parser", "--"]

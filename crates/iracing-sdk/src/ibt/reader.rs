@@ -82,7 +82,7 @@ impl IbtReader {
         header.validate()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
-        let disk_header = IbtDiskSubHeader::parse_from_reader(&mut cursor)?;
+        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut cursor, &header)?;
 
         // Extract variable schema
         let variable_schema = extract_variable_schema(&mut cursor, &header)?;

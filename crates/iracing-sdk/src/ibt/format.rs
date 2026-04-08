@@ -22,7 +22,7 @@
 
 use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, SeekFrom};
 use tracing::{debug, trace};
 
 // Size constants for IBT format structures
@@ -61,7 +61,8 @@ pub struct IbtHeader {
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
-/// Immediately follows the main [`IbtHeader`] and provides timing and record-count
+/// Stored just before the variable header array (at
+/// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
 /// metadata specific to `.ibt` replay files.
 #[derive(Debug, Clone)]
 pub struct IbtDiskSubHeader {
@@ -120,8 +121,17 @@ impl IbtHeader {
         let buf_len = parse_i32_le(&header_data, 36)?;
 
         debug!(
-            "Parsed IBT header: version={}, tick_rate={}, num_vars={}, buf_len={}",
-            version, tick_rate, num_vars, buf_len
+            "Parsed IBT header: version={}, status={}, tick_rate={}, session_info_update={}, session_info_len={}, session_info_offset={}, num_vars={}, var_header_offset={}, num_buf={} buf_len={}",
+            version,
+            status,
+            tick_rate,
+            session_info_update,
+            session_info_len,
+            session_info_offset,
+            num_vars,
+            var_header_offset,
+            num_buf,
+            buf_len
         );
 
         Ok(Self {
@@ -237,6 +247,38 @@ impl IbtDiskSubHeader {
             lap_count,
             record_count,
         })
+    }
+
+    /// Parses an [`IbtDiskSubHeader`] using the offset implied by `header`.
+    ///
+    /// IBT files place the disk sub-header immediately before the variable headers.
+    pub fn parse_from_reader_with_header<R: Read + Seek>(
+        reader: &mut R,
+        header: &IbtHeader,
+    ) -> Result<Self> {
+        let disk_header_offset = header
+            .var_header_offset
+            .checked_sub(Self::DISK_HEADER_SIZE as i32)
+            .ok_or_else(|| IRacingSDKError::Parse {
+                context: "IBT disk sub-header seek".to_string(),
+                details: format!(
+                    "Disk sub-header offset underflow (var_header_offset={}, disk_header_size={})",
+                    header.var_header_offset,
+                    Self::DISK_HEADER_SIZE
+                ),
+            })?;
+
+        reader
+            .seek(SeekFrom::Start(disk_header_offset as u64))
+            .map_err(|e| IRacingSDKError::Parse {
+                context: "IBT disk sub-header seek".to_string(),
+                details: format!(
+                    "Failed to seek to disk sub-header at offset {}: {}",
+                    disk_header_offset, e
+                ),
+            })?;
+
+        Self::parse_from_reader(reader)
     }
 }
 
@@ -494,7 +536,7 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader(&mut buf_reader)
+        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
             .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
@@ -573,7 +615,7 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader(&mut buf_reader)
+        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
             .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
@@ -644,7 +686,7 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader(&mut buf_reader)
+        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
             .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
@@ -698,7 +740,8 @@ mod tests {
             let mut buf_reader = open_buf_reader(file_path)?;
             let header = IbtHeader::parse_from_reader(&mut buf_reader)
                 .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-            let _disk_header = IbtDiskSubHeader::parse_from_reader(&mut buf_reader)
+            let _disk_header =
+                IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
                 .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
             let schema = extract_variable_schema(&mut buf_reader, &header)
                 .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
@@ -745,7 +788,7 @@ mod tests {
         let mut ford_reader = open_buf_reader(&ford_file)?;
         let ford_header = IbtHeader::parse_from_reader(&mut ford_reader)
             .with_context(|| format!("Parsing Ford header from {}", ford_file.display()))?;
-        let _ford_disk = IbtDiskSubHeader::parse_from_reader(&mut ford_reader)
+        let _ford_disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
             .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
         let ford_schema = extract_variable_schema(&mut ford_reader, &ford_header)
             .with_context(|| format!("Extracting Ford schema from {}", ford_file.display()))?;
@@ -755,7 +798,8 @@ mod tests {
             IbtHeader::parse_from_reader(&mut supercars_reader).with_context(|| {
                 format!("Parsing Supercars header from {}", supercars_file.display())
             })?;
-        let _supercars_disk = IbtDiskSubHeader::parse_from_reader(&mut supercars_reader)
+        let _supercars_disk =
+            IbtDiskSubHeader::parse_from_reader_with_header(&mut supercars_reader, &supercars_header)
             .with_context(|| {
                 format!(
                     "Parsing Supercars sub-header from {}",
@@ -832,7 +876,7 @@ mod tests {
         let mut reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let disk = IbtDiskSubHeader::parse_from_reader(&mut reader)
+        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
             .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
         super::verify_min_length(file_len, &header, &disk)?;
         Ok(())
@@ -843,7 +887,7 @@ mod tests {
         let file_path = require_smallest_ibt_fixture()?;
         let mut reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut reader)?;
-        let disk = IbtDiskSubHeader::parse_from_reader(&mut reader)?;
+        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)?;
         let result = super::verify_min_length(0, &header, &disk);
         assert!(result.is_err());
         Ok(())

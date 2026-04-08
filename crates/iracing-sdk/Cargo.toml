@@ -97,3 +97,11 @@ path = "src/bin/ibt_to_csv.rs"
 [[bin]]
 name = "live-to-csv"
 path = "src/bin/live_to_csv.rs"
+
+[[bin]]
+name = "ibt-headers"
+path = "src/bin/ibt_headers.rs"
+
+[[bin]]
+name = "live-headers"
+path = "src/bin/live_headers.rs"
