@@ -17,11 +17,19 @@ This crate provides:
 
 ## Install
 
-Add the crate from your workspace or registry:
+In this workspace, depend on the crate via a path dependency:
 
 ```toml
 [dependencies]
-iracing-sdk = "0.1"
+iracing-sdk = { path = "../iracing-sdk" }
+```
+
+If you’re consuming this crate outside the workspace, use a git dependency (or a published
+version if/when one exists):
+
+```toml
+[dependencies]
+iracing-sdk = { git = "https://github.com/racedirector/iracing.rs", package = "iracing-sdk" }
 ```
 
 Basic import:
@@ -108,7 +116,7 @@ fn main() -> iracing_sdk::Result<()> {
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
 | Session parsing (`SessionInfoParser`) | Yes | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-session-parser` and `live_to_csv` bins | No | Yes |
+| `live-position` example / `live-session-parser` and `live-to-csv` bins | No | Yes |
 
 ## Examples and Binaries
 
@@ -125,8 +133,8 @@ fn main() -> iracing_sdk::Result<()> {
   - `cargo run -p iracing-sdk --bin ibt-session-parser -- --ibt-path ./session.ibt --output-path ./session.yaml`
 - `live-session-parser` (Windows only):
   - `cargo run -p iracing-sdk --bin live-session-parser -- --output-path .\\live-session.yaml`
-- `live_to_csv` (Windows only):
-  - `cargo run -p iracing-sdk --bin live_to_csv -- --output-path .\\live.csv`
+- `live-to-csv` (Windows only):
+  - `cargo run -p iracing-sdk --bin live-to-csv -- --output-path .\\live.csv`
 
 ## Troubleshooting
 

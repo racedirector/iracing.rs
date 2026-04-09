@@ -1,25 +1,41 @@
 # iracing.rs
 
-Rust workspace for working with iRacing telemetry: reading `.ibt` recordings, consuming live shared memory, streaming frames to higher-level adapters, generating schemas, and probing the simulation lifecycle.
+Rust workspace for working with iRacing telemetry and simulation state:
 
-## Executive Summary
-- **Telemetry core (`iracing-sdk`)** — foundational library for decoding iRacing telemetry, encapsulating frame parsing, session YAML caching, and Windows shared-memory access.
-- **Adapter layer (`iracing-sdk-adapter`)** — stream-oriented abstractions (`Provider`, `FrameAdapter`) that turn raw frames into typed views or lightweight projections.
-- **Schema tooling (`iracing-sdk-codegen`)** — command-line utilities that emit JSON Schema/YAML representations of telemetry/session data for documentation and contract testing.
-- **Simulation utilities (`iracing-simulation`)** — minimal HTTP probe for determining whether the iRacing sim is running, with configurable transports and examples.
-- **Shared test helpers (`test-utils`)** — Git LFS-aware fixture discovery and test-data helpers used across the workspace.
+- Read `.ibt` recordings (cross-platform)
+- Read live iRacing shared memory (Windows-only, where supported)
+- Stream frames through an adapter layer for typed projections
+- Generate JSON Schema snapshots (serialized as YAML)
+- Probe the sim lifecycle via iRacing’s local HTTP status endpoint
+- Reuse shared fixture + test-data helpers across crates
 
-The workspace targets cross-platform offline replay with Windows-specific features for live telemetry and broadcast commands. CI enforces doc and example correctness for `iracing-sdk`, and cargo-dist powers tag-driven releases.
+## Crates
 
-## Workspace Packages
+- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), plus Windows-only shared-memory + broadcast tools.
+- [`crates/iracing-sdk-adapter`](crates/iracing-sdk-adapter) — streaming layer: `Provider` + `FramePacket` and the two-phase `FrameAdapter` contract (`validate_schema` then `adapt`) for fast per-frame extraction.
+- [`crates/iracing-sdk-codegen`](crates/iracing-sdk-codegen) — schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, …).
+- [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
+- [`crates/test-utils`](crates/test-utils) — fixture discovery + guardrails (Git LFS guidance, `require_*` helpers) used by integration tests.
 
-| Crate | Location | Highlights |
-| --- | --- | --- |
-| `iracing-sdk` | `crates/iracing-sdk` | `.ibt` reader (`IbtReader`), session YAML parser (`SessionInfoParser`), telemetry type system (`VariableSchema`, `VarData`), Windows shared-memory API (`WindowsConnection`), CLI bins for parsing/exporting telemetry. |
-| `iracing-sdk-adapter` | `crates/iracing-sdk-adapter` | Streaming providers for disk/live telemetry, adapter contract that pre-computes field indices, `DynamicFrame` for exploratory access, examples that convert frames into user-defined structs. |
-| `iracing-sdk-codegen` | `crates/iracing-sdk-codegen` | Schema generation binaries (disk/live telemetry, session data, car setup, primitives). Retains both `codegen` and `schema-discovery` features on `iracing-sdk`. |
-| `iracing-simulation` | `crates/iracing-simulation` | Dependency-light HTTP client (`StdSimStatusClient`) and façade (`Simulation`) for the sim-status endpoint, plus examples using `reqwest`/`ureq`. |
-| `test-utils` | `crates/test-utils` | Git-aware test-data path discovery and fixture checks that standardize missing-fixture messaging across integration tests. |
+## Generated schema artifacts
+
+This repo checks in a few schema snapshots at the workspace root:
+
+- [`session-schema.yml`](session-schema.yml) — baseline schema for `iracing_sdk::SessionInfo`
+- [`iracing-primitives-schema.yml`](iracing-primitives-schema.yml) — `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags)
+- [`live-session-schema.yml`](live-session-schema.yml) — schema generated from live session YAML (Windows-only)
+- [`live-variable-schema.yml`](live-variable-schema.yml) — schema generated from live telemetry variables (Windows-only)
+
+Regenerate them (from the workspace root):
+
+```bash
+cargo session-schema -- --output-path ./session-schema.yml
+cargo iracing-primitives-schema -- --output-path ./iracing-primitives-schema.yml
+
+# Windows-only
+cargo live-session-schema -- --output-path ./live-session-schema.yml
+cargo live-variable-schema -- --output-path ./live-variable-schema.yml
+```
 
 ## Getting Started
 
@@ -42,7 +58,8 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
-### Common Cargo Aliases
+### Common Cargo aliases
+
 Defined in `.cargo/config.toml` for convenience:
 
 | Alias | Command | Purpose |
@@ -61,6 +78,7 @@ Defined in `.cargo/config.toml` for convenience:
 - **Session parsing**: `SessionInfoParser` caches YAML, so reuse it rather than reparsing on every frame.
 - **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance.
 - **Schema discovery**: When new fields appear, run the appropriate codegen bin with `--discover` and incorporate the results back into `iracing-sdk` to improve typings.
+- **Fixtures**: Some integration tests expect `.ibt` fixtures under `test-data/ibt/` (see `crates/test-utils`). If you add new recordings under `test-data/`, place them in `test-data/ibt/` so the shared helpers can find them.
 
 ## Testing
 
@@ -79,3 +97,4 @@ Defined in `.cargo/config.toml` for convenience:
 - Per-crate guidance lives alongside each package (`crates/*/AGENTS.md`). Start there for deep-dive development tips.
 - Schema tool usage and examples are documented in `crates/iracing-sdk-codegen/README.md`.
 - Telemetry consumer examples reside under `examples/` in the respective crates; run them with `cargo run -p <crate> --example <name> -- --help` to inspect options.
+- Release notes and packaging pointers live in `docs/releasing.md`.

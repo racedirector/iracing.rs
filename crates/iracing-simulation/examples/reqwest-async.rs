@@ -26,7 +26,7 @@
 
 use std::time::Duration;
 
-use iracing_simulation::{Simulation, SimStatusClient, SimStatusResponse, sim_status_url};
+use iracing_simulation::{SimStatusClient, SimStatusResponse, Simulation, sim_status_url};
 use tokio::runtime::Handle;
 use tokio::task;
 

@@ -32,39 +32,39 @@ Generates the static baseline schema from `iracing_sdk::SessionInfo`.
 
 ```text
 cargo run -p iracing-sdk-codegen --bin session-schema -- \
-  --output-path ./session_schema.yml
+  --output-path ./session-schema.yml
 ```
 
-### `disk-telemetry-schema`
+### `disk-variable-schema`
 
 Generates telemetry schema from an `.ibt` file's variable headers.
 
 ```text
-cargo run -p iracing-sdk-codegen --bin disk-telemetry-schema -- \
+cargo run -p iracing-sdk-codegen --bin disk-variable-schema -- \
   --ibt-path ./recording.ibt \
-  --output-path ./disk_telemetry_schema.yml \
-  --annotate
+  --output-path ./disk-variable-schema.yml \
+  --annotate   # optional
 ```
 
 Options:
 
-- `--annotate`: annotate `irsdk_*` units with `x-irsdk-unit-ref` and inject referenced primitive defs.
+- `--annotate`: annotate `irsdk_*` units with primitive enum/bitflag refs and inject used `$defs`.
 
-### `live-telemetry-schema` (Windows)
+### `live-variable-schema` (Windows)
 
 Generates telemetry schema from live iRacing shared memory.
 
 ```text
-cargo run -p iracing-sdk-codegen --bin live-telemetry-schema -- \
-  --output-path ./live_telemetry_schema.yml \
+cargo run -p iracing-sdk-codegen --bin live-variable-schema -- \
+  --output-path ./live-variable-schema.yml \
   --allow-stale \
-  --annotate
+  --annotate   # optional
 ```
 
 Options:
 
 - `--allow-stale`: continue even when iRacing reports disconnected state.
-- `--annotate`: annotate `irsdk_*` units with `x-irsdk-unit-ref` and inject referenced primitive defs.
+- `--annotate`: annotate `irsdk_*` units with primitive enum/bitflag refs and inject used `$defs`.
 
 ### `disk-session-schema`
 
@@ -79,10 +79,10 @@ Options:
 ```text
 cargo run -p iracing-sdk-codegen --bin disk-session-schema -- \
   --ibt-path ./recording.ibt \
-  --output-path ./disk_session_schema.yml \
+  --output-path ./disk-session-schema.yml \
   --discover \
-  --diff ./session_schema.yml \
-  --diff-output-path ./disk_session_diff.yml
+  --diff ./session-schema.yml \
+  --diff-output-path ./disk-session-diff.yml
 ```
 
 ### `live-session-schema` (Windows)
@@ -98,11 +98,11 @@ Options:
 
 ```text
 cargo run -p iracing-sdk-codegen --bin live-session-schema -- \
-  --output-path ./live_session_schema.yml \
+  --output-path ./live-session-schema.yml \
   --allow-stale \
   --discover \
-  --diff ./session_schema.yml \
-  --diff-output-path ./live_session_diff.yml
+  --diff ./session-schema.yml \
+  --diff-output-path ./live-session-diff.yml
 ```
 
 ### `car-setup-schema`
@@ -110,7 +110,7 @@ cargo run -p iracing-sdk-codegen --bin live-session-schema -- \
 Generates car setup schema from either:
 
 - `--ibt-path <FILE.ibt>` (all platforms)
-- live iRacing session data when `--ibt-path` is omitted (Windows only)
+- live iRacing session data when `--ibt-path` is omitted (Windows only; requires iRacing to be connected)
 
 ```text
 # Parse from IBT
@@ -122,6 +122,11 @@ cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
 cargo run -p iracing-sdk-codegen --bin car-setup-schema -- \
   --output-dir ./out
 ```
+
+Notes:
+
+- If `--output-path` is not provided, the tool computes a filename from `CarID`/`SeriesID` found in the session YAML.
+- Live mode currently requires an active iRacing connection; there is no `--allow-stale` flag for this binary.
 
 ### `iracing-primitives-schema`
 
