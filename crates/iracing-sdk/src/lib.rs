@@ -57,7 +57,7 @@ pub mod types;
 pub mod yaml_utils;
 
 pub use error::*;
-pub use ibt::IbtReader;
+pub use ibt::{IbtReader, IndexedIbt, LapFlags, LapFrameIter, LapIndex, LapIndexVars, LapRef};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;
 
