@@ -8,7 +8,7 @@
 //! Platform: Cross-platform (uses real IBT test files, CI-safe)
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use iracing_sdk_adapter::{FramePacket, IbtReader, VariableSchema};
+use iracing_sdk::{FramePacket, IbtReader, VariableSchema};
 use std::hint::black_box;
 use std::sync::Arc;
 use test_utils::get_smallest_ibt_test_file;

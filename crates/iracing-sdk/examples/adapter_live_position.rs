@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::IRacingSDKError;
 #[cfg(windows)]
-use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
 #[cfg(windows)]
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
@@ -42,7 +42,7 @@ struct Row {
 impl FrameAdapter for Row {
     fn validate_schema(
         schema: &iracing_sdk::VariableSchema,
-    ) -> iracing_sdk_adapter::Result<AdapterValidation> {
+    ) -> iracing_sdk::Result<AdapterValidation> {
         let mut extraction_plan = Vec::new();
 
         let lap_distance_meters_info =
@@ -136,7 +136,7 @@ impl FrameAdapter for Row {
         Ok(AdapterValidation::new(extraction_plan))
     }
 
-    fn adapt(packet: &iracing_sdk_adapter::FramePacket, validation: &AdapterValidation) -> Self {
+    fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
         Self {
             lap_distance_meters: validation.fetch_or_default::<f32>(packet, "LapDist"),
             lap_distance_percentage: validation.fetch_or_default::<f32>(packet, "LapDistPct"),
@@ -164,7 +164,7 @@ fn main() -> Result<()> {
 #[cfg(windows)]
 fn run() -> Result<()> {
     use csv::Writer;
-    use iracing_sdk_adapter::Provider;
+    use iracing_sdk::Provider;
     use tracing::info;
 
     let Args { csv_output_path } = Args::parse();

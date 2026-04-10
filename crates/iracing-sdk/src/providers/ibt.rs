@@ -1,5 +1,4 @@
-use crate::{FramePacket, Result, provider::Provider};
-use iracing_sdk::{IbtReader, VariableSchema};
+use crate::{FramePacket, IbtReader, Provider, Result, VariableSchema};
 use std::{path::Path, sync::Arc};
 use tracing::{debug, trace};
 

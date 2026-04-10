@@ -66,6 +66,11 @@ name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
+[[bench]]
+name = "frame_construction"
+harness = false
+required-features = ["benchmark"]
+
 [[example]]
 name = "disk-position"
 path = "examples/disk_position.rs"
@@ -77,6 +82,18 @@ path = "examples/live_position.rs"
 [[example]]
 name = "enum-bitfields-disk"
 path = "examples/enum_bitfields_disk.rs"
+
+[[example]]
+name = "adapter-disk-position"
+path = "examples/adapter_disk_position.rs"
+
+[[example]]
+name = "adapter-live-position"
+path = "examples/adapter_live_position.rs"
+
+[[example]]
+name = "adapter-enum-bitfields-live"
+path = "examples/adapter_enum_bitfields_live.rs"
 
 [[bin]]
 name = "ibt-session-parser"

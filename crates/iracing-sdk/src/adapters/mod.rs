@@ -14,8 +14,7 @@
 //! # Example Usage
 //!
 //! ```rust
-//! use iracing_sdk::{IRacingSDKError, VarData, VariableSchema};
-//! use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, FramePacket};
+//! use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, VarData, VariableSchema};
 //!
 //! // Manual adapter implementation
 //! struct CarData {
@@ -25,7 +24,7 @@
 //! }
 //!
 //! impl FrameAdapter for CarData {
-//!     fn validate_schema(schema: &VariableSchema) -> iracing_sdk_adapter::Result<AdapterValidation> {
+//!     fn validate_schema(schema: &VariableSchema) -> iracing_sdk::Result<AdapterValidation> {
 //!         let mut extraction_plan = Vec::new();
 //!
 //!         // Validate required fields exist
@@ -72,7 +71,7 @@ pub use validation::{AdapterValidation, DefaultValue, FieldExtraction};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iracing_sdk::{VariableInfo, VariableSchema, VariableType};
+    use crate::{VariableInfo, VariableSchema, VariableType};
     use std::collections::HashMap;
 
     fn create_test_schema() -> VariableSchema {

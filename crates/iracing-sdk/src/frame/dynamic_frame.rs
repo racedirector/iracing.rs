@@ -2,13 +2,13 @@
 //!
 //! This adapter provides ergonomic, by-name lookups for variables without
 //! requiring a bespoke typed struct. It is intended for exploration, tooling,
-//! and diagnostics. For hot paths, prefer typed adapters generated via
-//! `#[derive(PitwallFrame)]` which avoid per-frame HashMap lookups and copies.
+//! and diagnostics. For hot paths, prefer typed adapters that implement
+//! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
-use crate::FramePacket;
-use crate::Result;
-use crate::adapters::{AdapterValidation, FrameAdapter};
-use iracing_sdk::{VarData, VariableInfo, VariableSchema};
+use crate::{
+    adapters::{AdapterValidation, FrameAdapter},
+    FramePacket, Result, VarData, VariableInfo, VariableSchema,
+};
 use std::sync::Arc;
 
 /// A self-contained view over a single telemetry frame supporting by-name lookups.
@@ -81,7 +81,7 @@ impl FrameAdapter for DynamicFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iracing_sdk::{VariableInfo, VariableSchema, types::VariableType};
+    use crate::{types::VariableType, VariableInfo, VariableSchema};
     use std::collections::HashMap;
 
     #[test]

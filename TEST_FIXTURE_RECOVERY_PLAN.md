@@ -10,13 +10,11 @@ The workspace currently assumes telemetry fixtures (`.ibt`) are available in `te
 
 ## Current failure surface
 
-### 1) Workspace-level blocker (independent of fixtures)
-`cargo test` currently fails before most tests run due to a platform-gated import issue in `iracing-sdk-adapter`:
+### 1) Workspace-level blocker
 
-- `crates/iracing-sdk-adapter/src/lib.rs` re-exports `live::LiveProvider` unconditionally.
-- `live` module is gated with `#[cfg(windows)]` in `providers/mod.rs`.
+The workspace member at `crates/iracing-sdk-adapter` has already been removed from `Cargo.toml`, and the adapter surface now lives in `iracing-sdk`. If any CI job or external workflow still points at the old path, it must be updated or restored to a real manifest before the rest of the plan can move forward.
 
-This must be fixed first or tests cannot complete on non-Windows CI.
+Immediate action: verify that non-Windows builds do not expose the live adapter surface, then remove any remaining stale CI inputs or restore the manifest if the compatibility crate truly needs to exist again.
 
 ### 2) Fixture dependency hotspots
 
@@ -35,7 +33,7 @@ The strongest fixture coupling is in:
 
 ## Phase 0 — Unblock test execution (same PR)
 
-1. Fix non-Windows adapter export mismatch.
+1. Verify and fix any non-Windows adapter export mismatch so the live surface stays Windows-only.
 2. Run baseline checks:
    - `cargo test -p test-utils`
    - `cargo test -p iracing-sdk --lib`
@@ -128,7 +126,7 @@ Use profiles with distinct characteristics so tests still cover variation:
 
 ## Implementation order (recommended)
 
-1. Fix adapter cfg export issue.
+1. Confirm the non-Windows adapter export surface is gated correctly.
 2. Add fixture manifest format + parser in `test-utils`.
 3. Implement generator script + produce 3 fixtures.
 4. Refactor `format.rs` tests to manifest-driven assertions.

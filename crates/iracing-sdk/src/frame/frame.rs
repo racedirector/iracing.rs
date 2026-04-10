@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use iracing_sdk::VariableSchema;
+use crate::VariableSchema;
 
 /// Raw telemetry frame packet for the stream-based architecture
 ///

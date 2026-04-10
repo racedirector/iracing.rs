@@ -5,6 +5,7 @@ Low-level iRacing telemetry parsing utilities for Rust.
 This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
+- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
 - Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
@@ -12,8 +13,10 @@ This crate provides:
 ## Start Here
 
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
-2. Use `SessionInfoParser` for session YAML parsing/caching.
-3. Use `WindowsConnection` for live telemetry on Windows.
+2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
+3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
+4. For session YAML parsing and caching, rely on `SessionInfoParser`.
+5. On Windows, use `WindowsConnection` for live telemetry.
 
 ## Install
 
@@ -35,7 +38,7 @@ iracing-sdk = { git = "https://github.com/racedirector/iracing.rs", package = "i
 Basic import:
 
 ```rust
-use iracing_sdk::{IbtReader, SessionInfoParser, VarData};
+use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, IbtReader};
 ```
 
 ## Quick Start
@@ -100,6 +103,35 @@ fn main() -> iracing_sdk::Result<()> {
 }
 ```
 
+### Streaming Adapters
+
+```rust,no_run
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
+
+#[derive(serde::Serialize)]
+struct Row {
+    speed: f32,
+}
+
+impl FrameAdapter for Row {
+    fn validate_schema(schema: &iracing_sdk::VariableSchema) -> iracing_sdk::Result<AdapterValidation> {
+        let speed_info = schema.get_variable("Speed").ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
+            context: "Field validation".to_string(),
+            details: "Missing required field 'Speed'".to_string(),
+        })?;
+
+        Ok(AdapterValidation::new(vec![FieldExtraction::Required {
+            name: "Speed".to_string(),
+            var_info: speed_info.clone(),
+        }]))
+    }
+
+    fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
+        Self { speed: validation.fetch_or_default(packet, "Speed") }
+    }
+}
+```
+
 ## Features
 
 | Feature | Purpose |
@@ -108,6 +140,14 @@ fn main() -> iracing_sdk::Result<()> {
 | `schema-discovery` | Enables collection/overlay of unknown session fields (used with `codegen`). |
 | `tokio` | Enables async `wait_for_update_async` for Windows live telemetry. |
 | `benchmark` | Enables benchmark targets. |
+
+## Adapter Surface
+
+- `FramePacket` — raw frame payload plus tick, session version, and schema.
+- `Provider` — frame source abstraction implemented by `IbtProvider`, with `LiveProvider` available only on Windows.
+- `FrameAdapter` — two-phase validation/extraction trait for typed rows.
+- `AdapterValidation`, `FieldExtraction`, `DefaultValue`, `SchemaProvider` — adapter planning helpers.
+- `DynamicFrame` — by-name lookup helper for debugging and exploratory analysis.
 
 ## Platform Matrix
 
@@ -126,6 +166,12 @@ fn main() -> iracing_sdk::Result<()> {
   - `cargo run -p iracing-sdk --example disk-position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
 - `live-position` (Windows only):
   - `cargo run -p iracing-sdk --example live-position -- --csv-output-path .\\positions.csv`
+- `adapter_disk_position`:
+  - `cargo run -p iracing-sdk --example adapter_disk_position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `adapter_live_position` (Windows only):
+  - `cargo run -p iracing-sdk --example adapter_live_position -- --csv-output-path .\\positions.csv`
+- `adapter_enum_bitfields_live` (Windows only):
+  - `cargo run -p iracing-sdk --example adapter_enum_bitfields_live -- --max-frames 120`
 
 ### Binaries
 

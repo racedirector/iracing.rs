@@ -1,7 +1,7 @@
 //! Validation types and field extraction strategies for adapters
 
 #[allow(unused_imports)] // Used by generated derive macro code
-use iracing_sdk::{IRacingSDKError, VariableInfo, VariableSchema};
+use crate::{IRacingSDKError, VariableInfo, VariableSchema};
 #[allow(unused_imports)] // Used by generated derive macro code and tests
 use std::collections::HashMap;
 
@@ -59,14 +59,14 @@ impl AdapterValidation {
     /// Fetch a telemetry value by name using the precomputed extraction plan.
     pub fn fetch_or_default<T>(&self, packet: &crate::FramePacket, name: &str) -> T
     where
-        T: iracing_sdk::VarData + ::core::default::Default,
+        T: crate::VarData + ::core::default::Default,
     {
         let data = packet.data.as_ref();
 
         if let Some(index) = self.index_of(name) {
             if let Some(entry) = self.extraction_plan.get(index) {
                 if let Some(var_info) = entry.var_info() {
-                    if let Ok(value) = <T as iracing_sdk::VarData>::from_bytes(data, var_info) {
+                    if let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info) {
                         return value;
                     }
                 }
@@ -74,7 +74,7 @@ impl AdapterValidation {
         }
 
         if let Some(var_info) = packet.schema.get_variable(name) {
-            if let Ok(value) = <T as iracing_sdk::VarData>::from_bytes(data, var_info) {
+            if let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info) {
                 return value;
             }
         }

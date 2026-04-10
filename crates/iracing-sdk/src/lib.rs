@@ -12,11 +12,15 @@
 //! - Replay/offline path (cross-platform):
 //!   - [`IbtReader`]
 //!   - [`types::VariableSchema`], [`types::VarData`]
+//! - Streaming adapter path:
+//!   - [`FramePacket`], [`Provider`], [`IbtProvider`], [`DynamicFrame`]
+//!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
 //!   - [`SessionInfo`], [`SessionInfoParser`]
 //!   - [`yaml_utils`] for iRacing YAML cleanup
 //! - Live path (Windows only):
-//!   - `WindowsConnection` and `WaitResult`
+//!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
+//!   - `Broadcast`, `BroadcastCommand`, `PitCommand`
 //!
 //! # Quick start
 //!
@@ -50,18 +54,28 @@
 //! - `tokio`: enables async waiting for live telemetry updates on Windows.
 //! - `benchmark`: enables benchmark targets.
 //!
+mod adapters;
 mod error;
+mod frame;
 pub mod ibt;
+mod providers;
 pub mod schema;
 pub mod types;
 pub mod yaml_utils;
 
+pub use adapters::*;
 pub use error::*;
+pub use frame::{DynamicFrame, FramePacket};
 pub use ibt::IbtReader;
+pub use providers::{IbtProvider, Provider};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;
 
 // Platform-specific modules
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use providers::LiveProvider;
+
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub mod windows;
