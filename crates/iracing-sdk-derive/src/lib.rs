@@ -801,9 +801,6 @@ fn generate_validation_phase(
                     &syn::parse_quote!(::iracing_sdk::BitField),
                     !*fail_if_missing,
                 );
-                validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit);
-                });
                 if *fail_if_missing {
                     // Override to Required path (strongest semantics)
                     validation_checks.push(quote! {
@@ -835,47 +832,53 @@ fn generate_validation_phase(
                     extraction_plan_items.push(quote! {
                         FieldExtraction::Required { name: #field_name_lit.to_string(), var_info: #validated_name }
                     });
-                } else if *target_is_option {
-                    validation_checks.push(quote! {
-                        let #validated_name = match #var_name {
-                            Some(var_info) => { #type_check }
-                            None => None,
-                        };
-                    });
-                    extraction_plan_items.push(quote! {
-                        FieldExtraction::Optional { name: #field_name_lit.to_string(), var_info: #validated_name }
-                    });
-                } else if default_expr.is_some() {
-                    let default_repr = quote!(#default_expr).to_string();
-                    let default_repr_lit =
-                        LitStr::new(&default_repr, proc_macro2::Span::call_site());
-                    validation_checks.push(quote! {
-                        let #validated_name = match #var_name {
-                            Some(var_info) => { #type_check }
-                            None => None,
-                        };
-                    });
-                    extraction_plan_items.push(quote! {
-                        FieldExtraction::WithDefault {
-                            name: #field_name_lit.to_string(),
-                            var_info: #validated_name,
-                            default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
-                        }
-                    });
                 } else {
                     validation_checks.push(quote! {
-                        let #validated_name = match #var_name {
-                            Some(var_info) => { #type_check }
-                            None => None,
-                        };
+                        let #var_name = schema.get_variable(#field_name_lit);
                     });
-                    extraction_plan_items.push(quote! {
-                        FieldExtraction::WithDefault {
-                            name: #field_name_lit.to_string(),
-                            var_info: #validated_name,
-                            default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
-                        }
-                    });
+
+                    if *target_is_option {
+                        validation_checks.push(quote! {
+                            let #validated_name = match #var_name {
+                                Some(var_info) => { #type_check }
+                                None => None,
+                            };
+                        });
+                        extraction_plan_items.push(quote! {
+                            FieldExtraction::Optional { name: #field_name_lit.to_string(), var_info: #validated_name }
+                        });
+                    } else if default_expr.is_some() {
+                        let default_repr = quote!(#default_expr).to_string();
+                        let default_repr_lit =
+                            LitStr::new(&default_repr, proc_macro2::Span::call_site());
+                        validation_checks.push(quote! {
+                            let #validated_name = match #var_name {
+                                Some(var_info) => { #type_check }
+                                None => None,
+                            };
+                        });
+                        extraction_plan_items.push(quote! {
+                            FieldExtraction::WithDefault {
+                                name: #field_name_lit.to_string(),
+                                var_info: #validated_name,
+                                default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
+                            }
+                        });
+                    } else {
+                        validation_checks.push(quote! {
+                            let #validated_name = match #var_name {
+                                Some(var_info) => { #type_check }
+                                None => None,
+                            };
+                        });
+                        extraction_plan_items.push(quote! {
+                            FieldExtraction::WithDefault {
+                                name: #field_name_lit.to_string(),
+                                var_info: #validated_name,
+                                default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
+                            }
+                        });
+                    }
                 }
             }
             FieldStrategy::Calculated { expression_str, .. } => {

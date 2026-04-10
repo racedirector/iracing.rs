@@ -25,8 +25,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    // TODO: open the IBT file, adapt `DriverInput` rows, and write the decoded
-    // telemetry to the requested output format.
     let mut ibt_provider =
         IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
     let schema = ibt_provider.schema();
