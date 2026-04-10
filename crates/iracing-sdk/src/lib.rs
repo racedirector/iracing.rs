@@ -19,7 +19,7 @@
 //!   - [`SessionInfo`], [`SessionInfoParser`]
 //!   - [`yaml_utils`] for iRacing YAML cleanup
 //! - Live path (Windows only):
-//!   - [`LiveProvider`], `WindowsConnection`, `WaitResult`
+//!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`, `PitCommand`
 //!
 //! # Quick start
