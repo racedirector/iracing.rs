@@ -148,4 +148,43 @@ pub struct DriverInput {
 
     #[bitfield(name = "SessionFlags", has = "iracing_sdk::SessionFlags::BLUE.bits()")]
     is_faster_car_approaching: bool,
+
+    ///
+    /// Tire wear
+    ///
+    #[field_name = "LFwearL"]
+    left_front_wear_outside: f32,
+
+    #[field_name = "LFwearM"]
+    left_front_wear_middle: f32,
+
+    #[field_name = "LFwearR"]
+    left_front_wear_inside: f32,
+
+    #[field_name = "RFwearL"]
+    right_front_wear_outside: f32,
+
+    #[field_name = "RFwearM"]
+    right_front_wear_middle: f32,
+
+    #[field_name = "RFwearR"]
+    right_front_wear_inside: f32,
+
+    #[field_name = "LRwearL"]
+    left_rear_wear_outside: f32,
+
+    #[field_name = "LRwearM"]
+    left_rear_wear_middle: f32,
+
+    #[field_name = "LRwearR"]
+    left_rear_wear_inside: f32,
+
+    #[field_name = "RRwearL"]
+    right_rear_wear_outside: f32,
+
+    #[field_name = "RRwearM"]
+    right_rear_wear_middle: f32,
+
+    #[field_name = "RRwearR"]
+    right_rear_wear_inside: f32,
 }
