@@ -11,7 +11,10 @@ The workspace currently assumes telemetry fixtures (`.ibt`) are available in `te
 ## Current failure surface
 
 ### 1) Workspace-level blocker
-The adapter API has been merged into `iracing-sdk`, and `crates/iracing-sdk-adapter` is now a compatibility crate that re-exports the adapter surface. Keep it aligned with `iracing-sdk` until the crate is retired, but the previous non-Windows import blocker is no longer the active issue.
+
+CI still references a missing manifest at `crates/iracing-sdk-adapter`. The path must be removed from the workspace/CI configuration or the manifest must be restored so CI matches the adapter surface that now lives in `iracing-sdk`.
+
+Immediate action: remove the stale path from the workspace metadata and CI inputs, or restore the manifest if the compatibility crate needs to exist again.
 
 ### 2) Fixture dependency hotspots
 

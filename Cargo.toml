@@ -3,7 +3,6 @@
 members = [
   "crates/iracing-sdk",
   "crates/iracing-sdk-codegen",
-  "crates/iracing-sdk-adapter",
   "crates/iracing-simulation",
   "crates/test-utils",
 ]

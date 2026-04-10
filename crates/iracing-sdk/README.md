@@ -5,7 +5,7 @@ Low-level iRacing telemetry parsing utilities for Rust.
 This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
-- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `LiveProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`
+- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
 - Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
@@ -13,10 +13,10 @@ This crate provides:
 ## Start Here
 
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
-2. Use `Provider`/`IbtProvider`/`LiveProvider` when you want frame-by-frame streaming.
-3. Use `FrameAdapter` or `DynamicFrame` when you want typed or ad-hoc per-frame decoding.
-4. Use `SessionInfoParser` for session YAML parsing/caching.
-5. Use `WindowsConnection` for live telemetry on Windows.
+2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
+3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
+4. For session YAML parsing and caching, rely on `SessionInfoParser`.
+5. On Windows, use `WindowsConnection` for live telemetry.
 
 ## Install
 
@@ -144,7 +144,7 @@ impl FrameAdapter for Row {
 ## Adapter Surface
 
 - `FramePacket` — raw frame payload plus tick, session version, and schema.
-- `Provider` — frame source abstraction implemented by `IbtProvider` and `LiveProvider`.
+- `Provider` — frame source abstraction implemented by `IbtProvider`, with `LiveProvider` available only on Windows.
 - `FrameAdapter` — two-phase validation/extraction trait for typed rows.
 - `AdapterValidation`, `FieldExtraction`, `DefaultValue`, `SchemaProvider` — adapter planning helpers.
 - `DynamicFrame` — by-name lookup helper for debugging and exploratory analysis.
