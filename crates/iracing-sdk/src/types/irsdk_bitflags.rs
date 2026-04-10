@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::BitField;
+use super::{BitField, VarData, VariableInfo, VariableType};
 
 macro_rules! define_irsdk_bitflags {
     (
@@ -87,6 +87,24 @@ macro_rules! define_irsdk_bitflags {
         impl From<$name> for BitField {
             fn from(value: $name) -> Self {
                 BitField::new(value.bits())
+            }
+        }
+
+        impl VarData for $name {
+            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+                if info.data_type != VariableType::BitField {
+                    return Err(crate::IRacingSDKError::TypeConversion {
+                        details: format!("Expected BitField, got {:?}", info.data_type),
+                    });
+                }
+
+                Ok(Self::from(BitField::from_bytes(data, info)?))
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::empty()
             }
         }
     };
@@ -283,6 +301,24 @@ impl From<IncidentFlags> for BitField {
     }
 }
 
+impl Default for IncidentFlags {
+    fn default() -> Self {
+        Self::from_bits_retain(0)
+    }
+}
+
+impl VarData for IncidentFlags {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+        if info.data_type != VariableType::BitField {
+            return Err(crate::IRacingSDKError::TypeConversion {
+                details: format!("Expected BitField, got {:?}", info.data_type),
+            });
+        }
+
+        Ok(Self::from(BitField::from_bytes(data, info)?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,5 +356,29 @@ mod tests {
         let incident = IncidentFlags::from_bits_retain(bits);
         assert_eq!(incident.report_code(), 0x08);
         assert_eq!(incident.penalty_code(), 0x04);
+    }
+
+    #[test]
+    fn bitflags_decode_via_vardata() {
+        let mut frame = vec![0u8; 8];
+        frame[..4].copy_from_slice(&SessionFlags::GREEN.bits().to_le_bytes());
+
+        let info = VariableInfo {
+            name: "SessionFlags".to_string(),
+            data_type: VariableType::BitField,
+            offset: 0,
+            count: 1,
+            count_as_time: false,
+            units: String::new(),
+            description: String::new(),
+        };
+
+        let value = SessionFlags::from_bytes(&frame, &info).expect("SessionFlags decode");
+        assert!(value.contains(SessionFlags::GREEN));
+    }
+
+    #[test]
+    fn incident_flags_default_is_empty() {
+        assert_eq!(IncidentFlags::default().bits(), 0);
     }
 }

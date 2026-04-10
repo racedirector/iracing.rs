@@ -6,8 +6,8 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    adapters::{AdapterValidation, FrameAdapter},
     FramePacket, Result, VarData, VariableInfo, VariableSchema,
+    adapters::{AdapterValidation, FrameAdapter},
 };
 use std::sync::Arc;
 
@@ -81,7 +81,7 @@ impl FrameAdapter for DynamicFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{types::VariableType, VariableInfo, VariableSchema};
+    use crate::{VariableInfo, VariableSchema, types::VariableType};
     use std::collections::HashMap;
 
     #[test]
