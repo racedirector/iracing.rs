@@ -1,6 +1,6 @@
 //! Frame adapter trait for type-safe telemetry extraction
 
-use iracing_sdk::VariableSchema;
+use crate::VariableSchema;
 
 use super::AdapterValidation;
 

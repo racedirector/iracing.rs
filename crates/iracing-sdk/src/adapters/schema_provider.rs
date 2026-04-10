@@ -1,6 +1,6 @@
 //! Schema provider trait for telemetry sources
 
-use iracing_sdk::{VariableInfo, VariableSchema};
+use crate::{VariableInfo, VariableSchema};
 
 /// Provider abstraction for schema discovery across different telemetry sources.
 ///

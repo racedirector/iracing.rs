@@ -12,6 +12,9 @@ Compact context for OpenCode sessions working in `crates/iracing-sdk`.
 - `ibt/`: `IbtReader` iterates `.ibt` telemetry; rely on `VarHeaders` metadata instead of re-parsing frame bytes.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, and bitfield enums; always decode via `VarData::from_bytes` (little-endian) rather than manual slicing.
 - `schema/session`: `SessionInfoParser` caches YAML; only re-parse when `session_version` changes.
+- `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
+- `frame/`: `FramePacket` and `DynamicFrame` provide raw frame access and ad-hoc lookups.
+- `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `DefaultValue`, and `SchemaProvider` support typed per-frame extraction.
 - `windows/`: `WindowsConnection`, `WaitResult`, broadcast helpers—everything behind `#[cfg(windows)]`.
 - `yaml_utils`: cleans iRacing’s malformed YAML before parsing; use it instead of custom scrubbing.
 
@@ -21,7 +24,8 @@ Compact context for OpenCode sessions working in `crates/iracing-sdk`.
 
 ## Examples & Binaries
 - `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo live-session-parser`, `cargo broadcast-cli`; they map to bins in this crate.
-- Keep cross-platform examples (`disk-position`, `enum-bitfields-disk`) runnable on non-Windows machines.
+- Keep cross-platform examples (`disk-position`, `adapter_disk_position`, `enum-bitfields-disk`) runnable on non-Windows machines.
+- Keep adapter examples importing from `iracing_sdk`, not `iracing_sdk_adapter`.
 
 ## Testing & Fixtures
 - Integration tests rely on `.ibt` fixtures from `test-data/ibt/`; use helpers in `crates/test-utils` (`require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hard-coded paths.

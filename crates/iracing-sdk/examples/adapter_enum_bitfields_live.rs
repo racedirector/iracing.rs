@@ -2,9 +2,9 @@ use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
-use iracing_sdk::{BitField, IRacingSDKError, VarData};
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
 #[cfg(windows)]
-use iracing_sdk_adapter::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{BitField, IRacingSDKError, VarData};
 
 #[cfg(windows)]
 #[derive(Parser, Debug)]
@@ -27,7 +27,7 @@ struct TelemetryRow {
 impl FrameAdapter for TelemetryRow {
     fn validate_schema(
         schema: &iracing_sdk::VariableSchema,
-    ) -> iracing_sdk_adapter::Result<AdapterValidation> {
+    ) -> iracing_sdk::Result<AdapterValidation> {
         let mut extraction_plan = Vec::new();
 
         for required in [
@@ -53,7 +53,7 @@ impl FrameAdapter for TelemetryRow {
         Ok(AdapterValidation::new(extraction_plan))
     }
 
-    fn adapt(packet: &iracing_sdk_adapter::FramePacket, validation: &AdapterValidation) -> Self {
+    fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
         let fetch_bitfield = |name: &str| {
             validation
                 .index_of(name)
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
 
 #[cfg(windows)]
 fn run() -> Result<()> {
-    use iracing_sdk_adapter::Provider;
+    use iracing_sdk::Provider;
 
     let args = Args::parse();
     let mut provider = LiveProvider::new()?;

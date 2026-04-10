@@ -13,3 +13,16 @@ pub trait Provider: Send + 'static {
     /// Return the session info YAML for `version`, or `Ok(None)` if unchanged.
     fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
 }
+
+/// IBT replay file provider.
+mod ibt;
+
+/// Live shared-memory provider (Windows only).
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+mod live;
+
+pub use ibt::IbtProvider;
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use live::LiveProvider;

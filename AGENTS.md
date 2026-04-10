@@ -15,8 +15,8 @@ Compact guidance for future OpenCode sessions working in this repo.
 - Use helpers from `crates/test-utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
 
 ## Workspace Map
-- `crates/iracing-sdk`: low-level `.ibt` reader, session YAML parser, and Windows shared-memory access. All live-telemetry additions must stay behind `#[cfg(windows)]` and keep binaries' `package.metadata.dist.bin.*.targets` in sync.
-- `crates/iracing-sdk-adapter`: stream abstraction. Respect the `FrameAdapter` two-phase contract—build extraction plans in `validate_schema`, read bytes with the precomputed indices in `adapt`.
+- `crates/iracing-sdk`: low-level `.ibt` reader, session YAML parser, streaming adapter APIs, and Windows shared-memory access. All live-telemetry additions must stay behind `#[cfg(windows)]` and keep binaries' `package.metadata.dist.bin.*.targets` in sync.
+- `crates/iracing-sdk-adapter`: compatibility crate that re-exports the adapter APIs. Keep it aligned with `iracing-sdk` until it is retired.
 - `crates/iracing-sdk-codegen`: Windows-toned schema generators; nearly every binary expects the `codegen` + `schema-discovery` features enabled.
 - `crates/iracing-simulation`: minimal HTTP probe for the sim; no Windows gating.
 - `crates/test-utils`: shared fixture plumbing and path discovery; lean on it for integration tests instead of reinventing file lookups.

@@ -10,13 +10,8 @@ The workspace currently assumes telemetry fixtures (`.ibt`) are available in `te
 
 ## Current failure surface
 
-### 1) Workspace-level blocker (independent of fixtures)
-`cargo test` currently fails before most tests run due to a platform-gated import issue in `iracing-sdk-adapter`:
-
-- `crates/iracing-sdk-adapter/src/lib.rs` re-exports `live::LiveProvider` unconditionally.
-- `live` module is gated with `#[cfg(windows)]` in `providers/mod.rs`.
-
-This must be fixed first or tests cannot complete on non-Windows CI.
+### 1) Workspace-level blocker
+The adapter API has been merged into `iracing-sdk`, and `crates/iracing-sdk-adapter` is now a compatibility crate that re-exports the adapter surface. Keep it aligned with `iracing-sdk` until the crate is retired, but the previous non-Windows import blocker is no longer the active issue.
 
 ### 2) Fixture dependency hotspots
 

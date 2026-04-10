@@ -4,15 +4,15 @@ Rust workspace for working with iRacing telemetry and simulation state:
 
 - Read `.ibt` recordings (cross-platform)
 - Read live iRacing shared memory (Windows-only, where supported)
-- Stream frames through an adapter layer for typed projections
+- Stream frames through adapter APIs for typed projections
 - Generate JSON Schema snapshots (serialized as YAML)
 - Probe the sim lifecycle via iRacing’s local HTTP status endpoint
 - Reuse shared fixture + test-data helpers across crates
 
 ## Crates
 
-- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), plus Windows-only shared-memory + broadcast tools.
-- [`crates/iracing-sdk-adapter`](crates/iracing-sdk-adapter) — streaming layer: `Provider` + `FramePacket` and the two-phase `FrameAdapter` contract (`validate_schema` then `adapt`) for fast per-frame extraction.
+- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, `LiveProvider`, and Windows-only shared-memory + broadcast tools.
+- [`crates/iracing-sdk-adapter`](crates/iracing-sdk-adapter) — compatibility crate that re-exports the adapter APIs from `iracing-sdk` for older imports.
 - [`crates/iracing-sdk-codegen`](crates/iracing-sdk-codegen) — schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, …).
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-utils`](crates/test-utils) — fixture discovery + guardrails (Git LFS guidance, `require_*` helpers) used by integration tests.
@@ -76,7 +76,7 @@ Defined in `.cargo/config.toml` for convenience:
 - **Platform gates**: Live shared-memory support, broadcast commands, and some codegen binaries are Windows-only. Keep new APIs behind `#[cfg(windows)]` and align `package.metadata.dist.bin.*.targets` with the code.
 - **Telemetry decoding**: Always use `VarData::from_bytes` and related helpers; frame data is little-endian and manual decoding tends to drift from the authoritative implementation.
 - **Session parsing**: `SessionInfoParser` caches YAML, so reuse it rather than reparsing on every frame.
-- **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance.
+- **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`; `crates/iracing-sdk-adapter` remains as a compatibility layer.
 - **Schema discovery**: When new fields appear, run the appropriate codegen bin with `--discover` and incorporate the results back into `iracing-sdk` to improve typings.
 - **Fixtures**: Some integration tests expect `.ibt` fixtures under `test-data/ibt/` (see `crates/test-utils`). If you add new recordings under `test-data/`, place them in `test-data/ibt/` so the shared helpers can find them.
 
