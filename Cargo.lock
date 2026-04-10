@@ -904,6 +904,7 @@ dependencies = [
  "criterion",
  "csv",
  "encoding_rs",
+ "iracing-sdk-derive",
  "proptest",
  "schemars",
  "serde",

@@ -101,6 +101,8 @@ pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
 /// Generate the FrameAdapter implementation
 fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
     let struct_name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Extract fields from struct
     let fields = match &input.data {
@@ -167,7 +169,7 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
 
     // Generate the complete implementation
     let expanded = quote! {
-        impl ::iracing_sdk::adapters::FrameAdapter for #struct_name {
+        impl #impl_generics ::iracing_sdk::adapters::FrameAdapter for #struct_name #ty_generics #where_clause {
             fn validate_schema(schema: &::iracing_sdk::VariableSchema) -> ::iracing_sdk::Result<::iracing_sdk::adapters::AdapterValidation> {
                 use ::iracing_sdk::adapters::FieldExtraction;
 
@@ -222,7 +224,6 @@ enum FieldStrategy {
     /// Calculated field produced from a runtime expression.
     Calculated {
         field_ident: syn::Ident,
-        field_type: syn::Type,
         expression: Expr,
         expression_str: String,
     },
@@ -249,6 +250,38 @@ enum FieldStrategy {
         field_ident: syn::Ident,
         field_type: syn::Type,
     },
+}
+
+fn generate_type_validation_check(
+    probe_expr: proc_macro2::TokenStream,
+    clone_expr: proc_macro2::TokenStream,
+    field_name_lit: &str,
+    target_type: &Type,
+    treat_mismatch_as_missing: bool,
+) -> proc_macro2::TokenStream {
+    let mismatch_handler = if treat_mismatch_as_missing {
+        quote! {
+            None
+        }
+    } else {
+        quote! {
+            return Err(::iracing_sdk::IRacingSDKError::Parse {
+                context: "Frame adapter validation".to_string(),
+                details: format!(
+                    "Field '{}' has incompatible telemetry type: {}",
+                    #field_name_lit,
+                    details
+                ),
+            });
+        }
+    };
+
+    quote! {
+        match ::iracing_sdk::adapters::telemetry_type_mismatch_details::<#target_type>(#probe_expr)? {
+            Some(details) => { #mismatch_handler }
+            None => Some(#clone_expr),
+        }
+    }
 }
 
 /// Parse a single field into its strategy
@@ -360,7 +393,6 @@ fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
         let expression: Expr = syn::parse_str(&expr_str)?;
         return Ok(FieldStrategy::Calculated {
             field_ident,
-            field_type,
             expression,
             expression_str: expr_str,
         });
@@ -607,18 +639,34 @@ fn generate_validation_phase(
 
     for (index, strategy) in strategies.iter().enumerate() {
         match strategy {
-            FieldStrategy::TypeDefault { field_name, .. } => {
+            FieldStrategy::TypeDefault {
+                field_name,
+                field_type,
+                ..
+            } => {
                 let field_name_lit = field_name;
                 let var_name = format_ident!("var_info_{}", index);
+                let validated_name = format_ident!("validated_var_info_{}", index);
+                let type_check = generate_type_validation_check(
+                    quote!(var_info),
+                    quote!((*var_info).clone()),
+                    field_name_lit,
+                    field_type,
+                    true,
+                );
 
                 validation_checks.push(quote! {
                     let #var_name = schema.get_variable(#field_name_lit);
+                    let #validated_name = match #var_name {
+                        Some(var_info) => { #type_check }
+                        None => None,
+                    };
                 });
 
                 extraction_plan_items.push(quote! {
                     FieldExtraction::WithDefault {
                         name: #field_name_lit.to_string(),
-                        var_info: #var_name.cloned(),
+                        var_info: #validated_name,
                         default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
                     }
                 });
@@ -626,46 +674,79 @@ fn generate_validation_phase(
             FieldStrategy::WithDefault {
                 field_name,
                 default_expr,
+                field_type,
                 ..
             } => {
                 let field_name_lit = field_name;
                 let var_name = format_ident!("var_info_{}", index);
+                let validated_name = format_ident!("validated_var_info_{}", index);
                 let default_repr = quote!(#default_expr).to_string();
                 let default_repr_lit = LitStr::new(&default_repr, proc_macro2::Span::call_site());
+                let type_check = generate_type_validation_check(
+                    quote!(var_info),
+                    quote!((*var_info).clone()),
+                    field_name_lit,
+                    field_type,
+                    true,
+                );
 
                 validation_checks.push(quote! {
                     let #var_name = schema.get_variable(#field_name_lit);
+                    let #validated_name = match #var_name {
+                        Some(var_info) => { #type_check }
+                        None => None,
+                    };
                 });
 
                 extraction_plan_items.push(quote! {
                     FieldExtraction::WithDefault {
                         name: #field_name_lit.to_string(),
-                        var_info: #var_name.cloned(),
+                        var_info: #validated_name,
                         default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
                     }
                 });
             }
-            FieldStrategy::Optional { field_name, .. } => {
+            FieldStrategy::Optional {
+                field_name,
+                inner_type,
+                ..
+            } => {
                 let field_name_lit = field_name;
                 let var_name = format_ident!("var_info_{}", index);
+                let validated_name = format_ident!("validated_var_info_{}", index);
+                let type_check = generate_type_validation_check(
+                    quote!(var_info),
+                    quote!((*var_info).clone()),
+                    field_name_lit,
+                    inner_type,
+                    true,
+                );
 
                 validation_checks.push(quote! {
                     let #var_name = schema.get_variable(#field_name_lit);
+                    let #validated_name = match #var_name {
+                        Some(var_info) => { #type_check }
+                        None => None,
+                    };
                 });
 
                 extraction_plan_items.push(quote! {
                     FieldExtraction::Optional {
                         name: #field_name_lit.to_string(),
-                        var_info: #var_name.cloned(),
+                        var_info: #validated_name,
                     }
                 });
             }
-            FieldStrategy::Critical { field_name, .. } => {
+            FieldStrategy::Critical {
+                field_name,
+                field_type,
+                ..
+            } => {
                 let field_name_lit = field_name;
                 validation_checks.push(quote! {
                     if !schema.variables.contains_key(#field_name_lit) {
                         let available_fields: Vec<String> = schema.variables.keys().cloned().collect();
-                        return Err(::iracing_sdk::TelemetryError::Parse {
+                        return Err(::iracing_sdk::IRacingSDKError::Parse {
                             context: "Frame adapter validation".to_string(),
                             details: format!("Critical field '{}' is missing from schema. Connection aborted. Available fields: {}",
                                 #field_name_lit, available_fields.join(", ")),
@@ -674,14 +755,25 @@ fn generate_validation_phase(
                 });
 
                 let var_name = format_ident!("var_info_{}", index);
+                let validated_name = format_ident!("validated_var_info_{}", index);
+                let type_check = generate_type_validation_check(
+                    quote!(&#var_name),
+                    quote!(#var_name.clone()),
+                    field_name_lit,
+                    field_type,
+                    false,
+                );
                 validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit).unwrap();
+                    let #var_name = schema.get_variable(#field_name_lit).unwrap().clone();
+                    let #validated_name = {
+                        #type_check
+                    }.unwrap();
                 });
 
                 extraction_plan_items.push(quote! {
                     FieldExtraction::Required {
                         name: #field_name_lit.to_string(),
-                        var_info: #var_name.clone(),
+                        var_info: #validated_name,
                     }
                 });
             }
@@ -701,46 +793,86 @@ fn generate_validation_phase(
             } => {
                 let field_name_lit = field_name;
                 let var_name = format_ident!("var_info_{}", index);
-                validation_checks
-                    .push(quote! { let #var_name = schema.get_variable(#field_name_lit); });
+                let validated_name = format_ident!("validated_var_info_{}", index);
+                let type_check = generate_type_validation_check(
+                    quote!(var_info),
+                    quote!((*var_info).clone()),
+                    field_name_lit,
+                    &syn::parse_quote!(::iracing_sdk::BitField),
+                    !*fail_if_missing,
+                );
+                validation_checks.push(quote! {
+                    let #var_name = schema.get_variable(#field_name_lit);
+                });
                 if *fail_if_missing {
                     // Override to Required path (strongest semantics)
                     validation_checks.push(quote! {
                         if !schema.variables.contains_key(#field_name_lit) {
                             let available_fields: Vec<String> = schema.variables.keys().cloned().collect();
-                            return Err(::iracing_sdk::TelemetryError::Parse {
+                            return Err(::iracing_sdk::IRacingSDKError::Parse {
                                 context: "Frame adapter validation".to_string(),
                                 details: format!("Critical field '{}' is missing from schema. Connection aborted. Available fields: {}",
                                     #field_name_lit, available_fields.join(", ")),
                             });
                         }
                     });
-                    validation_checks.push(
-                        quote! { let #var_name = schema.get_variable(#field_name_lit).unwrap(); },
-                    );
+                    validation_checks.push(quote! {
+                        let #var_name = schema.get_variable(#field_name_lit).unwrap().clone();
+                        let #validated_name = match ::iracing_sdk::adapters::telemetry_type_mismatch_details::<::iracing_sdk::BitField>(&#var_name)? {
+                            Some(details) => {
+                                return Err(::iracing_sdk::IRacingSDKError::Parse {
+                                    context: "Frame adapter validation".to_string(),
+                                    details: format!(
+                                        "Field '{}' has incompatible telemetry type: {}",
+                                        #field_name_lit,
+                                        details
+                                    ),
+                                });
+                            }
+                            None => #var_name.clone(),
+                        };
+                    });
                     extraction_plan_items.push(quote! {
-                        FieldExtraction::Required { name: #field_name_lit.to_string(), var_info: #var_name.clone() }
+                        FieldExtraction::Required { name: #field_name_lit.to_string(), var_info: #validated_name }
                     });
                 } else if *target_is_option {
+                    validation_checks.push(quote! {
+                        let #validated_name = match #var_name {
+                            Some(var_info) => { #type_check }
+                            None => None,
+                        };
+                    });
                     extraction_plan_items.push(quote! {
-                        FieldExtraction::Optional { name: #field_name_lit.to_string(), var_info: #var_name.cloned() }
+                        FieldExtraction::Optional { name: #field_name_lit.to_string(), var_info: #validated_name }
                     });
                 } else if default_expr.is_some() {
                     let default_repr = quote!(#default_expr).to_string();
                     let default_repr_lit =
                         LitStr::new(&default_repr, proc_macro2::Span::call_site());
+                    validation_checks.push(quote! {
+                        let #validated_name = match #var_name {
+                            Some(var_info) => { #type_check }
+                            None => None,
+                        };
+                    });
                     extraction_plan_items.push(quote! {
                         FieldExtraction::WithDefault {
                             name: #field_name_lit.to_string(),
-                            var_info: #var_name.cloned(),
+                            var_info: #validated_name,
                             default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
                         }
                     });
                 } else {
+                    validation_checks.push(quote! {
+                        let #validated_name = match #var_name {
+                            Some(var_info) => { #type_check }
+                            None => None,
+                        };
+                    });
                     extraction_plan_items.push(quote! {
                         FieldExtraction::WithDefault {
                             name: #field_name_lit.to_string(),
-                            var_info: #var_name.cloned(),
+                            var_info: #validated_name,
                             default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
                         }
                     });
@@ -768,12 +900,8 @@ fn generate_validation_phase(
 fn process_calculated_expression(
     expr: &Expr,
     field_map: &HashMap<String, (usize, Type)>,
-    fallback_type: &Type,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let mut folder = CalculatedExprFolder {
-        field_map,
-        fallback_type: fallback_type.clone(),
-    };
+    let mut folder = CalculatedExprFolder { field_map };
     let rewritten = folder.fold_expr(expr.clone());
     Ok(quote! { #rewritten })
 }
@@ -781,7 +909,6 @@ fn process_calculated_expression(
 /// Rewrites calculated expressions at compile time so they reuse the runtime extraction plan.
 struct CalculatedExprFolder<'a> {
     field_map: &'a HashMap<String, (usize, Type)>,
-    fallback_type: Type,
 }
 
 impl<'a> Fold for CalculatedExprFolder<'a> {
@@ -792,15 +919,13 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
             {
                 if let Some(ident) = expr_path.path.get_ident() {
                     let ident_str = ident.to_string();
-                    let ty = self
-                        .field_map
-                        .get(&ident_str)
-                        .map(|(_, ty)| ty.clone())
-                        .unwrap_or_else(|| self.fallback_type.clone());
-                    let name_lit = LitStr::new(&ident_str, ident.span());
-                    return syn::parse_quote! {
-                        validation.fetch_or_default::<#ty>(packet, #name_lit)
-                    };
+                    if let Some((_, ty)) = self.field_map.get(&ident_str) {
+                        let name_lit = LitStr::new(&ident_str, ident.span());
+                        let ty = ty.clone();
+                        return syn::parse_quote! {
+                            validation.fetch_or_default::<#ty>(packet, #name_lit)
+                        };
+                    }
                 }
                 Expr::Path(expr_path)
             }
@@ -1189,12 +1314,11 @@ fn generate_extraction_phase(
 
             FieldStrategy::Calculated {
                 field_ident,
-                field_type,
                 expression,
                 ..
             } => {
                 let rewritten =
-                    process_calculated_expression(expression, telemetry_map, field_type)?;
+                    process_calculated_expression(expression, telemetry_map)?;
                 quote! {
                     #field_ident: { #rewritten }
                 }

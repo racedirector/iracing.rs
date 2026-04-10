@@ -83,6 +83,25 @@ impl AdapterValidation {
     }
 }
 
+/// Probe whether a schema entry is compatible with a target `VarData` type.
+///
+/// The adapter derive macro uses this during connection-time validation. Calling
+/// `VarData::from_bytes` with an empty slice is enough to trigger the type check
+/// without requiring a live frame buffer; a compatible mapping reaches the
+/// bounds check and returns `Memory`, while an incompatible mapping returns
+/// `TypeConversion`.
+#[doc(hidden)]
+pub fn telemetry_type_mismatch_details<T>(var_info: &VariableInfo) -> crate::Result<Option<String>>
+where
+    T: crate::VarData,
+{
+    match <T as crate::VarData>::from_bytes(&[], var_info) {
+        Ok(_) | Err(IRacingSDKError::Memory { .. }) => Ok(None),
+        Err(IRacingSDKError::TypeConversion { details }) => Ok(Some(details)),
+        Err(err) => Err(err),
+    }
+}
+
 /// Extraction strategy for a single adapter field.
 ///
 /// Strategy is determined at connection time based on field annotations,

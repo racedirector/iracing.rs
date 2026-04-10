@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{VarData, VariableInfo, VariableType};
+use super::{VarData, VariableInfo};
 
 macro_rules! define_irsdk_enum {
     (
@@ -84,22 +84,8 @@ macro_rules! define_irsdk_enum {
 
         impl VarData for $name {
             fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                if info.data_type != VariableType::Int32 {
-                    return Err(crate::IRacingSDKError::TypeConversion {
-                        details: format!("Expected Int32, got {:?}", info.data_type),
-                    });
-                }
-
-                let bytes =
-                    data.get(info.offset..info.offset + 4)
-                        .ok_or(crate::IRacingSDKError::Memory {
-                            offset: info.offset,
-                            source: None,
-                        })?;
-
-                Ok(Self::from_raw(i32::from_le_bytes([
-                    bytes[0], bytes[1], bytes[2], bytes[3],
-                ])))
+                let value = <i32 as VarData>::from_bytes(data, info)?;
+                Ok(Self::from_raw(value))
             }
         }
 
