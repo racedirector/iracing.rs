@@ -51,6 +51,8 @@
 //!
 //! - `codegen`: enables schema generation helpers like `session_root_schema`.
 //! - `derive`: re-exports telemetry adapter derive macros from `iracing-sdk-derive`.
+//!   Generated derive code uses `iracing-sdk`'s internal `tracing` re-export, so downstream
+//!   crates do not need a direct `tracing` dependency just to compile derived adapters.
 //! - `schema-discovery`: enables unknown-field discovery overlays for session schemas.
 //! - `tokio`: enables async waiting for live telemetry updates on Windows.
 //! - `benchmark`: enables benchmark targets.
@@ -69,6 +71,11 @@ pub use ibt::IbtReader;
 pub use providers::{IbtProvider, Provider};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use tracing;
+}
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]

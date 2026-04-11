@@ -4,6 +4,7 @@ members = [
   "crates/iracing-sdk",
   "crates/iracing-sdk-codegen",
   "crates/iracing-sdk-derive",
+  "crates/iracing-sdk-derive-no-tracing-fixture",
   "crates/iracing-simulation",
   "crates/test-utils",
   "examples/driver-inputs",

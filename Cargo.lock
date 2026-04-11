@@ -944,11 +944,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "iracing-sdk-derive-no-tracing-fixture"
+version = "0.0.0"
+dependencies = [
+ "iracing-sdk",
+]
+
+[[package]]
 name = "iracing-simulation"
 version = "0.1.0"
 dependencies = [
  "clap",
  "reqwest",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
