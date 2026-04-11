@@ -96,20 +96,18 @@ impl AdapterValidation {
     {
         let data = packet.data.as_ref();
 
-        if let Some(index) = self.index_of(name) {
-            if let Some(entry) = self.extraction_plan.get(index) {
-                if let Some(var_info) = entry.var_info() {
-                    if let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info) {
-                        return value;
-                    }
-                }
-            }
+        if let Some(index) = self.index_of(name)
+            && let Some(entry) = self.extraction_plan.get(index)
+            && let Some(var_info) = entry.var_info()
+            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
+        {
+            return value;
         }
 
-        if let Some(var_info) = packet.schema.get_variable(name) {
-            if let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info) {
-                return value;
-            }
+        if let Some(var_info) = packet.schema.get_variable(name)
+            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
+        {
+            return value;
         }
 
         T::default()

@@ -127,36 +127,36 @@ fn bench_bitfield_operations(c: &mut Criterion) {
         .values()
         .find(|v| matches!(v.data_type, iracing_sdk::VariableType::BitField));
 
-    if let Some(bitfield_info) = bitfield_var {
-        if let Ok(bitfield) = BitField::from_bytes(&data, bitfield_info) {
-            group.bench_function("bitfield_extraction", |b| {
-                b.iter(|| {
-                    let bf = black_box(BitField::from_bytes(&data, bitfield_info).unwrap());
-                    black_box(bf)
-                })
-            });
+    if let Some(bitfield_info) = bitfield_var
+        && let Ok(bitfield) = BitField::from_bytes(&data, bitfield_info)
+    {
+        group.bench_function("bitfield_extraction", |b| {
+            b.iter(|| {
+                let bf = black_box(BitField::from_bytes(&data, bitfield_info).unwrap());
+                black_box(bf)
+            })
+        });
 
-            group.bench_function("bitfield_is_set", |b| {
-                b.iter(|| {
-                    let is_set = black_box(bitfield.is_set(0));
-                    black_box(is_set)
-                })
-            });
+        group.bench_function("bitfield_is_set", |b| {
+            b.iter(|| {
+                let is_set = black_box(bitfield.is_set(0));
+                black_box(is_set)
+            })
+        });
 
-            group.bench_function("bitfield_has_flag", |b| {
-                b.iter(|| {
-                    let has_flag = black_box(bitfield.has_flag(0x00000001));
-                    black_box(has_flag)
-                })
-            });
+        group.bench_function("bitfield_has_flag", |b| {
+            b.iter(|| {
+                let has_flag = black_box(bitfield.has_flag(0x00000001));
+                black_box(has_flag)
+            })
+        });
 
-            group.bench_function("bitfield_value", |b| {
-                b.iter(|| {
-                    let value = black_box(bitfield.value());
-                    black_box(value)
-                })
-            });
-        }
+        group.bench_function("bitfield_value", |b| {
+            b.iter(|| {
+                let value = black_box(bitfield.value());
+                black_box(value)
+            })
+        });
     }
 
     group.finish();

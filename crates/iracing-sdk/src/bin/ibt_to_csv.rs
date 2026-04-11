@@ -143,7 +143,7 @@ fn main() -> Result<()> {
         writer.write_record(&row)?;
         frame_count += 1;
 
-        if frame_count % 10_000 == 0 {
+        if frame_count.is_multiple_of(10_000) {
             debug!(frames_exported = frame_count, "CSV export progress");
         }
     }

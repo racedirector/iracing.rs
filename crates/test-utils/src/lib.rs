@@ -141,11 +141,11 @@ pub fn get_smallest_ibt_test_file() -> Option<PathBuf> {
     let mut smallest_size = u64::MAX;
 
     for file in test_files {
-        if let Ok(metadata) = std::fs::metadata(&file) {
-            if metadata.len() < smallest_size {
-                smallest_size = metadata.len();
-                smallest_file = Some(file);
-            }
+        if let Ok(metadata) = std::fs::metadata(&file)
+            && metadata.len() < smallest_size
+        {
+            smallest_size = metadata.len();
+            smallest_file = Some(file);
         }
     }
 

@@ -63,11 +63,11 @@ impl SessionInfoParser {
         session_version: u32,
     ) -> Result<SessionInfo> {
         // Check cache validity first
-        if let Some(cached) = &self.cache {
-            if cached.is_valid(session_version) {
-                debug!(version = session_version, "Using cached session info");
-                return Ok(cached.session_info.clone());
-            }
+        if let Some(cached) = &self.cache
+            && cached.is_valid(session_version)
+        {
+            debug!(version = session_version, "Using cached session info");
+            return Ok(cached.session_info.clone());
         }
 
         debug!(

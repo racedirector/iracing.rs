@@ -704,7 +704,7 @@ fn is_regular_field_attribute(attr: &Attribute) -> bool {
 /// - `#[calculated = "…"]`
 /// - `#[fail_if_missing]`
 /// - `#[skip]`
-/// /// The `#[default = ...]` form is rejected with a specific error message.
+/// - The `#[default = ...]` form is rejected with a specific error message.
 ///
 /// # Examples
 ///
@@ -804,12 +804,11 @@ fn parse_attribute(attr: &Attribute) -> syn::Result<AttributeValue> {
 fn extract_option_type(ty: &Type) -> Option<Type> {
     if let Type::Path(type_path) = ty {
         let last_segment = type_path.path.segments.last()?;
-        if last_segment.ident == "Option" {
-            if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-                    return Some(inner_type.clone());
-                }
-            }
+        if last_segment.ident == "Option"
+            && let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments
+            && let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
+        {
+            return Some(inner_type.clone());
         }
     }
     None

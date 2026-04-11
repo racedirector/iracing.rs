@@ -350,6 +350,7 @@ define_irsdk_enum! {
 
 #[cfg(test)]
 mod tests {
+    use super::super::VariableType;
     use super::*;
 
     macro_rules! assert_enum_roundtrip {
