@@ -95,16 +95,16 @@ use syn::{
 /// The generated impl validates a provided `VariableSchema` and produces an `AdapterValidation`
 /// which `adapt` uses to populate `SimpleFrame` from a `FramePacket`.
 #[proc_macro_derive(
-IRacingTelemetryFrame,
-attributes(
-field_name,
-missing,
-fail_if_missing,
-calculated,
-skip,
-bitfield,
-bitfield_map
-)
+    IRacingTelemetryFrame,
+    attributes(
+        field_name,
+        missing,
+        fail_if_missing,
+        calculated,
+        skip,
+        bitfield,
+        bitfield_map
+    )
 )]
 pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -389,12 +389,14 @@ fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
         let mut default_value: Option<String> = None;
         let mut fail_if_missing = false;
         for attr in &field.attrs {
-            if let Ok(attr_value) = parse_attribute(attr) {
-                match attr_value {
-                    AttributeValue::Missing(value) => default_value = Some(value),
-                    AttributeValue::FailIfMissing => fail_if_missing = true,
-                    _ => {}
-                }
+            if !is_bitfield_common_attribute(attr) {
+                continue;
+            }
+
+            match parse_attribute(attr)? {
+                AttributeValue::Missing(value) => default_value = Some(value),
+                AttributeValue::FailIfMissing => fail_if_missing = true,
+                _ => {}
             }
         }
 
@@ -462,14 +464,16 @@ fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
     let mut skip = false;
 
     for attr in &field.attrs {
-        if let Ok(attr_value) = parse_attribute(attr) {
-            match attr_value {
-                AttributeValue::FieldName(name) => field_name = Some(name),
-                AttributeValue::Missing(value) => default_value = Some(value),
-                AttributeValue::FailIfMissing => fail_if_missing = true,
-                AttributeValue::Calculated(expr) => calculated = Some(expr),
-                AttributeValue::Skip => skip = true,
-            }
+        if !is_regular_field_attribute(attr) {
+            continue;
+        }
+
+        match parse_attribute(attr)? {
+            AttributeValue::FieldName(name) => field_name = Some(name),
+            AttributeValue::Missing(value) => default_value = Some(value),
+            AttributeValue::FailIfMissing => fail_if_missing = true,
+            AttributeValue::Calculated(expr) => calculated = Some(expr),
+            AttributeValue::Skip => skip = true,
         }
     }
 
@@ -496,7 +500,15 @@ fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
         )
     })?;
 
+    let option_inner_type = extract_option_type(&field_type);
     if fail_if_missing {
+        if option_inner_type.is_some() {
+            return Err(syn::Error::new_spanned(
+                &field.ty,
+                "#[fail_if_missing] cannot be used on Option<T> fields",
+            ));
+        }
+
         return Ok(FieldStrategy::Critical {
             field_name,
             field_ident,
@@ -504,7 +516,7 @@ fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
         });
     }
 
-    if let Some(inner_type) = extract_option_type(&field_type) {
+    if let Some(inner_type) = option_inner_type {
         return Ok(FieldStrategy::Optional {
             field_name,
             field_ident,
@@ -665,6 +677,21 @@ fn parse_bitfield_attr(field: &Field) -> syn::Result<Option<BitfieldAttr>> {
         }
     }
     Ok(None)
+}
+
+fn is_bitfield_common_attribute(attr: &Attribute) -> bool {
+    let path = attr.path();
+    path.is_ident("missing") || path.is_ident("fail_if_missing") || path.is_ident("default")
+}
+
+fn is_regular_field_attribute(attr: &Attribute) -> bool {
+    let path = attr.path();
+    path.is_ident("field_name")
+        || path.is_ident("missing")
+        || path.is_ident("fail_if_missing")
+        || path.is_ident("default")
+        || path.is_ident("calculated")
+        || path.is_ident("skip")
 }
 
 /// Parse a single field attribute into an `AttributeValue`.
@@ -1766,8 +1793,7 @@ fn generate_extraction_phase(
                 expression,
                 ..
             } => {
-                let rewritten =
-                    process_calculated_expression(expression, telemetry_map)?;
+                let rewritten = process_calculated_expression(expression, telemetry_map)?;
                 quote! {
                     #field_ident: { #rewritten }
                 }
@@ -1786,4 +1812,56 @@ fn generate_extraction_phase(
     }
 
     Ok(assignments)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    fn parse_strategy_error(field: &Field) -> String {
+        match parse_field_strategy(field) {
+            Ok(_) => panic!("field strategy should fail"),
+            Err(err) => err.to_string(),
+        }
+    }
+
+    #[test]
+    fn malformed_missing_attribute_is_reported_for_regular_fields() {
+        let field: Field = parse_quote! {
+            #[field_name = "Speed"]
+            #[missing = 123]
+            speed: f32
+        };
+
+        let error = parse_strategy_error(&field);
+
+        assert!(error.contains("missing must be a string literal"));
+    }
+
+    #[test]
+    fn malformed_missing_attribute_is_reported_for_bitfield_fields() {
+        let field: Field = parse_quote! {
+            #[bitfield(name = "SessionFlags", has = "0b1")]
+            #[missing = 123]
+            is_green: bool
+        };
+
+        let error = parse_strategy_error(&field);
+
+        assert!(error.contains("missing must be a string literal"));
+    }
+
+    #[test]
+    fn fail_if_missing_rejects_option_fields() {
+        let field: Field = parse_quote! {
+            #[field_name = "Speed"]
+            #[fail_if_missing]
+            speed: Option<f32>
+        };
+
+        let error = parse_strategy_error(&field);
+
+        assert!(error.contains("#[fail_if_missing] cannot be used on Option<T> fields"));
+    }
 }

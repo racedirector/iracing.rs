@@ -203,7 +203,9 @@ fn validate_schema_treats_incompatible_optional_and_default_fields_as_missing() 
         "HasFlagField",
         "MappedFlagField",
     ] {
-        let index = validation.index_of(field_name).expect("field should be indexed");
+        let index = validation
+            .index_of(field_name)
+            .expect("field should be indexed");
         let extraction = validation
             .extraction_plan
             .get(index)
@@ -247,8 +249,7 @@ fn validate_schema_rejects_incompatible_required_fields() {
 fn validate_schema_rejects_incompatible_required_bitfields() {
     let schema = make_schema(&[("SessionFlags", VariableType::Int32, 0)], 4);
 
-    let err =
-        CriticalBitfieldRow::validate_schema(&schema).expect_err("validation should fail");
+    let err = CriticalBitfieldRow::validate_schema(&schema).expect_err("validation should fail");
     match err {
         IRacingSDKError::Parse { context, details } => {
             assert_eq!(context, "Frame adapter validation");
