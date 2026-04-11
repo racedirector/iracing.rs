@@ -11,6 +11,6 @@
 mod simulation;
 
 pub use simulation::{
-    DEFAULT_HOST, DEFAULT_PORT, SIM_STATUS_PATH, SimStatusClient, SimStatusResponse, Simulation,
-    StdSimStatusClient, sim_status_url,
+    DEFAULT_HOST, DEFAULT_PORT, SIM_STATUS_PATH, SimStatusClient, SimStatusError,
+    SimStatusResponse, Simulation, StdSimStatusClient, sim_status_url,
 };

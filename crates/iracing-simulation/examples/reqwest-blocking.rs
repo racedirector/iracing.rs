@@ -16,7 +16,9 @@
 
 use std::time::Duration;
 
-use iracing_simulation::{SimStatusClient, SimStatusResponse, Simulation, sim_status_url};
+use iracing_simulation::{
+    SimStatusClient, SimStatusError, SimStatusResponse, Simulation, sim_status_url,
+};
 use reqwest::blocking::Client;
 
 // ---------------------------------------------------------------------------
@@ -34,16 +36,20 @@ impl SimStatusClient for ReqwestBlockingClient {
         host: &str,
         port: u16,
         timeout: Duration,
-    ) -> Result<SimStatusResponse, ()> {
+    ) -> Result<SimStatusResponse, SimStatusError> {
         let response = self
             .client
             .get(sim_status_url(host, port))
             .timeout(timeout)
             .send()
-            .map_err(|_| ())?;
+            .map_err(|err| SimStatusError::Client {
+                message: err.to_string(),
+            })?;
 
         let status_code = response.status().as_u16();
-        let body = response.text().map_err(|_| ())?;
+        let body = response.text().map_err(|err| SimStatusError::Client {
+            message: err.to_string(),
+        })?;
 
         Ok(SimStatusResponse { status_code, body })
     }

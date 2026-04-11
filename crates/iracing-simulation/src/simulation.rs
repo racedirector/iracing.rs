@@ -2,6 +2,8 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration, Instant};
 
+use thiserror::Error;
+
 /// Default host used by iRacing's HTTP status endpoint.
 pub const DEFAULT_HOST: &str = "127.0.0.1";
 
@@ -37,19 +39,75 @@ pub struct SimStatusResponse {
     pub body: String,
 }
 
+/// Errors returned when fetching the iRacing sim-status endpoint fails.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum SimStatusError {
+    /// The configured host and port could not be parsed as a socket address.
+    #[error("invalid simulation status address `{address}`")]
+    InvalidAddress {
+        /// Address string that failed to parse.
+        address: String,
+    },
+    /// The client could not connect to the sim-status endpoint.
+    #[error("failed to connect to simulation status endpoint at {address}: {message}")]
+    Connect {
+        /// Endpoint address that could not be reached.
+        address: String,
+        /// Underlying transport error text.
+        message: String,
+    },
+    /// The client could not configure the socket timeout.
+    #[error("failed to configure simulation status socket timeout: {message}")]
+    ConfigureTimeout {
+        /// Underlying socket configuration error text.
+        message: String,
+    },
+    /// The client could not write the HTTP request to the socket.
+    #[error("failed to send simulation status request to {address}: {message}")]
+    RequestWrite {
+        /// Endpoint address being queried.
+        address: String,
+        /// Underlying write error text.
+        message: String,
+    },
+    /// Reading the response exceeded the configured timeout.
+    #[error("timed out reading simulation status response after {timeout_ms}ms")]
+    ReadTimeout {
+        /// Configured timeout in milliseconds.
+        timeout_ms: u128,
+    },
+    /// The client could not read the HTTP response from the socket.
+    #[error("failed to read simulation status response from {address}: {message}")]
+    ResponseRead {
+        /// Endpoint address being queried.
+        address: String,
+        /// Underlying read error text.
+        message: String,
+    },
+    /// The endpoint returned bytes that were not parseable as the expected HTTP response.
+    #[error("simulation status response was not valid HTTP")]
+    InvalidResponse,
+    /// Error reported by a custom [`SimStatusClient`] implementation.
+    #[error("simulation status request failed: {message}")]
+    Client {
+        /// Custom client error text.
+        message: String,
+    },
+}
+
 /// Consumer-injectable HTTP logic.
 /// Keep this synchronous + dependency-free from this crate's perspective.
 pub trait SimStatusClient {
     /// Send a GET request to the iRacing sim-status endpoint and return the response.
     ///
     /// Implementors should connect to `host:port`, issue the request within
-    /// `timeout`, and map transport or protocol errors to `Err(())`.
+    /// `timeout`, and map transport or protocol errors to [`SimStatusError`].
     fn get_sim_status(
         &self,
         host: &str,
         port: u16,
         timeout: Duration,
-    ) -> Result<SimStatusResponse, ()>;
+    ) -> Result<SimStatusResponse, SimStatusError>;
 }
 
 /// Dependency-free default client: raw HTTP/1.1 over TcpStream.
@@ -62,12 +120,29 @@ impl SimStatusClient for StdSimStatusClient {
         host: &str,
         port: u16,
         timeout: Duration,
-    ) -> Result<SimStatusResponse, ()> {
-        let addr: SocketAddr = format!("{host}:{port}").parse().map_err(|_| ())?;
+    ) -> Result<SimStatusResponse, SimStatusError> {
+        let address = format!("{host}:{port}");
+        let addr: SocketAddr = address
+            .parse()
+            .map_err(|_| SimStatusError::InvalidAddress {
+                address: address.clone(),
+            })?;
 
-        let mut stream = TcpStream::connect_timeout(&addr, timeout).map_err(|_| ())?;
-        stream.set_read_timeout(Some(timeout)).map_err(|_| ())?;
-        stream.set_write_timeout(Some(timeout)).map_err(|_| ())?;
+        let mut stream =
+            TcpStream::connect_timeout(&addr, timeout).map_err(|err| SimStatusError::Connect {
+                address: address.clone(),
+                message: err.to_string(),
+            })?;
+        stream
+            .set_read_timeout(Some(timeout))
+            .map_err(|err| SimStatusError::ConfigureTimeout {
+                message: err.to_string(),
+            })?;
+        stream.set_write_timeout(Some(timeout)).map_err(|err| {
+            SimStatusError::ConfigureTimeout {
+                message: err.to_string(),
+            }
+        })?;
 
         let request = format!(
             "GET {path} HTTP/1.1\r\n\
@@ -80,7 +155,12 @@ impl SimStatusClient for StdSimStatusClient {
             port = port
         );
 
-        stream.write_all(request.as_bytes()).map_err(|_| ())?;
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|err| SimStatusError::RequestWrite {
+                address: address.clone(),
+                message: err.to_string(),
+            })?;
 
         // Read the full response until EOF. Timeouts are enforced by the socket;
         // keep a secondary guard to bound total loop time for odd cases.
@@ -90,17 +170,24 @@ impl SimStatusClient for StdSimStatusClient {
 
         loop {
             if start.elapsed() > timeout {
-                return Err(());
+                return Err(SimStatusError::ReadTimeout {
+                    timeout_ms: timeout.as_millis(),
+                });
             }
 
             match stream.read(&mut chunk) {
                 Ok(0) => break,
                 Ok(n) => bytes.extend_from_slice(&chunk[..n]),
-                Err(_) => return Err(()),
+                Err(err) => {
+                    return Err(SimStatusError::ResponseRead {
+                        address: address.clone(),
+                        message: err.to_string(),
+                    });
+                }
             }
         }
 
-        parse_http_response(&bytes).ok_or(())
+        parse_http_response(&bytes).ok_or(SimStatusError::InvalidResponse)
     }
 }
 
@@ -202,7 +289,7 @@ mod tests {
     use super::*;
 
     struct FakeClient {
-        resp: Result<SimStatusResponse, ()>,
+        resp: Result<SimStatusResponse, SimStatusError>,
     }
 
     impl SimStatusClient for FakeClient {
@@ -211,7 +298,7 @@ mod tests {
             _host: &str,
             _port: u16,
             _timeout: Duration,
-        ) -> Result<SimStatusResponse, ()> {
+        ) -> Result<SimStatusResponse, SimStatusError> {
             self.resp.clone()
         }
     }
@@ -266,7 +353,15 @@ mod tests {
 
     #[test]
     fn check_sim_status_false_on_client_error() {
-        let sim = Simulation::new_with_client("127.0.0.1", 32034, FakeClient { resp: Err(()) });
+        let sim = Simulation::new_with_client(
+            "127.0.0.1",
+            32034,
+            FakeClient {
+                resp: Err(SimStatusError::Client {
+                    message: "sim unavailable".into(),
+                }),
+            },
+        );
 
         assert!(!sim.check_sim_status());
     }

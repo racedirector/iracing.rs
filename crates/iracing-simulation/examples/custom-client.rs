@@ -17,7 +17,9 @@
 //! The example exits with code 0 when the simulation is running and 1 when it
 //! is not (or unreachable).
 
-use iracing_simulation::{SimStatusClient, SimStatusResponse, Simulation, sim_status_url};
+use iracing_simulation::{
+    SimStatusClient, SimStatusError, SimStatusResponse, Simulation, sim_status_url,
+};
 use std::time::Duration;
 use ureq::{self, Agent};
 
@@ -39,7 +41,7 @@ impl SimStatusClient for UreqClient {
         host: &str,
         port: u16,
         timeout: Duration,
-    ) -> Result<SimStatusResponse, ()> {
+    ) -> Result<SimStatusResponse, SimStatusError> {
         let config = Agent::config_builder()
             .timeout_await_100(Some(timeout))
             .build();
@@ -47,10 +49,17 @@ impl SimStatusClient for UreqClient {
         let mut response = Agent::new_with_config(config)
             .get(&sim_status_url(host, port))
             .call()
-            .map_err(|_| ())?;
+            .map_err(|err| SimStatusError::Client {
+                message: err.to_string(),
+            })?;
 
         let status_code = response.status().as_u16();
-        let body = response.body_mut().read_to_string().map_err(|_| ())?;
+        let body = response
+            .body_mut()
+            .read_to_string()
+            .map_err(|err| SimStatusError::Client {
+                message: err.to_string(),
+            })?;
 
         Ok(SimStatusResponse { status_code, body })
     }

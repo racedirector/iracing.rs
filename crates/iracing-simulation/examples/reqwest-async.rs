@@ -26,7 +26,9 @@
 
 use std::time::Duration;
 
-use iracing_simulation::{SimStatusClient, SimStatusResponse, Simulation, sim_status_url};
+use iracing_simulation::{
+    SimStatusClient, SimStatusError, SimStatusResponse, Simulation, sim_status_url,
+};
 use tokio::runtime::Handle;
 use tokio::task;
 
@@ -51,7 +53,7 @@ impl SimStatusClient for ReqwestAsyncClient {
         host: &str,
         port: u16,
         timeout: Duration,
-    ) -> Result<SimStatusResponse, ()> {
+    ) -> Result<SimStatusResponse, SimStatusError> {
         let url = sim_status_url(host, port);
         let client = self.client.clone();
 
@@ -64,10 +66,17 @@ impl SimStatusClient for ReqwestAsyncClient {
                     .timeout(timeout)
                     .send()
                     .await
-                    .map_err(|_| ())?;
+                    .map_err(|err| SimStatusError::Client {
+                        message: err.to_string(),
+                    })?;
 
                 let status_code = response.status().as_u16();
-                let body = response.text().await.map_err(|_| ())?;
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|err| SimStatusError::Client {
+                        message: err.to_string(),
+                    })?;
 
                 Ok(SimStatusResponse { status_code, body })
             })
