@@ -46,6 +46,8 @@
 //! ```
 
 mod bitfield;
+mod dynamic_frame;
+mod frame;
 mod incident;
 mod irsdk_bitflags;
 mod irsdk_enums;
@@ -60,6 +62,8 @@ pub use bitfield::{
     BitField, engine_mandatory_repair_needed, engine_optional_repair_needed,
     session_dq_scoring_invalid, tick_after_u32,
 };
+pub use dynamic_frame::DynamicFrame;
+pub use frame::FramePacket;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
 pub use irsdk_bitflags::{

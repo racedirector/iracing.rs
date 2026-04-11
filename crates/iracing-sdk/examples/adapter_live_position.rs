@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]

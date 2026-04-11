@@ -423,6 +423,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "driver-inputs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv",
+ "iracing-sdk",
+ "iracing-sdk-derive",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -891,6 +904,7 @@ dependencies = [
  "criterion",
  "csv",
  "encoding_rs",
+ "iracing-sdk-derive",
  "proptest",
  "schemars",
  "serde",
@@ -918,6 +932,15 @@ dependencies = [
  "serde_yaml_ng",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "iracing-sdk-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

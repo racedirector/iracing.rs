@@ -54,9 +54,8 @@
 //! - `tokio`: enables async waiting for live telemetry updates on Windows.
 //! - `benchmark`: enables benchmark targets.
 //!
-mod adapters;
+pub mod adapters;
 mod error;
-mod frame;
 pub mod ibt;
 mod providers;
 pub mod schema;
@@ -65,7 +64,6 @@ pub mod yaml_utils;
 
 pub use adapters::*;
 pub use error::*;
-pub use frame::{DynamicFrame, FramePacket};
 pub use ibt::IbtReader;
 pub use providers::{IbtProvider, Provider};
 pub use schema::{SessionInfo, SessionInfoParser};

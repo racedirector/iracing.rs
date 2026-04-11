@@ -66,7 +66,9 @@ mod validation;
 // Re-export all public types
 pub use frame_adapter::FrameAdapter;
 pub use schema_provider::SchemaProvider;
-pub use validation::{AdapterValidation, DefaultValue, FieldExtraction};
+pub use validation::{
+    AdapterValidation, DefaultValue, FieldExtraction, telemetry_type_mismatch_details,
+};
 
 #[cfg(test)]
 mod tests {

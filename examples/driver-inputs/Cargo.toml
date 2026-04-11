@@ -1,0 +1,17 @@
+[package]
+name = "driver-inputs"
+version = "0.1.0"
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+clap = { workspace = true }
+csv = { workspace = true }
+iracing-sdk = { path = "../../crates/iracing-sdk" }
+iracing-sdk-derive = { path = "../../crates/iracing-sdk-derive" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

@@ -56,7 +56,40 @@ impl AdapterValidation {
         self.index_map.get(name).copied()
     }
 
-    /// Fetch a telemetry value by name using the precomputed extraction plan.
+    /// Fetches a telemetry value by name using the adapter's extraction plan, falling back to the packet schema and ultimately the type default when unavailable.
+    ///
+    /// Attempts to decode the value using the precomputed extraction plan entry for `name` (if present) and its associated `VariableInfo`; if that fails, attempts to decode using `packet.schema.get_variable(name)`. If decoding succeeds returns the decoded value; otherwise returns `T::default()`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use iracing_sdk::{
+    ///     AdapterValidation, FieldExtraction, FramePacket, VariableInfo, VariableSchema,
+    ///     VariableType,
+    /// };
+    /// use std::{collections::HashMap, sync::Arc};
+    ///
+    /// let speed_info = VariableInfo {
+    ///     name: "Speed".to_string(),
+    ///     data_type: VariableType::Float32,
+    ///     offset: 0,
+    ///     count: 1,
+    ///     count_as_time: false,
+    ///     units: "m/s".to_string(),
+    ///     description: "Car speed".to_string(),
+    /// };
+    ///
+    /// let validation = AdapterValidation::new(vec![FieldExtraction::Required {
+    ///     name: "Speed".to_string(),
+    ///     var_info: speed_info.clone(),
+    /// }]);
+    /// let schema = VariableSchema::new(HashMap::from([("Speed".to_string(), speed_info)]), 4)?;
+    /// let packet = FramePacket::new(42.0f32.to_le_bytes().to_vec(), 0, 0, Arc::new(schema));
+    ///
+    /// let speed: f32 = validation.fetch_or_default(&packet, "Speed");
+    /// assert_eq!(speed, 42.0);
+    /// # Ok::<(), iracing_sdk::IRacingSDKError>(())
+    /// ```
     pub fn fetch_or_default<T>(&self, packet: &crate::FramePacket, name: &str) -> T
     where
         T: crate::VarData + ::core::default::Default,
@@ -80,6 +113,45 @@ impl AdapterValidation {
         }
 
         T::default()
+    }
+}
+
+/// Determine whether a schema variable is incompatible with a target `VarData` type.
+///
+/// This probes type compatibility by calling `<T as VarData>::from_bytes(&[], var_info)`,
+/// which performs type checks without requiring a real frame buffer.
+///
+/// # Returns
+///
+/// - `Ok(None)` if the variable can be mapped to `T` (including when the probe hits a memory/bounds condition).
+/// - `Ok(Some(details))` if the probe fails with a type-conversion error; `details` contains the diagnostic message.
+/// - `Err(err)` for any other error encountered while probing.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
+/// # use iracing_sdk::{VariableInfo, VariableType};
+/// let var_info = VariableInfo {
+///     name: "Speed".to_string(),
+///     data_type: VariableType::Float32,
+///     offset: 0,
+///     count: 1,
+///     count_as_time: false,
+///     units: "m/s".to_string(),
+///     description: "Car speed".to_string(),
+/// };
+/// let _ = telemetry_type_mismatch_details::<f32>(&var_info);
+/// ```
+#[doc(hidden)]
+pub fn telemetry_type_mismatch_details<T>(var_info: &VariableInfo) -> crate::Result<Option<String>>
+where
+    T: crate::VarData,
+{
+    match <T as crate::VarData>::from_bytes(&[], var_info) {
+        Ok(_) | Err(IRacingSDKError::Memory { .. }) => Ok(None),
+        Err(IRacingSDKError::TypeConversion { details }) => Ok(Some(details)),
+        Err(err) => Err(err),
     }
 }
 

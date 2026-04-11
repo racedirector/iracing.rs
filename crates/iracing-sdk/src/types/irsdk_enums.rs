@@ -4,6 +4,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::{VarData, VariableInfo};
+
 macro_rules! define_irsdk_enum {
     (
         $(#[$meta:meta])*
@@ -77,6 +79,19 @@ macro_rules! define_irsdk_enum {
                     Self::Unknown(raw) => Err(raw),
                     known => Ok(known),
                 }
+            }
+        }
+
+        impl VarData for $name {
+            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+                let value = <i32 as VarData>::from_bytes(data, info)?;
+                Ok(Self::from_raw(value))
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::from_raw(0)
             }
         }
     };
@@ -370,5 +385,30 @@ mod tests {
         assert_enum_roundtrip!(FfbCommandMode, 0, 77);
         assert_enum_roundtrip!(CameraSwitchFocus, -1, 77);
         assert_enum_roundtrip!(VideoCaptureMode, 3, 77);
+    }
+
+    #[test]
+    fn typed_enums_decode_via_vardata() {
+        let data = super::super::irsdk_flags::trk_loc::ON_TRACK.to_le_bytes();
+        let mut frame = vec![0u8; 8];
+        frame[..4].copy_from_slice(&data);
+
+        let info = VariableInfo {
+            name: "TrackLocation".to_string(),
+            data_type: VariableType::Int32,
+            offset: 0,
+            count: 1,
+            count_as_time: false,
+            units: String::new(),
+            description: String::new(),
+        };
+
+        let value = TrackLocation::from_bytes(&frame, &info).expect("TrackLocation decode");
+        assert!(matches!(value, TrackLocation::OnTrack));
+    }
+
+    #[test]
+    fn typed_enums_have_zero_default() {
+        assert_eq!(TrackLocation::default().to_raw(), 0);
     }
 }

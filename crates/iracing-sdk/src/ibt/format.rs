@@ -536,8 +536,9 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-            .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+        let _disk_header =
+            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
@@ -615,8 +616,9 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-            .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+        let _disk_header =
+            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
@@ -686,8 +688,9 @@ mod tests {
         let mut buf_reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut buf_reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-            .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+        let _disk_header =
+            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
         let schema = extract_variable_schema(&mut buf_reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
@@ -742,7 +745,7 @@ mod tests {
                 .with_context(|| format!("Parsing header from {}", file_path.display()))?;
             let _disk_header =
                 IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+                    .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
             let schema = extract_variable_schema(&mut buf_reader, &header)
                 .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
 
@@ -788,8 +791,9 @@ mod tests {
         let mut ford_reader = open_buf_reader(&ford_file)?;
         let ford_header = IbtHeader::parse_from_reader(&mut ford_reader)
             .with_context(|| format!("Parsing Ford header from {}", ford_file.display()))?;
-        let _ford_disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
-            .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
+        let _ford_disk =
+            IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
+                .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
         let ford_schema = extract_variable_schema(&mut ford_reader, &ford_header)
             .with_context(|| format!("Extracting Ford schema from {}", ford_file.display()))?;
 
@@ -798,14 +802,16 @@ mod tests {
             IbtHeader::parse_from_reader(&mut supercars_reader).with_context(|| {
                 format!("Parsing Supercars header from {}", supercars_file.display())
             })?;
-        let _supercars_disk =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut supercars_reader, &supercars_header)
-            .with_context(|| {
-                format!(
-                    "Parsing Supercars sub-header from {}",
-                    supercars_file.display()
-                )
-            })?;
+        let _supercars_disk = IbtDiskSubHeader::parse_from_reader_with_header(
+            &mut supercars_reader,
+            &supercars_header,
+        )
+        .with_context(|| {
+            format!(
+                "Parsing Supercars sub-header from {}",
+                supercars_file.display()
+            )
+        })?;
         let supercars_schema = extract_variable_schema(&mut supercars_reader, &supercars_header)
             .with_context(|| {
                 format!(
