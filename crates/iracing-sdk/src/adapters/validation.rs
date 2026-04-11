@@ -63,9 +63,32 @@ impl AdapterValidation {
     /// # Examples
     ///
     /// ```
-    /// // Assume `adapter: AdapterValidation`, `packet: FramePacket`
-    /// let speed: f32 = adapter.fetch_or_default(&packet, "speed");
-    /// // `speed` is the decoded telemetry value or `f32::default()` if missing/invalid
+    /// use iracing_sdk::{
+    ///     AdapterValidation, FieldExtraction, FramePacket, VariableInfo, VariableSchema,
+    ///     VariableType,
+    /// };
+    /// use std::{collections::HashMap, sync::Arc};
+    ///
+    /// let speed_info = VariableInfo {
+    ///     name: "Speed".to_string(),
+    ///     data_type: VariableType::Float32,
+    ///     offset: 0,
+    ///     count: 1,
+    ///     count_as_time: false,
+    ///     units: "m/s".to_string(),
+    ///     description: "Car speed".to_string(),
+    /// };
+    ///
+    /// let validation = AdapterValidation::new(vec![FieldExtraction::Required {
+    ///     name: "Speed".to_string(),
+    ///     var_info: speed_info.clone(),
+    /// }]);
+    /// let schema = VariableSchema::new(HashMap::from([("Speed".to_string(), speed_info)]), 4)?;
+    /// let packet = FramePacket::new(42.0f32.to_le_bytes().to_vec(), 0, 0, Arc::new(schema));
+    ///
+    /// let speed: f32 = validation.fetch_or_default(&packet, "Speed");
+    /// assert_eq!(speed, 42.0);
+    /// # Ok::<(), iracing_sdk::IRacingSDKError>(())
     /// ```
     pub fn fetch_or_default<T>(&self, packet: &crate::FramePacket, name: &str) -> T
     where
@@ -107,9 +130,17 @@ impl AdapterValidation {
 /// # Examples
 ///
 /// ```no_run
-/// # use iracing_sdk::adapters::validation::telemetry_type_mismatch_details;
-/// # use iracing_sdk::VariableInfo;
-/// let var_info = VariableInfo::default();
+/// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
+/// # use iracing_sdk::{VariableInfo, VariableType};
+/// let var_info = VariableInfo {
+///     name: "Speed".to_string(),
+///     data_type: VariableType::Float32,
+///     offset: 0,
+///     count: 1,
+///     count_as_time: false,
+///     units: "m/s".to_string(),
+///     description: "Car speed".to_string(),
+/// };
 /// let _ = telemetry_type_mismatch_details::<f32>(&var_info);
 /// ```
 #[doc(hidden)]

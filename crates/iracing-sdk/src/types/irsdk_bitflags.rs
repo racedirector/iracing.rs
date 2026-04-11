@@ -301,6 +301,8 @@ impl From<IncidentFlags> for BitField {
     /// # Examples
     ///
     /// ```
+    /// use iracing_sdk::{BitField, IncidentFlags};
+    ///
     /// let flags = IncidentFlags::from_bits_retain(0x_00_04_03); // arbitrary raw bits
     /// let bf = BitField::from(flags);
     /// assert_eq!(bf.value(), flags.bits());
@@ -316,7 +318,9 @@ impl Default for IncidentFlags {
     /// # Examples
     ///
     /// ```
-    /// let flags = Default::default();
+    /// use iracing_sdk::IncidentFlags;
+    ///
+    /// let flags = IncidentFlags::default();
     /// assert_eq!(flags.bits(), 0);
     /// ```
     fn default() -> Self {
@@ -338,14 +342,19 @@ impl VarData for IncidentFlags {
     /// # Examples
     ///
     /// ```
-    /// use crate::types::{VariableInfo, VariableType, SessionFlags};
+    /// use iracing_sdk::{SessionFlags, VarData, VariableInfo, VariableType};
     ///
     /// let mut frame = [0u8; 8];
     /// frame[..4].copy_from_slice(&SessionFlags::GREEN.bits().to_le_bytes());
     ///
     /// let info = VariableInfo {
+    ///     name: "SessionFlags".to_string(),
     ///     data_type: VariableType::BitField,
-    ///     ..Default::default()
+    ///     offset: 0,
+    ///     count: 1,
+    ///     count_as_time: false,
+    ///     units: String::new(),
+    ///     description: "Session flags".to_string(),
     /// };
     ///
     /// let val = SessionFlags::from_bytes(&frame, &info).unwrap();
