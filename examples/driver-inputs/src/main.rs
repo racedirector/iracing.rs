@@ -17,6 +17,17 @@ struct Args {
     csv_output_path: PathBuf,
 }
 
+/// Parse CLI arguments, read frames from an IBT file, adapt them to `DriverInput`, and write each adapted frame as a CSV row to the specified output path.
+///
+/// The program exits with `Ok(())` on success. It returns an error if schema validation, frame iteration, frame adaptation, CSV serialization, or flushing fails.
+///
+/// # Examples
+///
+/// ```no_run
+/// // Typical usage: run the compiled binary with `--ibt-path` and `--csv-output-path`.
+/// // From code/tests you can invoke the entrypoint directly (no runtime side-effects in this doctest).
+/// let _ = crate::main();
+/// ```
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Args {
         ibt_path,

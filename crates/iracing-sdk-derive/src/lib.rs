@@ -72,22 +72,39 @@ use syn::{
     Attribute, DeriveInput, Expr, Field, Lit, LitInt, LitStr, Meta, Type, parse_macro_input,
 };
 
-/// Derive macro for automatic frame adapter generation.
+/// Derive macro that implements `::iracing_sdk::adapters::FrameAdapter` for structs with named fields.
 ///
-/// Generates a `FrameAdapter` implementation with dual-phase validation:
-/// 1. Connection-time schema validation with helpful error messages
-/// 2. Runtime field extraction with zero HashMap lookups
+/// Generates an implementation that performs two phases:
+/// 1. Connection-time schema validation producing an ordered extraction plan.
+/// 2. Runtime adaptation that decodes packet bytes into the struct fields using the plan.
+///
+/// # Examples
+///
+/// ```
+/// use iracing_sdk_derive::IRacingTelemetryFrame;
+///
+/// #[derive(IRacingTelemetryFrame)]
+/// struct SimpleFrame {
+///     #[field_name = "Speed"]
+///     speed: f32,
+///     #[field_name = "DriverName"]
+///     name: Option<String>,
+/// }
+/// ```
+///
+/// The generated impl validates a provided `VariableSchema` and produces an `AdapterValidation`
+/// which `adapt` uses to populate `SimpleFrame` from a `FramePacket`.
 #[proc_macro_derive(
-    IRacingTelemetryFrame,
-    attributes(
-        field_name,
-        missing,
-        fail_if_missing,
-        calculated,
-        skip,
-        bitfield,
-        bitfield_map
-    )
+IRacingTelemetryFrame,
+attributes(
+field_name,
+missing,
+fail_if_missing,
+calculated,
+skip,
+bitfield,
+bitfield_map
+)
 )]
 pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -98,7 +115,27 @@ pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Generate the FrameAdapter implementation
+/// Generate the `FrameAdapter` implementation for the provided derive input.
+///
+/// Parses the given `DeriveInput` (must be a struct with named fields), computes per-field
+/// extraction strategies, builds a telemetry lookup map for calculated expressions,
+/// and emits the `impl ::iracing_sdk::adapters::FrameAdapter` token stream which contains
+/// `validate_schema` and `adapt` implementations tailored to the struct's fields and attributes.
+///
+/// The function returns a `syn::Error` on unsupported inputs (non-struct or non-named fields)
+/// or on invalid/malformed per-field attributes.
+///
+/// # Examples
+///
+/// ```
+/// # use syn::{parse_str, DeriveInput};
+/// # fn _example() -> syn::Result<()> {
+/// let input: DeriveInput = parse_str("struct S { a: i32 }")?;
+/// // `generate_frame_adapter` produces the token stream implementing FrameAdapter for `S`.
+/// let _tokens = iracing_sdk_derive::generate_frame_adapter(&input)?;
+/// # Ok(()) }
+/// ```
+/* no outer attributes */
 fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
     let struct_name = &input.ident;
     let generics = &input.generics;
@@ -252,6 +289,33 @@ enum FieldStrategy {
     },
 }
 
+/// Generates a tokenized validation expression that checks a telemetry variable's runtime type against `target_type` and yields an optional cloned value for the field.
+///
+/// The produced code calls `::iracing_sdk::adapters::telemetry_type_mismatch_details::<T>(probe_expr)?` and:
+/// - returns `Some(clone_expr)` when the telemetry type matches `target_type`;
+/// - yields `None` when a type mismatch is detected and `treat_mismatch_as_missing` is `true`;
+/// - returns a `IRacingSDKError::Parse` error when a type mismatch is detected and `treat_mismatch_as_missing` is `false` (the error message includes `field_name_lit` and the mismatch `details`).
+///
+/// # Parameters
+///
+/// - `probe_expr`: token stream yielding an expression used to probe the telemetry variable (e.g., a lookup into the schema).
+/// - `clone_expr`: token stream yielding an expression that produces the value to return inside `Some(...)` when the types match.
+/// - `field_name_lit`: string literal of the telemetry field name used in error messages.
+/// - `target_type`: the Rust type to validate against the telemetry variable.
+/// - `treat_mismatch_as_missing`: when `true`, a type mismatch is treated as missing (returns `None`); when `false`, a type mismatch produces a `Parse` error.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use quote::quote;
+/// # use syn::parse_str;
+/// // produce code that probes a schema entry and clones it when compatible
+/// let probe = quote! { schema.get_variable("Speed") };
+/// let clone = quote! { var_info.clone() };
+/// let target: syn::Type = parse_str("f32").unwrap();
+/// let tokens = generate_type_validation_check(probe, clone, "Speed", &target, true);
+/// // `tokens` now contains generated code that yields `Some(var_info.clone())` or `None` depending on type compatibility
+/// ```
 fn generate_type_validation_check(
     probe_expr: proc_macro2::TokenStream,
     clone_expr: proc_macro2::TokenStream,
@@ -284,7 +348,34 @@ fn generate_type_validation_check(
     }
 }
 
-/// Parse a single field into its strategy
+/// Determine the extraction strategy for a single struct field from its attributes and type.
+///
+/// This inspects bitfield-specific attributes (`#[bitfield(...)]`, `#[bitfield_map(...)]`) first,
+/// then regular attributes (`#[field_name = "..."]`, `#[missing = "..."]`, `#[fail_if_missing]`,
+/// `#[calculated = "..."]`, `#[skip]`) and the Rust type to produce one of the `FieldStrategy`
+/// variants:
+/// - `Skipped` when `#[skip]` is present.
+/// - `Calculated` when `#[calculated = "..."]` is present.
+/// - Bitfield strategies (`BitfieldHas` / `BitfieldMap`) when corresponding `#[bitfield*]` attrs exist.
+/// - `Critical` when `#[fail_if_missing]` is set for a non-`Option` telemetry field.
+/// - `Optional` for `Option<T>` telemetry-backed fields.
+/// - `WithDefault` when `#[missing = "..."]` is provided for a non-`Option` field.
+/// - `TypeDefault` when the field is telemetry-backed but has no explicit missing/default handling.
+///
+/// The function returns a `syn::Error` when required attribute forms or literal values are missing
+/// or malformed, or when bitfield target types are incompatible (for example, `#[bitfield(..., has = ...)]`
+/// requires `bool` or `Option<bool>`).
+///
+/// # Examples
+///
+/// ```
+/// use syn::{Field, Result};
+/// use std::str::FromStr;
+/// // parse a field with a telemetry name into a syn::Field and derive its strategy
+/// let field: Field = syn::parse_str("#[field_name = \"RPM\"] pub rpm: Option<u32>").unwrap();
+/// let strat = crate::parse_field_strategy(&field).unwrap();
+/// assert!(matches!(strat, crate::FieldStrategy::Optional { .. }));
+/// ```
 fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
     let field_ident = field
         .ident
@@ -455,6 +546,33 @@ enum BitfieldAttr {
     Map { name: String, decoder: String },
 }
 
+/// Parses a field's attributes for a `#[bitfield(...)]` or `#[bitfield_map(...)]` directive.
+///
+/// Returns `Some(BitfieldAttr::Has { name, mask })` when a `#[bitfield(name = "...", has = "...")]`
+/// attribute is found, `Some(BitfieldAttr::Map { name, decoder })` when a
+/// `#[bitfield_map(name = "...", decoder = "...")]` attribute is found, and `None` when neither
+/// attribute is present. Returns a `syn::Error` if the attribute is present but malformed
+/// (missing required keys or non-string literal values).
+///
+/// # Examples
+///
+/// ```
+/// use syn::Field;
+///
+/// // Parse a field with a `bitfield` attribute.
+/// let field: Field = syn::parse_str(
+///     "#[bitfield(name = \"Speed\", has = \"0x4\")] pub speed: bool"
+/// ).unwrap();
+/// let attr = crate::parse_bitfield_attr(&field).unwrap();
+/// assert!(matches!(attr, Some(crate::BitfieldAttr::Has { name, mask }) if name == "Speed" && mask == "0x4"));
+///
+/// // Parse a field with a `bitfield_map` attribute.
+/// let field_map: Field = syn::parse_str(
+///     "#[bitfield_map(name = \"Flags\", decoder = \"decode_flags\")] pub flags: u32"
+/// ).unwrap();
+/// let attr_map = crate::parse_bitfield_attr(&field_map).unwrap();
+/// assert!(matches!(attr_map, Some(crate::BitfieldAttr::Map { name, decoder }) if name == "Flags" && decoder == "decode_flags"));
+/// ```
 fn parse_bitfield_attr(field: &Field) -> syn::Result<Option<BitfieldAttr>> {
     use syn::punctuated::Punctuated;
     use syn::{Meta, MetaNameValue, Token};
@@ -549,7 +667,30 @@ fn parse_bitfield_attr(field: &Field) -> syn::Result<Option<BitfieldAttr>> {
     Ok(None)
 }
 
-/// Parse a single attribute
+/// Parse a single field attribute into an `AttributeValue`.
+///
+/// Accepts a `syn::Attribute` that uses one of the supported forms and returns
+/// a structured `AttributeValue` or a `syn::Error` if the attribute is unknown
+/// or has an invalid literal form. Supported attribute shapes:
+/// - `#[field_name = "…"]`
+/// - `#[missing = "…"]`
+/// - `#[calculated = "…"]`
+/// - `#[fail_if_missing]`
+/// - `#[skip]`
+/// /// The `#[default = ...]` form is rejected with a specific error message.
+///
+/// # Examples
+///
+/// ```
+/// use syn::Attribute;
+/// // parse a name-value attribute into a syn::Attribute
+/// let attr: Attribute = syn::parse_str(r#"#[field_name = "Speed"]"#).unwrap();
+/// let parsed = parse_attribute(&attr).unwrap();
+/// match parsed {
+///     AttributeValue::FieldName(name) => assert_eq!(name, "Speed"),
+///     _ => panic!("unexpected attribute value"),
+/// }
+/// ```
 fn parse_attribute(attr: &Attribute) -> syn::Result<AttributeValue> {
     match &attr.meta {
         Meta::NameValue(name_value) if name_value.path.is_ident("field_name") => {
@@ -615,7 +756,24 @@ fn parse_attribute(attr: &Attribute) -> syn::Result<AttributeValue> {
     }
 }
 
-/// Extract inner type from Option<T>
+/// Extracts the inner `T` when the provided `ty` is syntactically `Option<T>`.
+///
+/// # Returns
+///
+/// `Some(T)` containing the inner type if `ty` is `Option<T>`, `None` otherwise.
+///
+/// # Examples
+///
+/// ```
+/// use syn::Type;
+///
+/// let t: Type = syn::parse_str("Option<u32>").unwrap();
+/// let inner = crate::extract_option_type(&t).expect("expected Option");
+/// assert_eq!(format!("{}", inner.into_token_stream()), "u32");
+///
+/// let t2: Type = syn::parse_str("Vec<u32>").unwrap();
+/// assert!(crate::extract_option_type(&t2).is_none());
+/// ```
 fn extract_option_type(ty: &Type) -> Option<Type> {
     if let Type::Path(type_path) = ty {
         let last_segment = type_path.path.segments.last()?;
@@ -630,7 +788,24 @@ fn extract_option_type(ty: &Type) -> Option<Type> {
     None
 }
 
-/// Generate validation phase code
+/// Build the code snippets for the schema validation phase and the extraction plan from field strategies.
+///
+/// This function converts an ordered slice of `FieldStrategy` values into two vectors of token streams:
+/// - validation checks: statements that will be emitted into `validate_schema` to verify schema presence and telemetry type compatibility;
+/// - extraction plan items: `FieldExtraction` entries that encode how `adapt` should read or compute each struct field at runtime.
+///
+/// # Returns
+///
+/// A tuple where the first element is a `Vec<proc_macro2::TokenStream>` containing validation-check code fragments and the second element is a `Vec<proc_macro2::TokenStream>` containing extraction-plan entries.
+///
+/// # Examples
+///
+/// ```
+/// // Minimal example: no fields produces empty validation and extraction-plan vectors.
+/// let (validation_checks, extraction_plan_items) = generate_validation_phase(&[]);
+/// assert!(validation_checks.is_empty());
+/// assert!(extraction_plan_items.is_empty());
+/// ```
 fn generate_validation_phase(
     strategies: &[FieldStrategy],
 ) -> (Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>) {
@@ -899,7 +1074,33 @@ fn generate_validation_phase(
     (validation_checks, extraction_plan_items)
 }
 
-/// Process calculated field expressions to replace telemetry field names with extraction calls
+/// Rewrites a calculated expression so bare telemetry identifiers are replaced with
+/// calls that fetch or default their extracted values at runtime.
+///
+/// Identifiers in `expr` that match keys in `field_map` are replaced with
+/// `validation.fetch_or_default::<T>(packet, "Name")`-style expressions where `T` is
+/// the associated `Type` from `field_map`.
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::HashMap;
+/// use syn::{Expr, Type};
+///
+/// // Build a simple expression referencing telemetry fields `speed` and `rpm`.
+/// let expr: Expr = syn::parse_str("speed * 2.0 + rpm as f32").unwrap();
+///
+/// // Map `speed` and `rpm` to dummy types to trigger rewriting.
+/// let mut field_map: HashMap<String, (usize, Type)> = HashMap::new();
+/// field_map.insert("speed".to_string(), (0, syn::parse_str::<Type>("f32").unwrap()));
+/// field_map.insert("rpm".to_string(), (1, syn::parse_str::<Type>("i32").unwrap()));
+///
+/// let tokens = process_calculated_expression(&expr, &field_map).unwrap();
+/// let s = tokens.to_string();
+///
+/// // The output should contain fetch_or_default-style calls for the mapped identifiers.
+/// assert!(s.contains("fetch_or_default"));
+/// ```
 fn process_calculated_expression(
     expr: &Expr,
     field_map: &HashMap<String, (usize, Type)>,
@@ -915,6 +1116,30 @@ struct CalculatedExprFolder<'a> {
 }
 
 impl<'a> Fold for CalculatedExprFolder<'a> {
+    /// Rewrites simple identifier paths that match known telemetry fields into
+    /// `validation.fetch_or_default::<Type>(packet, "FieldName")` calls; all other
+    /// expressions are folded unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use syn::{parse_quote, Expr, LitStr};
+    /// use std::collections::HashMap;
+    ///
+    /// // Minimal stand-in for the folder's field_map: name -> (index, type)
+    /// let mut field_map: HashMap<String, (usize, syn::Type)> = HashMap::new();
+    /// field_map.insert("speed".to_string(), (0, parse_quote!(i32)));
+    ///
+    /// // Expression referencing a telemetry field by bare identifier.
+    /// let expr: Expr = parse_quote!(speed);
+    ///
+    /// // Manually perform the transformation the folder would do:
+    /// let transformed: Expr = parse_quote! {
+    ///     validation.fetch_or_default::<i32>(packet, LitStr::new("speed", proc_macro2::Span::call_site()))
+    /// };
+    ///
+    /// assert_eq!(quote::quote!(#transformed).to_string(), "validation . fetch_or_default :: < i32 > ( packet , \"speed\" )");
+    /// ```
     fn fold_expr(&mut self, expr: Expr) -> Expr {
         match expr {
             Expr::Path(expr_path)
@@ -937,7 +1162,33 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     }
 }
 
-/// Generate field assignment for TypeDefault strategy
+/// Generate the struct-field assignment token stream for a telemetry-backed field that falls back to the Rust type's `Default` when the variable is absent or decoding fails.
+///
+/// The produced tokens initialize the named field by indexing the adapter validation's extraction plan at `index` and:
+/// - If the plan contains a `FieldExtraction::WithDefault` with `Some(var_info)`, attempts to decode the bytes using `<FieldType as VarData>::from_bytes`. On successful decode the decoded value is used; on decode error a one-time `tracing::warn!` is emitted and `<FieldType as Default>::default()` is used.
+/// - If `var_info` is `None` or the plan entry is missing/other variant, uses `<FieldType as Default>::default()`.
+///
+/// # Parameters
+///
+/// - `index`: zero-based position of the field's extraction plan entry within `validation.extraction_plan`.
+/// - `field_ident`: identifier of the struct field to assign.
+/// - `field_type`: Rust type of the field (used both for decoding and to obtain `Default`).
+/// - `field_name`: telemetry variable name used for diagnostic messages in warnings.
+///
+/// # Examples
+///
+/// ```
+/// use proc_macro2::Span;
+/// use syn::Ident;
+/// // Construct a token stream for a field named `speed: i32` mapped to telemetry variable "Speed"
+/// let ts = generate_type_default_assignment(
+///     0,
+///     &Ident::new("speed", Span::call_site()),
+///     &syn::parse_str::<syn::Type>("i32").unwrap(),
+///     "Speed",
+/// );
+/// // `ts` can be interpolated into an impl body generated by the derive macro.
+/// ```
 fn generate_type_default_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -977,7 +1228,44 @@ fn generate_type_default_assignment(
     }
 }
 
-/// Generate field assignment for WithDefault strategy
+/// Generates the TokenStream for a struct field initializer that implements the "WithDefault"
+/// extraction strategy.
+///
+/// The generated code will:
+/// - Look up the field's extraction plan entry at `index`.
+/// - If a `var_info` is present, attempt to decode the bytes into `field_type` via
+///   `<field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info)`.
+/// - On successful decode, return the decoded value.
+/// - On decode error, emit a one-time `tracing::warn!` annotated with `field_name` and the
+///   observed telemetry type, then evaluate and return `default_expr`.
+/// - If `var_info` is absent or the plan entry is missing/unexpected, evaluate and return
+///   `default_expr`.
+///
+/// Parameters:
+/// - `index`: index of this field's extraction plan entry in `validation.extraction_plan`.
+/// - `field_ident`: identifier of the struct field to initialize.
+/// - `field_type`: Rust type of the field; used both in the generated type casts and in the
+///   emitted warning message.
+/// - `default_expr`: expression to evaluate when the telemetry value is missing or decoding
+///   fails; inserted verbatim into the generated code.
+/// - `field_name`: telemetry variable name used in warning metadata.
+///
+/// # Examples
+///
+/// ```no_run
+/// use syn::{Expr, Ident, Type};
+/// use proc_macro2::TokenStream;
+///
+/// // Example usage (construction of syn values omitted for brevity)
+/// let idx = 0usize;
+/// let ident: Ident = syn::parse_str("speed").unwrap();
+/// let ty: Type = syn::parse_str("f32").unwrap();
+/// let default_expr: Expr = syn::parse_str("0.0f32").unwrap();
+/// let field_name = "Speed";
+///
+/// let ts: TokenStream = generate_with_default_assignment(idx, &ident, &ty, &default_expr, field_name);
+/// // `ts` now contains the tokens for the field initializer implementing the WithDefault strategy.
+/// ```
 fn generate_with_default_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1019,7 +1307,43 @@ fn generate_with_default_assignment(
     }
 }
 
-/// Generate field assignment for Optional strategy
+/// Generates the struct-field initializer TokenStream for a field whose strategy is `Optional`.
+///
+/// The produced code reads the adapter's extraction plan at `index`, expects a
+/// `FieldExtraction::Optional { var_info, .. }` entry, and:
+/// - if `var_info` is `Some`, decodes bytes with `<inner_type as VarData>::from_bytes(&data, var_info)` and returns `Some(value)` on success;
+/// - on decode error, emits a one-time `tracing::warn!` (including the field name, expected Rust type, actual telemetry type, and the error) and yields `None`;
+/// - if `var_info` is `None` or the plan entry is missing/unexpected, yields `None`.
+///
+/// # Parameters
+///
+/// - `index`: zero-based index of this field in the adapter's extraction plan.
+/// - `field_ident`: identifier of the struct field being generated.
+/// - `inner_type`: the Rust type `T` inside the `Option<T>` target.
+/// - `field_name`: telemetry variable name used in diagnostics.
+///
+/// # Returns
+///
+/// A `proc_macro2::TokenStream` containing the expression that initializes the struct field to an `Option<inner_type>` according to the behavior above.
+///
+/// # Examples
+///
+/// ```
+/// # use syn::{Ident, Type};
+/// # use proc_macro2::TokenStream;
+/// // Construct inputs for a hypothetical field `speed: Option<f32>` mapped to telemetry "Speed"
+/// let index = 0usize;
+/// let field_ident: Ident = syn::parse_str("speed").unwrap();
+/// let inner_type: Type = syn::parse_str("f32").unwrap();
+/// let field_name = "Speed";
+///
+/// // Call the generator (assumes visibility in the same crate)
+/// let tokens: TokenStream = crate::generate_optional_assignment(index, &field_ident, &inner_type, field_name);
+///
+/// // Generated tokens should reference the field identifier
+/// let tokens_str = tokens.to_string();
+/// assert!(tokens_str.contains("speed"));
+/// ```
 fn generate_optional_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1059,7 +1383,41 @@ fn generate_optional_assignment(
     }
 }
 
-/// Generate field assignment for Critical strategy
+/// Generate the struct field assignment tokens for a field classified as "Critical".
+///
+/// This produces code that reads the extraction plan at `index`, expects a
+/// `FieldExtraction::Required { name, var_info }` entry, decodes the variable
+/// with `<T as VarData>::from_bytes(&data, var_info)`, returns the decoded
+/// value on success and panics on decode errors or if the plan entry is missing
+/// or of an unexpected variant.
+///
+/// # Panics
+///
+/// Panics if the extraction plan entry at `index` is missing, is not
+/// `FieldExtraction::Required`, or if decoding the variable fails.
+///
+/// # Returns
+///
+/// A `proc_macro2::TokenStream` containing the generated assignment expression
+/// for the given field.
+///
+/// # Examples
+///
+/// ```
+/// // Generated snippet (conceptual):
+/// // my_field: {
+/// //     match validation.extraction_plan.get(3) {
+/// //         Some(::iracing_sdk::adapters::FieldExtraction::Required { name, var_info }) => {
+/// //             match <MyType as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+/// //                 Ok(value) => value,
+/// //                 Err(err) => panic!("Failed to decode critical field '{}' during adapt: {err:?}", name),
+/// //             }
+/// //         }
+/// //         Some(other) => panic!("Validation plan entry for 'MyField' is {:?}, expected Required", other),
+/// //         None => panic!("Validation plan missing required field 'MyField'"),
+/// //     }
+/// // }
+/// ```
 fn generate_critical_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1084,7 +1442,39 @@ fn generate_critical_assignment(
     }
 }
 
-/// Generate field assignment for BitfieldHas strategy
+/// Generate the struct-field assignment tokens for a `BitfieldHas` extraction strategy.
+///
+/// This produces the TokenStream used to initialize a single struct field when the field is
+/// extracted from a `::iracing_sdk::BitField` mask. For `target_is_option == true` the
+/// generated code returns `Option<bool>` (using `None` on missing/mis-parse); otherwise it
+/// returns `bool` and uses `default_expr` or `false` as the fallback when the bitfield is
+/// absent or fails to decode.
+///
+/// # Examples
+///
+/// ```
+/// use syn::parse_str;
+/// use quote::ToTokens;
+///
+/// // Prepare inputs
+/// let ident = parse_str::<syn::Ident>("flag_field").unwrap();
+/// let mask_expr = parse_str::<syn::Expr>("0x04u32").unwrap();
+/// let default_expr = Some(parse_str::<syn::Expr>("true").unwrap());
+///
+/// // Generate tokens for a non-option bool field with explicit fallback
+/// let ts = iracing_sdk_derive::generate_bitfield_has_assignment(
+///     0,
+///     &ident,
+///     "FLAG_NAME",
+///     false,
+///     &default_expr,
+///     &mask_expr,
+/// );
+///
+/// let s = ts.to_string();
+/// // Generated code should attempt to call `has_flag` on the decoded BitField
+/// assert!(s.contains("has_flag"));
+/// ```
 fn generate_bitfield_has_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1166,7 +1556,32 @@ fn generate_bitfield_has_assignment(
     }
 }
 
-/// Generate field assignment for BitfieldMap strategy
+/// Generate the struct-field assignment tokens for a `BitfieldMap` extraction strategy.
+///
+/// The produced code reads the corresponding `validation.extraction_plan` entry at `index`,
+/// decodes a `::iracing_sdk::BitField` from `data` when present, applies `decoder_expr` to the
+/// decoded `BitField`, and returns either the decoded/mapped value, an explicit `default_expr` or
+/// `Default::default()` fallback, or `None` for `Option` targets. For critical (`Required`)
+/// plan entries a decode error will panic; for non-critical entries a one-time `tracing::warn!`
+/// is emitted on decode failures and the fallback is used.
+///
+/// # Examples
+///
+/// ```no_run
+/// use syn::{Ident, Expr};
+/// // Construct a simple decoder expression and an ident for demonstration purposes.
+/// let ident = Ident::new("mapped_field", proc_macro2::Span::call_site());
+/// let decoder: Expr = syn::parse_str("|bits: ::iracing_sdk::BitField| bits.some_map()").unwrap();
+/// let tokens = iracing_sdk_derive::generate_bitfield_map_assignment(
+///     0,
+///     &ident,
+///     "SomeBitfield",
+///     false,
+///     &None,
+///     &decoder,
+/// );
+/// // `tokens` contains the generated assignment for use in the derived `adapt` implementation.
+/// ```
 fn generate_bitfield_map_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1248,7 +1663,38 @@ fn generate_bitfield_map_assignment(
     }
 }
 
-/// Generate extraction phase code
+/// Generates the runtime field-assignment token streams used by the generated `adapt` method.
+///
+/// Produces one token stream per struct field (in the same order as `strategies`) containing
+/// the initializer for that field. Each assignment is built from the corresponding
+/// `FieldStrategy`; `Calculated` strategies are rewritten using `telemetry_map`. Returns a
+/// `syn::Error` if rewriting any calculated expression fails.
+///
+/// # Parameters
+///
+/// - `strategies`: ordered per-field extraction strategies describing how each struct field
+///   should be populated at runtime.
+/// - `telemetry_map`: mapping from telemetry variable name to `(field_index, field_type)` used
+///   when rewriting calculated expressions.
+///
+/// # Returns
+///
+/// `Ok(Vec<proc_macro2::TokenStream>)` with one token stream per field initializer in struct order,
+/// or `Err(syn::Error)` if generation fails (for example, while processing a calculated expression).
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::HashMap;
+/// # use syn::Type;
+/// # use proc_macro2::TokenStream;
+/// # fn _example() -> Result<(), syn::Error> {
+/// let strategies: Vec<crate::FieldStrategy> = Vec::new();
+/// let telemetry_map: HashMap<String, (usize, Type)> = HashMap::new();
+/// let assignments = crate::generate_extraction_phase(&strategies, &telemetry_map)?;
+/// assert!(assignments.is_empty());
+/// # Ok(()) }
+/// ```
 fn generate_extraction_phase(
     strategies: &[FieldStrategy],
     telemetry_map: &HashMap<String, (usize, syn::Type)>,

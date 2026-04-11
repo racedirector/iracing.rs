@@ -296,18 +296,61 @@ impl From<BitField> for IncidentFlags {
 }
 
 impl From<IncidentFlags> for BitField {
+    /// Converts an `IncidentFlags` value into a `BitField`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let flags = IncidentFlags::from_bits_retain(0x_00_04_03); // arbitrary raw bits
+    /// let bf = BitField::from(flags);
+    /// assert_eq!(bf.value(), flags.bits());
+    /// ```
     fn from(value: IncidentFlags) -> Self {
         BitField::new(value.bits())
     }
 }
 
 impl Default for IncidentFlags {
+    /// Create an empty bitflags value with no bits set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let flags = Default::default();
+    /// assert_eq!(flags.bits(), 0);
+    /// ```
     fn default() -> Self {
         Self::from_bits_retain(0)
     }
 }
 
 impl VarData for IncidentFlags {
+    /// Decode this bitflag type from a byte slice using the provided VariableInfo.
+    ///
+    /// Validates that `info.data_type` is `VariableType::BitField`; if not, returns a
+    /// `TypeConversion` error. On success, decodes a `BitField` from `data` and converts it into `Self`,
+    /// propagating any decoding errors from `BitField::from_bytes`.
+    ///
+    /// # Returns
+    ///
+    /// `Self` decoded from the provided bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::types::{VariableInfo, VariableType, SessionFlags};
+    ///
+    /// let mut frame = [0u8; 8];
+    /// frame[..4].copy_from_slice(&SessionFlags::GREEN.bits().to_le_bytes());
+    ///
+    /// let info = VariableInfo {
+    ///     data_type: VariableType::BitField,
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let val = SessionFlags::from_bytes(&frame, &info).unwrap();
+    /// assert!(val.contains(SessionFlags::GREEN));
+    /// ```
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         if info.data_type != VariableType::BitField {
             return Err(crate::IRacingSDKError::TypeConversion {

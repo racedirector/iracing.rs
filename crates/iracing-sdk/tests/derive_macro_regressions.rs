@@ -6,6 +6,17 @@ use iracing_sdk::{
 };
 use iracing_sdk_derive::IRacingTelemetryFrame;
 
+/// Creates a `VariableInfo` for a single scalar telemetry variable.
+///
+/// # Examples
+///
+/// ```
+/// let info = make_variable_info("Speed", VariableType::Float32, 0);
+/// assert_eq!(info.name, "Speed");
+/// assert_eq!(info.data_type, VariableType::Float32);
+/// assert_eq!(info.offset, 0);
+/// assert_eq!(info.count, 1);
+/// ```
 fn make_variable_info(name: &str, data_type: VariableType, offset: usize) -> VariableInfo {
     VariableInfo {
         name: name.to_string(),
@@ -18,6 +29,19 @@ fn make_variable_info(name: &str, data_type: VariableType, offset: usize) -> Var
     }
 }
 
+/// Builds a VariableSchema from a list of `(name, VariableType, offset)` entries.
+///
+/// The provided entries are converted into `VariableInfo` records and assembled into a
+/// `VariableSchema` with the given `frame_size`. This function will panic if the
+/// constructed schema is invalid.
+///
+/// # Examples
+///
+/// ```
+/// let entries = &[("Speed", VariableType::Float32, 0usize)];
+/// let schema = make_schema(entries, 4);
+/// let _ = schema; // use schema for validation/adaptation in tests
+/// ```
 fn make_schema(entries: &[(&str, VariableType, usize)], frame_size: usize) -> VariableSchema {
     let variables = entries
         .iter()
@@ -32,14 +56,52 @@ fn make_schema(entries: &[(&str, VariableType, usize)], frame_size: usize) -> Va
     VariableSchema::new(variables, frame_size).expect("schema should be valid")
 }
 
+/// Constructs a FramePacket from raw frame bytes and an associated VariableSchema.
+///
+/// # Examples
+///
+/// ```
+/// // `schema` should be an `Arc<VariableSchema>` obtained from schema construction/validation.
+/// // This example demonstrates the call; concrete schema construction is omitted for brevity.
+/// let schema = /* Arc<VariableSchema> */ unimplemented!();
+/// let packet = make_packet(schema, vec![0u8; 16]);
+/// // `packet` is ready for adaptation/inspection.
+/// ```
 fn make_packet(schema: Arc<VariableSchema>, data: Vec<u8>) -> FramePacket {
     FramePacket::new(data, 7, 11, schema)
 }
 
+/// Checks whether the least-significant bit (0b1) is set in the bitfield.
+///
+/// # Examples
+///
+/// ```
+/// let bits = BitField::from(0b1);
+/// assert!(decode_low_bit(bits));
+///
+/// let bits = BitField::from(0b0);
+/// assert!(!decode_low_bit(bits));
+/// ```
+///
+/// # Returns
+///
+/// `true` if the least-significant bit is set, `false` otherwise.
 fn decode_low_bit(bits: BitField) -> bool {
     bits.has_flag(0b1)
 }
 
+/// Convert speed from miles per hour to kilometers per hour.
+///
+/// # Returns
+///
+/// The equivalent speed in kilometers per hour.
+///
+/// # Examples
+///
+/// ```
+/// let kph = mph_to_kph(60.0);
+/// assert!((kph - 96.5604).abs() < 1e-6);
+/// ```
 fn mph_to_kph(speed: f32) -> f32 {
     speed * 1.609_34
 }
