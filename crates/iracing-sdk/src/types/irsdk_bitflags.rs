@@ -55,6 +55,21 @@ macro_rules! define_irsdk_bitflags {
             }
         }
 
+        impl $name {
+            /// Bitfield definitions/associated strings
+            pub const DEFINITIONS: &'static [(Self, &'static str)] = &[
+                $((Self::$flag, stringify!($flag)),)+
+            ];
+
+            /// The name of all associated strings within the bitfield.
+            pub fn names(self) -> Vec<&'static str> {
+                Self::DEFINITIONS
+                    .iter()
+                    .filter_map(|(flag, name)| self.intersects(*flag).then_some(*name))
+                    .collect()
+            }
+        }
+
         #[cfg(feature = "codegen")]
         impl $name {
             /// Named `(flag-name, raw-value)` pairs for all defined flags, used for JSON Schema generation.
@@ -125,6 +140,25 @@ define_irsdk_bitflags! {
     }
 }
 
+impl EngineWarnings {
+    /// If the engine has repairs
+    pub fn has_repairs(&self) -> bool {
+        self.intersects(
+            EngineWarnings::MANDATORY_REPAIR_NEEDED.union(EngineWarnings::OPTIONAL_REPAIR_NEEDED),
+        )
+    }
+
+    /// If the engine has required repairs
+    pub fn has_required_repairs(&self) -> bool {
+        self.contains(EngineWarnings::MANDATORY_REPAIR_NEEDED)
+    }
+
+    /// If the engine has optional repairs
+    pub fn has_optional_repairs(&self) -> bool {
+        self.contains(EngineWarnings::OPTIONAL_REPAIR_NEEDED)
+    }
+}
+
 define_irsdk_bitflags! {
     /// `enum irsdk_Flags`
     pub struct SessionFlags {
@@ -157,6 +191,57 @@ define_irsdk_bitflags! {
     }
 }
 
+impl SessionFlags {
+    /// Bitfield representing start control being shown.
+    pub const START_CONTROL_FLAGS: Self = SessionFlags::START_HIDDEN
+        .union(SessionFlags::START_READY)
+        .union(SessionFlags::START_SET)
+        .union(SessionFlags::START_GO);
+
+    /// Bitfield representing any race control flag being shown.
+    pub const RACE_CONTROL_FLAGS: Self = SessionFlags::CHECKERED
+        .union(SessionFlags::WHITE)
+        .union(SessionFlags::GREEN)
+        .union(SessionFlags::GREEN_HELD)
+        .union(SessionFlags::ONE_LAP_TO_GREEN)
+        .union(SessionFlags::YELLOW)
+        .union(SessionFlags::YELLOW_WAVING)
+        .union(SessionFlags::CAUTION)
+        .union(SessionFlags::CAUTION_WAVING)
+        .union(SessionFlags::DEBRIS)
+        .union(SessionFlags::CROSSED)
+        .union(SessionFlags::FURLED)
+        .union(SessionFlags::BLACK)
+        .union(SessionFlags::RED)
+        .union(SessionFlags::BLUE);
+
+    /// Bitfield representing any caution being shown.
+    pub const CAUTION_FLAGS: Self = SessionFlags::CAUTION.union(SessionFlags::CAUTION_WAVING);
+
+    /// Bitfield representing any yellow being shown.
+    pub const YELLOW_FLAGS: Self = SessionFlags::YELLOW.union(SessionFlags::YELLOW_WAVING);
+
+    /// Indicates start control being shown.
+    pub fn has_start_control(&self) -> bool {
+        self.intersects(Self::START_CONTROL_FLAGS)
+    }
+
+    /// Indicates whether the session is under caution.
+    pub fn has_caution(&self) -> bool {
+        self.intersects(Self::CAUTION_FLAGS)
+    }
+
+    /// Indicates whether the session is yellow.
+    pub fn has_yellow(&self) -> bool {
+        self.intersects(Self::YELLOW_FLAGS)
+    }
+
+    /// Indicates whether scoring has been invalidated.
+    pub fn has_dq_scoring_invalid(&self) -> bool {
+        self.contains(SessionFlags::DQ_SCORING_INVALID)
+    }
+}
+
 define_irsdk_bitflags! {
     /// `enum irsdk_CameraState`
     pub struct CameraState {
@@ -182,6 +267,19 @@ define_irsdk_bitflags! {
         FUEL_FILL = super::irsdk_flags::pit_sv_flags::FUEL_FILL,
         WINDSHIELD_TEAROFF = super::irsdk_flags::pit_sv_flags::WINDSHIELD_TEAROFF,
         FAST_REPAIR = super::irsdk_flags::pit_sv_flags::FAST_REPAIR,
+    }
+}
+
+impl PitServiceFlags {
+    /// Any tire service flag
+    pub const TIRE_SERVICE: Self = PitServiceFlags::LF_TIRE_CHANGE
+        .union(PitServiceFlags::RF_TIRE_CHANGE)
+        .union(PitServiceFlags::LR_TIRE_CHANGE)
+        .union(PitServiceFlags::RR_TIRE_CHANGE);
+
+    /// Whether the service request incldues any tire service.
+    pub fn has_tire_service(&self) -> bool {
+        self.intersects(Self::TIRE_SERVICE)
     }
 }
 
@@ -432,5 +530,99 @@ mod tests {
     #[test]
     fn incident_flags_default_is_empty() {
         assert_eq!(IncidentFlags::default().bits(), 0);
+    }
+
+    #[test]
+    fn bitflags_definitions_and_names_only_include_known_bits() {
+        assert_eq!(
+            PaceFlags::DEFINITIONS,
+            &[
+                (PaceFlags::END_OF_LINE, "END_OF_LINE"),
+                (PaceFlags::FREE_PASS, "FREE_PASS"),
+                (PaceFlags::WAVED_AROUND, "WAVED_AROUND"),
+            ]
+        );
+
+        assert!(PaceFlags::empty().names().is_empty());
+        assert!(PaceFlags::from_bits_retain(0x8000_0000).names().is_empty());
+
+        let flags = PaceFlags::END_OF_LINE.union(PaceFlags::WAVED_AROUND);
+        assert_eq!(flags.names(), vec!["END_OF_LINE", "WAVED_AROUND"]);
+    }
+
+    #[test]
+    fn engine_warnings_repairs_helpers() {
+        let none = EngineWarnings::empty();
+        assert!(!none.has_repairs());
+        assert!(!none.has_required_repairs());
+        assert!(!none.has_optional_repairs());
+
+        let mandatory = EngineWarnings::MANDATORY_REPAIR_NEEDED;
+        assert!(mandatory.has_repairs());
+        assert!(mandatory.has_required_repairs());
+        assert!(!mandatory.has_optional_repairs());
+
+        let optional = EngineWarnings::OPTIONAL_REPAIR_NEEDED;
+        assert!(optional.has_repairs());
+        assert!(!optional.has_required_repairs());
+        assert!(optional.has_optional_repairs());
+
+        let both = mandatory.union(optional);
+        assert!(both.has_repairs());
+        assert!(both.has_required_repairs());
+        assert!(both.has_optional_repairs());
+    }
+
+    #[test]
+    fn session_flags_helpers() {
+        assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_HIDDEN));
+        assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_READY));
+        assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_SET));
+        assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_GO));
+
+        let none = SessionFlags::empty();
+        assert!(!none.has_start_control());
+        assert!(!none.has_caution());
+        assert!(!none.has_yellow());
+        assert!(!none.has_dq_scoring_invalid());
+
+        let start = SessionFlags::START_READY;
+        assert!(start.has_start_control());
+        assert!(!start.has_caution());
+        assert!(!start.has_yellow());
+
+        let caution = SessionFlags::CAUTION;
+        assert!(!caution.has_start_control());
+        assert!(caution.has_caution());
+        assert!(!caution.has_yellow());
+
+        let yellow = SessionFlags::YELLOW_WAVING;
+        assert!(!yellow.has_start_control());
+        assert!(!yellow.has_caution());
+        assert!(yellow.has_yellow());
+
+        let dq = SessionFlags::DQ_SCORING_INVALID;
+        assert!(dq.has_dq_scoring_invalid());
+        assert!(!none.union(SessionFlags::GREEN).has_dq_scoring_invalid());
+    }
+
+    #[test]
+    fn pit_service_flags_helpers() {
+        assert!(PitServiceFlags::TIRE_SERVICE.contains(PitServiceFlags::LF_TIRE_CHANGE));
+        assert!(PitServiceFlags::TIRE_SERVICE.contains(PitServiceFlags::RF_TIRE_CHANGE));
+        assert!(PitServiceFlags::TIRE_SERVICE.contains(PitServiceFlags::LR_TIRE_CHANGE));
+        assert!(PitServiceFlags::TIRE_SERVICE.contains(PitServiceFlags::RR_TIRE_CHANGE));
+
+        let none = PitServiceFlags::empty();
+        assert!(!none.has_tire_service());
+
+        let lf = PitServiceFlags::LF_TIRE_CHANGE;
+        assert!(lf.has_tire_service());
+
+        let fuel_only = PitServiceFlags::FUEL_FILL;
+        assert!(!fuel_only.has_tire_service());
+
+        let mixed = PitServiceFlags::FUEL_FILL.union(PitServiceFlags::RR_TIRE_CHANGE);
+        assert!(mixed.has_tire_service());
     }
 }
