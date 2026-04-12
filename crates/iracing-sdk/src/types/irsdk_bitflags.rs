@@ -306,6 +306,26 @@ impl PitServiceFlags {
         self.intersects(Self::TIRE_SERVICE)
     }
 
+    /// Whether the service request includes front tire changes.
+    pub fn has_front_tire_service(&self) -> bool {
+        self.intersects(Self::LF_TIRE_CHANGE.union(Self::RF_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes rear tire changes.
+    pub fn has_rear_tire_service(&self) -> bool {
+        self.intersects(Self::LR_TIRE_CHANGE.union(Self::RR_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes left side tire changes.
+    pub fn has_left_side_tire_service(&self) -> bool {
+        self.intersects(Self::LF_TIRE_CHANGE.union(Self::LR_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes right side tire changes.
+    pub fn has_right_side_tire_service(&self) -> bool {
+        self.intersects(Self::RF_TIRE_CHANGE.union(Self::RR_TIRE_CHANGE))
+    }
+
     /// If the next stop is full service. Full service is all 4 tires, fuel, and a tearoff.
     pub fn has_full_service(&self) -> bool {
         self.intersects(
@@ -660,14 +680,54 @@ mod tests {
 
         let none = PitServiceFlags::empty();
         assert!(!none.has_tire_service());
+        assert!(!none.has_front_tire_service());
+        assert!(!none.has_rear_tire_service());
+        assert!(!none.has_left_side_tire_service());
+        assert!(!none.has_right_side_tire_service());
 
         let lf = PitServiceFlags::LF_TIRE_CHANGE;
         assert!(lf.has_tire_service());
+        assert!(lf.has_front_tire_service());
+        assert!(!lf.has_rear_tire_service());
+        assert!(lf.has_left_side_tire_service());
+        assert!(!lf.has_right_side_tire_service());
 
-        let fuel_only = PitServiceFlags::FUEL_FILL;
-        assert!(!fuel_only.has_tire_service());
+        let rf = PitServiceFlags::RF_TIRE_CHANGE;
+        assert!(rf.has_tire_service());
+        assert!(rf.has_front_tire_service());
+        assert!(!rf.has_rear_tire_service());
+        assert!(!rf.has_left_side_tire_service());
+        assert!(rf.has_right_side_tire_service());
+
+        let lr = PitServiceFlags::LR_TIRE_CHANGE;
+        assert!(lr.has_tire_service());
+        assert!(!lr.has_front_tire_service());
+        assert!(lr.has_rear_tire_service());
+        assert!(lr.has_left_side_tire_service());
+        assert!(!lr.has_right_side_tire_service());
+
+        let rr = PitServiceFlags::RR_TIRE_CHANGE;
+        assert!(rr.has_tire_service());
+        assert!(!rr.has_front_tire_service());
+        assert!(rr.has_rear_tire_service());
+        assert!(!rr.has_left_side_tire_service());
+        assert!(rr.has_right_side_tire_service());
+
+        let full_tire_service = PitServiceFlags::LF_TIRE_CHANGE
+            .union(PitServiceFlags::RF_TIRE_CHANGE)
+            .union(PitServiceFlags::LR_TIRE_CHANGE)
+            .union(PitServiceFlags::RR_TIRE_CHANGE);
+        assert!(full_tire_service.has_tire_service());
+        assert!(full_tire_service.has_front_tire_service());
+        assert!(full_tire_service.has_rear_tire_service());
+        assert!(full_tire_service.has_left_side_tire_service());
+        assert!(full_tire_service.has_right_side_tire_service());
 
         let mixed = PitServiceFlags::FUEL_FILL.union(PitServiceFlags::RR_TIRE_CHANGE);
         assert!(mixed.has_tire_service());
+        assert!(!mixed.has_front_tire_service());
+        assert!(mixed.has_rear_tire_service());
+        assert!(!mixed.has_left_side_tire_service());
+        assert!(mixed.has_right_side_tire_service());
     }
 }
