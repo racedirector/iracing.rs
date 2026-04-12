@@ -59,8 +59,10 @@ mod variable_type;
 
 // Re-export all public types
 pub use bitfield::{
-    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed,
-    session_dq_scoring_invalid, tick_after_u32,
+    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed, engine_repairs_needed,
+    pit_service_has_full_service, pit_service_has_tire_service, session_dq_scoring_invalid,
+    session_penalty_shown, session_start_control_shown, session_under_caution,
+    session_under_yellow, tick_after_u32,
 };
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
@@ -380,9 +382,11 @@ mod tests {
         let flags = BitField::new(ew::MAND_REP_NEEDED | ew::OPT_REP_NEEDED);
         assert!(engine_mandatory_repair_needed(flags));
         assert!(engine_optional_repair_needed(flags));
+        assert!(engine_repairs_needed(flags));
         let none = BitField::new(0);
         assert!(!engine_mandatory_repair_needed(none));
         assert!(!engine_optional_repair_needed(none));
+        assert!(!engine_repairs_needed(none));
     }
 
     #[test]
@@ -392,5 +396,49 @@ mod tests {
         assert!(session_dq_scoring_invalid(flags));
         let none = BitField::new(0);
         assert!(!session_dq_scoring_invalid(none));
+    }
+
+    #[test]
+    fn test_session_control_and_caution_helpers() {
+        use crate::irsdk_flags::flags as f;
+
+        let none = BitField::new(0);
+        assert!(!session_start_control_shown(none));
+        assert!(!session_under_caution(none));
+        assert!(!session_under_yellow(none));
+
+        let start = BitField::new(f::START_READY);
+        assert!(session_start_control_shown(start));
+        assert!(!session_under_caution(start));
+        assert!(!session_under_yellow(start));
+
+        let caution = BitField::new(f::CAUTION_WAVING);
+        assert!(!session_start_control_shown(caution));
+        assert!(session_under_caution(caution));
+        assert!(!session_under_yellow(caution));
+
+        let yellow = BitField::new(f::YELLOW_WAVING);
+        assert!(!session_start_control_shown(yellow));
+        assert!(!session_under_caution(yellow));
+        assert!(session_under_yellow(yellow));
+    }
+
+    #[test]
+    fn test_pit_service_helpers() {
+        use crate::irsdk_flags::pit_sv_flags as p;
+
+        let none = BitField::new(0);
+        assert!(!pit_service_has_tire_service(none));
+        assert!(!pit_service_has_full_service(none));
+
+        let tire_only = BitField::new(p::RR_TIRE_CHANGE);
+        assert!(pit_service_has_tire_service(tire_only));
+
+        let fuel_only = BitField::new(p::FUEL_FILL);
+        assert!(!pit_service_has_tire_service(fuel_only));
+
+        let mixed = BitField::new(p::LF_TIRE_CHANGE | p::FUEL_FILL | p::WINDSHIELD_TEAROFF);
+        assert!(pit_service_has_tire_service(mixed));
+        assert!(pit_service_has_full_service(mixed));
     }
 }
