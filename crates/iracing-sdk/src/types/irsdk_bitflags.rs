@@ -281,6 +281,15 @@ impl PitServiceFlags {
     pub fn has_tire_service(&self) -> bool {
         self.intersects(Self::TIRE_SERVICE)
     }
+
+    /// If the next stop is full service. Full service is all 4 tires, fuel, and a tearoff.
+    pub fn has_full_service(&self) -> bool {
+        self.intersects(
+            Self::TIRE_SERVICE
+                .union(PitServiceFlags::FUEL_FILL)
+                .union(PitServiceFlags::WINDSHIELD_TEAROFF),
+        )
+    }
 }
 
 define_irsdk_bitflags! {

@@ -191,6 +191,20 @@ define_irsdk_enum! {
     }
 }
 
+impl PitServiceStatus {
+    /// Helper that indicates if the car is out of position in the pit box.
+    pub fn is_out_of_position(self) -> bool {
+        matches!(
+            self,
+            Self::TooFarLeft
+                | Self::TooFarRight
+                | Self::TooFarForward
+                | Self::TooFarBack
+                | Self::BadAngle
+        )
+    }
+}
+
 define_irsdk_enum! {
     /// `enum irsdk_PaceMode`
     pub enum PaceMode {
@@ -213,6 +227,29 @@ define_irsdk_enum! {
         ModeratelyWet = super::irsdk_flags::track_wetness::MODERATELY_WET,
         VeryWet = super::irsdk_flags::track_wetness::VERY_WET,
         ExtremelyWet = super::irsdk_flags::track_wetness::EXTREMELY_WET,
+    }
+}
+
+impl TrackWetness {
+    /// If the track is considered dry.
+    pub fn is_dry(self) -> bool {
+        self == Self::Dry
+    }
+
+    /// If the track conditions are mixed; could be dry in some areas, wet in others.
+    pub fn is_mixed(self) -> bool {
+        matches!(
+            self,
+            Self::MostlyDry | Self::VeryLightlyWet | Self::LightlyWet
+        )
+    }
+
+    /// If the track conditions indicate it's wet. Very likely wet tires only!
+    pub fn is_wet(self) -> bool {
+        matches!(
+            self,
+            Self::ModeratelyWet | Self::VeryWet | Self::ExtremelyWet
+        )
     }
 }
 
