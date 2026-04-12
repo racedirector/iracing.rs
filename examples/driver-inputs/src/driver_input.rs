@@ -4,6 +4,10 @@ use serde::Serialize;
 
 #[derive(IRacingTelemetryFrame, Debug, Serialize)]
 pub struct DriverInput {
+    #[field_name = "Lap"]
+    #[fail_if_missing]
+    lap_number: i32,
+
     /// Input & Output.
     /// GPS vehicle speed. Unit: m/s.
     #[field_name = "Speed"]
@@ -109,6 +113,7 @@ pub struct DriverInput {
     altitude: f32,
 
     #[field_name = "PlayerTrackSurface"]
+    #[fail_if_missing]
     track_location: TrackLocation,
 
     #[field_name = "IsOnTrack"]
@@ -124,6 +129,7 @@ pub struct DriverInput {
     is_in_pit_stall: bool,
 
     #[field_name = "SessionFlags"]
+    #[fail_if_missing]
     flags: SessionFlags,
 
     #[bitfield(

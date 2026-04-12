@@ -349,12 +349,12 @@ pub fn extract_variable_schema<R: Read + Seek>(
 
         // Convert iRacing var type to our VariableType
         let data_type = match var_type {
-            0 => VariableType::Int8,    // char
-            1 => VariableType::Bool,    // bool
-            2 => VariableType::Int32,   // int
-            3 => VariableType::Int32,   // bitField (treat as int32)
-            4 => VariableType::Float32, // float
-            5 => VariableType::Float64, // double
+            0 => VariableType::Char,     // char
+            1 => VariableType::Bool,     // bool
+            2 => VariableType::Int32,    // int
+            3 => VariableType::BitField, // bitField (treat as int32)
+            4 => VariableType::Float32,  // float
+            5 => VariableType::Float64,  // double
             _ => {
                 // Log unknown types for diagnostics
                 debug!(

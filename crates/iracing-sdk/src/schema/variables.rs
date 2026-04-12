@@ -90,7 +90,6 @@ struct IRSDKVarHeader {
 /// These constants map to the irsdk_VarType enum values used in IBT files
 /// and live telemetry. They document the numeric values found in the type
 /// field of IRSDKVarHeader structs.
-#[allow(dead_code)]
 mod irsdk_var_type {
     pub const IRSDK_CHAR: i32 = 0;
     pub const IRSDK_BOOL: i32 = 1;
