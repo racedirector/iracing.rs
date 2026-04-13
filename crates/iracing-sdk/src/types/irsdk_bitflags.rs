@@ -348,7 +348,7 @@ define_irsdk_bitflags! {
 /// `enum irsdk_IncidentFlags` as a combined report+penalty container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
-pub struct IncidentFlags(u32);
+pub struct IncidentFlags(pub u32);
 
 impl IncidentFlags {
     /// Bitmask covering the report code portion of an incident flag word (low byte, `0x0000_00FF`).

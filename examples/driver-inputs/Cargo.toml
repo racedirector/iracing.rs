@@ -15,3 +15,4 @@ iracing-sdk-derive = { path = "../../crates/iracing-sdk-derive" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }

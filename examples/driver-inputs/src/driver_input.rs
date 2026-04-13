@@ -1,12 +1,15 @@
-use iracing_sdk::{SessionFlags, TrackLocation};
+use iracing_sdk::{SessionFlags, SessionState, TrackLocation};
 use iracing_sdk_derive::IRacingTelemetryFrame;
 use serde::Serialize;
 
-#[derive(IRacingTelemetryFrame, Debug, Serialize)]
+#[derive(IRacingTelemetryFrame, Debug, Clone, Copy, Serialize)]
 pub struct DriverInput {
     #[field_name = "Lap"]
     #[fail_if_missing]
-    lap_number: i32,
+    pub lap_number: i32,
+
+    #[field_name = "SessionState"]
+    pub session_state: SessionState,
 
     /// Input & Output.
     /// GPS vehicle speed. Unit: m/s.
@@ -114,7 +117,7 @@ pub struct DriverInput {
 
     #[field_name = "PlayerTrackSurface"]
     #[fail_if_missing]
-    track_location: TrackLocation,
+    pub track_location: TrackLocation,
 
     #[field_name = "IsOnTrack"]
     is_on_track: bool,
@@ -128,32 +131,52 @@ pub struct DriverInput {
     #[field_name = "PlayerCarInPitStall"]
     is_in_pit_stall: bool,
 
+    #[field_name = "PlayerIncidents"]
+    #[fail_if_missing]
+    pub player_incidents: i32,
+
     #[field_name = "SessionFlags"]
     #[fail_if_missing]
-    flags: SessionFlags,
+    pub flags: SessionFlags,
 
-    #[bitfield(
+    #[bitfield_map(
         name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::YELLOW.bits()
-          | iracing_sdk::SessionFlags::YELLOW_WAVING.bits()"
+        decoder = "iracing_sdk::types::session_start_control_shown"
     )]
-    is_yellow: bool,
+    pub has_start_control: bool,
 
-    #[bitfield(
+    #[bitfield_map(
         name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::CAUTION.bits()
-          | iracing_sdk::SessionFlags::CAUTION_WAVING.bits()"
+        decoder = "iracing_sdk::types::session_under_yellow"
     )]
-    is_caution: bool,
+    pub is_yellow: bool,
+
+    #[bitfield_map(
+        name = "SessionFlags",
+        decoder = "iracing_sdk::types::session_under_caution"
+    )]
+    pub is_caution: bool,
 
     #[bitfield(
         name = "SessionFlags",
         has = "iracing_sdk::SessionFlags::DEBRIS.bits()"
     )]
-    is_debris: bool,
+    pub is_debris: bool,
 
     #[bitfield(name = "SessionFlags", has = "iracing_sdk::SessionFlags::BLUE.bits()")]
-    is_faster_car_approaching: bool,
+    pub is_faster_car_approaching: bool,
+
+    #[bitfield_map(
+        name = "EngineWarnings",
+        decoder = "iracing_sdk::types::engine_repairs_needed"
+    )]
+    pub has_repairs: bool,
+
+    #[bitfield(
+        name = "SessionFlags",
+        has = "iracing_sdk::SessionFlags::SERVICIBLE.bits()"
+    )]
+    pub is_servicible: bool,
 
     ///
     /// Tire wear
