@@ -1,5 +1,8 @@
 # iracing.rs
 
+_Big thanks to Kevin O'Neill ([werace.au](werace.au)] and his [`pitwall`](https://werace.au/opensource/pitwall) library, available on crates.io.
+This library is heavily influenced by their initial implementation._
+
 Rust workspace for working with iRacing telemetry and simulation state:
 
 - Read `.ibt` recordings (cross-platform)
