@@ -79,8 +79,18 @@ name = "disk-position"
 path = "examples/disk_position.rs"
 
 [[example]]
+name = "disk-position-derive"
+path = "examples/disk_position_derive.rs"
+required-features = ["derive"]
+
+[[example]]
 name = "live-position"
 path = "examples/live_position.rs"
+
+[[example]]
+name = "live-position-derive"
+path = "examples/live_position_derive.rs"
+required-features = ["derive"]
 
 [[example]]
 name = "enum-bitfields-disk"
