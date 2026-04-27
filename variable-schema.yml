@@ -1,0 +1,84 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Variable info
+description: Information about a specific telemetry variable.
+type: object
+properties:
+  count:
+    title: Count
+    description: Number of elements (1 for scalar, >1 for arrays)
+    type: integer
+    format: uint
+    minimum: 0
+  count_as_time:
+    title: Count as time
+    description: Whether the simulator treats the sample count as elapsed time
+    type: boolean
+  data_type:
+    title: Data type
+    description: Data type of the variable
+    $ref: '#/$defs/VariableType'
+  description:
+    title: Description
+    description: Human-readable description
+    type: string
+  name:
+    title: Name
+    description: Variable name as defined by iRacing
+    type: string
+  offset:
+    title: Byte offset
+    description: Byte offset within the telemetry frame
+    type: integer
+    format: uint
+    minimum: 0
+  units:
+    title: Unites
+    description: Units of measurement (e.g., "m/s", "C", "N*m")
+    type: string
+required:
+- name
+- data_type
+- offset
+- count
+- count_as_time
+- units
+- description
+$defs:
+  VariableType:
+    description: |-
+      Supported telemetry data types.
+      Maps to iRacing SDK's irsdk_VarType enum.
+    oneOf:
+    - description: 8-bit character (maps to irsdk_char)
+      type: string
+      const: Char
+    - description: 8-bit signed integer
+      type: string
+      const: Int8
+    - description: 8-bit unsigned integer
+      type: string
+      const: UInt8
+    - description: 16-bit signed integer
+      type: string
+      const: Int16
+    - description: 16-bit unsigned integer
+      type: string
+      const: UInt16
+    - description: 32-bit signed integer (maps to irsdk_int)
+      type: string
+      const: Int32
+    - description: 32-bit unsigned integer
+      type: string
+      const: UInt32
+    - description: 32-bit floating point (maps to irsdk_float)
+      type: string
+      const: Float32
+    - description: 64-bit floating point (maps to irsdk_double)
+      type: string
+      const: Float64
+    - description: Boolean value (maps to irsdk_bool)
+      type: string
+      const: Bool
+    - description: 32-bit bitfield (maps to irsdk_bitField)
+      type: string
+      const: BitField

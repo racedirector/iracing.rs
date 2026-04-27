@@ -50,7 +50,6 @@ use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{IbtReader, VariableInfo, VariableType};
 use std::path::PathBuf;
-use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk session parser.
@@ -87,10 +86,10 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader.
     // ------------------------------------------------------------
-    info!(path = %ibt_path.display(), "Opening IBT file");
+    tracing::info!(path = %ibt_path.display(), "Opening IBT file");
     let mut reader = IbtReader::open(&ibt_path).context("Failed to open IBT file")?;
 
-    info!(path = %output_path.display(), "Creating CSV output");
+    tracing::info!(path = %output_path.display(), "Creating CSV output");
     let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
 
     // Clone and sort variables for deterministic column ordering.
@@ -105,7 +104,7 @@ fn main() -> Result<()> {
     let expected_column_count = headers.len();
     writer.write_record(&headers)?;
 
-    info!(
+    tracing::info!(
         variable_count = variables.len(),
         column_count = expected_column_count,
         "Starting CSV export"
@@ -144,12 +143,12 @@ fn main() -> Result<()> {
         frame_count += 1;
 
         if frame_count.is_multiple_of(10_000) {
-            debug!(frames_exported = frame_count, "CSV export progress");
+            tracing::debug!(frames_exported = frame_count, "CSV export progress");
         }
     }
 
     writer.flush()?;
-    info!(frames_exported = frame_count, "Finished CSV export");
+    tracing::info!(frames_exported = frame_count, "Finished CSV export");
 
     Ok(())
 }

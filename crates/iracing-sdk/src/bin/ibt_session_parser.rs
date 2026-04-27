@@ -62,7 +62,6 @@ use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::IbtReader;
 use std::{fs, path::PathBuf};
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk session parser.
@@ -104,16 +103,16 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Write session string to output path.
     // ------------------------------------------------------------
-    info!("Parsing session information");
+    tracing::info!("Parsing session information");
     if let Some(session) = reader.session_yaml()? {
         if let Some(output_path) = output_path {
             fs::write(output_path, session)?;
         } else {
-            info!("\n{}", session);
+            tracing::info!("\n{}", session);
         }
     }
 
-    info!("Finished parsing session information.");
+    tracing::info!("Finished parsing session information.");
 
     Ok(())
 }

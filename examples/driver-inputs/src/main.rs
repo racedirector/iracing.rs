@@ -3,7 +3,7 @@ mod driver_input;
 use clap::Parser;
 use csv::Writer;
 use driver_input::DriverInput;
-use iracing_sdk::{FrameAdapter, IbtProvider, IncidentFlags, Provider, SessionFlags};
+use iracing_sdk::{FrameAdapter, IbtProvider, Provider, SessionFlags};
 use std::{fs::File, path::PathBuf};
 use tracing::info;
 use tracing_subscriber::EnvFilter;

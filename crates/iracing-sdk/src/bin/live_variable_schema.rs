@@ -15,18 +15,6 @@
 //! ```
 
 use anyhow::{Result, anyhow};
-#[cfg(windows)]
-use clap::{ArgAction, Parser};
-#[cfg(windows)]
-use iracing_sdk::{VariableSchema, WindowsConnection};
-#[cfg(windows)]
-use iracing_sdk_codegen::primitive_annotations::annotate_variable_schema;
-#[cfg(windows)]
-use schemars::schema_for_value;
-#[cfg(windows)]
-use std::{fs::File, io::BufWriter, path::PathBuf};
-#[cfg(windows)]
-use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live telemetry schema generator.
@@ -41,10 +29,6 @@ struct Args {
     /// Allow schema generation even if iRacing is disconnected (may be stale).
     #[arg(long, action = ArgAction::SetTrue)]
     allow_stale: bool,
-
-    /// Annotate `irsdk_*` units with primitive enum/bitflag refs and inject used defs.
-    #[arg(long, action = ArgAction::SetTrue)]
-    annotate: bool,
 }
 
 pub fn main() -> Result<()> {
@@ -61,13 +45,16 @@ pub fn main() -> Result<()> {
 /// Connects to iRacing shared memory, generates the telemetry variable schema, and writes it to disk.
 #[cfg(windows)]
 fn run() -> Result<()> {
+    use clap::{ArgAction, Parser};
+    use iracing_sdk::{VariableSchema, WindowsConnection};
+    use std::{fs::File, io::BufWriter, path::PathBuf};
+
     // ------------------------------------------------------------
     // Parse CLI arguments
     // ------------------------------------------------------------
     let Args {
         output_path,
         allow_stale,
-        annotate,
     } = Args::parse();
 
     // ------------------------------------------------------------
@@ -90,27 +77,14 @@ fn run() -> Result<()> {
 
     let frame_size = connection.header().buf_len as usize;
     let variable_schema = VariableSchema::new(variable_map, frame_size)?;
-    let mut schema = schema_for_value!(variable_schema);
-
-    if annotate {
-        let report = annotate_variable_schema(&mut schema)?;
-        info!(
-            annotated_variables = report.annotated_variables,
-            injected_defs = report.injected_defs,
-            "Annotated telemetry schema with primitive references"
-        );
-
-        for unit in report.unknown_units {
-            warn!(unit = %unit, "Unknown irsdk_* units token; skipping annotation");
-        }
-    }
+    let mut schema = schemars::schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
 
     serde_yaml_ng::to_writer(writer, &schema)?;
 
-    info!(path=%output_path.display(),"Wrote live telemetry schema");
+    tracing::info!(path=%output_path.display(),"Wrote live telemetry schema");
 
     Ok(())
 }

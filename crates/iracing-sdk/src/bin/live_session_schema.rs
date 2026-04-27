@@ -19,15 +19,7 @@
 
 use anyhow::{Result, anyhow};
 use clap::{ArgAction, Parser};
-#[cfg(windows)]
-use iracing_sdk::{SessionInfoParser, WindowsConnection};
-#[cfg(windows)]
-use iracing_sdk_codegen::schema_diff::{diff_schemas, summarize_diff};
 use std::path::PathBuf;
-#[cfg(windows)]
-use std::{fs::File, io::BufWriter};
-#[cfg(windows)]
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live session schema generator.
@@ -41,18 +33,6 @@ struct Args {
     /// Allow schema generation even if iRacing is disconnected (may be stale).
     #[arg(long, action = ArgAction::SetTrue)]
     allow_stale: bool,
-
-    /// Merge discovered session fields into the emitted schema.
-    #[arg(long, action = ArgAction::SetTrue)]
-    discover: bool,
-
-    /// Compare generated schema against this baseline schema YAML file.
-    #[arg(long)]
-    diff: Option<PathBuf>,
-
-    /// Optional path to write a detailed schema diff report YAML.
-    #[arg(long)]
-    diff_output_path: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -65,21 +45,19 @@ fn main() -> Result<()> {
 /// Connects to iRacing shared memory, generates the session schema, and writes it to disk.
 #[cfg(windows)]
 fn run() -> Result<()> {
-    use schemars::schema_for_value;
+    use iracing_sdk::{SessionInfoParser, WindowsConnection};
+    use std::{fs::File, io::BufWriter};
 
     let Args {
         output_path,
         allow_stale,
-        discover: _,
-        diff,
-        diff_output_path,
     } = Args::parse();
 
     if diff.is_none() && diff_output_path.is_some() {
         return Err(anyhow!("--diff-output-path requires --diff"));
     }
 
-    info!("Opening iRacing connection");
+    tracing::info!("Opening iRacing connection");
     let connection = WindowsConnection::try_connect()?;
 
     if !connection.is_connected() && !allow_stale {
@@ -94,27 +72,13 @@ fn run() -> Result<()> {
 
     let parser = SessionInfoParser::new();
     let session = parser.parse(raw_session_yaml)?;
-    let schema = schema_for_value!(session);
+    let schema = schemars::schema_for_value!(session);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
     serde_yaml_ng::to_writer(writer, &schema)?;
 
-    info!(path = %output_path.display(), "Wrote live session schema");
-
-    if let Some(diff_path) = diff {
-        let file = File::open(diff_path)?;
-        let baseline = serde_yaml_ng::from_reader(file)?;
-        let report = diff_schemas(&schema, &baseline);
-        info!("{}", summarize_diff(&report));
-
-        if let Some(report_path) = diff_output_path {
-            let file = File::create(&report_path)?;
-            let writer = BufWriter::new(file);
-            serde_yaml_ng::to_writer(writer, &report)?;
-            info!(path = %report_path.display(), "Wrote session schema diff report");
-        }
-    }
+    tracing::info!(path = %output_path.display(), "Wrote live session schema");
 
     Ok(())
 }

@@ -18,10 +18,6 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use iracing_sdk::{IbtReader, SessionInfo};
-#[cfg(windows)]
-use iracing_sdk::{SessionInfoParser, WindowsConnection};
-use schemars::schema_for_value;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the car setup schema generator.
@@ -46,7 +42,8 @@ struct Args {
 
 /// Opens an `.ibt` file and parses session info from the embedded YAML.
 fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
-    info!(path = %ibt_path.display(), "Opening IBT file");
+    tracing::info!(path = %ibt_path.display(), "Opening IBT file");
+
     let reader = IbtReader::open(&ibt_path)?;
 
     let session_yaml = reader
@@ -59,7 +56,10 @@ fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
 /// Connects to live iRacing shared memory and parses the current session info.
 #[cfg(windows)]
 fn parse_live_session() -> Result<SessionInfo> {
-    info!("Opening iRacing connection");
+    use iracing_sdk::{SessionInfoParser, WindowsConnection};
+
+    tracing::info!("Opening iRacing connection");
+
     let connection = WindowsConnection::try_connect()?;
 
     if !connection.is_connected() {
@@ -116,36 +116,44 @@ fn output_file_name(session_info: &SessionInfo) -> Result<String> {
 }
 
 /// Resolves the final output path, preferring an explicit `--output-path` when provided.
-fn resolve_output_path(args: &Args, session_info: &SessionInfo) -> Result<PathBuf> {
-    if let Some(path) = args.output_path.as_ref() {
+fn resolve_output_path(
+    session_info: &SessionInfo,
+    output_dir: PathBuf,
+    output_path: Option<PathBuf>,
+) -> Result<PathBuf> {
+    if let Some(path) = output_path {
         // If they passed a relative path, interpret it under output_dir.
         // If absolute, use as-is.
         return Ok(if path.is_absolute() {
             path.clone()
         } else {
-            args.output_dir.join(path)
+            output_dir.join(path)
         });
     }
 
-    let file_name = output_file_name(session_info)?; // String
-    Ok(args.output_dir.join(file_name))
+    let file_name = output_file_name(session_info)?;
+    Ok(output_dir.join(file_name))
 }
 
 fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    let args = Args::parse();
+    let Args {
+        ibt_path,
+        output_dir,
+        output_path,
+    } = Args::parse();
 
-    let session_info = if let Some(path) = args.ibt_path.clone() {
+    let session_info = if let Some(path) = ibt_path {
         parse_disk_session(path)?
     } else {
         parse_live_session()?
     };
 
-    let schema = schema_for_value!(session_info.car_setup);
+    let schema = schemars::schema_for_value!(session_info.car_setup);
 
-    let output_path = resolve_output_path(&args, &session_info)?;
+    let output_path = resolve_output_path(&session_info, output_dir, output_path)?;
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
