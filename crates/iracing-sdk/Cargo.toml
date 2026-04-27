@@ -145,6 +145,11 @@ path = "src/bin/live_variable_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
+name = "primitives-schema"
+path = "src/bin/primitives_schema.rs"
+required-features = ["codegen"]
+
+[[bin]]
 name = "ibt-to-csv"
 path = "src/bin/ibt_to_csv.rs"
 

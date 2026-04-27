@@ -17,7 +17,6 @@ use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::IbtReader;
 use std::{fs::File, io::BufWriter, path::PathBuf};
-use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk telemetry schema generator.
 ///
@@ -39,7 +38,8 @@ pub fn main() -> Result<()> {
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
     // ------------------------------------------------------------
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // ------------------------------------------------------------

@@ -47,12 +47,14 @@ ibt-session-parser = [
 
 ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
 
-iracing-primitives-schema = [
+primitives-schema = [
   "run",
   "-p",
-  "iracing-sdk-codegen",
+  "iracing-sdk",
+  "--features",
+  "codegen",
   "--bin",
-  "iracing-primitives-schema",
+  "primitives-schema",
   "--",
 ]
 
