@@ -21,23 +21,16 @@ Rust workspace for working with iRacing telemetry and simulation state:
 
 ## Generated schema artifacts
 
-This repo checks in a few schema snapshots at the workspace root:
+Schema snapshots are checked in under [`docs/reference`](docs/reference). Do not hand edit them.
 
-- [`session-schema.yml`](session-schema.yml) — baseline schema for `iracing_sdk::SessionInfo`
-- [`iracing-primitives-schema.yml`](iracing-primitives-schema.yml) — `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags)
-- [`live-session-schema.yml`](live-session-schema.yml) — schema generated from live session YAML (Windows-only)
-- [`live-variable-schema.yml`](live-variable-schema.yml) — schema generated from live telemetry variables (Windows-only)
-
-Regenerate them (from the workspace root):
-
-```bash
-cargo session-schema -- --output-path ./session-schema.yml
-cargo iracing-primitives-schema -- --output-path ./iracing-primitives-schema.yml
-
-# Windows-only
-cargo live-session-schema -- --output-path ./live-session-schema.yml
-cargo live-variable-schema -- --output-path ./live-variable-schema.yml
-```
+| Artifact | Purpose | Regenerate from workspace root |
+| --- | --- | --- |
+| [`docs/reference/session-schema.yml`](docs/reference/session-schema.yml) | Baseline schema for `iracing_sdk::SessionInfo`. | `cargo session-schema -- --output-path ./docs/reference/session-schema.yml` |
+| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo variable-schema -- --output-path ./docs/reference/variable-schema.yml` |
+| [`docs/reference/primitives-schema.yml`](docs/reference/primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo primitives-schema -- --output-path ./docs/reference/primitives-schema.yml` |
+| [`docs/reference/disk-variable-schema.yml`](docs/reference/disk-variable-schema.yml) | Telemetry variable schema derived from `.ibt` headers. | `cargo disk-variable-schema -- --ibt-path <PATH_TO_FILE.ibt> --output-path ./docs/reference/disk-variable-schema.yml` |
+| [`docs/reference/live-session-schema.yml`](docs/reference/live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo live-session-schema -- --output-path ./docs/reference/live-session-schema.yml` |
+| [`docs/reference/live-variable-schema.yml`](docs/reference/live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | `cargo live-variable-schema -- --output-path ./docs/reference/live-variable-schema.yml` |
 
 ## Getting Started
 
@@ -69,9 +62,12 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo ibt-session-parser` | `cargo run -p iracing-sdk --bin ibt-session-parser --` | Extract session YAML from `.ibt`. |
 | `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
-| `cargo session-schema` | `cargo run -p iracing-sdk-codegen --bin session-schema --` | Emit baseline session schema. |
-| `cargo disk-variable-schema` | `cargo run -p iracing-sdk-codegen --bin disk-variable-schema --` | Generate telemetry schema from `.ibt` headers. |
-| `cargo live-session-schema` | `cargo run -p iracing-sdk-codegen --bin live-session-schema --` | Collect live session schema (Windows). |
+| `cargo session-schema` | `cargo run -p iracing-sdk --features codegen --bin session-schema --` | Emit baseline session schema. |
+| `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen --bin variable-schema --` | Emit baseline variable schema. |
+| `cargo primitives-schema` | `cargo run -p iracing-sdk --features codegen --bin primitives-schema --` | Emit the `irsdk_*` primitive schema catalog. |
+| `cargo disk-variable-schema` | `cargo run -p iracing-sdk --features codegen --bin disk-variable-schema --` | Generate telemetry schema from `.ibt` headers. |
+| `cargo live-session-schema` | `cargo run -p iracing-sdk --bin live-session-schema --` | Collect live session schema (Windows). |
+| `cargo live-variable-schema` | `cargo run -p iracing-sdk --features codegen --bin live-variable-schema --` | Collect live telemetry variable schema (Windows). |
 
 ## Development Notes
 
