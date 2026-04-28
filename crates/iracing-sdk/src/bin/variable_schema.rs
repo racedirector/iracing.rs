@@ -1,27 +1,25 @@
-//! Static session schema generator.
+//! Static variable schema generator.
 //!
-//! Generates the baseline JSON Schema for `iracing_sdk::SessionInfo` using the
+//! Generates the baseline JSON Schema for `iracing_sdk::VariableInfo` using the
 //! compile-time Rust type definition (not live/discovered runtime data).
 //!
 //! This is useful as a stable reference schema that can be compared against
-//! runtime-derived session schemas from:
-//! - `disk_session_schema`
-//! - `live_session_schema`
+//! runtime-derived variable schemas from:
+//! - `disk-variable-schema`
+//! - `live-variable-schema`
 //!
 //! # Output format
 //! The schema is serialized as YAML.
 //!
 //! # Usage
 //! ```text
-//! session_schema --output-path <PATH>
+//! variable-schema --output-path <PATH>
 //! ```
 
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
-use schemars::schema_for;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the disk session parser.
@@ -31,7 +29,7 @@ use tracing_subscriber::EnvFilter;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path where the generated schema YAML should be written.
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "variable-schema.yml")]
     output_path: PathBuf,
 }
 
@@ -48,13 +46,13 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     let Args { output_path } = Args::parse();
 
-    let schema = schema_for!(iracing_sdk::SessionInfo);
+    let schema = schemars::schema_for!(iracing_sdk::VariableInfo);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);
     serde_yaml_ng::to_writer(writer, &schema)?;
 
-    info!(path=%output_path.display(),"Wrote static session schema");
+    tracing::info!(path=%output_path.display(),"Wrote static variable schema");
 
     Ok(())
 }

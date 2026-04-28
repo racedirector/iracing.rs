@@ -1,4 +1,4 @@
-use iracing_sdk::{SessionFlags, SessionState, TrackLocation};
+use iracing_sdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
 use iracing_sdk_derive::IRacingTelemetryFrame;
 use serde::Serialize;
 
@@ -133,7 +133,8 @@ pub struct DriverInput {
 
     #[field_name = "PlayerIncidents"]
     #[fail_if_missing]
-    pub player_incidents: i32,
+    // #[calculated = "iracing_sdk::types::IncidentFlags::from_bits_retain"]
+    pub player_incidents: IncidentFlags,
 
     #[field_name = "SessionFlags"]
     #[fail_if_missing]
@@ -183,37 +184,29 @@ pub struct DriverInput {
     ///
     #[field_name = "LFwearL"]
     left_front_wear_outside: f32,
-
     #[field_name = "LFwearM"]
     left_front_wear_middle: f32,
-
     #[field_name = "LFwearR"]
     left_front_wear_inside: f32,
 
     #[field_name = "RFwearL"]
     right_front_wear_outside: f32,
-
     #[field_name = "RFwearM"]
     right_front_wear_middle: f32,
-
     #[field_name = "RFwearR"]
     right_front_wear_inside: f32,
 
     #[field_name = "LRwearL"]
     left_rear_wear_outside: f32,
-
     #[field_name = "LRwearM"]
     left_rear_wear_middle: f32,
-
     #[field_name = "LRwearR"]
     left_rear_wear_inside: f32,
 
     #[field_name = "RRwearL"]
     right_rear_wear_outside: f32,
-
     #[field_name = "RRwearM"]
     right_rear_wear_middle: f32,
-
     #[field_name = "RRwearR"]
     right_rear_wear_inside: f32,
 }

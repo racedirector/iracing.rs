@@ -42,7 +42,6 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use iracing_sdk::ibt::format::{IbtDiskSubHeader, IbtHeader};
 use std::{fs::File, io::BufReader, path::PathBuf};
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the IBT header dump.
@@ -71,12 +70,12 @@ fn main() -> Result<()> {
         .with_context(|| format!("Opening IBT file {}", ibt_path.display()))?;
     let mut reader = BufReader::new(file);
 
-    info!("Parsing IBT header");
+    tracing::info!("Parsing IBT header");
     let header = IbtHeader::parse_from_reader(&mut reader)
         .with_context(|| format!("Parsing IBT header from {}", ibt_path.display()))?;
     println!("{:#?}", header);
 
-    info!("Parsing IBT disk sub-header");
+    tracing::info!("Parsing IBT disk sub-header");
     let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
         .with_context(|| format!("Parsing IBT disk sub-header from {}", ibt_path.display()))?;
 

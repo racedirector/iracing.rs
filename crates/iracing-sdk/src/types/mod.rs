@@ -46,6 +46,7 @@
 //! ```
 
 mod bitfield;
+mod codegen;
 mod dynamic_frame;
 mod frame;
 mod incident;

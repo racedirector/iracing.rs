@@ -45,7 +45,6 @@ use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{IbtReader, types::VarData};
 use std::path::PathBuf;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the `disk-position` extractor.
@@ -116,7 +115,7 @@ fn main() -> Result<()> {
         csv_output_path,
     } = Args::parse();
 
-    info!(path = %ibt_path.display(), "Opening IBT file");
+    tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
@@ -124,7 +123,7 @@ fn main() -> Result<()> {
     let mut reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    info!("Resolving telemetry schema");
+    tracing::info!("Resolving telemetry schema");
 
     // Clone the schema once to avoid repeated lookups.
     let schema = reader.variables().clone();
@@ -154,7 +153,7 @@ fn main() -> Result<()> {
         .get_variable("PlayerCarInPitStall")
         .expect("No `PlayerCarInPitStall` in schema");
 
-    info!("Beginning frame iteration");
+    tracing::info!("Beginning frame iteration");
 
     // ------------------------------------------------------------
     // Frame iteration
@@ -196,7 +195,7 @@ fn main() -> Result<()> {
     }
 
     writer.flush()?;
-    info!("Finished processing frames");
+    tracing::info!("Finished processing frames");
 
     Ok(())
 }

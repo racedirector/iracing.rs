@@ -7,12 +7,15 @@ use std::collections::HashMap;
 
 use super::VariableType;
 
+/// # Variable schema
 /// Schema describing the structure and metadata of telemetry variables.
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableSchema {
+    /// # Variables map
     /// Map of variable names to their metadata (provides O(1) lookup)
     pub variables: HashMap<String, VariableInfo>,
+    /// # Frame size
     /// Total size of a telemetry frame in bytes
     pub frame_size: usize,
 }
@@ -79,22 +82,30 @@ impl VariableSchema {
     }
 }
 
+/// # Variable info
 /// Information about a specific telemetry variable.
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableInfo {
+    /// # Name
     /// Variable name as defined by iRacing
     pub name: String,
+    /// # Data type
     /// Data type of the variable
     pub data_type: VariableType,
+    /// # Byte offset
     /// Byte offset within the telemetry frame
     pub offset: usize,
+    /// # Count
     /// Number of elements (1 for scalar, >1 for arrays)
     pub count: usize,
+    /// # Count as time
     /// Whether the simulator treats the sample count as elapsed time
     pub count_as_time: bool,
+    /// # Units
     /// Units of measurement (e.g., "m/s", "C", "N*m")
     pub units: String,
+    /// # Description
     /// Human-readable description
     pub description: String,
 }

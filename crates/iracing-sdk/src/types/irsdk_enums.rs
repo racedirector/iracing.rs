@@ -1,9 +1,11 @@
 //! Typed enum wrappers for IRSDK numeric enums.
 
 #[cfg(feature = "codegen")]
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "codegen")]
+use super::codegen::named_schema_values;
 use super::{VarData, VariableInfo};
 
 macro_rules! define_irsdk_enum {
@@ -15,7 +17,6 @@ macro_rules! define_irsdk_enum {
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[cfg_attr(feature = "codegen", derive(JsonSchema))]
         $vis enum $name {
             $(
                 /// Named enum variant — see the `irsdk_flags` module for the raw constant value.
@@ -51,6 +52,36 @@ macro_rules! define_irsdk_enum {
             pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
                 $((stringify!($variant), $value as i64),)+
             ];
+        }
+
+        #[cfg(feature = "codegen")]
+        impl JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+
+            fn schema_id() -> std::borrow::Cow<'static, str> {
+                concat!(module_path!(), "::", stringify!($name)).into()
+            }
+
+            fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+                #[allow(dead_code)]
+                #[derive(JsonSchema)]
+                $(#[$meta])*
+                enum SchemaRepr {
+                    $(
+                        $variant,
+                    )+
+                    /// An unrecognised value from the iRacing SDK.
+                    Unknown(i32),
+                }
+
+                let mut schema = SchemaRepr::json_schema(generator);
+                let schema_object = schema.ensure_object();
+                schema_object.insert("x-irsdk-kind".into(), "enum".into());
+                schema_object.insert("x-irsdk-values".into(), named_schema_values(Self::SCHEMA_VALUES));
+                schema
+            }
         }
 
         impl From<$name> for u16 {
@@ -389,6 +420,10 @@ define_irsdk_enum! {
 mod tests {
     use super::super::VariableType;
     use super::*;
+    #[cfg(feature = "codegen")]
+    use schemars::schema_for;
+    #[cfg(feature = "codegen")]
+    use serde_json::Value;
 
     macro_rules! assert_enum_roundtrip {
         ($ty:ty, $known:expr, $unknown:expr) => {{
@@ -448,5 +483,38 @@ mod tests {
     #[test]
     fn typed_enums_have_zero_default() {
         assert_eq!(TrackLocation::default().to_raw(), 0);
+    }
+
+    #[cfg(feature = "codegen")]
+    #[test]
+    fn enum_schema_includes_codegen_annotations() {
+        let schema = schema_for!(TrackLocation);
+        let schema_object = schema
+            .as_value()
+            .as_object()
+            .expect("schema root should be an object");
+
+        assert!(
+            schema_object
+                .get("oneOf")
+                .and_then(Value::as_array)
+                .is_some()
+        );
+        assert_eq!(
+            schema_object.get("x-irsdk-kind").and_then(Value::as_str),
+            Some("enum")
+        );
+
+        let values = schema_object
+            .get("x-irsdk-values")
+            .and_then(Value::as_array)
+            .expect("x-irsdk-values should be an array");
+        assert!(values.iter().any(|entry| {
+            entry.as_object().is_some_and(|entry| {
+                entry.get("name").and_then(Value::as_str) == Some("OnTrack")
+                    && entry.get("value").and_then(Value::as_i64)
+                        == Some(super::super::irsdk_flags::trk_loc::ON_TRACK as i64)
+            })
+        }));
     }
 }

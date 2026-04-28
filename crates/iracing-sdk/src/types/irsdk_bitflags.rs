@@ -1,9 +1,13 @@
 //! Typed wrappers for IRSDK bitfield families.
 
 #[cfg(feature = "codegen")]
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "codegen")]
+use serde_json::{Map, Value};
 
+#[cfg(feature = "codegen")]
+use super::codegen::named_schema_values;
 use super::{BitField, VarData, VariableInfo, VariableType};
 
 macro_rules! define_irsdk_bitflags {
@@ -15,7 +19,6 @@ macro_rules! define_irsdk_bitflags {
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[cfg_attr(feature = "codegen", derive(JsonSchema))]
         $vis struct $name(u32);
 
         impl $name {
@@ -79,6 +82,34 @@ macro_rules! define_irsdk_bitflags {
 
             /// Bitmask that covers all defined (named) flag bits.
             pub const SCHEMA_KNOWN_MASK: u32 = 0u32 $(| ($value as u32))+;
+        }
+
+        #[cfg(feature = "codegen")]
+        impl JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+
+            fn schema_id() -> std::borrow::Cow<'static, str> {
+                concat!(module_path!(), "::", stringify!($name)).into()
+            }
+
+            fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+                #[allow(dead_code)]
+                #[derive(JsonSchema)]
+                $(#[$meta])*
+                struct SchemaRepr(u32);
+
+                let mut schema = SchemaRepr::json_schema(generator);
+                let schema_object = schema.ensure_object();
+                schema_object.insert("x-irsdk-kind".into(), "bitflags".into());
+                schema_object.insert("x-irsdk-values".into(), named_schema_values(Self::SCHEMA_VALUES));
+                schema_object.insert(
+                    "x-irsdk-known-mask".into(),
+                    (Self::SCHEMA_KNOWN_MASK as u64).into(),
+                );
+                schema
+            }
         }
 
         impl From<u32> for $name {
@@ -347,7 +378,6 @@ define_irsdk_bitflags! {
 
 /// `enum irsdk_IncidentFlags` as a combined report+penalty container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(JsonSchema))]
 pub struct IncidentFlags(pub u32);
 
 impl IncidentFlags {
@@ -479,6 +509,42 @@ impl Default for IncidentFlags {
     }
 }
 
+#[cfg(feature = "codegen")]
+impl JsonSchema for IncidentFlags {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "IncidentFlags".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        concat!(module_path!(), "::IncidentFlags").into()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        #[allow(dead_code)]
+        #[derive(JsonSchema)]
+        /// `enum irsdk_IncidentFlags` as a combined report+penalty container.
+        struct SchemaRepr(u32);
+
+        let mut schema = SchemaRepr::json_schema(generator);
+        let schema_object = schema.ensure_object();
+        schema_object.insert("x-irsdk-kind".into(), "incident-flags".into());
+
+        let mut masks = Map::new();
+        masks.insert("report".into(), (Self::REP_MASK as u64).into());
+        masks.insert("penalty".into(), (Self::PEN_MASK as u64).into());
+        schema_object.insert("x-irsdk-masks".into(), Value::Object(masks));
+        schema_object.insert(
+            "x-irsdk-report-codes".into(),
+            named_schema_values(Self::SCHEMA_REPORT_CODES),
+        );
+        schema_object.insert(
+            "x-irsdk-penalty-codes".into(),
+            named_schema_values(Self::SCHEMA_PENALTY_CODES),
+        );
+        schema
+    }
+}
+
 impl VarData for IncidentFlags {
     /// Decode this bitflag type from a byte slice using the provided VariableInfo.
     ///
@@ -525,6 +591,10 @@ impl VarData for IncidentFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "codegen")]
+    use schemars::schema_for;
+    #[cfg(feature = "codegen")]
+    use serde_json::Value;
 
     #[test]
     fn bitflag_family_operations() {
@@ -729,5 +799,70 @@ mod tests {
         assert!(mixed.has_rear_tire_service());
         assert!(!mixed.has_left_side_tire_service());
         assert!(mixed.has_right_side_tire_service());
+    }
+
+    #[cfg(feature = "codegen")]
+    #[test]
+    fn bitflag_schema_includes_codegen_annotations() {
+        let schema = schema_for!(SessionFlags);
+        let schema_object = schema
+            .as_value()
+            .as_object()
+            .expect("schema root should be an object");
+
+        assert_eq!(
+            schema_object.get("type").and_then(Value::as_str),
+            Some("integer")
+        );
+        assert_eq!(
+            schema_object.get("x-irsdk-kind").and_then(Value::as_str),
+            Some("bitflags")
+        );
+        assert_eq!(
+            schema_object
+                .get("x-irsdk-known-mask")
+                .and_then(Value::as_u64),
+            Some(SessionFlags::SCHEMA_KNOWN_MASK as u64)
+        );
+
+        let values = schema_object
+            .get("x-irsdk-values")
+            .and_then(Value::as_array)
+            .expect("x-irsdk-values should be an array");
+        assert!(values.iter().any(|entry| {
+            entry
+                .as_object()
+                .is_some_and(|entry| entry.get("name").and_then(Value::as_str) == Some("GREEN"))
+        }));
+    }
+
+    #[cfg(feature = "codegen")]
+    #[test]
+    fn incident_schema_includes_codegen_annotations() {
+        let schema = schema_for!(IncidentFlags);
+        let schema_object = schema
+            .as_value()
+            .as_object()
+            .expect("schema root should be an object");
+
+        assert_eq!(
+            schema_object.get("x-irsdk-kind").and_then(Value::as_str),
+            Some("incident-flags")
+        );
+        assert_eq!(
+            schema_object
+                .get("x-irsdk-masks")
+                .and_then(Value::as_object)
+                .and_then(|masks| masks.get("report"))
+                .and_then(Value::as_u64),
+            Some(IncidentFlags::REP_MASK as u64)
+        );
+        assert_eq!(
+            schema_object
+                .get("x-irsdk-penalty-codes")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(IncidentFlags::SCHEMA_PENALTY_CODES.len())
+        );
     }
 }
