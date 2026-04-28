@@ -3,18 +3,9 @@
 //! Connects to iRacing shared memory, reads live session YAML, and generates
 //! session JSON Schema (serialized as YAML).
 //!
-//! # Discovery mode
-//! `--discover` overlays unknown fields discovered in runtime session YAML onto
-//! the emitted schema using `iracing_sdk::session_root_schema_with_discovery`.
-//!
-//! # Diff mode
-//! `--diff <PATH>` compares generated schema vs baseline schema and logs a
-//! path/type summary. Use `--diff-output-path <PATH>` to also write full diff YAML.
-//!
 //! # Usage
 //! ```text
-//! live_session_schema --output-path <SCHEMA.yml> [--allow-stale] [--discover]
-//! live_session_schema --output-path <SCHEMA.yml> --diff <BASELINE.yml> [--diff-output-path <DIFF.yml>]
+//! live-session-schema --output-path <SCHEMA.yml> [--allow-stale]
 //! ```
 
 use anyhow::{Result, anyhow};
@@ -52,10 +43,6 @@ fn run() -> Result<()> {
         output_path,
         allow_stale,
     } = Args::parse();
-
-    if diff.is_none() && diff_output_path.is_some() {
-        return Err(anyhow!("--diff-output-path requires --diff"));
-    }
 
     tracing::info!("Opening iRacing connection");
     let connection = WindowsConnection::try_connect()?;

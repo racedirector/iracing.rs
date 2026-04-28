@@ -5,7 +5,7 @@
 //!
 //! # Usage
 //! ```text
-//! disk_session_schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
+//! disk-session-schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
 //! ```
 
 use anyhow::{Result, anyhow};

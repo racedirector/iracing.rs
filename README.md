@@ -15,13 +15,13 @@ Rust workspace for working with iRacing telemetry and simulation state:
 ## Crates
 
 - [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
-- [`crates/iracing-sdk-codegen`](crates/iracing-sdk-codegen) — schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, …).
+- [`crates/iracing-sdk`](crates/iracing-sdk) — also contains the schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, `live-session-schema`, `live-variable-schema`, …).
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-utils`](crates/test-utils) — fixture discovery + guardrails (Git LFS guidance, `require_*` helpers) used by integration tests.
 
 ## Generated schema artifacts
 
-Schema snapshots are checked in under [`docs/reference`](docs/reference). Do not hand edit them.
+Schema snapshots are checked in under [`docs/reference`](docs/reference). Do not hand-edit them.
 
 | Artifact | Purpose | Regenerate from workspace root |
 | --- | --- | --- |
@@ -62,12 +62,12 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo ibt-session-parser` | `cargo run -p iracing-sdk --bin ibt-session-parser --` | Extract session YAML from `.ibt`. |
 | `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
-| `cargo session-schema` | `cargo run -p iracing-sdk --features codegen --bin session-schema --` | Emit baseline session schema. |
-| `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen --bin variable-schema --` | Emit baseline variable schema. |
-| `cargo primitives-schema` | `cargo run -p iracing-sdk --features codegen --bin primitives-schema --` | Emit the `irsdk_*` primitive schema catalog. |
-| `cargo disk-variable-schema` | `cargo run -p iracing-sdk --features codegen --bin disk-variable-schema --` | Generate telemetry schema from `.ibt` headers. |
-| `cargo live-session-schema` | `cargo run -p iracing-sdk --bin live-session-schema --` | Collect live session schema (Windows). |
-| `cargo live-variable-schema` | `cargo run -p iracing-sdk --features codegen --bin live-variable-schema --` | Collect live telemetry variable schema (Windows). |
+| `cargo session-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session-schema --` | Emit baseline session schema. |
+| `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin variable-schema --` | Emit baseline variable schema. |
+| `cargo primitives-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin primitives-schema --` | Emit the `irsdk_*` primitive schema catalog. |
+| `cargo disk-variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin disk-variable-schema --` | Generate telemetry schema from `.ibt` headers. |
+| `cargo live-session-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin live-session-schema --` | Collect live session schema (Windows). |
+| `cargo live-variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin live-variable-schema --` | Collect live telemetry variable schema (Windows). |
 
 ## Development Notes
 
@@ -93,6 +93,6 @@ Defined in `.cargo/config.toml` for convenience:
 ## Additional Resources
 
 - Per-crate guidance lives alongside each package (`crates/*/AGENTS.md`). Start there for deep-dive development tips.
-- Schema tool usage and examples are documented in `crates/iracing-sdk-codegen/README.md`.
+- Schema tool usage and examples are documented in the binary sources under `crates/iracing-sdk/src/bin/`.
 - Telemetry consumer examples reside under `examples/` in the respective crates; run them with `cargo run -p <crate> --example <name> -- --help` to inspect options.
 - Release notes and packaging pointers live in `docs/releasing.md`.

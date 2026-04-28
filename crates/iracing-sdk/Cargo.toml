@@ -26,6 +26,15 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.live_to_csv]
 targets = ["x86_64-pc-windows-msvc"]
 
+[package.metadata.dist.bin.live-session-schema]
+targets = ["x86_64-pc-windows-msvc"]
+
+[package.metadata.dist.bin.live-variable-schema]
+targets = ["x86_64-pc-windows-msvc"]
+
+[package.metadata.dist.bin.live-headers]
+targets = ["x86_64-pc-windows-msvc"]
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -138,6 +147,7 @@ path = "src/bin/ibt_session_parser.rs"
 [[bin]]
 name = "live-session-schema"
 path = "src/bin/live_session_schema.rs"
+required-features = ["codegen"]
 
 [[bin]]
 name = "live-variable-schema"

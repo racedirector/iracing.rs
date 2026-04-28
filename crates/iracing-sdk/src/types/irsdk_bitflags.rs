@@ -6,22 +6,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "codegen")]
 use serde_json::{Map, Value};
 
-use super::{BitField, VarData, VariableInfo, VariableType};
-
 #[cfg(feature = "codegen")]
-fn named_schema_values(values: &[(&'static str, i64)]) -> Value {
-    Value::Array(
-        values
-            .iter()
-            .map(|(name, value)| {
-                let mut entry = Map::new();
-                entry.insert("name".into(), (*name).into());
-                entry.insert("value".into(), (*value).into());
-                Value::Object(entry)
-            })
-            .collect(),
-    )
-}
+use super::codegen::named_schema_values;
+use super::{BitField, VarData, VariableInfo, VariableType};
 
 macro_rules! define_irsdk_bitflags {
     (

@@ -15,6 +15,10 @@
 //! ```
 
 use anyhow::{Result, anyhow};
+#[cfg(windows)]
+use clap::{ArgAction, Parser};
+#[cfg(windows)]
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live telemetry schema generator.
@@ -45,9 +49,8 @@ pub fn main() -> Result<()> {
 /// Connects to iRacing shared memory, generates the telemetry variable schema, and writes it to disk.
 #[cfg(windows)]
 fn run() -> Result<()> {
-    use clap::{ArgAction, Parser};
     use iracing_sdk::{VariableSchema, WindowsConnection};
-    use std::{fs::File, io::BufWriter, path::PathBuf};
+    use std::{fs::File, io::BufWriter};
 
     // ------------------------------------------------------------
     // Parse CLI arguments
@@ -77,7 +80,7 @@ fn run() -> Result<()> {
 
     let frame_size = connection.header().buf_len as usize;
     let variable_schema = VariableSchema::new(variable_map, frame_size)?;
-    let mut schema = schemars::schema_for_value!(variable_schema);
+    let schema = schemars::schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);

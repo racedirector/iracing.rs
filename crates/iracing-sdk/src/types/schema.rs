@@ -102,7 +102,7 @@ pub struct VariableInfo {
     /// # Count as time
     /// Whether the simulator treats the sample count as elapsed time
     pub count_as_time: bool,
-    /// # Unites
+    /// # Units
     /// Units of measurement (e.g., "m/s", "C", "N*m")
     pub units: String,
     /// # Description

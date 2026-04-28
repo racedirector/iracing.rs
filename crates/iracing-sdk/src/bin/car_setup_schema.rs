@@ -63,9 +63,7 @@ fn parse_live_session() -> Result<SessionInfo> {
     let connection = WindowsConnection::try_connect()?;
 
     if !connection.is_connected() {
-        return Err(anyhow!(
-            "iRacing is not connected (pass --allow-stale to continue)."
-        ));
+        return Err(anyhow!("iRacing is not connected."));
     }
 
     let raw_session_yaml = connection
@@ -125,7 +123,7 @@ fn resolve_output_path(
         // If they passed a relative path, interpret it under output_dir.
         // If absolute, use as-is.
         return Ok(if path.is_absolute() {
-            path.clone()
+            path
         } else {
             output_dir.join(path)
         });

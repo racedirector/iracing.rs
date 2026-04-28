@@ -1,9 +1,12 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+#[cfg(windows)]
 use clap::Parser;
-use csv::Writer;
-use iracing_sdk::{FrameAdapter, IRacingTelemetryFrame, LiveProvider, Provider};
+#[cfg(windows)]
+use iracing_sdk::IRacingTelemetryFrame;
+#[cfg(windows)]
 use std::path::PathBuf;
 
+#[cfg(windows)]
 #[derive(Parser, Debug)]
 struct Args {
     /// Path where the output CSV should be written.
@@ -14,6 +17,7 @@ struct Args {
 /// CSV row representation of positional telemetry.
 ///
 /// This struct defines the output schema written per frame.
+#[cfg(windows)]
 #[derive(IRacingTelemetryFrame, Debug, Clone, Copy, serde::Serialize)]
 struct Row {
     /// Distance traveled around the lap (meters).
@@ -27,12 +31,12 @@ struct Row {
     lap_distance_percentage: f32,
 
     /// !!!: iRacing uses EPSG:3857 for coordinates.
-    /// Latitude in decimal degress. Unit: deg.
+    /// Latitude in decimal degrees. Unit: deg.
     #[field_name = "Lat"]
     #[fail_if_missing]
     latitude: f64,
 
-    /// Longitude in decimal degress. Unit: deg.
+    /// Longitude in decimal degrees. Unit: deg.
     #[field_name = "Lon"]
     #[fail_if_missing]
     longitude: f64,
@@ -67,6 +71,9 @@ fn main() -> Result<()> {
 
 #[cfg(windows)]
 fn run() -> Result<()> {
+    use csv::Writer;
+    use iracing_sdk::{FrameAdapter, LiveProvider, Provider};
+
     // ------------------------------------------------------------
     // Parse CLI arguments
     // ------------------------------------------------------------
@@ -76,9 +83,9 @@ fn run() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut provider = LiveProvider::new().expect("Could not get IBT provider from path.");
+    let mut provider = LiveProvider::new()?;
     let schema = provider.schema();
-    let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
+    let mut writer = Writer::from_path(&csv_output_path)?;
 
     let shared_validation = Row::validate_schema(&schema)?;
     while let Some(packet) = provider.next_frame()? {

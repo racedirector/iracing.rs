@@ -32,7 +32,7 @@ properties:
     format: uint
     minimum: 0
   units:
-    title: Unites
+    title: Units
     description: Units of measurement (e.g., "m/s", "C", "N*m")
     type: string
 required:

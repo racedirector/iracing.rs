@@ -31,12 +31,12 @@ struct Row {
     lap_distance_percentage: f32,
 
     /// !!!: iRacing uses EPSG:3857 for coordinates.
-    /// Latitude in decimal degress. Unit: deg.
+    /// Latitude in decimal degrees. Unit: deg.
     #[field_name = "Lat"]
     #[fail_if_missing]
     latitude: f64,
 
-    /// Longitude in decimal degress. Unit: deg.
+    /// Longitude in decimal degrees. Unit: deg.
     #[field_name = "Lon"]
     #[fail_if_missing]
     longitude: f64,
@@ -79,10 +79,9 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut provider =
-        IbtProvider::from_path(&ibt_path).expect("Could not get IBT provider from path.");
+    let mut provider = IbtProvider::from_path(&ibt_path)?;
     let schema = provider.schema();
-    let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
+    let mut writer = Writer::from_path(&csv_output_path)?;
 
     tracing::info!(
         total_frames = provider.total_frames(),

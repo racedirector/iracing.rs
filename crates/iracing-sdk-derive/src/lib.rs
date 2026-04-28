@@ -1993,12 +1993,8 @@ mod tests {
 
     #[test]
     fn generate_optional_assignment_emits_optional_decode_path() {
-        let tokens = generate_optional_assignment(
-            0,
-            &parse_quote!(speed),
-            &parse_quote!(f32),
-            "Speed",
-        );
+        let tokens =
+            generate_optional_assignment(0, &parse_quote!(speed), &parse_quote!(f32), "Speed");
         let rendered = tokens.to_string();
 
         assert!(rendered.contains("FieldExtraction :: Optional"));
