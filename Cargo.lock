@@ -921,24 +921,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "iracing-sdk-codegen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "iracing-sdk",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "iracing-sdk-derive"
 version = "0.1.0"
 dependencies = [
+ "iracing-sdk",
  "proc-macro2",
  "quote",
  "syn",

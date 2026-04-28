@@ -28,7 +28,7 @@
 //!
 //! # Example Usage
 //!
-//! ```rust,ignore
+//! ```no_run
 //! use iracing_sdk_derive::IRacingTelemetryFrame;
 //!
 //! #[derive(IRacingTelemetryFrame, Debug)]
@@ -80,15 +80,15 @@ use syn::{
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
 /// use iracing_sdk_derive::IRacingTelemetryFrame;
 ///
 /// #[derive(IRacingTelemetryFrame)]
 /// struct SimpleFrame {
 ///     #[field_name = "Speed"]
 ///     speed: f32,
-///     #[field_name = "DriverName"]
-///     name: Option<String>,
+///     #[field_name = "Gear"]
+///     gear: Option<i32>,
 /// }
 /// ```
 ///
@@ -127,13 +127,16 @@ pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```
-/// # use syn::{parse_str, DeriveInput};
-/// # fn _example() -> syn::Result<()> {
-/// let input: DeriveInput = parse_str("struct S { a: i32 }")?;
-/// // `generate_frame_adapter` produces the token stream implementing FrameAdapter for `S`.
-/// let _tokens = iracing_sdk_derive::generate_frame_adapter(&input)?;
-/// # Ok(()) }
+/// ```rust,ignore
+/// use syn::DeriveInput;
+///
+/// let input: DeriveInput = syn::parse_quote! {
+///     struct S {
+///         #[field_name = "Speed"]
+///         speed: f32,
+///     }
+/// };
+/// let _tokens = generate_frame_adapter(&input)?;
 /// ```
 /* no outer attributes */
 fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
@@ -306,7 +309,7 @@ enum FieldStrategy {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// # use quote::quote;
 /// # use syn::parse_str;
 /// // produce code that probes a schema entry and clones it when compatible
@@ -368,13 +371,15 @@ fn generate_type_validation_check(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use syn::{Field, Result};
-/// use std::str::FromStr;
 /// // parse a field with a telemetry name into a syn::Field and derive its strategy
-/// let field: Field = syn::parse_str("#[field_name = \"RPM\"] pub rpm: Option<u32>").unwrap();
-/// let strat = crate::parse_field_strategy(&field).unwrap();
-/// assert!(matches!(strat, crate::FieldStrategy::Optional { .. }));
+/// let field: Field = syn::parse_quote! {
+///     #[field_name = "RPM"]
+///     pub rpm: Option<u32>
+/// };
+/// let strat = parse_field_strategy(&field).unwrap();
+/// assert!(matches!(strat, FieldStrategy::Optional { .. }));
 /// ```
 fn parse_field_strategy(field: &Field) -> syn::Result<FieldStrategy> {
     let field_ident = field
@@ -568,22 +573,24 @@ enum BitfieldAttr {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use syn::Field;
 ///
 /// // Parse a field with a `bitfield` attribute.
-/// let field: Field = syn::parse_str(
-///     "#[bitfield(name = \"Speed\", has = \"0x4\")] pub speed: bool"
-/// ).unwrap();
-/// let attr = crate::parse_bitfield_attr(&field).unwrap();
-/// assert!(matches!(attr, Some(crate::BitfieldAttr::Has { name, mask }) if name == "Speed" && mask == "0x4"));
+/// let field: Field = syn::parse_quote! {
+///     #[bitfield(name = "Speed", has = "0x4")]
+///     pub speed: bool
+/// };
+/// let attr = parse_bitfield_attr(&field).unwrap();
+/// assert!(matches!(attr, Some(BitfieldAttr::Has { name, mask }) if name == "Speed" && mask == "0x4"));
 ///
 /// // Parse a field with a `bitfield_map` attribute.
-/// let field_map: Field = syn::parse_str(
-///     "#[bitfield_map(name = \"Flags\", decoder = \"decode_flags\")] pub flags: u32"
-/// ).unwrap();
-/// let attr_map = crate::parse_bitfield_attr(&field_map).unwrap();
-/// assert!(matches!(attr_map, Some(crate::BitfieldAttr::Map { name, decoder }) if name == "Flags" && decoder == "decode_flags"));
+/// let field_map: Field = syn::parse_quote! {
+///     #[bitfield_map(name = "Flags", decoder = "decode_flags")]
+///     pub flags: u32
+/// };
+/// let attr_map = parse_bitfield_attr(&field_map).unwrap();
+/// assert!(matches!(attr_map, Some(BitfieldAttr::Map { name, decoder }) if name == "Flags" && decoder == "decode_flags"));
 /// ```
 fn parse_bitfield_attr(field: &Field) -> syn::Result<Option<BitfieldAttr>> {
     use syn::punctuated::Punctuated;
@@ -708,10 +715,10 @@ fn is_regular_field_attribute(attr: &Attribute) -> bool {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use syn::Attribute;
 /// // parse a name-value attribute into a syn::Attribute
-/// let attr: Attribute = syn::parse_str(r#"#[field_name = "Speed"]"#).unwrap();
+/// let attr: Attribute = syn::parse_quote!(#[field_name = "Speed"]);
 /// let parsed = parse_attribute(&attr).unwrap();
 /// match parsed {
 ///     AttributeValue::FieldName(name) => assert_eq!(name, "Speed"),
@@ -791,15 +798,16 @@ fn parse_attribute(attr: &Attribute) -> syn::Result<AttributeValue> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
+/// use quote::ToTokens;
 /// use syn::Type;
 ///
 /// let t: Type = syn::parse_str("Option<u32>").unwrap();
-/// let inner = crate::extract_option_type(&t).expect("expected Option");
+/// let inner = extract_option_type(&t).expect("expected Option");
 /// assert_eq!(format!("{}", inner.into_token_stream()), "u32");
 ///
 /// let t2: Type = syn::parse_str("Vec<u32>").unwrap();
-/// assert!(crate::extract_option_type(&t2).is_none());
+/// assert!(extract_option_type(&t2).is_none());
 /// ```
 fn extract_option_type(ty: &Type) -> Option<Type> {
     if let Type::Path(type_path) = ty {
@@ -826,7 +834,7 @@ fn extract_option_type(ty: &Type) -> Option<Type> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// // Minimal example: no fields produces empty validation and extraction-plan vectors.
 /// let (validation_checks, extraction_plan_items) = generate_validation_phase(&[]);
 /// assert!(validation_checks.is_empty());
@@ -1109,7 +1117,7 @@ fn generate_validation_phase(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use std::collections::HashMap;
 /// use syn::{Expr, Type};
 ///
@@ -1148,7 +1156,7 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust,ignore
     /// use syn::{parse_quote, Expr, LitStr};
     /// use std::collections::HashMap;
     ///
@@ -1164,7 +1172,9 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     ///     validation.fetch_or_default::<i32>(packet, LitStr::new("speed", proc_macro2::Span::call_site()))
     /// };
     ///
-    /// assert_eq!(quote::quote!(#transformed).to_string(), "validation . fetch_or_default :: < i32 > ( packet , \"speed\" )");
+    /// let rendered = quote::quote!(#transformed).to_string();
+    /// assert!(rendered.contains("fetch_or_default"));
+    /// assert!(rendered.contains("speed"));
     /// ```
     fn fold_expr(&mut self, expr: Expr) -> Expr {
         match expr {
@@ -1203,7 +1213,7 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use proc_macro2::Span;
 /// use syn::Ident;
 /// // Construct a token stream for a field named `speed: i32` mapped to telemetry variable "Speed"
@@ -1278,7 +1288,7 @@ fn generate_type_default_assignment(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use syn::{Expr, Ident, Type};
 /// use proc_macro2::TokenStream;
 ///
@@ -1354,7 +1364,7 @@ fn generate_with_default_assignment(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// # use syn::{Ident, Type};
 /// # use proc_macro2::TokenStream;
 /// // Construct inputs for a hypothetical field `speed: Option<f32>` mapped to telemetry "Speed"
@@ -1364,7 +1374,7 @@ fn generate_with_default_assignment(
 /// let field_name = "Speed";
 ///
 /// // Call the generator (assumes visibility in the same crate)
-/// let tokens: TokenStream = crate::generate_optional_assignment(index, &field_ident, &inner_type, field_name);
+/// let tokens: TokenStream = generate_optional_assignment(index, &field_ident, &inner_type, field_name);
 ///
 /// // Generated tokens should reference the field identifier
 /// let tokens_str = tokens.to_string();
@@ -1429,7 +1439,7 @@ fn generate_optional_assignment(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// // Generated snippet (conceptual):
 /// // my_field: {
 /// //     match validation.extraction_plan.get(3) {
@@ -1478,7 +1488,7 @@ fn generate_critical_assignment(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// use syn::parse_str;
 /// use quote::ToTokens;
 ///
@@ -1593,7 +1603,7 @@ fn generate_bitfield_has_assignment(
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```rust,ignore
 /// use syn::{Ident, Expr};
 /// // Construct a simple decoder expression and an ident for demonstration purposes.
 /// let ident = Ident::new("mapped_field", proc_macro2::Span::call_site());
@@ -1710,14 +1720,14 @@ fn generate_bitfield_map_assignment(
 ///
 /// # Examples
 ///
-/// ```
+/// ```rust,ignore
 /// # use std::collections::HashMap;
 /// # use syn::Type;
 /// # use proc_macro2::TokenStream;
 /// # fn _example() -> Result<(), syn::Error> {
-/// let strategies: Vec<crate::FieldStrategy> = Vec::new();
+/// let strategies: Vec<FieldStrategy> = Vec::new();
 /// let telemetry_map: HashMap<String, (usize, Type)> = HashMap::new();
-/// let assignments = crate::generate_extraction_phase(&strategies, &telemetry_map)?;
+/// let assignments = generate_extraction_phase(&strategies, &telemetry_map)?;
 /// assert!(assignments.is_empty());
 /// # Ok(()) }
 /// ```
@@ -1816,6 +1826,7 @@ fn generate_extraction_phase(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quote::ToTokens;
     use syn::parse_quote;
 
     fn parse_strategy_error(field: &Field) -> String {
@@ -1862,5 +1873,174 @@ mod tests {
         let error = parse_strategy_error(&field);
 
         assert!(error.contains("#[fail_if_missing] cannot be used on Option<T> fields"));
+    }
+
+    #[test]
+    fn parse_attribute_extracts_field_name() {
+        let attr: Attribute = parse_quote!(#[field_name = "Speed"]);
+
+        let parsed = parse_attribute(&attr).unwrap();
+
+        assert!(matches!(parsed, AttributeValue::FieldName(name) if name == "Speed"));
+    }
+
+    #[test]
+    fn parse_bitfield_attr_supports_has_and_map_forms() {
+        let has_field: Field = parse_quote! {
+            #[bitfield(name = "Flags", has = "0x4")]
+            flag: bool
+        };
+        let map_field: Field = parse_quote! {
+            #[bitfield_map(name = "Flags", decoder = "decode_flags")]
+            decoded: u32
+        };
+
+        let has_attr = parse_bitfield_attr(&has_field).unwrap();
+        let map_attr = parse_bitfield_attr(&map_field).unwrap();
+
+        assert!(matches!(
+            has_attr,
+            Some(BitfieldAttr::Has { name, mask }) if name == "Flags" && mask == "0x4"
+        ));
+        assert!(matches!(
+            map_attr,
+            Some(BitfieldAttr::Map { name, decoder }) if name == "Flags" && decoder == "decode_flags"
+        ));
+    }
+
+    #[test]
+    fn extract_option_type_returns_inner_type() {
+        let option_ty: Type = parse_quote!(Option<u32>);
+        let vec_ty: Type = parse_quote!(Vec<u32>);
+
+        let inner = extract_option_type(&option_ty).unwrap();
+
+        assert_eq!(inner.into_token_stream().to_string(), "u32");
+        assert!(extract_option_type(&vec_ty).is_none());
+    }
+
+    #[test]
+    fn parse_field_strategy_returns_optional_variant() {
+        let field: Field = parse_quote! {
+            #[field_name = "RPM"]
+            rpm: Option<u32>
+        };
+
+        let strategy = parse_field_strategy(&field).unwrap();
+
+        assert!(matches!(
+            strategy,
+            FieldStrategy::Optional { field_name, .. } if field_name == "RPM"
+        ));
+    }
+
+    #[test]
+    fn generate_validation_phase_builds_expected_plan_kinds() {
+        let strategies = vec![
+            FieldStrategy::TypeDefault {
+                field_name: "Speed".to_string(),
+                field_ident: parse_quote!(speed),
+                field_type: parse_quote!(f32),
+            },
+            FieldStrategy::Optional {
+                field_name: "Gear".to_string(),
+                field_ident: parse_quote!(gear),
+                inner_type: parse_quote!(i32),
+            },
+            FieldStrategy::Calculated {
+                field_ident: parse_quote!(derived),
+                expression: parse_quote!(speed + 1.0),
+                expression_str: "speed + 1.0".to_string(),
+            },
+        ];
+
+        let (validation_checks, extraction_plan_items) = generate_validation_phase(&strategies);
+        let checks = validation_checks
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let plan = extraction_plan_items
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert_eq!(validation_checks.len(), 2);
+        assert_eq!(extraction_plan_items.len(), 3);
+        assert!(checks.contains("get_variable"));
+        assert!(checks.contains("\"Speed\""));
+        assert!(checks.contains("\"Gear\""));
+        assert!(plan.contains("FieldExtraction :: WithDefault"));
+        assert!(plan.contains("FieldExtraction :: Optional"));
+        assert!(plan.contains("FieldExtraction :: Calculated"));
+    }
+
+    #[test]
+    fn process_calculated_expression_rewrites_known_identifiers() {
+        let expr: Expr = parse_quote!(speed * 2.0 + rpm as f32);
+        let mut field_map = HashMap::new();
+        field_map.insert("speed".to_string(), (0, parse_quote!(f32)));
+        field_map.insert("rpm".to_string(), (1, parse_quote!(i32)));
+
+        let tokens = process_calculated_expression(&expr, &field_map).unwrap();
+        let rendered = tokens.to_string();
+
+        assert!(rendered.contains("fetch_or_default"));
+        assert!(rendered.contains("\"speed\""));
+        assert!(rendered.contains("\"rpm\""));
+    }
+
+    #[test]
+    fn generate_optional_assignment_emits_optional_decode_path() {
+        let tokens = generate_optional_assignment(
+            0,
+            &parse_quote!(speed),
+            &parse_quote!(f32),
+            "Speed",
+        );
+        let rendered = tokens.to_string();
+
+        assert!(rendered.contains("FieldExtraction :: Optional"));
+        assert!(rendered.contains("Some"));
+        assert!(rendered.contains("from_bytes"));
+        assert!(rendered.contains("\"Speed\""));
+    }
+
+    #[test]
+    fn generate_bitfield_has_assignment_emits_has_flag_logic() {
+        let default_expr = Some(parse_quote!(true));
+        let mask_expr: Expr = parse_quote!(0x4u32);
+        let tokens = generate_bitfield_has_assignment(
+            0,
+            &parse_quote!(is_green),
+            "SessionFlags",
+            false,
+            &default_expr,
+            &mask_expr,
+        );
+        let rendered = tokens.to_string();
+
+        assert!(rendered.contains("has_flag"));
+        assert!(rendered.contains("0x4u32"));
+        assert!(rendered.contains("\"SessionFlags\""));
+    }
+
+    #[test]
+    fn generate_bitfield_map_assignment_emits_decoder_call() {
+        let decoder_expr: Expr = parse_quote!(decode_flags);
+        let tokens = generate_bitfield_map_assignment(
+            0,
+            &parse_quote!(flags),
+            "SessionFlags",
+            false,
+            &None,
+            &decoder_expr,
+        );
+        let rendered = tokens.to_string();
+
+        assert!(rendered.contains("(decode_flags)"));
+        assert!(rendered.contains("FieldExtraction :: WithDefault"));
+        assert!(rendered.contains("\"SessionFlags\""));
     }
 }

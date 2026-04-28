@@ -26,8 +26,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run doctests
+      - name: Run `iracing-sdk` doctests
         run: cargo test -p iracing-sdk --doc
+
+      - name: Run `iracing-sdk-derive` doctests
+        run: cargo test -p iracing-sdk-derive --doc
+
+      - name: Run `iracing-simulation` doctests
+        run: cargo test -p iracing-simulation --doc
 
       - name: Build docs with warnings as errors
         run: RUSTDOCFLAGS="-D warnings" cargo doc -p iracing-sdk --no-deps
