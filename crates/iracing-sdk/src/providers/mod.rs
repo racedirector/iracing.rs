@@ -14,8 +14,12 @@ pub trait Provider: Send + 'static {
     fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
 }
 
-/// IBT replay file provider.
+/// IBT file provider.
 mod ibt;
+
+/// Replay IBT provider.
+#[cfg(feature = "tokio")]
+mod replay;
 
 /// Live shared-memory provider (Windows only).
 #[cfg(windows)]
