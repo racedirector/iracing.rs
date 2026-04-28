@@ -35,6 +35,9 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.live-headers]
 targets = ["x86_64-pc-windows-msvc"]
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }

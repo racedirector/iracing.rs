@@ -30,6 +30,14 @@ tokio = { version = "1", features = ["rt", "macros"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
+[workspace.lints.rust]
+rust_2018_idioms = "warn"
+unused_lifetimes = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
 [workspace.metadata.dist]
 cargo-dist-version = "0.30.4"
 ci = ["github"]
