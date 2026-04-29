@@ -137,9 +137,16 @@ fn monitor_connected_session(
     tracing::info!("Monitoring live telemetry session");
 
     loop {
-        if !is_process_running(process_name).unwrap_or(false) {
-            tracing::info!("iRacing process exited; restarting monitor");
-            return;
+        match is_process_running(process_name) {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::info!("iRacing process exited; restarting monitor");
+                return;
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "Process detection failed; restarting monitor");
+                return;
+            }
         }
 
         if !simulation.check_sim_status() {

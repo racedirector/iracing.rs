@@ -16,8 +16,7 @@ mod simulation;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use process::{
-    DEFAULT_IRACING_PROCESS_NAME, ProcessDetectionError, RunningProcess,
-    is_iracing_process_running, is_process_running, list_running_processes,
+    DEFAULT_IRACING_PROCESS_NAME, ProcessDetectionError, is_iracing_process_running,
 };
 pub use simulation::{
     DEFAULT_HOST, DEFAULT_PORT, SIM_STATUS_PATH, SimStatusClient, SimStatusError,
