@@ -51,12 +51,19 @@ fn wait_for_process(poll_interval: Duration) -> Result<()> {
     tracing::info!("Waiting for iRacing process");
 
     loop {
-        if is_iracing_process_running()? {
-            tracing::info!("Detected iRacing process");
-            return Ok(());
+        match is_iracing_process_running() {
+            Ok(true) => {
+                tracing::info!("Detected iRacing process");
+                return Ok(());
+            }
+            Ok(false) => {
+                thread::sleep(poll_interval);
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "Process detection failed while waiting for iRacing; retrying");
+                thread::sleep(poll_interval);
+            }
         }
-
-        thread::sleep(poll_interval);
     }
 }
 
@@ -125,8 +132,9 @@ fn monitor_connected_session(
                 return;
             }
             Err(err) => {
-                tracing::warn!(error = %err, "Process detection failed; restarting monitor");
-                return;
+                tracing::error!(error = %err, "Process detection failed while monitoring telemetry; retrying");
+                thread::sleep(poll_interval);
+                continue;
             }
         }
 
