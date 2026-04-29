@@ -897,6 +897,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "469fb0b9cefa57e3ef31275ee7cacb78f2fdca44e4765491884a2b119d4eb130"
 
 [[package]]
+name = "iracing-lifecycle-monitor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "iracing-sdk",
+ "iracing-simulation",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "iracing-sdk"
 version = "0.1.0"
 dependencies = [
@@ -941,6 +953,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ureq",
+ "windows",
 ]
 
 [[package]]

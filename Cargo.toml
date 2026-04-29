@@ -6,6 +6,7 @@ members = [
   "crates/iracing-simulation",
   "crates/test-utils",
   "examples/driver-inputs",
+  "examples/iracing-lifecycle-monitor",
 ]
 
 resolver = "3"

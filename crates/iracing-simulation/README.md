@@ -2,11 +2,12 @@
 
 Minimal Rust helpers for checking whether the **iRacing Simulation** is running on a given machine.
 
-This crate talks to iRacing’s local HTTP status endpoint (by default `127.0.0.1:32034`) and exposes a small, dependency-light API:
+This crate talks to iRacing’s local HTTP status endpoint (by default `127.0.0.1:32034`) and also exposes Windows-only process detection helpers:
 
 - A high-level `Simulation` facade with a single “is it running?” check.
 - A `SimStatusClient` trait so you can plug in your existing HTTP stack (`reqwest`, `ureq`, etc.).
 - A built-in `StdSimStatusClient` that uses raw `TcpStream` and a tiny HTTP parser (no external HTTP dependency required).
+- Windows process enumeration helpers for checking whether `iRacingSim64DX11.exe` is running.
 
 ## What “running” means
 
@@ -26,6 +27,19 @@ use iracing_simulation::Simulation;
 let sim = Simulation::local();
 let running = sim.check_sim_status();
 println!("running={running}");
+```
+
+### Windows process detection
+
+```rust,no_run
+#[cfg(windows)]
+{
+    use iracing_simulation::is_iracing_process_running;
+
+    let running = is_iracing_process_running()?;
+    println!("process_running={running}");
+}
+# Ok::<(), iracing_simulation::ProcessDetectionError>(())
 ```
 
 ### Library usage (custom client)
@@ -88,6 +102,17 @@ If you need richer error information, wrap it in your own client and map failure
   - `Simulation::new_with_client(host, port, client)`: inject your own client.
   - `Simulation::with_timeout(duration)`: override the default timeout (default is 5s).
   - `Simulation::check_sim_status() -> bool`: returns whether iRacing reports `running:1`.
+
+### Windows process helpers
+
+- `DEFAULT_IRACING_PROCESS_NAME`: default Windows executable name for iRacing.
+- `is_iracing_process_running() -> Result<bool, ProcessDetectionError>`: convenience wrapper for the default iRacing executable.
+
+Notes:
+
+- Process detection is Windows-only and gated with `#[cfg(windows)]`.
+- `Simulation::check_sim_status()` remains an HTTP check; it does not fall back to process detection.
+- Basic process enumeration does not normally require administrator privileges.
 
 ## Examples (recommended entry point)
 
