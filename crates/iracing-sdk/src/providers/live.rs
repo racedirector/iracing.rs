@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use iracing_sdk::{Result, VariableSchema, WindowsConnection, yaml_utils};
+use crate::{Result, VariableSchema, WindowsConnection, yaml_utils};
 use tracing::{debug, info};
 
 use crate::Provider;
