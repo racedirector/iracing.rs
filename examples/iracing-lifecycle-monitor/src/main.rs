@@ -7,8 +7,6 @@ use iracing_sdk::WindowsConnection;
 use iracing_simulation::{DEFAULT_IRACING_PROCESS_NAME, Simulation, is_process_running};
 #[cfg(windows)]
 use std::{thread, time::Duration};
-#[cfg(windows)]
-use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
@@ -59,11 +57,11 @@ fn run() -> Result<()> {
 
 #[cfg(windows)]
 fn wait_for_process(process_name: &str, poll_interval: Duration) -> Result<()> {
-    info!(process_name, "Waiting for iRacing process");
+    tracing::info!(process_name, "Waiting for iRacing process");
 
     loop {
         if is_process_running(process_name)? {
-            info!(process_name, "Detected iRacing process");
+            tracing::info!(process_name, "Detected iRacing process");
             return Ok(());
         }
 
@@ -77,16 +75,16 @@ fn wait_for_sim_status(
     process_name: &str,
     poll_interval: Duration,
 ) -> Result<()> {
-    info!("Waiting for iRacing sim status endpoint to report running");
+    tracing::info!("Waiting for iRacing sim status endpoint to report running");
 
     loop {
         if !is_process_running(process_name)? {
-            info!("iRacing process exited before sim status became ready");
+            tracing::info!("iRacing process exited before sim status became ready");
             return Ok(());
         }
 
         if simulation.check_sim_status() {
-            info!("Sim status endpoint reports running");
+            tracing::info!("Sim status endpoint reports running");
             return Ok(());
         }
 
@@ -101,28 +99,28 @@ fn monitor_telemetry(
     poll_interval: Duration,
     telemetry_wait: Duration,
 ) {
-    info!("Waiting for live telemetry shared memory");
+    tracing::info!("Waiting for live telemetry shared memory");
 
     loop {
         if !process_still_ready(simulation, process_name) {
-            info!("Process or sim status became unavailable before telemetry connected");
+            tracing::info!("Process or sim status became unavailable before telemetry connected");
             return;
         }
 
         match WindowsConnection::try_connect() {
             Ok(connection) => {
                 if !connection.is_connected() {
-                    debug!("Shared memory opened but telemetry is not connected yet");
+                    tracing::debug!("Shared memory opened but telemetry is not connected yet");
                     thread::sleep(poll_interval);
                     continue;
                 }
 
-                info!("Telemetry connected");
+                tracing::info!("Telemetry connected");
                 monitor_connected_session(simulation, process_name, connection, telemetry_wait);
                 return;
             }
             Err(err) => {
-                debug!(error = %err, "Telemetry shared memory not available yet");
+                tracing::debug!(error = %err, "Telemetry shared memory not available yet");
                 thread::sleep(poll_interval);
             }
         }
@@ -136,33 +134,33 @@ fn monitor_connected_session(
     connection: WindowsConnection,
     telemetry_wait: Duration,
 ) {
-    info!("Monitoring live telemetry session");
+    tracing::info!("Monitoring live telemetry session");
 
     loop {
         if !is_process_running(process_name).unwrap_or(false) {
-            info!("iRacing process exited; restarting monitor");
+            tracing::info!("iRacing process exited; restarting monitor");
             return;
         }
 
         if !simulation.check_sim_status() {
-            info!("Sim status dropped; restarting monitor");
+            tracing::info!("Sim status dropped; restarting monitor");
             return;
         }
 
         if !connection.is_connected() {
-            info!("Telemetry disconnected; restarting monitor");
+            tracing::info!("Telemetry disconnected; restarting monitor");
             return;
         }
 
         match connection.wait_for_update(telemetry_wait) {
             Ok(iracing_sdk::WaitResult::Signaled) => {
-                debug!("Telemetry update signaled");
+                tracing::debug!("Telemetry update signaled");
             }
             Ok(iracing_sdk::WaitResult::Timeout) => {
-                debug!("Telemetry wait timed out");
+                tracing::debug!("Telemetry wait timed out");
             }
             Err(err) => {
-                warn!(error = %err, "Telemetry wait failed; restarting monitor");
+                tracing::warn!(error = %err, "Telemetry wait failed; restarting monitor");
                 return;
             }
         }
@@ -175,7 +173,7 @@ fn process_still_ready(simulation: &Simulation, process_name: &str) -> bool {
         Ok(true) => simulation.check_sim_status(),
         Ok(false) => false,
         Err(err) => {
-            warn!(error = %err, "Process detection failed");
+            tracing::warn!(error = %err, "Process detection failed");
             false
         }
     }
