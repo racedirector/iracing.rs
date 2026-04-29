@@ -408,14 +408,14 @@ fn command_to_messages(command: SendCommand) -> Result<Vec<BroadcastCommand>> {
 fn build_camera_state(args: CameraStateArgs) -> Result<CameraState> {
     if let Some(raw_bits) = args.raw_bits {
         if !args.flags.is_empty() {
-            bail!("choose either --raw-bits or --flag values, not both");
+            anyhow::bail!("choose either --raw-bits or --flag values, not both");
         }
 
         return Ok(CameraState::from_bits_retain(raw_bits));
     }
 
     if args.flags.is_empty() {
-        bail!("camera set-state requires either --raw-bits or at least one --flag");
+        anyhow::bail!("camera set-state requires either --raw-bits or at least one --flag");
     }
 
     let mut state = CameraState::empty();
@@ -541,7 +541,7 @@ fn parse_u8_input(input: &str, min: u8, max: u8) -> Result<Option<u8>> {
     }
     let value = input.parse::<u8>()?;
     if value < min || value > max {
-        bail!("value must be in range {min}..={max}");
+        anyhow::bail!("value must be in range {min}..={max}");
     }
     Ok(Some(value))
 }
@@ -553,7 +553,7 @@ fn parse_u16_input(input: &str, min: u16, max: u16) -> Result<Option<u16>> {
     }
     let value = input.parse::<u16>()?;
     if value < min || value > max {
-        bail!("value must be in range {min}..={max}");
+        anyhow::bail!("value must be in range {min}..={max}");
     }
     Ok(Some(value))
 }
@@ -565,7 +565,7 @@ fn parse_u32_input(input: &str, min: u32, max: u32) -> Result<Option<u32>> {
     }
     let value = input.parse::<u32>()?;
     if value < min || value > max {
-        bail!("value must be in range {min}..={max}");
+        anyhow::bail!("value must be in range {min}..={max}");
     }
     Ok(Some(value))
 }
@@ -578,12 +578,12 @@ fn parse_f32_input(input: &str, min: Option<f32>, max: Option<f32>) -> Result<Op
     let value = input.parse::<f32>()?;
     if let Some(min) = min {
         if value < min {
-            bail!("value must be >= {min}");
+            anyhow::bail!("value must be >= {min}");
         }
     }
     if let Some(max) = max {
         if value > max {
-            bail!("value must be <= {max}");
+            anyhow::bail!("value must be <= {max}");
         }
     }
     Ok(Some(value))

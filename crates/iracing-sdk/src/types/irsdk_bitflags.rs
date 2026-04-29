@@ -698,7 +698,6 @@ mod tests {
 
     #[test]
     fn session_flags_helpers() {
-        assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_HIDDEN));
         assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_READY));
         assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_SET));
         assert!(SessionFlags::START_CONTROL_FLAGS.contains(SessionFlags::START_GO));

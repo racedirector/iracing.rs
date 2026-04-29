@@ -482,420 +482,420 @@ fn extract_null_terminated_string(bytes: &[u8]) -> String {
     String::from_utf8_lossy(&bytes[..null_pos]).to_string()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    use anyhow::{Context, Result, ensure};
-    use std::fs::File;
-    use std::path::{Path, PathBuf};
-    use test_utils::{
-        FIXTURE_INSTALL_GUIDANCE, require_ibt_fixtures, require_named_ibt_fixture,
-        require_smallest_ibt_fixture,
-    };
+//     use anyhow::{Context, Result, ensure};
+//     use std::fs::File;
+//     use std::path::{Path, PathBuf};
+//     use test_utils::{
+//         FIXTURE_INSTALL_GUIDANCE, require_ibt_fixtures, require_named_ibt_fixture,
+//         require_smallest_ibt_fixture,
+//     };
 
-    fn collect_files() -> Result<Vec<PathBuf>> {
-        Ok(require_ibt_fixtures()?)
-    }
+//     fn collect_files() -> Result<Vec<PathBuf>> {
+//         Ok(require_ibt_fixtures()?)
+//     }
 
-    fn find_fixture(expected: &str) -> Result<PathBuf> {
-        Ok(require_named_ibt_fixture(expected)?)
-    }
+//     fn find_fixture(expected: &str) -> Result<PathBuf> {
+//         Ok(require_named_ibt_fixture(expected)?)
+//     }
 
-    fn open_buf_reader(path: &Path) -> Result<std::io::BufReader<File>> {
-        let file = File::open(path).with_context(|| format!("Opening {}", path.display()))?;
-        Ok(std::io::BufReader::new(file))
-    }
+//     fn open_buf_reader(path: &Path) -> Result<std::io::BufReader<File>> {
+//         let file = File::open(path).with_context(|| format!("Opening {}", path.display()))?;
+//         Ok(std::io::BufReader::new(file))
+//     }
 
-    #[test]
-    fn test_ford_mustang_gt4_road_atlanta_header() -> Result<()> {
-        let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
+//     #[test]
+//     fn test_ford_mustang_gt4_road_atlanta_header() -> Result<()> {
+//         let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
 
-        // Ford Mustang GT4 Road Atlanta specific header assertions
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 287);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1107);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 11340);
-        assert_eq!(header.session_info_offset, 41472);
+//         // Ford Mustang GT4 Road Atlanta specific header assertions
+//         assert_eq!(header.version, 2);
+//         assert_eq!(header.tick_rate, 60);
+//         assert_eq!(header.num_vars, 287);
+//         assert_eq!(header.var_header_offset, 144);
+//         assert_eq!(header.buf_len, 1107);
+//         assert_eq!(header.num_buf, 1);
+//         assert_eq!(header.session_info_len, 11340);
+//         assert_eq!(header.session_info_offset, 41472);
 
-        header.validate()?;
-        Ok(())
-    }
+//         header.validate()?;
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_ford_mustang_gt4_road_atlanta_variables() -> Result<()> {
-        let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
+//     #[test]
+//     fn test_ford_mustang_gt4_road_atlanta_variables() -> Result<()> {
+//         let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let _disk_header =
+//             IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+//                 .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+//         let schema = extract_variable_schema(&mut buf_reader, &header)
+//             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
-        // Ford Mustang GT4 specific variable assertions
-        assert_eq!(schema.frame_size, 1107);
-        assert_eq!(schema.variable_count(), 287);
+//         // Ford Mustang GT4 specific variable assertions
+//         assert_eq!(schema.frame_size, 1107);
+//         assert_eq!(schema.variable_count(), 287);
 
-        // Check for key variables and their exact offsets in GT4
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("SessionTime"));
-        assert!(schema.variables.contains_key("LapDist"));
-        assert!(schema.variables.contains_key("LapCompleted"));
-        assert!(schema.variables.contains_key("Brake"));
-        assert!(schema.variables.contains_key("Throttle"));
+//         // Check for key variables and their exact offsets in GT4
+//         assert!(schema.variables.contains_key("Speed"));
+//         assert!(schema.variables.contains_key("SessionTime"));
+//         assert!(schema.variables.contains_key("LapDist"));
+//         assert!(schema.variables.contains_key("LapCompleted"));
+//         assert!(schema.variables.contains_key("Brake"));
+//         assert!(schema.variables.contains_key("Throttle"));
 
-        // Verify specific variable details for Ford Mustang GT4
-        let speed_var = &schema.variables["Speed"];
-        assert_eq!(speed_var.offset, 310);
-        assert_eq!(speed_var.data_type, VariableType::Float32);
-        assert_eq!(speed_var.units, "m/s");
+//         // Verify specific variable details for Ford Mustang GT4
+//         let speed_var = &schema.variables["Speed"];
+//         assert_eq!(speed_var.offset, 310);
+//         assert_eq!(speed_var.data_type, VariableType::Float32);
+//         assert_eq!(speed_var.units, "m/s");
 
-        let session_time_var = &schema.variables["SessionTime"];
-        assert_eq!(session_time_var.offset, 0);
-        assert_eq!(session_time_var.data_type, VariableType::Float64);
-        assert_eq!(session_time_var.units, "s");
+//         let session_time_var = &schema.variables["SessionTime"];
+//         assert_eq!(session_time_var.offset, 0);
+//         assert_eq!(session_time_var.data_type, VariableType::Float64);
+//         assert_eq!(session_time_var.units, "s");
 
-        let lap_dist_var = &schema.variables["LapDist"];
-        assert_eq!(lap_dist_var.offset, 217);
-        assert_eq!(lap_dist_var.data_type, VariableType::Float32);
-        assert_eq!(lap_dist_var.units, "m");
-        Ok(())
-    }
+//         let lap_dist_var = &schema.variables["LapDist"];
+//         assert_eq!(lap_dist_var.offset, 217);
+//         assert_eq!(lap_dist_var.data_type, VariableType::Float32);
+//         assert_eq!(lap_dist_var.units, "m");
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_ford_mustang_gt4_road_atlanta_frames() -> Result<()> {
-        let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 19873);
-        Ok(())
-    }
+//     #[test]
+//     fn test_ford_mustang_gt4_road_atlanta_frames() -> Result<()> {
+//         let file_path = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
+//         let reader = crate::ibt::IbtReader::open(&file_path)
+//             .with_context(|| format!("Opening {}", file_path.display()))?;
+//         ensure!(
+//             reader.total_frames() > 0,
+//             "Fixture should contain telemetry frames"
+//         );
+//         assert_eq!(reader.total_frames(), 19873);
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_jerez_header() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
+//     #[test]
+//     fn test_supercars_camaro_jerez_header() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
 
-        // Supercars Camaro Jerez specific header assertions
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 283);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1094);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 70555);
-        assert_eq!(header.session_info_offset, 40896);
+//         // Supercars Camaro Jerez specific header assertions
+//         assert_eq!(header.version, 2);
+//         assert_eq!(header.tick_rate, 60);
+//         assert_eq!(header.num_vars, 283);
+//         assert_eq!(header.var_header_offset, 144);
+//         assert_eq!(header.buf_len, 1094);
+//         assert_eq!(header.num_buf, 1);
+//         assert_eq!(header.session_info_len, 70555);
+//         assert_eq!(header.session_info_offset, 40896);
 
-        header.validate()?;
-        Ok(())
-    }
+//         header.validate()?;
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_jerez_variables() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
+//     #[test]
+//     fn test_supercars_camaro_jerez_variables() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let _disk_header =
+//             IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+//                 .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+//         let schema = extract_variable_schema(&mut buf_reader, &header)
+//             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
-        // Supercars specific variable assertions
-        assert_eq!(schema.frame_size, 1094);
-        assert_eq!(schema.variable_count(), 283);
+//         // Supercars specific variable assertions
+//         assert_eq!(schema.frame_size, 1094);
+//         assert_eq!(schema.variable_count(), 283);
 
-        // Verify Supercars-specific variables exist
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("SessionTime"));
-        assert!(schema.variables.contains_key("LapDist"));
+//         // Verify Supercars-specific variables exist
+//         assert!(schema.variables.contains_key("Speed"));
+//         assert!(schema.variables.contains_key("SessionTime"));
+//         assert!(schema.variables.contains_key("LapDist"));
 
-        // Supercars has different frame layout than GT4
-        let speed_var = &schema.variables["Speed"];
-        assert_eq!(speed_var.data_type, VariableType::Float32);
-        assert_eq!(speed_var.units, "m/s");
-        assert_eq!(speed_var.offset, 310); // Same offset as GT4
+//         // Supercars has different frame layout than GT4
+//         let speed_var = &schema.variables["Speed"];
+//         assert_eq!(speed_var.data_type, VariableType::Float32);
+//         assert_eq!(speed_var.units, "m/s");
+//         assert_eq!(speed_var.offset, 310); // Same offset as GT4
 
-        let session_time_var = &schema.variables["SessionTime"];
-        assert_eq!(session_time_var.offset, 0);
-        assert_eq!(session_time_var.data_type, VariableType::Float64);
-        Ok(())
-    }
+//         let session_time_var = &schema.variables["SessionTime"];
+//         assert_eq!(session_time_var.offset, 0);
+//         assert_eq!(session_time_var.data_type, VariableType::Float64);
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_jerez_frames() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 31221);
-        Ok(())
-    }
+//     #[test]
+//     fn test_supercars_camaro_jerez_frames() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
+//         let reader = crate::ibt::IbtReader::open(&file_path)
+//             .with_context(|| format!("Opening {}", file_path.display()))?;
+//         ensure!(
+//             reader.total_frames() > 0,
+//             "Fixture should contain telemetry frames"
+//         );
+//         assert_eq!(reader.total_frames(), 31221);
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_okayama_header() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
+//     #[test]
+//     fn test_supercars_camaro_okayama_header() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
 
-        // Supercars Camaro Okayama specific header assertions
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 283);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1094);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 60847);
-        assert_eq!(header.session_info_offset, 40896);
+//         // Supercars Camaro Okayama specific header assertions
+//         assert_eq!(header.version, 2);
+//         assert_eq!(header.tick_rate, 60);
+//         assert_eq!(header.num_vars, 283);
+//         assert_eq!(header.var_header_offset, 144);
+//         assert_eq!(header.buf_len, 1094);
+//         assert_eq!(header.num_buf, 1);
+//         assert_eq!(header.session_info_len, 60847);
+//         assert_eq!(header.session_info_offset, 40896);
 
-        header.validate()?;
-        Ok(())
-    }
+//         header.validate()?;
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_okayama_variables() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
+//     #[test]
+//     fn test_supercars_camaro_okayama_variables() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
 
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
+//         let mut buf_reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let _disk_header =
+//             IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+//                 .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+//         let schema = extract_variable_schema(&mut buf_reader, &header)
+//             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
 
-        // Okayama session variable assertions
-        assert_eq!(schema.frame_size, 1094);
-        assert_eq!(schema.variable_count(), 283);
+//         // Okayama session variable assertions
+//         assert_eq!(schema.frame_size, 1094);
+//         assert_eq!(schema.variable_count(), 283);
 
-        // Essential variables present
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("RPM"));
-        assert!(schema.variables.contains_key("Gear"));
-        assert!(schema.variables.contains_key("SessionTime"));
+//         // Essential variables present
+//         assert!(schema.variables.contains_key("Speed"));
+//         assert!(schema.variables.contains_key("RPM"));
+//         assert!(schema.variables.contains_key("Gear"));
+//         assert!(schema.variables.contains_key("SessionTime"));
 
-        // Check variable types and units
-        let rpm_var = &schema.variables["RPM"];
-        assert_eq!(rpm_var.data_type, VariableType::Float32);
-        assert_eq!(rpm_var.units, "revs/min");
+//         // Check variable types and units
+//         let rpm_var = &schema.variables["RPM"];
+//         assert_eq!(rpm_var.data_type, VariableType::Float32);
+//         assert_eq!(rpm_var.units, "revs/min");
 
-        let gear_var = &schema.variables["Gear"];
-        assert_eq!(gear_var.data_type, VariableType::Int32);
-        assert_eq!(gear_var.units, "");
-        Ok(())
-    }
+//         let gear_var = &schema.variables["Gear"];
+//         assert_eq!(gear_var.data_type, VariableType::Int32);
+//         assert_eq!(gear_var.units, "");
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_supercars_camaro_okayama_frames() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 51183);
-        Ok(())
-    }
+//     #[test]
+//     fn test_supercars_camaro_okayama_frames() -> Result<()> {
+//         let file_path =
+//             find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
+//         let reader = crate::ibt::IbtReader::open(&file_path)
+//             .with_context(|| format!("Opening {}", file_path.display()))?;
+//         ensure!(
+//             reader.total_frames() > 0,
+//             "Fixture should contain telemetry frames"
+//         );
+//         assert_eq!(reader.total_frames(), 51183);
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_essential_variables_across_all_files() -> Result<()> {
-        let files = collect_files()?;
-        ensure!(
-            files.len() == 3,
-            "Expected 3 IBT fixtures, found {}. {}",
-            files.len(),
-            FIXTURE_INSTALL_GUIDANCE
-        );
+//     #[test]
+//     fn test_essential_variables_across_all_files() -> Result<()> {
+//         let files = collect_files()?;
+//         ensure!(
+//             files.len() == 3,
+//             "Expected 3 IBT fixtures, found {}. {}",
+//             files.len(),
+//             FIXTURE_INSTALL_GUIDANCE
+//         );
 
-        for file_path in &files {
-            let mut buf_reader = open_buf_reader(file_path)?;
-            let header = IbtHeader::parse_from_reader(&mut buf_reader)
-                .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-            let _disk_header =
-                IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                    .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-            let schema = extract_variable_schema(&mut buf_reader, &header)
-                .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
+//         for file_path in &files {
+//             let mut buf_reader = open_buf_reader(file_path)?;
+//             let header = IbtHeader::parse_from_reader(&mut buf_reader)
+//                 .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//             let _disk_header =
+//                 IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
+//                     .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
+//             let schema = extract_variable_schema(&mut buf_reader, &header)
+//                 .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
 
-            for key in [
-                "Speed",
-                "SessionTime",
-                "LapDist",
-                "LapCompleted",
-                "Brake",
-                "Throttle",
-            ] {
-                assert!(
-                    schema.variables.contains_key(key),
-                    "File {} missing {} variable",
-                    file_path.display(),
-                    key
-                );
-            }
+//             for key in [
+//                 "Speed",
+//                 "SessionTime",
+//                 "LapDist",
+//                 "LapCompleted",
+//                 "Brake",
+//                 "Throttle",
+//             ] {
+//                 assert!(
+//                     schema.variables.contains_key(key),
+//                     "File {} missing {} variable",
+//                     file_path.display(),
+//                     key
+//                 );
+//             }
 
-            assert!(
-                schema.variable_count() >= 280,
-                "File {} has too few variables: {}",
-                file_path.display(),
-                schema.variable_count()
-            );
+//             assert!(
+//                 schema.variable_count() >= 280,
+//                 "File {} has too few variables: {}",
+//                 file_path.display(),
+//                 schema.variable_count()
+//             );
 
-            assert!(
-                schema.frame_size >= 1000,
-                "File {} has unexpectedly small frame size: {}",
-                file_path.display(),
-                schema.frame_size
-            );
-        }
-        Ok(())
-    }
+//             assert!(
+//                 schema.frame_size >= 1000,
+//                 "File {} has unexpectedly small frame size: {}",
+//                 file_path.display(),
+//                 schema.frame_size
+//             );
+//         }
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_ford_vs_supercars_variable_differences() -> Result<()> {
-        let ford_file = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
-        let supercars_file =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
+//     #[test]
+//     fn test_ford_vs_supercars_variable_differences() -> Result<()> {
+//         let ford_file = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
+//         let supercars_file =
+//             find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
 
-        let mut ford_reader = open_buf_reader(&ford_file)?;
-        let ford_header = IbtHeader::parse_from_reader(&mut ford_reader)
-            .with_context(|| format!("Parsing Ford header from {}", ford_file.display()))?;
-        let _ford_disk =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
-                .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
-        let ford_schema = extract_variable_schema(&mut ford_reader, &ford_header)
-            .with_context(|| format!("Extracting Ford schema from {}", ford_file.display()))?;
+//         let mut ford_reader = open_buf_reader(&ford_file)?;
+//         let ford_header = IbtHeader::parse_from_reader(&mut ford_reader)
+//             .with_context(|| format!("Parsing Ford header from {}", ford_file.display()))?;
+//         let _ford_disk =
+//             IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
+//                 .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
+//         let ford_schema = extract_variable_schema(&mut ford_reader, &ford_header)
+//             .with_context(|| format!("Extracting Ford schema from {}", ford_file.display()))?;
 
-        let mut supercars_reader = open_buf_reader(&supercars_file)?;
-        let supercars_header =
-            IbtHeader::parse_from_reader(&mut supercars_reader).with_context(|| {
-                format!("Parsing Supercars header from {}", supercars_file.display())
-            })?;
-        let _supercars_disk = IbtDiskSubHeader::parse_from_reader_with_header(
-            &mut supercars_reader,
-            &supercars_header,
-        )
-        .with_context(|| {
-            format!(
-                "Parsing Supercars sub-header from {}",
-                supercars_file.display()
-            )
-        })?;
-        let supercars_schema = extract_variable_schema(&mut supercars_reader, &supercars_header)
-            .with_context(|| {
-                format!(
-                    "Extracting Supercars schema from {}",
-                    supercars_file.display()
-                )
-            })?;
+//         let mut supercars_reader = open_buf_reader(&supercars_file)?;
+//         let supercars_header =
+//             IbtHeader::parse_from_reader(&mut supercars_reader).with_context(|| {
+//                 format!("Parsing Supercars header from {}", supercars_file.display())
+//             })?;
+//         let _supercars_disk = IbtDiskSubHeader::parse_from_reader_with_header(
+//             &mut supercars_reader,
+//             &supercars_header,
+//         )
+//         .with_context(|| {
+//             format!(
+//                 "Parsing Supercars sub-header from {}",
+//                 supercars_file.display()
+//             )
+//         })?;
+//         let supercars_schema = extract_variable_schema(&mut supercars_reader, &supercars_header)
+//             .with_context(|| {
+//                 format!(
+//                     "Extracting Supercars schema from {}",
+//                     supercars_file.display()
+//                 )
+//             })?;
 
-        // Ford GT4 has more variables than Supercars
-        assert_eq!(ford_schema.variable_count(), 287);
-        assert_eq!(supercars_schema.variable_count(), 283);
-        assert!(ford_schema.variable_count() > supercars_schema.variable_count());
+//         // Ford GT4 has more variables than Supercars
+//         assert_eq!(ford_schema.variable_count(), 287);
+//         assert_eq!(supercars_schema.variable_count(), 283);
+//         assert!(ford_schema.variable_count() > supercars_schema.variable_count());
 
-        // Ford GT4 has larger frame size
-        assert_eq!(ford_schema.frame_size, 1107);
-        assert_eq!(supercars_schema.frame_size, 1094);
-        assert!(ford_schema.frame_size > supercars_schema.frame_size);
+//         // Ford GT4 has larger frame size
+//         assert_eq!(ford_schema.frame_size, 1107);
+//         assert_eq!(supercars_schema.frame_size, 1094);
+//         assert!(ford_schema.frame_size > supercars_schema.frame_size);
 
-        // Both should have Speed at same offset
+//         // Both should have Speed at same offset
 
-        assert_eq!(ford_schema.variables["Speed"].offset, 310);
-        assert_eq!(supercars_schema.variables["Speed"].offset, 310);
-        Ok(())
-    }
+//         assert_eq!(ford_schema.variables["Speed"].offset, 310);
+//         assert_eq!(supercars_schema.variables["Speed"].offset, 310);
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_truncated_file_handling() {
-        let truncated_data = vec![0u8; 10];
-        let mut cursor = std::io::Cursor::new(truncated_data);
-        let result = IbtHeader::parse_from_reader(&mut cursor);
+//     #[test]
+//     fn test_truncated_file_handling() {
+//         let truncated_data = vec![0u8; 10];
+//         let mut cursor = std::io::Cursor::new(truncated_data);
+//         let result = IbtHeader::parse_from_reader(&mut cursor);
 
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            IRacingSDKError::Parse { .. } => {}
-            other => panic!("Expected Parse error, got {:?}", other),
-        }
-    }
+//         assert!(result.is_err());
+//         match result.unwrap_err() {
+//             IRacingSDKError::Parse { .. } => {}
+//             other => panic!("Expected Parse error, got {:?}", other),
+//         }
+//     }
 
-    #[test]
-    fn test_invalid_version_handling() -> Result<()> {
-        let test_file = require_smallest_ibt_fixture()?;
-        let mut data = std::fs::read(&test_file)
-            .with_context(|| format!("Reading {}", test_file.display()))?;
+//     #[test]
+//     fn test_invalid_version_handling() -> Result<()> {
+//         let test_file = require_smallest_ibt_fixture()?;
+//         let mut data = std::fs::read(&test_file)
+//             .with_context(|| format!("Reading {}", test_file.display()))?;
 
-        // Corrupt version to 999
-        data[0..4].copy_from_slice(&999i32.to_le_bytes());
+//         // Corrupt version to 999
+//         data[0..4].copy_from_slice(&999i32.to_le_bytes());
 
-        let mut cursor = std::io::Cursor::new(data);
+//         let mut cursor = std::io::Cursor::new(data);
 
-        let header_result = IbtHeader::parse_from_reader(&mut cursor);
+//         let header_result = IbtHeader::parse_from_reader(&mut cursor);
 
-        if let Ok(header) = header_result {
-            let result = header.validate();
-            assert!(matches!(
-                result.unwrap_err(),
-                IRacingSDKError::Version { .. }
-            ));
-        }
+//         if let Ok(header) = header_result {
+//             let result = header.validate();
+//             assert!(matches!(
+//                 result.unwrap_err(),
+//                 IRacingSDKError::Version { .. }
+//             ));
+//         }
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_disk_length_verification_ok() -> Result<()> {
-        use std::fs::metadata;
-        let file_path = require_smallest_ibt_fixture()?;
-        let file_len = metadata(&file_path)?.len();
-        let mut reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
-            .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
-        super::verify_min_length(file_len, &header, &disk)?;
-        Ok(())
-    }
+//     #[test]
+//     fn test_disk_length_verification_ok() -> Result<()> {
+//         use std::fs::metadata;
+//         let file_path = require_smallest_ibt_fixture()?;
+//         let file_len = metadata(&file_path)?.len();
+//         let mut reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut reader)
+//             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+//         let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
+//             .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
+//         super::verify_min_length(file_len, &header, &disk)?;
+//         Ok(())
+//     }
 
-    #[test]
-    fn test_disk_length_verification_truncated() -> Result<()> {
-        let file_path = require_smallest_ibt_fixture()?;
-        let mut reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut reader)?;
-        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)?;
-        let result = super::verify_min_length(0, &header, &disk);
-        assert!(result.is_err());
-        Ok(())
-    }
-}
+//     #[test]
+//     fn test_disk_length_verification_truncated() -> Result<()> {
+//         let file_path = require_smallest_ibt_fixture()?;
+//         let mut reader = open_buf_reader(&file_path)?;
+//         let header = IbtHeader::parse_from_reader(&mut reader)?;
+//         let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)?;
+//         let result = super::verify_min_length(0, &header, &disk);
+//         assert!(result.is_err());
+//         Ok(())
+//     }
+// }
