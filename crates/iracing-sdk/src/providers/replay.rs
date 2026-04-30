@@ -72,7 +72,13 @@ impl<TimerRuntime> ReplayProvider<TimerRuntime> {
     }
 
     fn pacing_interval(&self) -> Duration {
-        Duration::from_secs_f64(self.frame_interval.as_secs_f64() / self.speed)
+        let safe_speed = if self.speed > 0.0 {
+            self.speed
+        } else {
+            f64::EPSILON
+        };
+
+        Duration::from_secs_f64(self.frame_interval.as_secs_f64() / safe_speed)
     }
 }
 

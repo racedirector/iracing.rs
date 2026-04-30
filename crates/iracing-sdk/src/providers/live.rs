@@ -74,6 +74,7 @@ where
     async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         let mut no_connection_count = 0u32;
         const MAX_NO_CONNECTION_ATTEMPTS: u32 = 600;
+        const NO_CONNECTION_SLEEP: Duration = Duration::from_millis(500);
 
         loop {
             if !self.connection.is_connected() {
@@ -82,9 +83,10 @@ where
                 if no_connection_count == 1 {
                     tracing::info!("Waiting for iRacing to start a session...");
                 } else if no_connection_count % 20 == 0 {
+                    let elapsed = NO_CONNECTION_SLEEP.saturating_mul(no_connection_count);
                     tracing::debug!(
                         "Waiting for iRacing to start a session ({}s elapsed)",
-                        no_connection_count / 2
+                        elapsed.as_secs()
                     );
                 }
 
@@ -93,7 +95,7 @@ where
                     return Ok(None);
                 }
 
-                TimerRuntime::sleep(Duration::from_millis(500)).await;
+                TimerRuntime::sleep(NO_CONNECTION_SLEEP).await;
                 continue;
             }
 
@@ -139,25 +141,37 @@ where
         }
     }
 
-    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        let raw_yaml = match self.connection.session_info() {
-            Some(yaml) => yaml,
-            None => {
-                tracing::debug!("No session info available");
+        // Get the last session version
+        let session_version = self.connection.session_info_update() as u32;
+
+        // If session versions do not match, there is likely an update
+        if session_version != version {
+            // Attempt to read the session info
+            let raw_yaml = match self.connection.session_info() {
+                Some(yaml) => yaml,
+                None => {
+                    tracing::debug!("No session info available");
+                    return Ok(None);
+                }
+            };
+
+            // Handle empty string
+            if raw_yaml.trim().is_empty() {
                 return Ok(None);
             }
-        };
 
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
+            // Parse the yaml string
+            let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
+
+            // Return it
+            tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
+            return Ok(Some(cleaned_yaml));
         }
 
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-
-        Ok(Some(cleaned_yaml))
+        // Session versions match, there is no update.
+        Ok(None)
     }
 }

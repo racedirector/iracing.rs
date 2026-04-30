@@ -31,7 +31,7 @@ pub trait Timer {
     fn sleep(duration: Duration) -> impl Future<Output = ()>;
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, not(target_arch = "wasm32")))]
 /// Runtime hook for offloading Windows event waits from async providers.
 pub trait WaitRuntime {
     /// Wait for the next live telemetry signal without coupling providers to a runtime.

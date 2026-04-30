@@ -37,16 +37,14 @@ use anyhow::Result;
 use iracing_sdk::WindowsConnection;
 #[cfg(windows)]
 use iracing_sdk::schema::header::IRSDKHeader;
-#[cfg(windows)]
-use tracing::info;
-use tracing_subscriber::EnvFilter;
 
 fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
     // ------------------------------------------------------------
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     run()
@@ -54,18 +52,18 @@ fn main() -> Result<()> {
 
 #[cfg(windows)]
 fn run() -> Result<()> {
-    info!("Opening iRacing connection...");
+    tracing::info!("Opening iRacing connection...");
     let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
 
-    info!("Reading live header bytes");
+    tracing::info!("Reading live header bytes");
     let header_ptr = connection.header() as *const iracing_sdk::windows::IRSDKHeader as *const u8;
     let header_bytes =
         unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
 
-    info!("Parsing live header");
+    tracing::info!("Parsing live header");
     let header = IRSDKHeader::parse_from_memory(header_bytes)?;
 
-    println!("IRSDKHeader:\n{:#?}", header);
+    tracing::info!("IRSDKHeader:\n{:#?}", header);
 
     Ok(())
 }

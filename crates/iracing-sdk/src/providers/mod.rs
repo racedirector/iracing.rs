@@ -27,10 +27,10 @@ mod replay;
 mod live;
 
 pub use ibt::IbtProvider;
-pub use replay::ReplayProvider;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use live::DefaultLiveProvider;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use live::LiveProvider;
+pub use replay::ReplayProvider;

@@ -69,7 +69,7 @@ async fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "setup-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );

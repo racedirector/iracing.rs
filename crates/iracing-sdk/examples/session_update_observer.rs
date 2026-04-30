@@ -62,7 +62,7 @@ async fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "session-update-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
@@ -82,7 +82,9 @@ fn log_session_info_diff(previous: Option<&SessionInfo>, current: &SessionInfo) 
             collect_value_diff("$", &previous_value, &current_value, &mut changes);
 
             if changes.is_empty() {
-                tracing::info!("Session info update received, but no parsed field changes were detected.");
+                tracing::info!(
+                    "Session info update received, but no parsed field changes were detected."
+                );
             } else {
                 tracing::info!("Session info update changed {} field(s):", changes.len());
                 for change in changes {
