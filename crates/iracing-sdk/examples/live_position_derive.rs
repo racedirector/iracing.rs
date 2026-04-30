@@ -33,17 +33,14 @@ struct Row {
     /// !!!: iRacing uses EPSG:3857 for coordinates.
     /// Latitude in decimal degrees. Unit: deg.
     #[field_name = "Lat"]
-    #[fail_if_missing]
     latitude: f64,
 
     /// Longitude in decimal degrees. Unit: deg.
     #[field_name = "Lon"]
-    #[fail_if_missing]
     longitude: f64,
 
     /// Altitude. Unit: m.
     #[field_name = "Alt"]
-    #[fail_if_missing]
     altitude: f32,
 
     /// Whether the car is currently on pit road.
