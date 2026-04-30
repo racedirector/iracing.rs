@@ -72,6 +72,8 @@ fn run() -> Result<()> {
 
 #[cfg(not(windows))]
 fn run() -> Result<()> {
+    use anyhow::anyhow;
+
     tracing::warn!(
         "live-headers is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
