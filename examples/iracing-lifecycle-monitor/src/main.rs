@@ -26,7 +26,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     run()
@@ -126,6 +126,9 @@ fn monitor_telemetry(simulation: &Simulation, poll_interval: Duration, telemetry
                 tracing::info!("Telemetry connected");
                 monitor_connected_session(simulation, connection, poll_interval, telemetry_wait);
                 return;
+            }
+            Err(_) => {
+                continue;
             }
         }
     }
