@@ -100,4 +100,8 @@ where
     async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
         self.ibt_provider.session_yaml(version).await
     }
+
+    fn tick_rate(&self) -> f64 {
+        self.tick_rate
+    }
 }

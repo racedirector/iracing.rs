@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use gloo_timers::future::TimeoutFuture;
 
+/// Timer implementation for `wasm32` targets.
 pub struct WasmTimer;
 
 impl super::Timer for WasmTimer {
