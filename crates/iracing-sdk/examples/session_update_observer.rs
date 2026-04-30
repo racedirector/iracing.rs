@@ -47,8 +47,11 @@ async fn run() -> Result<()> {
 
                 if current_update != previous_session_info_update
                     && let Some(session_info_yaml) = connection.session_info()
-                    && let Some(session_info) = SessionInfo::parse(&session_info_yaml).ok()
                 {
+                    let session_info = SessionInfo::parse(&session_info_yaml).map_err(|err| {
+                        anyhow!("failed to parse session info update {current_update}: {err}")
+                    })?;
+
                     log_session_info_diff(previous_session_info.as_ref(), &session_info)?;
                     previous_session_info = Some(session_info);
                     previous_session_info_update = current_update;
@@ -56,7 +59,7 @@ async fn run() -> Result<()> {
                 continue;
             }
             Ok(WaitResult::Timeout) => continue,
-            Err(err) => return Err(anyhow!("{}", err.to_string())),
+            Err(err) => return Err(anyhow!("{}", err)),
         }
     }
 }

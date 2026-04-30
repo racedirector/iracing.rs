@@ -64,7 +64,7 @@ async fn run() -> Result<()> {
                 continue;
             }
             Ok(WaitResult::Timeout) => continue,
-            Err(err) => return Err(anyhow!("{}", err.to_string())),
+            Err(err) => return Err(anyhow!("{}", err)),
         }
     }
 }

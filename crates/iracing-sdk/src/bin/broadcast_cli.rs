@@ -231,7 +231,7 @@ fn run() -> Result<()> {
 
     #[cfg(windows)]
     {
-        return run_windows(cli);
+        run_windows(cli)
     }
 
     #[cfg(not(windows))]

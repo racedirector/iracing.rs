@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
@@ -101,7 +101,7 @@ async fn run() -> Result<()> {
     tracing::warn!(
         "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
-    Err(anyhow!(
+    Err(anyhow::anyhow!(
         "live-position example is only supported on Windows"
     ))
 }

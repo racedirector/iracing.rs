@@ -111,7 +111,7 @@ fn run() -> Result<()> {
 
             if wait_ticks == 1 {
                 info!("Waiting for iRacing to start a session...");
-            } else if wait_ticks % 20 == 0 {
+            } else if wait_ticks.is_multiple_of(20) {
                 debug!(
                     "Still waiting for iRacing session ({}s elapsed)",
                     wait_ticks / 2
