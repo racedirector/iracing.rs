@@ -46,11 +46,13 @@ fn run() -> Result<()> {
     }
 }
 
+/// Waits for the iRacing process to start running.
 #[cfg(windows)]
 fn wait_for_process(poll_interval: Duration) -> Result<()> {
     tracing::info!("Waiting for iRacing process");
 
     loop {
+        // If the iRacing process is running, return
         match is_iracing_process_running() {
             Ok(true) => {
                 tracing::info!("Detected iRacing process");
@@ -67,11 +69,16 @@ fn wait_for_process(poll_interval: Duration) -> Result<()> {
     }
 }
 
+/// Waits for the simulation to return that it's running via iracing_simulation.
 #[cfg(windows)]
 fn wait_for_sim_status(simulation: &Simulation, poll_interval: Duration) -> Result<()> {
     tracing::info!("Waiting for iRacing sim status endpoint to report running");
 
+    // Ensure the process is still running and check the sim status
     loop {
+        // If the process is still running, check sim status.
+        // If the process is not still running, bail
+        // If there is an error checking the process status, sleep and try again.
         match is_iracing_process_running() {
             Ok(true) => {}
             Ok(false) => {
@@ -84,8 +91,8 @@ fn wait_for_sim_status(simulation: &Simulation, poll_interval: Duration) -> Resu
                 continue;
             }
         }
-        }
 
+        // Check if the sim is connected
         if simulation.check_sim_status() {
             tracing::info!("Sim status endpoint reports running");
             return Ok(());
@@ -100,13 +107,16 @@ fn monitor_telemetry(simulation: &Simulation, poll_interval: Duration, telemetry
     tracing::info!("Waiting for live telemetry shared memory");
 
     loop {
+        // If the process is not still running (detected process, and sim reports connected), bail
         if !process_still_ready(simulation) {
             tracing::info!("Process or sim status became unavailable before telemetry connected");
             return;
         }
 
+        // Attempt to connect
         match WindowsConnection::try_connect() {
             Ok(connection) => {
+                // If not connected, try again
                 if !connection.is_connected() {
                     tracing::debug!("Shared memory opened but telemetry is not connected yet");
                     thread::sleep(poll_interval);
@@ -117,19 +127,6 @@ fn monitor_telemetry(simulation: &Simulation, poll_interval: Duration, telemetry
                 monitor_connected_session(simulation, connection, poll_interval, telemetry_wait);
                 return;
             }
-
-fn monitor_connected_session(
-    simulation: &Simulation,
-    connection: WindowsConnection,
-    poll_interval: Duration,
-    telemetry_wait: Duration,
-) {
-                return;
-            }
-            Err(err) => {
-                tracing::debug!(error = %err, "Telemetry shared memory not available yet");
-                thread::sleep(poll_interval);
-            }
         }
     }
 }
@@ -138,11 +135,13 @@ fn monitor_connected_session(
 fn monitor_connected_session(
     simulation: &Simulation,
     connection: WindowsConnection,
+    poll_interval: Duration,
     telemetry_wait: Duration,
 ) {
     tracing::info!("Monitoring live telemetry session");
 
     loop {
+        // Check if the process is running
         match is_iracing_process_running() {
             Ok(true) => {}
             Ok(false) => {
@@ -156,16 +155,19 @@ fn monitor_connected_session(
             }
         }
 
+        // Check if the sim is connected
         if !simulation.check_sim_status() {
             tracing::info!("Sim status dropped; restarting monitor");
             return;
         }
 
+        // Check if the telemetry is connected
         if !connection.is_connected() {
             tracing::info!("Telemetry disconnected; restarting monitor");
             return;
         }
 
+        // Wait for an update
         match connection.wait_for_update(telemetry_wait) {
             Ok(iracing_sdk::WaitResult::Signaled) => {
                 tracing::debug!("Telemetry update signaled");
