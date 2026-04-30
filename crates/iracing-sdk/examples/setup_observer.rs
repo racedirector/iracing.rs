@@ -9,6 +9,7 @@ use iracing_sdk::SessionInfo;
 use iracing_sdk::WaitResult;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
+#[cfg(windows)]
 use serde_yaml_ng::to_string;
 use tracing_subscriber::EnvFilter;
 
