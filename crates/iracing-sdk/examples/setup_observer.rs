@@ -71,7 +71,7 @@ async fn run() -> Result<()> {
 #[cfg(not(windows))]
 fn run() -> Result<()> {
     tracing::warn!(
-        "live-session-parser is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        "setup-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
-    Err(anyhow!("live-session-parser is only supported on Windows"))
+    Err(anyhow!("setup-observer is only supported on Windows"))
 }

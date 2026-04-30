@@ -126,6 +126,10 @@ name = "adapter-enum-bitfields-live"
 path = "examples/adapter_enum_bitfields_live.rs"
 
 [[example]]
+name = "session-update-observer"
+path = "examples/session_update_observer.rs"
+
+[[example]]
 name = "setup-observer"
 path = "examples/setup_observer.rs"
 
