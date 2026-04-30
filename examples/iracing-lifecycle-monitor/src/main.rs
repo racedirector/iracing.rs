@@ -72,9 +72,18 @@ fn wait_for_sim_status(simulation: &Simulation, poll_interval: Duration) -> Resu
     tracing::info!("Waiting for iRacing sim status endpoint to report running");
 
     loop {
-        if !is_iracing_process_running()? {
-            tracing::info!("iRacing process exited before sim status became ready");
-            return Ok(());
+        match is_iracing_process_running() {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::info!("iRacing process exited before sim status became ready");
+                return Ok(());
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "Process detection failed while waiting for sim status; retrying");
+                thread::sleep(poll_interval);
+                continue;
+            }
+        }
         }
 
         if simulation.check_sim_status() {
