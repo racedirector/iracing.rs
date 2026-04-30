@@ -114,7 +114,16 @@ fn monitor_telemetry(simulation: &Simulation, poll_interval: Duration, telemetry
                 }
 
                 tracing::info!("Telemetry connected");
-                monitor_connected_session(simulation, connection, telemetry_wait);
+                monitor_connected_session(simulation, connection, poll_interval, telemetry_wait);
+                return;
+            }
+
+fn monitor_connected_session(
+    simulation: &Simulation,
+    connection: WindowsConnection,
+    poll_interval: Duration,
+    telemetry_wait: Duration,
+) {
                 return;
             }
             Err(err) => {
