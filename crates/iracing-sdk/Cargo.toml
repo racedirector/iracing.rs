@@ -125,6 +125,10 @@ path = "examples/adapter_live_position.rs"
 name = "adapter-enum-bitfields-live"
 path = "examples/adapter_enum_bitfields_live.rs"
 
+[[example]]
+name = "setup-observer"
+path = "examples/setup_observer.rs"
+
 [[bin]]
 name = "broadcast-cli"
 path = "src/bin/broadcast_cli.rs"
