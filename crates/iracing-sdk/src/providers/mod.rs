@@ -6,19 +6,19 @@ use crate::{FramePacket, Result};
 /// `Ok(None)` (end of file) or an error. When `session_version` on a
 /// [`FramePacket`] changes, call [`Provider::session_yaml`] with the new
 /// version to retrieve updated session info YAML.
-pub trait Provider: Send + 'static {
+#[async_trait::async_trait(?Send)]
+pub trait Provider {
     /// Return the next telemetry frame, or `Ok(None)` when the source is exhausted.
-    fn next_frame(&mut self) -> Result<Option<FramePacket>>;
+    async fn next_frame(&mut self) -> Result<Option<FramePacket>>;
 
     /// Return the session info YAML for `version`, or `Ok(None)` if unchanged.
-    fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
+    async fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
 }
 
 /// IBT file provider.
 mod ibt;
 
 /// Replay IBT provider.
-#[cfg(feature = "tokio")]
 mod replay;
 
 /// Live shared-memory provider (Windows only).
@@ -27,6 +27,10 @@ mod replay;
 mod live;
 
 pub use ibt::IbtProvider;
+pub use replay::ReplayProvider;
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use live::DefaultLiveProvider;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use live::LiveProvider;

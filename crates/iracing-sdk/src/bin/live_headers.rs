@@ -32,7 +32,7 @@
 //! cargo run -p iracing-sdk --bin live_headers
 //! ```
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 #[cfg(windows)]

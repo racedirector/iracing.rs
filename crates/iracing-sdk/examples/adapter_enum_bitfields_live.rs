@@ -2,7 +2,7 @@ use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
 #[cfg(windows)]
 use iracing_sdk::{BitField, IRacingSDKError, VarData};
 
@@ -78,20 +78,21 @@ impl FrameAdapter for TelemetryRow {
     }
 }
 
-fn main() -> Result<()> {
-    run()
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    run().await
 }
 
 #[cfg(windows)]
-fn run() -> Result<()> {
-    use iracing_sdk::Provider;
+async fn run() -> Result<()> {
+    use iracing_sdk::{DefaultLiveProvider, Provider};
 
     let args = Args::parse();
-    let mut provider = LiveProvider::new()?;
+    let mut provider = DefaultLiveProvider::new()?;
     let validation = TelemetryRow::validate_schema(&provider.schema())?;
 
     let mut seen = 0usize;
-    while let Some(packet) = provider.next_frame()? {
+    while let Some(packet) = provider.next_frame().await? {
         if seen >= args.max_frames {
             break;
         }
@@ -116,7 +117,7 @@ fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     Err(anyhow::anyhow!(
         "enum-bitfields-live example is only supported on Windows"
     ))

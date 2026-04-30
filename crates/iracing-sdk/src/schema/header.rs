@@ -387,18 +387,26 @@ impl IRSDKHeader {
 /// Essential schema information extracted from header
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaInfo {
+    /// Number of variables described by the header.
     pub num_vars: i32,
+    /// Byte offset to the variable header table.
     pub var_header_offset: i32,
+    /// Session info update counter from the source header.
     pub session_info_update: i32,
+    /// Session info payload length in bytes.
     pub session_info_len: i32,
+    /// Byte offset to the session info YAML payload.
     pub session_info_offset: i32,
 }
 
 /// Buffer management information
 #[derive(Debug, Clone, Copy)]
 pub struct BufferInfo {
+    /// Number of rotating telemetry buffers.
     pub num_buffers: i32,
+    /// Length in bytes of each telemetry buffer.
     pub buffer_length: i32,
+    /// Metadata for each telemetry buffer slot.
     pub buffers: [IRSDKVarBuf; 4],
 }
 

@@ -242,6 +242,7 @@ fn encode_pit(command: PitCommand) -> (u16, u16) {
     command.encode()
 }
 
+/// Client for sending iRacing broadcast commands over the Win32 broadcast channel.
 pub struct Broadcast {
     message_id: u32,
 }

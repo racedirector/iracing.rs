@@ -36,8 +36,9 @@ impl IbtProvider {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Provider for IbtProvider {
-    fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
+    async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         let total_frames = self.reader.total_frames();
         if self.reader.current_frame() >= total_frames {
             tracing::debug!("End of IBT frames");
@@ -65,7 +66,7 @@ impl Provider for IbtProvider {
         Ok(Some(packet))
     }
 
-    fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
         // Get cleaned YAML from IBT file
         // IBT files have static session info, version parameter is ignored
         self.reader.session_yaml()

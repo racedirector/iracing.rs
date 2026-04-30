@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::IRacingSDKError;
 #[cfg(windows)]
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
 #[cfg(windows)]
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
@@ -150,7 +150,8 @@ impl FrameAdapter for Row {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -158,25 +159,25 @@ fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
+    run().await
 }
 
 #[cfg(windows)]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     use csv::Writer;
-    use iracing_sdk::Provider;
+    use iracing_sdk::{DefaultLiveProvider, Provider};
     use tracing::info;
 
     let Args { csv_output_path } = Args::parse();
 
-    let mut live_provider = LiveProvider::new().expect("Could not create LiveProvider");
+    let mut live_provider = DefaultLiveProvider::new().expect("Could not create LiveProvider");
     let schema = live_provider.schema();
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
     info!("Parsing frames from live connection");
 
     let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = live_provider.next_frame()? {
+    while let Some(packet) = live_provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         writer.serialize(frame)?;
     }
@@ -188,7 +189,7 @@ fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );

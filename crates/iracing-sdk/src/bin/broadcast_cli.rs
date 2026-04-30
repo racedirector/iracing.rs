@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 #[cfg(windows)]
 use iracing_sdk::windows::{Broadcast, BroadcastCommand, PitCommand};

@@ -6,7 +6,6 @@
 use crate::{IRacingSDKError, Result};
 use std::ptr::NonNull;
 use std::time::Duration;
-use tracing::{debug, trace, warn};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Memory::{
     FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile,
@@ -31,8 +30,11 @@ const IRSDK_MAX_BUFS: usize = 4;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct VarBuf {
+    /// Tick count associated with this buffer snapshot.
     pub tick_count: i32, // Used to detect changes in data
+    /// Offset from the header to this buffer's telemetry payload.
     pub buf_offset: i32, // Offset from header
+    /// Reserved padding to preserve the C layout.
     pub pad: [i32; 2],   // 16-byte alignment
 }
 
@@ -93,29 +95,43 @@ impl IRSDKVarHeader {
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKHeader {
+    /// SDK header version.
     pub ver: i32,       // API header version (should be IRSDK_VER)
+    /// Connection status bitfield.
     pub status: i32,    // Bitfield using status flags
+    /// Telemetry tick rate reported by iRacing.
     pub tick_rate: i32, // Ticks per second (60 or 360 etc)
 
     // Session information, updated periodically
+    /// Incremented when session YAML changes.
     pub session_info_update: i32, // Incremented when session info changes
+    /// Length in bytes of the session info payload.
     pub session_info_len: i32,    // Length in bytes of session info string
+    /// Offset from the header to the session info payload.
     pub session_info_offset: i32, // Session info, encoded in YAML format
 
     // State data, output at tick_rate
+    /// Number of variables described by the variable header table.
     pub num_vars: i32,          // Length of array pointed to by var_header_offset
+    /// Offset from the header to the variable header table.
     pub var_header_offset: i32, // Offset to variable header array
 
+    /// Number of rotating telemetry buffers.
     pub num_buf: i32,                      // Number of buffers (<= IRSDK_MAX_BUFS)
+    /// Length in bytes of each telemetry buffer.
     pub buf_len: i32,                      // Length in bytes for one line
+    /// Reserved padding to preserve the C layout.
     pub pad1: [i32; 2],                    // 16-byte alignment
+    /// Rotating telemetry buffers managed by iRacing.
     pub var_buf: [VarBuf; IRSDK_MAX_BUFS], // Buffers of data being written to
 }
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitResult {
+    /// The telemetry event was signaled before the timeout elapsed.
     Signaled,
+    /// The wait timed out without a new telemetry signal.
     Timeout,
 }
 
@@ -130,7 +146,7 @@ pub struct Connection {
 impl Connection {
     /// Attempt to connect to iRacing shared memory
     pub fn try_connect() -> Result<Self> {
-        trace!("Attempting to connect to iRacing shared memory");
+        tracing::trace!("Attempting to connect to iRacing shared memory");
 
         // Open the memory mapping
         let mapping = unsafe {
@@ -171,9 +187,9 @@ impl Connection {
         // Validate the connection
         connection.validate_connection()?;
 
-        debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
+        tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
 
-        debug!("Successfully connected to iRacing shared memory");
+        tracing::debug!("Successfully connected to iRacing shared memory");
         Ok(connection)
     }
 
@@ -190,18 +206,35 @@ impl Connection {
 
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
-        let ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-        trace!(timeout_ms = ms, "Waiting for telemetry update");
+        let timeout_ms = crate::runtime::duration_to_timeout_ms(timeout);
+        Self::wait_for_event(self.event, timeout_ms)
+    }
 
-        let result = unsafe { WaitForSingleObject(self.event, ms) };
+    pub(crate) fn event_handle_raw(&self) -> usize {
+        self.event.0 as usize
+    }
+
+    pub(crate) fn wait_for_event_handle(
+        event_handle: usize,
+        timeout: Duration,
+    ) -> Result<WaitResult> {
+        let event = HANDLE(event_handle as *mut std::ffi::c_void);
+        let timeout_ms = crate::runtime::duration_to_timeout_ms(timeout);
+        Self::wait_for_event(event, timeout_ms)
+    }
+
+    fn wait_for_event(event: HANDLE, timeout_ms: u32) -> Result<WaitResult> {
+        tracing::trace!(timeout_ms, "Waiting for telemetry update");
+
+        let result = unsafe { WaitForSingleObject(event, timeout_ms) };
 
         match result {
             WAIT_OBJECT_0 => {
-                debug!("Telemetry update signaled");
+                tracing::debug!("Telemetry update signaled");
                 Ok(WaitResult::Signaled)
             }
             WAIT_TIMEOUT => {
-                trace!("Wait timed out");
+                tracing::trace!("Wait timed out");
                 Ok(WaitResult::Timeout)
             }
             _ => {
@@ -214,62 +247,10 @@ impl Connection {
         }
     }
 
-    /// Wait for new telemetry data (async - cooperative, non-blocking)
-    ///
-    /// This method uses `spawn_blocking` to isolate the synchronous Windows event wait
-    /// on a dedicated blocking thread pool, preventing starvation of other async tasks.
-    /// The async worker thread yields cooperatively via `.await` while the blocking
-    /// thread waits for the Windows event signal.
-    ///
-    /// At 60Hz (16.67ms frames), the hot path (data already available) never reaches
-    /// this method, so spawn_blocking overhead is only paid during startup, pauses,
-    /// or frame drops - exactly when we want cooperative yielding anyway.
-    #[cfg(feature = "tokio")]
-    pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
-        // Convert HANDLE to raw pointer value (usize) to make it Send
-        // SAFETY: Windows event handles are thread-safe kernel objects
-        let event_raw = self.event.0 as usize;
-        let timeout_ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-
-        tokio::task::spawn_blocking(move || {
-            trace!(timeout_ms, "Async waiting for Windows event");
-
-            // Reconstruct HANDLE from raw pointer value
-            // SAFETY: event_raw came from a valid HANDLE, kernel object is still alive
-            let event = HANDLE(event_raw as *mut std::ffi::c_void);
-            let result = unsafe { WaitForSingleObject(event, timeout_ms) };
-
-            match result {
-                WAIT_OBJECT_0 => {
-                    trace!("Event signaled");
-                    Ok(WaitResult::Signaled)
-                }
-                WAIT_TIMEOUT => {
-                    trace!("Event wait timed out");
-                    Ok(WaitResult::Timeout)
-                }
-                _ => {
-                    let win_err = windows::core::Error::from_thread();
-                    Err(IRacingSDKError::windows_api_error(
-                        "WaitForSingleObject",
-                        win_err,
-                    ))
-                }
-            }
-        })
-        .await
-        .map_err(|e| {
-            IRacingSDKError::buffer_operation_error(
-                format!("Event wait task panicked: {}", e),
-                None,
-            )
-        })?
-    }
-
     /// Get latest telemetry data if available
     pub fn get_new_data(&mut self) -> Option<&[u8]> {
         if !self.is_connected() {
-            debug!("Not connected to iRacing");
+            tracing::debug!("Not connected to iRacing");
             self.last_tick_count = i32::MAX;
             return None;
         }
@@ -280,22 +261,25 @@ impl Connection {
         let latest_buf_idx = self.find_latest_buffer(header);
         let latest_buf = &header.var_buf[latest_buf_idx];
 
-        debug!(
+        tracing::debug!(
             "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
-            self.last_tick_count, latest_buf.tick_count, latest_buf_idx
+            self.last_tick_count,
+            latest_buf.tick_count,
+            latest_buf_idx
         );
 
         // Check if we have new data
         if self.last_tick_count == latest_buf.tick_count {
-            trace!("No new data (same tick count)");
+            tracing::trace!("No new data (same tick count)");
             return None;
         }
 
         // Handle potential tick count reset or wraparound
         if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
-            debug!(
+            tracing::debug!(
                 "Tick count reset detected: {} -> {}",
-                self.last_tick_count, latest_buf.tick_count
+                self.last_tick_count,
+                latest_buf.tick_count
             );
         }
 
@@ -309,14 +293,14 @@ impl Connection {
 
             if tick_before == tick_after {
                 self.last_tick_count = tick_before;
-                debug!(
+                tracing::debug!(
                     "Returning new data: tick={}, size={} bytes",
                     tick_before,
                     data_slice.len()
                 );
                 return Some(data_slice);
             } else {
-                debug!(
+                tracing::debug!(
                     "Data consistency check failed on attempt {}: before={}, after={}",
                     attempt + 1,
                     tick_before,
@@ -325,7 +309,7 @@ impl Connection {
             }
         }
 
-        warn!("Failed consistency checks, no data returned");
+        tracing::warn!("Failed consistency checks, no data returned");
         None
     }
 
@@ -403,7 +387,7 @@ impl Connection {
             });
         }
 
-        debug!(
+        tracing::debug!(
             ver = header.ver,
             num_vars = header.num_vars,
             num_buf = header.num_buf,

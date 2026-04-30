@@ -5,7 +5,7 @@ Low-level iRacing telemetry parsing utilities for Rust.
 This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
-- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
+- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `DefaultLiveProvider` is the Windows-only live source
 - Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
@@ -13,7 +13,7 @@ This crate provides:
 ## Start Here
 
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
-2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
+2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `DefaultLiveProvider` on Windows when you want the live source.
 3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
 4. For session YAML parsing and caching, rely on `SessionInfoParser`.
 5. On Windows, use `WindowsConnection` for live telemetry.
@@ -139,13 +139,12 @@ impl FrameAdapter for Row {
 | `codegen` | Enables JSON schema generation helpers such as `session_root_schema`. |
 | `derive` | Re-exports telemetry adapter derive macros from `iracing-sdk-derive`, including `IRacingTelemetryFrame`. |
 | `schema-discovery` | Enables collection/overlay of unknown session fields (used with `codegen`). |
-| `tokio` | Enables async `wait_for_update_async` for Windows live telemetry. |
 | `benchmark` | Enables benchmark targets. |
 
 ## Adapter Surface
 
 - `FramePacket` — raw frame payload plus tick, session version, and schema.
-- `Provider` — frame source abstraction implemented by `IbtProvider`, with `LiveProvider` available only on Windows.
+- `Provider` — async frame source abstraction implemented by `IbtProvider`, with `LiveProvider` and `DefaultLiveProvider` available on Windows.
 - `FrameAdapter` — two-phase validation/extraction trait for typed rows.
 - `AdapterValidation`, `FieldExtraction`, `DefaultValue`, `SchemaProvider` — adapter planning helpers.
 - `DynamicFrame` — by-name lookup helper for debugging and exploratory analysis.

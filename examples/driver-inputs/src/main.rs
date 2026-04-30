@@ -79,7 +79,8 @@ impl Drop for FlagObserver {
 /// // From code/tests you can invoke the entrypoint directly (no runtime side-effects in this doctest).
 /// let _ = crate::main();
 /// ```
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -115,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let shared_validation = DriverInput::validate_schema(&schema)?;
-    while let Some(packet) = ibt_provider.next_frame()? {
+    while let Some(packet) = ibt_provider.next_frame().await? {
         let frame = DriverInput::adapt(&packet, &shared_validation);
         flag_observer.observe(frame.flags)?;
 

@@ -13,13 +13,13 @@
 //!   - [`IbtReader`]
 //!   - [`types::VariableSchema`], [`types::VarData`]
 //! - Streaming adapter path:
-//!   - [`FramePacket`], [`Provider`], [`IbtProvider`], [`DynamicFrame`]
+//!   - [`FramePacket`], [`Provider`], [`IbtProvider`], [`ReplayProvider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
 //!   - [`SessionInfo`], [`SessionInfoParser`]
 //!   - [`yaml_utils`] for iRacing YAML cleanup
 //! - Live path (Windows only):
-//!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
+//!   - `DefaultLiveProvider`, `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`, `PitCommand`
 //!
 //! # Quick start
@@ -54,13 +54,14 @@
 //!   Generated derive code uses `iracing-sdk`'s internal `tracing` re-export, so downstream
 //!   crates do not need a direct `tracing` dependency just to compile derived adapters.
 //! - `schema-discovery`: enables unknown-field discovery overlays for session schemas.
-//! - `tokio`: enables async waiting for live telemetry updates on Windows.
 //! - `benchmark`: enables benchmark targets.
 //!
 pub mod adapters;
 mod error;
 pub mod ibt;
 mod providers;
+/// Runtime abstractions used by async providers.
+pub mod runtime;
 pub mod schema;
 pub mod types;
 pub mod yaml_utils;
@@ -68,7 +69,7 @@ pub mod yaml_utils;
 pub use adapters::*;
 pub use error::*;
 pub use ibt::IbtReader;
-pub use providers::{IbtProvider, Provider};
+pub use providers::{IbtProvider, Provider, ReplayProvider};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;
 
@@ -82,6 +83,9 @@ pub mod __private {
 pub use iracing_sdk_derive::*;
 
 // Platform-specific modules
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use providers::DefaultLiveProvider;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use providers::LiveProvider;

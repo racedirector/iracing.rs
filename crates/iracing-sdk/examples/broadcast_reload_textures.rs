@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 #[cfg(windows)]
 use iracing_sdk::windows::{Broadcast, BroadcastCommand};
 #[cfg(windows)]

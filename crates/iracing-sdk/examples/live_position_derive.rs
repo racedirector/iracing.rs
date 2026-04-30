@@ -54,7 +54,8 @@ struct Row {
     is_in_pit_box: bool,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -63,13 +64,13 @@ fn main() -> Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
+    run().await
 }
 
 #[cfg(windows)]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     use csv::Writer;
-    use iracing_sdk::{FrameAdapter, LiveProvider, Provider};
+    use iracing_sdk::{DefaultLiveProvider, FrameAdapter, Provider};
 
     // ------------------------------------------------------------
     // Parse CLI arguments
@@ -80,12 +81,12 @@ fn run() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut provider = LiveProvider::new()?;
+    let mut provider = DefaultLiveProvider::new()?;
     let schema = provider.schema();
     let mut writer = Writer::from_path(&csv_output_path)?;
 
     let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = provider.next_frame()? {
+    while let Some(packet) = provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         writer.serialize(frame)?;
     }
@@ -96,7 +97,7 @@ fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
