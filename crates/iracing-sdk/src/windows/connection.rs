@@ -3,7 +3,7 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::{IRacingSDKError, Result};
+use crate::{IRacingSDKError, Result, yaml_utils};
 use std::ptr::NonNull;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
@@ -35,7 +35,7 @@ pub struct VarBuf {
     /// Offset from the header to this buffer's telemetry payload.
     pub buf_offset: i32, // Offset from header
     /// Reserved padding to preserve the C layout.
-    pub pad: [i32; 2],   // 16-byte alignment
+    pub pad: [i32; 2], // 16-byte alignment
 }
 
 /// Variable header structure from iRacing SDK
@@ -96,9 +96,9 @@ impl IRSDKVarHeader {
 #[derive(Debug)]
 pub struct IRSDKHeader {
     /// SDK header version.
-    pub ver: i32,       // API header version (should be IRSDK_VER)
+    pub ver: i32, // API header version (should be IRSDK_VER)
     /// Connection status bitfield.
-    pub status: i32,    // Bitfield using status flags
+    pub status: i32, // Bitfield using status flags
     /// Telemetry tick rate reported by iRacing.
     pub tick_rate: i32, // Ticks per second (60 or 360 etc)
 
@@ -106,22 +106,22 @@ pub struct IRSDKHeader {
     /// Incremented when session YAML changes.
     pub session_info_update: i32, // Incremented when session info changes
     /// Length in bytes of the session info payload.
-    pub session_info_len: i32,    // Length in bytes of session info string
+    pub session_info_len: i32, // Length in bytes of session info string
     /// Offset from the header to the session info payload.
     pub session_info_offset: i32, // Session info, encoded in YAML format
 
     // State data, output at tick_rate
     /// Number of variables described by the variable header table.
-    pub num_vars: i32,          // Length of array pointed to by var_header_offset
+    pub num_vars: i32, // Length of array pointed to by var_header_offset
     /// Offset from the header to the variable header table.
     pub var_header_offset: i32, // Offset to variable header array
 
     /// Number of rotating telemetry buffers.
-    pub num_buf: i32,                      // Number of buffers (<= IRSDK_MAX_BUFS)
+    pub num_buf: i32, // Number of buffers (<= IRSDK_MAX_BUFS)
     /// Length in bytes of each telemetry buffer.
-    pub buf_len: i32,                      // Length in bytes for one line
+    pub buf_len: i32, // Length in bytes for one line
     /// Reserved padding to preserve the C layout.
-    pub pad1: [i32; 2],                    // 16-byte alignment
+    pub pad1: [i32; 2], // 16-byte alignment
     /// Rotating telemetry buffers managed by iRacing.
     pub var_buf: [VarBuf; IRSDK_MAX_BUFS], // Buffers of data being written to
 }
@@ -314,7 +314,7 @@ impl Connection {
     }
 
     /// Get session info YAML string
-    pub fn session_info(&self) -> Option<&str> {
+    pub fn session_info(&self) -> Option<String> {
         let header = self.header();
         if header.session_info_len <= 0 {
             return None;
@@ -324,14 +324,7 @@ impl Connection {
             let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
             let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
 
-            // Find null terminator - iRacing YAML is null-terminated
-            let null_pos = info_slice
-                .iter()
-                .position(|&b| b == 0)
-                .unwrap_or(info_slice.len());
-            let yaml_bytes = &info_slice[..null_pos];
-
-            std::str::from_utf8(yaml_bytes).ok()
+            yaml_utils::decode_yaml_from_buffer(info_slice, header.session_info_len as usize).ok()
         }
     }
 

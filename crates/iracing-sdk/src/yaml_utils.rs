@@ -89,6 +89,14 @@ pub fn extract_yaml_from_memory(data: &[u8], offset: i32, length: i32) -> Result
 
     // Extract the substring
     let yaml_data = &data[offset..offset + length];
+    decode_yaml_from_buffer(yaml_data, length)
+}
+
+/// Decode YAML from memory buffer.
+///
+/// iRacing YAML is null-terminated.
+/// Attempts to decode as UTF-8, falls back to WINDOWS_1252.
+pub fn decode_yaml_from_buffer(yaml_data: &[u8], length: usize) -> Result<String> {
     // Find null terminator or use entire length
     let yaml_len = yaml_data.iter().position(|&b| b == 0).unwrap_or(length);
     let candidate = &yaml_data[..yaml_len];

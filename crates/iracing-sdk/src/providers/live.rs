@@ -154,7 +154,7 @@ where
             return Ok(None);
         }
 
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(raw_yaml)?;
+        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
 
         tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
 
