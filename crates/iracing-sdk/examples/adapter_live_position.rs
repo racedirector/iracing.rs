@@ -190,6 +190,8 @@ async fn run() -> Result<()> {
 
 #[cfg(not(windows))]
 async fn run() -> Result<()> {
+    use anyhow::anyhow;
+
     tracing::warn!(
         "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
