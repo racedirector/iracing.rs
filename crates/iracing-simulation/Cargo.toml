@@ -27,3 +27,9 @@ clap = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.0", features = [
+  "Win32_Foundation",
+  "Win32_System_Diagnostics_ToolHelp",
+] }
