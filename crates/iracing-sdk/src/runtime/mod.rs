@@ -41,6 +41,7 @@ pub trait WaitRuntime {
     ) -> impl Future<Output = crate::Result<crate::WaitResult>>;
 }
 
+#[cfg(any(windows, target_arch = "wasm32", test))]
 pub(crate) fn duration_to_timeout_ms(duration: Duration) -> u32 {
     duration.as_millis().min(u32::MAX as u128) as u32
 }
