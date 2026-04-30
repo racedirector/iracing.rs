@@ -13,6 +13,11 @@ pub trait Provider {
 
     /// Return the session info YAML for `version`, or `Ok(None)` if unchanged.
     async fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
+
+    /// Get the native tick rate in Hz
+    ///
+    /// This is the source frequency (e.g., 60Hz for live, varies for replays)
+    fn tick_rate(&self) -> f64;
 }
 
 /// IBT file provider.

@@ -71,4 +71,8 @@ impl Provider for IbtProvider {
         // IBT files have static session info, version parameter is ignored
         self.reader.session_yaml()
     }
+
+    fn tick_rate(&self) -> f64 {
+        self.reader.tick_rate()
+    }
 }

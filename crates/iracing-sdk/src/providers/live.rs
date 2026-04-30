@@ -174,4 +174,8 @@ where
         // Session versions match, there is no update.
         Ok(None)
     }
+
+    fn tick_rate(&self) -> f64 {
+        self.connection.header().tick_rate as f64
+    }
 }

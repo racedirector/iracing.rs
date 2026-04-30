@@ -302,9 +302,8 @@ impl SessionInfo {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
-    use anyhow::{Context, Result};
     use proptest::prelude::*;
-    use test_utils::{find_git_repository_root, require_test_data_file};
+    use test_utils::find_git_repository_root;
 
     #[test]
     fn find_git_repository_root_works() {
@@ -792,19 +791,18 @@ SessionState: Racing
         println!("  ✅ Session info caching working correctly");
 
         // Test some drivers if available
-        if let Some(driver_info) = &session_info.driver_info {
-            if let Some(drivers) = &driver_info.drivers {
-                if !drivers.is_empty() {
-                    println!("\nDriver information:");
-                    for (i, driver) in drivers.iter().take(3).enumerate() {
-                        println!(
-                            "  Driver {}: {} ({})",
-                            i + 1,
-                            driver.user_name,
-                            driver.abbrev_name.as_deref().unwrap_or("N/A")
-                        );
-                    }
-                }
+        if let Some(driver_info) = &session_info.driver_info
+            && let Some(drivers) = &driver_info.drivers
+            && !drivers.is_empty()
+        {
+            println!("\nDriver information:");
+            for (i, driver) in drivers.iter().take(3).enumerate() {
+                println!(
+                    "  Driver {}: {} ({})",
+                    i + 1,
+                    driver.user_name,
+                    driver.abbrev_name.as_deref().unwrap_or("N/A")
+                );
             }
         }
 
