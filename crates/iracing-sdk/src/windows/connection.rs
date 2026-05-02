@@ -224,7 +224,6 @@ impl Connection {
     /// At 60Hz (16.67ms frames), the hot path (data already available) never reaches
     /// this method, so spawn_blocking overhead is only paid during startup, pauses,
     /// or frame drops - exactly when we want cooperative yielding anyway.
-    #[cfg(feature = "tokio")]
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
         // Convert HANDLE to raw pointer value (usize) to make it Send
         // SAFETY: Windows event handles are thread-safe kernel objects

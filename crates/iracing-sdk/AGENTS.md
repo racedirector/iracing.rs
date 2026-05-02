@@ -20,7 +20,8 @@ Compact context for OpenCode sessions working in `crates/iracing-sdk`.
 
 ## Platform & Feature Guardrails
 - Live telemetry and broadcast APIs must stay `#[cfg(windows)]`; add matching targets in `package.metadata.dist.bin.*.targets` when adding bins.
-- Tokio support is optional; gate async wait paths behind the `tokio` feature.
+- Tokio is a target-specific internal dependency: native targets use full Tokio, while `wasm32` builds are limited to Tokio's WASM-safe subset.
+- Only gate APIs that require incompatible Tokio runtime behavior; `tokio::sync` usage can stay in shared code.
 
 ## Examples & Binaries
 - `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo live-session-parser`, `cargo broadcast-cli`; they map to bins in this crate.

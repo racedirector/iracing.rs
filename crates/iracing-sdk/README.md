@@ -139,7 +139,6 @@ impl FrameAdapter for Row {
 | `codegen` | Enables JSON schema generation helpers such as `session_root_schema`. |
 | `derive` | Re-exports telemetry adapter derive macros from `iracing-sdk-derive`, including `IRacingTelemetryFrame`. |
 | `schema-discovery` | Enables collection/overlay of unknown session fields (used with `codegen`). |
-| `tokio` | Enables async `wait_for_update_async` for Windows live telemetry. |
 | `benchmark` | Enables benchmark targets. |
 
 ## Adapter Surface
