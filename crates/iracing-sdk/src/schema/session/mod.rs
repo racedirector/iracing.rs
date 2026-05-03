@@ -61,6 +61,7 @@ use std::collections::HashMap;
 // Submodules
 pub mod cache;
 pub mod camera;
+pub mod car_setup;
 #[cfg(feature = "schema-discovery")]
 pub mod discovery;
 pub mod driver;
@@ -72,6 +73,7 @@ pub mod weekend;
 // Re-exports for backward compatibility
 pub use cache::{SessionInfoCache, SessionInfoParser};
 pub use camera::{Camera, CameraGroup, CameraInfo};
+pub use car_setup::CarSetup;
 #[cfg(feature = "schema-discovery")]
 pub use discovery::{
     UnknownField, UnknownFieldType, collect_leaf_fields, value_to_example, value_to_type,
@@ -106,7 +108,7 @@ pub struct SessionInfo {
     /// Car setup information
     #[serde(default)]
     #[cfg_attr(feature = "codegen", schemars(with = "Option<serde_json::Value>"))]
-    pub car_setup: Option<serde_yaml_ng::Value>,
+    pub car_setup: Option<CarSetup>,
     /// Camera information
     #[serde(default)]
     pub camera_info: Option<CameraInfo>,
