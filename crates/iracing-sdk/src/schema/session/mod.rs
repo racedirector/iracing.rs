@@ -325,10 +325,13 @@ mod tests {
 
         println!("Found git repository root: {:?}", repo_root);
 
+        let repo_path_name = repo_root.file_name().unwrap();
+
         // The path should end with 'pitwall' (our project name)
         assert!(
-            repo_root.file_name().unwrap() == "iracing-rs",
-            "Repository root should be named 'iracing-rs'"
+            repo_path_name == "iracing.rs",
+            "Repository root should be named 'iracing.rs'. Received: {:?}",
+            repo_path_name
         );
     }
 
