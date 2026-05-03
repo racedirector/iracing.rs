@@ -31,23 +31,34 @@ const IRSDK_MAX_BUFS: usize = 4;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct VarBuf {
-    pub tick_count: i32, // Used to detect changes in data
-    pub buf_offset: i32, // Offset from header
-    pub pad: [i32; 2],   // 16-byte alignment
+    /// Used to detect changes in data
+    pub tick_count: i32,
+    /// Offset from header
+    pub buf_offset: i32,
+    /// 16-byte alignment
+    pub pad: [i32; 2],
 }
 
 /// Variable header structure from iRacing SDK
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKVarHeader {
-    pub var_type: i32,                    // Variable type (irsdk_VarType)
-    pub offset: i32,                      // Offset from start of buffer row
-    pub count: i32,                       // Number of entries (array)
-    pub count_as_time: bool,              // Values in array represent timeseries data
-    pub pad: [u8; 3],                     // 16-byte alignment padding
-    pub name: [std::os::raw::c_char; 32], // Variable name
-    pub desc: [std::os::raw::c_char; 64], // Variable description
-    pub unit: [std::os::raw::c_char; 32], // Variable units
+    /// Variable type (irsdk_VarType)
+    pub var_type: i32,
+    /// Offset from start of buffer row
+    pub offset: i32,
+    /// Number of entries (array)
+    pub count: i32,
+    /// Values in array represent timeseries data
+    pub count_as_time: bool,
+    /// 16-byte alignment padding
+    pub pad: [u8; 3],
+    /// Variable name
+    pub name: [std::os::raw::c_char; 32],
+    /// Variable description
+    pub desc: [std::os::raw::c_char; 64],
+    /// Variable units
+    pub unit: [std::os::raw::c_char; 32],
 }
 
 impl IRSDKVarHeader {
@@ -93,29 +104,43 @@ impl IRSDKVarHeader {
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKHeader {
-    pub ver: i32,       // API header version (should be IRSDK_VER)
-    pub status: i32,    // Bitfield using status flags
-    pub tick_rate: i32, // Ticks per second (60 or 360 etc)
+    /// API header version (should be IRSDK_VER)
+    pub ver: i32,
+    /// Bitfield using status flags
+    pub status: i32,
+    /// Ticks per second (60 or 360 etc)
+    pub tick_rate: i32,
 
     // Session information, updated periodically
-    pub session_info_update: i32, // Incremented when session info changes
-    pub session_info_len: i32,    // Length in bytes of session info string
-    pub session_info_offset: i32, // Session info, encoded in YAML format
+    /// Incremented when session info changes
+    pub session_info_update: i32,
+    /// Length in bytes of session info string
+    pub session_info_len: i32,
+    /// Session info, encoded in YAML format
+    pub session_info_offset: i32,
 
     // State data, output at tick_rate
-    pub num_vars: i32,          // Length of array pointed to by var_header_offset
-    pub var_header_offset: i32, // Offset to variable header array
+    /// Length of array pointed to by var_header_offset
+    pub num_vars: i32,
+    /// Offset to variable header array
+    pub var_header_offset: i32,
 
-    pub num_buf: i32,                      // Number of buffers (<= IRSDK_MAX_BUFS)
-    pub buf_len: i32,                      // Length in bytes for one line
-    pub pad1: [i32; 2],                    // 16-byte alignment
-    pub var_buf: [VarBuf; IRSDK_MAX_BUFS], // Buffers of data being written to
+    /// Number of buffers (<= IRSDK_MAX_BUFS)
+    pub num_buf: i32,
+    /// Length in bytes for one line
+    pub buf_len: i32,
+    /// 16-byte alignment
+    pub pad1: [i32; 2],
+    /// Buffers of data being written to
+    pub var_buf: [VarBuf; IRSDK_MAX_BUFS],
 }
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitResult {
+    /// Wait resolved with data.
     Signaled,
+    /// Wait time elapsed.
     Timeout,
 }
 
