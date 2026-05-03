@@ -1,6 +1,15 @@
 [alias]
 broadcast-cli = ["run", "-p", "iracing-sdk", "--bin", "broadcast-cli", "--"]
 
+car-setup-observer = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--example",
+  "car-setup-observer",
+  "--",
+]
+
 car-setup-schema = [
   "run",
   "-p",
@@ -101,6 +110,15 @@ session-schema = [
   "codegen,schema-discovery",
   "--bin",
   "session-schema",
+  "--",
+]
+
+session-update-observer = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--example",
+  "session-update-observer",
   "--",
 ]
 

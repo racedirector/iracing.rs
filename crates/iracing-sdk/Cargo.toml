@@ -105,6 +105,10 @@ harness = false
 required-features = ["benchmark"]
 
 [[example]]
+name = "car-setup-observer"
+path = "examples/car_setup_observer.rs"
+
+[[example]]
 name = "disk-position"
 path = "examples/disk_position.rs"
 
@@ -137,6 +141,10 @@ path = "examples/adapter_live_position.rs"
 [[example]]
 name = "adapter-enum-bitfields-live"
 path = "examples/adapter_enum_bitfields_live.rs"
+
+[[example]]
+name = "session-update-observer"
+path = "examples/session_update_observer.rs"
 
 [[bin]]
 name = "broadcast-cli"
