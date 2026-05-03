@@ -31,11 +31,11 @@ const IRSDK_MAX_BUFS: usize = 4;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct VarBuf {
-    // Used to detect changes in data
+    /// Used to detect changes in data
     pub tick_count: i32,
-    // Offset from header
+    /// Offset from header
     pub buf_offset: i32,
-    // 16-byte alignment
+    /// 16-byte alignment
     pub pad: [i32; 2],
 }
 
@@ -43,21 +43,21 @@ pub struct VarBuf {
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKVarHeader {
-    // Variable type (irsdk_VarType)
+    /// Variable type (irsdk_VarType)
     pub var_type: i32,
-    // Offset from start of buffer row
+    /// Offset from start of buffer row
     pub offset: i32,
-    // Number of entries (array)
+    /// Number of entries (array)
     pub count: i32,
-    // Values in array represent timeseries data
+    /// Values in array represent timeseries data
     pub count_as_time: bool,
-    // 16-byte alignment padding
+    /// 16-byte alignment padding
     pub pad: [u8; 3],
-    // Variable name
+    /// Variable name
     pub name: [std::os::raw::c_char; 32],
-    // Variable description
+    /// Variable description
     pub desc: [std::os::raw::c_char; 64],
-    // Variable units
+    /// Variable units
     pub unit: [std::os::raw::c_char; 32],
 }
 
@@ -104,43 +104,43 @@ impl IRSDKVarHeader {
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKHeader {
-    // API header version (should be IRSDK_VER)
+    /// API header version (should be IRSDK_VER)
     pub ver: i32,
-    // Bitfield using status flags
+    /// Bitfield using status flags
     pub status: i32,
-    // Ticks per second (60 or 360 etc)
+    /// Ticks per second (60 or 360 etc)
     pub tick_rate: i32,
 
     // Session information, updated periodically
-    // Incremented when session info changes
+    /// Incremented when session info changes
     pub session_info_update: i32,
-    // Length in bytes of session info string
+    /// Length in bytes of session info string
     pub session_info_len: i32,
-    // Session info, encoded in YAML format
+    /// Session info, encoded in YAML format
     pub session_info_offset: i32,
 
     // State data, output at tick_rate
-    // Length of array pointed to by var_header_offset
+    /// Length of array pointed to by var_header_offset
     pub num_vars: i32,
-    // Offset to variable header array
+    /// Offset to variable header array
     pub var_header_offset: i32,
 
-    // Number of buffers (<= IRSDK_MAX_BUFS)
+    /// Number of buffers (<= IRSDK_MAX_BUFS)
     pub num_buf: i32,
-    // Length in bytes for one line
+    /// Length in bytes for one line
     pub buf_len: i32,
-    // 16-byte alignment
+    /// 16-byte alignment
     pub pad1: [i32; 2],
-    // Buffers of data being written to
+    /// Buffers of data being written to
     pub var_buf: [VarBuf; IRSDK_MAX_BUFS],
 }
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitResult {
-    // Wait resolved with data.
+    /// Wait resolved with data.
     Signaled,
-    // Wait time elapsed.
+    /// Wait time elapsed.
     Timeout,
 }
 
