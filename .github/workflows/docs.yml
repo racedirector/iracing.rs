@@ -63,6 +63,12 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk --no-deps
+      - name: Upload generated docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: iracing-sdk-docs-${{ matrix.os }}
+          path: target/doc
+          if-no-files-found: error
 
       - name: Check examples and binaries
         run: cargo check -p iracing-sdk --examples --bins
@@ -92,6 +98,12 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk-derive --no-deps
+      - name: Upload generated docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: iracing-sdk-derive-docs-${{ matrix.os }}
+          path: target/doc
+          if-no-files-found: error
 
       - name: Check examples and binaries
         run: cargo check -p iracing-sdk-derive --examples --bins
@@ -121,6 +133,12 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-simulation --no-deps
+      - name: Upload generated docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: iracing-simulation-docs-${{ matrix.os }}
+          path: target/doc
+          if-no-files-found: error
 
       - name: Check examples and binaries
         run: cargo check -p iracing-simulation --examples --bins
