@@ -46,6 +46,7 @@ csv = { workspace = true }
 encoding_rs = "0.8.35"
 futures = "0.3"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
+pin-project-lite = "0.2"
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -66,14 +67,17 @@ windows-core = "0.62.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tokio = { version = "1", default-features = false, features = [
+  "macros",
   "sync",
   "rt",
   "time",
 ] }
+gloo-timers = { version = "0.3", features = ["futures"] }
 tokio-stream = { version = "0.1", default-features = false, features = [
   "sync",
 ] }
 tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+wasm-bindgen-futures = "0.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -114,6 +118,11 @@ name = "disk-position"
 path = "examples/disk_position.rs"
 
 [[example]]
+name = "disk-position-connection"
+path = "examples/disk_position_connection.rs"
+required-features = ["derive"]
+
+[[example]]
 name = "disk-position-derive"
 path = "examples/disk_position_derive.rs"
 required-features = ["derive"]
@@ -121,6 +130,11 @@ required-features = ["derive"]
 [[example]]
 name = "live-position"
 path = "examples/live_position.rs"
+
+[[example]]
+name = "live-position-connection"
+path = "examples/live_position_connection.rs"
+required-features = ["derive"]
 
 [[example]]
 name = "live-position-derive"

@@ -40,7 +40,7 @@ impl LiveProvider {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl Provider for LiveProvider {
     async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         // Track how long we've been waiting without a connection

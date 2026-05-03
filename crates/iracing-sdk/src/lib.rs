@@ -57,14 +57,20 @@
 //! - `benchmark`: enables benchmark targets.
 //!
 pub mod adapters;
+pub mod connection;
+pub mod emitter;
 mod error;
 pub mod ibt;
 mod providers;
 pub mod schema;
+pub mod stream;
 pub mod types;
 pub mod yaml_utils;
 
 pub use adapters::*;
+pub use connection::IRacingSDKConnection;
+pub use connection::ibt::IbtConnection;
+pub use connection::live::LiveConnection;
 pub use error::*;
 pub use ibt::IbtReader;
 pub use providers::{IbtProvider, Provider};

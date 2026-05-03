@@ -1,6 +1,6 @@
 //! IBT file reader for telemetry replay
 //!
-//! Provides cross-platform IBT file reading for use with the ReplayProvider.
+//! Provides cross-platform IBT file reading for use with provider-based telemetry streaming.
 //! This allows IBT files to be replayed through the same architecture as live telemetry.
 //!
 //! ## Usage Example

@@ -36,7 +36,8 @@ impl IbtProvider {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl Provider for IbtProvider {
     async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         let total_frames = self.reader.total_frames();
