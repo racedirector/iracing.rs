@@ -2,23 +2,53 @@ name: Docs
 
 on:
   pull_request:
-    paths:
-      - "crates/iracing-sdk/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/docs.yml"
   push:
     branches:
       - main
-    paths:
-      - "crates/iracing-sdk/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/docs.yml"
 
 jobs:
-  iracing-sdk-docs:
+  changes:
+    name: Detect docs changes
     runs-on: ubuntu-latest
+    outputs:
+      iracing_sdk: ${{ steps.filter.outputs.iracing_sdk }}
+      iracing_sdk_derive: ${{ steps.filter.outputs.iracing_sdk_derive }}
+      iracing_simulation: ${{ steps.filter.outputs.iracing_simulation }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect changed crates
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            iracing_sdk:
+              - 'crates/iracing-sdk/**'
+              - 'crates/iracing-sdk-derive/**'
+              - '.github/workflows/docs.yml'
+
+            iracing_sdk_derive:
+              - 'crates/iracing-sdk-derive/**'
+              - '.github/workflows/docs.yml'
+
+            iracing_simulation:
+              - 'crates/iracing-simulation/**'
+              - 'crates/iracing-sdk/**'
+              - 'crates/iracing-sdk-derive/**'
+              - '.github/workflows/docs.yml'
+
+  iracing-sdk-docs:
+    name: iracing-sdk docs (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.iracing_sdk == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -26,17 +56,71 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run `iracing-sdk` doctests
+      - name: Run doctests
         run: cargo test -p iracing-sdk --doc
 
-      - name: Run `iracing-sdk-derive` doctests
-        run: cargo test -p iracing-sdk-derive --doc
-
-      - name: Run `iracing-simulation` doctests
-        run: cargo test -p iracing-simulation --doc
-
       - name: Build docs with warnings as errors
-        run: RUSTDOCFLAGS="-D warnings" cargo doc -p iracing-sdk --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc -p iracing-sdk --no-deps
 
       - name: Check examples and binaries
         run: cargo check -p iracing-sdk --examples --bins
+
+  iracing-sdk-derive-docs:
+    name: iracing-sdk-derive docs (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.iracing_sdk_derive == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run doctests
+        run: cargo test -p iracing-sdk-derive --doc
+
+      - name: Build docs with warnings as errors
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc -p iracing-sdk-derive --no-deps
+
+      - name: Check examples and binaries
+        run: cargo check -p iracing-sdk-derive --examples --bins
+
+  iracing-simulation-docs:
+    name: iracing-simulation docs (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.iracing_simulation == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run doctests
+        run: cargo test -p iracing-simulation --doc
+
+      - name: Build docs with warnings as errors
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc -p iracing-simulation --no-deps
+
+      - name: Check examples and binaries
+        run: cargo check -p iracing-simulation --examples --bins
