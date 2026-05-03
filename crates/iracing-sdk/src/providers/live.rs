@@ -5,18 +5,21 @@ use tracing::{debug, info};
 
 use crate::Provider;
 
+/// A [`Provider`] that streams telemetry frames from an iRacing mmap file.
 pub struct LiveProvider {
     connection: WindowsConnection,
     schema: Arc<VariableSchema>,
 }
 
 impl LiveProvider {
+    /// Opens a connection the iRacing live telemetry and constructs a `LiveProvider`.
     pub fn new() -> Result<Self> {
         let connection = WindowsConnection::try_connect()?;
 
         Self::with_connection(connection)
     }
 
+    /// Constructs a `LiveProvider` from an established [`WindowsConnection`].
     pub fn with_connection(connection: WindowsConnection) -> Result<Self> {
         let header = connection.header();
         let variables = connection.get_variables();
