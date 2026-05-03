@@ -21,56 +21,57 @@ fn main() -> Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
-
-#[cfg(windows)]
-fn run() -> Result<()> {
-    tracing::info!("Opening iRacing connection...");
-
-    let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-    if !connection.is_connected() {
-        return Err(anyhow!("iRacing telemetry is not connected"));
+    #[cfg(not(windows))]
+    {
+        tracing::warn!(
+            "session-update-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        );
+        Err(anyhow!(
+            "session-update-observer is only supported on Windows"
+        ))
     }
 
-    let mut previous_session_info_update: i32 = -1;
-    let mut previous_session_info: Option<SessionInfo> = None;
-    loop {
+    #[cfg(windows)]
+    {
+        tracing::info!("Opening iRacing connection...");
+
+        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
         if !connection.is_connected() {
-            return Err(anyhow!("iRacing disconnected"));
+            return Err(anyhow!("iRacing telemetry is not connected"));
         }
 
-        match connection.wait_for_update(Duration::from_millis(500)) {
-            Ok(WaitResult::Signaled) => {
-                let current_update = connection.session_info_update();
-
-                if current_update != previous_session_info_update
-                    && let Some(session_info_yaml) = connection.session_info()
-                {
-                    let session_info = SessionInfo::parse(&session_info_yaml).map_err(|err| {
-                        anyhow!("failed to parse session info update {current_update}: {err}")
-                    })?;
-
-                    log_session_info_diff(previous_session_info.as_ref(), &session_info)?;
-                    previous_session_info = Some(session_info);
-                    previous_session_info_update = current_update;
-                }
-                continue;
+        let mut previous_session_info_update: i32 = -1;
+        let mut previous_session_info: Option<SessionInfo> = None;
+        loop {
+            if !connection.is_connected() {
+                return Err(anyhow!("iRacing disconnected"));
             }
-            Ok(WaitResult::Timeout) => continue,
-            Err(err) => return Err(anyhow!("{}", err)),
+
+            match connection.wait_for_update(Duration::from_millis(500)) {
+                Ok(WaitResult::Signaled) => {
+                    let current_update = connection.session_info_update();
+
+                    if current_update != previous_session_info_update
+                        && let Some(session_info_yaml) = connection.session_info()
+                    {
+                        let session_info =
+                            SessionInfo::parse(session_info_yaml).map_err(|err| {
+                                anyhow!(
+                                    "failed to parse session info update {current_update}: {err}"
+                                )
+                            })?;
+
+                        log_session_info_diff(previous_session_info.as_ref(), &session_info)?;
+                        previous_session_info = Some(session_info);
+                        previous_session_info_update = current_update;
+                    }
+                    continue;
+                }
+                Ok(WaitResult::Timeout) => continue,
+                Err(err) => return Err(anyhow!("{}", err)),
+            }
         }
     }
-}
-
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    tracing::warn!(
-        "session-update-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-    );
-    Err(anyhow!(
-        "session-update-observer is only supported on Windows"
-    ))
 }
 
 #[cfg(windows)]

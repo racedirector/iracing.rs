@@ -7,7 +7,6 @@ use iracing_sdk::WindowsConnection;
 use iracing_simulation::{Simulation, is_iracing_process_running};
 #[cfg(windows)]
 use std::{thread, time::Duration};
-use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
 #[derive(Debug, Parser)]
@@ -26,23 +25,29 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
+    #[cfg(not(windows))]
+    {
+        Err(anyhow::anyhow!(
+            "iracing-lifecycle-monitor is only supported on Windows"
+        ))
+    }
 
-#[cfg(windows)]
-fn run() -> Result<()> {
-    let args = Args::parse();
-    let poll_interval = Duration::from_millis(args.poll_interval_ms);
-    let telemetry_wait = Duration::from_millis(args.telemetry_wait_ms);
-    let simulation = Simulation::local();
+    #[cfg(windows)]
+    {
+        let args = Args::parse();
+        let poll_interval = Duration::from_millis(args.poll_interval_ms);
+        let telemetry_wait = Duration::from_millis(args.telemetry_wait_ms);
+        let simulation = Simulation::local();
 
-    loop {
-        wait_for_process(poll_interval)?;
-        wait_for_sim_status(&simulation, poll_interval)?;
-        monitor_telemetry(&simulation, poll_interval, telemetry_wait);
+        loop {
+            wait_for_process(poll_interval)?;
+            wait_for_sim_status(&simulation, poll_interval)?;
+            monitor_telemetry(&simulation, poll_interval, telemetry_wait);
+        }
     }
 }
 
@@ -196,11 +201,4 @@ fn process_still_ready(simulation: &Simulation) -> bool {
             false
         }
     }
-}
-
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    Err(anyhow::anyhow!(
-        "iracing-lifecycle-monitor is only supported on Windows"
-    ))
 }
