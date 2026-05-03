@@ -231,7 +231,7 @@ fn run() -> Result<()> {
 
     #[cfg(windows)]
     {
-        return run_windows(cli);
+        run_windows(cli)
     }
 
     #[cfg(not(windows))]
@@ -576,16 +576,17 @@ fn parse_f32_input(input: &str, min: Option<f32>, max: Option<f32>) -> Result<Op
         return Ok(None);
     }
     let value = input.parse::<f32>()?;
-    if let Some(min) = min {
-        if value < min {
-            anyhow::bail!("value must be >= {min}");
-        }
+    if let Some(min) = min
+        && value < min
+    {
+        anyhow::bail!("value must be >= {min}");
     }
-    if let Some(max) = max {
-        if value > max {
-            anyhow::bail!("value must be <= {max}");
-        }
+    if let Some(max) = max
+        && value > max
+    {
+        anyhow::bail!("value must be <= {max}");
     }
+
     Ok(Some(value))
 }
 

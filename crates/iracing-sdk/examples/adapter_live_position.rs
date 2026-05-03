@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
@@ -150,7 +149,7 @@ impl FrameAdapter for Row {
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -158,41 +157,38 @@ fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
-
-#[cfg(windows)]
-fn run() -> Result<()> {
-    use csv::Writer;
-    use iracing_sdk::Provider;
-    use tracing::info;
-
-    let Args { csv_output_path } = Args::parse();
-
-    let mut live_provider = LiveProvider::new().expect("Could not create LiveProvider");
-    let schema = live_provider.schema();
-    let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
-
-    info!("Parsing frames from live connection");
-
-    let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = live_provider.next_frame()? {
-        let frame = Row::adapt(&packet, &shared_validation);
-        writer.serialize(frame)?;
+    #[cfg(not(windows))]
+    {
+        tracing::warn!(
+            "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        );
+        Err(anyhow::anyhow!(
+            "live-position example is only supported on Windows"
+        ))
     }
 
-    writer.flush()?;
-    info!(output_path = %csv_output_path.display(), "Finished processing frames");
+    #[cfg(windows)]
+    {
+        use iracing_sdk::Provider;
 
-    Ok(())
-}
+        let Args { csv_output_path } = Args::parse();
 
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    tracing::warn!(
-        "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-    );
-    Err(anyhow!(
-        "live-position example is only supported on Windows"
-    ))
+        let mut live_provider = LiveProvider::new().expect("Could not create LiveProvider");
+        let schema = live_provider.schema();
+        let mut writer =
+            csv::Writer::from_path(&csv_output_path).expect("Could not create CSV output");
+
+        tracing::info!("Parsing frames from live connection");
+
+        let shared_validation = Row::validate_schema(&schema)?;
+        while let Some(packet) = live_provider.next_frame()? {
+            let frame = Row::adapt(&packet, &shared_validation);
+            writer.serialize(frame)?;
+        }
+
+        writer.flush()?;
+        tracing::info!(output_path = %csv_output_path.display(), "Finished processing frames");
+
+        Ok(())
+    }
 }
