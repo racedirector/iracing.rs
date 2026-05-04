@@ -60,8 +60,12 @@ pub enum IRacingSDKError {
         details: String,
     },
 
+    /// A requested telemetry field was not present in the current data source.
     #[error("Field '{field}' not found in telemetry data")]
-    FieldNotFound { field: String },
+    FieldNotFound {
+        /// Name of the missing field.
+        field: String,
+    },
 
     /// A value could not be converted to the expected type.
     #[error("Type conversion error: {details}")]
@@ -70,9 +74,12 @@ pub enum IRacingSDKError {
         details: String,
     },
 
+    /// A feature was requested on an unsupported target platform.
     #[error("{feature} is only available on {required_platform}")]
     UnsupportedPlatform {
+        /// Name of the feature that is platform-restricted.
         feature: String,
+        /// Platform required to use the requested feature.
         required_platform: String,
     },
 
@@ -87,10 +94,14 @@ pub enum IRacingSDKError {
         source: core::Error,
     },
 
+    /// The parsed telemetry schema did not pass validation rules.
     #[error("Schema validation failed: {reason}")]
     SchemaValidation {
+        /// Human-readable explanation of the validation failure.
         reason: String,
+        /// Expected schema version, if known.
         expected_version: Option<u32>,
+        /// Actual schema version that was encountered, if known.
         actual_version: Option<u32>,
     },
 
