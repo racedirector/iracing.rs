@@ -437,6 +437,21 @@ mod tests {
 
         let mem_error = IRacingSDKError::memory_access_error(0x1000);
         assert!(matches!(mem_error, IRacingSDKError::Memory { .. }));
+
+        let schema_error = IRacingSDKError::schema_validation_error(
+            "version mismatch",
+            Some(2),
+            Some(1),
+        );
+        assert!(matches!(schema_error, IRacingSDKError::SchemaValidation { .. }));
+        let schema_display = format!("{}", schema_error);
+        assert!(schema_display.contains("version mismatch"));
+
+        let platform_error = IRacingSDKError::unsupported_platform(
+            "live telemetry",
+            "Windows",
+        );
+        assert!(matches!(platform_error, IRacingSDKError::UnsupportedPlatform { .. }));
     }
 
     #[test]
