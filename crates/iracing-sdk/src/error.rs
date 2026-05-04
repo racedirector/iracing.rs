@@ -443,7 +443,7 @@ mod tests {
             Some(2),
             Some(1),
         );
-        assert!(matches!(schema_error, IRacingSDKError::SchemaValidation { .. }));
+        assert!(matches!(&schema_error, IRacingSDKError::SchemaValidation { .. }));
         let schema_display = format!("{}", schema_error);
         assert!(schema_display.contains("version mismatch"));
 
