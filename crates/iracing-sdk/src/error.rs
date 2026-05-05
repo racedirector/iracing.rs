@@ -95,7 +95,9 @@ pub enum IRacingSDKError {
     },
 
     /// The parsed telemetry schema did not pass validation rules.
-    #[error("Schema validation failed: {reason}")]
+    #[error(
+        "Schema validation failed: {reason} (expected: {expected_version:?}, actual: {actual_version:?})"
+    )]
     SchemaValidation {
         /// Human-readable explanation of the validation failure.
         reason: String,
@@ -167,7 +169,7 @@ impl IRacingSDKError {
                 "Verify source data integrity",
                 "Update parsing logic if needed",
             ],
-            &IRacingSDKError::FieldNotFound { .. } => vec![
+            IRacingSDKError::FieldNotFound { .. } => vec![
                 "Check field name spelling",
                 "Verify field exists in current iRacing version",
                 "Use optional field access patterns",
@@ -266,15 +268,6 @@ impl IRacingSDKError {
 }
 
 // Comprehensive From implementations
-impl From<std::io::Error> for IRacingSDKError {
-    fn from(err: std::io::Error) -> Self {
-        IRacingSDKError::File {
-            path: PathBuf::from("<unknown>"),
-            source: err,
-        }
-    }
-}
-
 #[cfg(windows)]
 impl From<core::Error> for IRacingSDKError {
     fn from(err: core::Error) -> Self {
@@ -497,13 +490,18 @@ mod tests {
     }
 
     #[test]
-    fn from_conversions_work() {
-        // Test From trait implementations
+    fn file_error_helper_preserves_source() {
+        // Test helper constructor retains path and source error details
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "test file");
-        let telemetry_err: IRacingSDKError = io_err.into();
+        let path = PathBuf::from("test.ibt");
+        let telemetry_err = IRacingSDKError::file_error(path.clone(), io_err);
 
         match telemetry_err {
-            IRacingSDKError::File { source, .. } => {
+            IRacingSDKError::File {
+                path: err_path,
+                source,
+            } => {
+                assert_eq!(err_path, path);
                 assert_eq!(source.to_string(), "test file");
             }
             _ => panic!("Expected File error variant"),
