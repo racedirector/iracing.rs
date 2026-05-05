@@ -185,8 +185,8 @@ impl FrameAdapter for Row {
 ## Troubleshooting
 
 - Missing telemetry fixtures during tests:
-  - Fixtures live under `test-data/` and are typically Git LFS assets.
-  - Install Git LFS and run `git lfs pull`.
+  - Generated fixtures live under `test-data/ibt/` and are listed in `test-data/ibt/manifest.json`.
+  - Run `python3 scripts/check_test_fixtures.py` from the repository root.
 - `live-*` tools fail on non-Windows:
   - Live shared memory APIs are Windows-only.
 - No session YAML written by parser tools:

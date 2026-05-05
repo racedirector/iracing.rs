@@ -1,0 +1,308 @@
+{
+  "schema_version": 1,
+  "generated_by": "scripts/generate_test_fixtures.py",
+  "layout": {
+    "live_header_prefix_size": 112,
+    "ibt_header_size": 144,
+    "disk_sub_header_size": 32,
+    "variable_header_size": 144,
+    "disk_sub_header_offset_rule": "var_header_offset - disk_sub_header_size"
+  },
+  "fixtures": [
+    {
+      "name": "profile_small",
+      "path": "test-data/ibt/profile_small.ibt",
+      "session_yaml_path": "test-data/session-yaml/profile_small.yaml",
+      "seed": 10001,
+      "tick_rate": 60,
+      "num_vars": 8,
+      "frame_size": 48,
+      "num_frames": 12,
+      "var_header_offset": 144,
+      "disk_sub_header_offset": 112,
+      "session_info_update": 0,
+      "session_info_len": 309,
+      "session_info_offset": 1296,
+      "num_buf": 1,
+      "disk_header": {
+        "start_date": 1775785000,
+        "start_time": 120.0,
+        "end_time": 120.2,
+        "lap_count": 1,
+        "record_count": 12
+      },
+      "sha256": "5c329b3e5e2563e3aa99fe8b5f583718c3290ea6c6d8d77df2b5d7755aeeb12c",
+      "required_variables": [
+        {
+          "name": "SessionTime",
+          "data_type": "Float64",
+          "offset": 0,
+          "count": 1,
+          "units": "s"
+        },
+        {
+          "name": "Speed",
+          "data_type": "Float32",
+          "offset": 8,
+          "count": 1,
+          "units": "m/s"
+        },
+        {
+          "name": "LapDist",
+          "data_type": "Float32",
+          "offset": 12,
+          "count": 1,
+          "units": "m"
+        },
+        {
+          "name": "LapCompleted",
+          "data_type": "Int32",
+          "offset": 16,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "Brake",
+          "data_type": "Float32",
+          "offset": 20,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "Throttle",
+          "data_type": "Float32",
+          "offset": 24,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "RPM",
+          "data_type": "Float32",
+          "offset": 28,
+          "count": 1,
+          "units": "revs/min"
+        },
+        {
+          "name": "Gear",
+          "data_type": "Int32",
+          "offset": 32,
+          "count": 1,
+          "units": ""
+        }
+      ]
+    },
+    {
+      "name": "profile_medium",
+      "path": "test-data/ibt/profile_medium.ibt",
+      "session_yaml_path": "test-data/session-yaml/profile_medium.yaml",
+      "seed": 20002,
+      "tick_rate": 60,
+      "num_vars": 10,
+      "frame_size": 64,
+      "num_frames": 24,
+      "var_header_offset": 144,
+      "disk_sub_header_offset": 112,
+      "session_info_update": 0,
+      "session_info_len": 309,
+      "session_info_offset": 1584,
+      "num_buf": 1,
+      "disk_header": {
+        "start_date": 1775786000,
+        "start_time": 240.0,
+        "end_time": 240.4,
+        "lap_count": 3,
+        "record_count": 24
+      },
+      "sha256": "31f832f7fb8dc2c36c40003173fa652fe3177f9a0d5c20baa76332c1e97b26ef",
+      "required_variables": [
+        {
+          "name": "SessionTime",
+          "data_type": "Float64",
+          "offset": 0,
+          "count": 1,
+          "units": "s"
+        },
+        {
+          "name": "Speed",
+          "data_type": "Float32",
+          "offset": 8,
+          "count": 1,
+          "units": "m/s"
+        },
+        {
+          "name": "LapDist",
+          "data_type": "Float32",
+          "offset": 12,
+          "count": 1,
+          "units": "m"
+        },
+        {
+          "name": "LapCompleted",
+          "data_type": "Int32",
+          "offset": 16,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "Brake",
+          "data_type": "Float32",
+          "offset": 20,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "Throttle",
+          "data_type": "Float32",
+          "offset": 24,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "RPM",
+          "data_type": "Float32",
+          "offset": 28,
+          "count": 1,
+          "units": "revs/min"
+        },
+        {
+          "name": "Gear",
+          "data_type": "Int32",
+          "offset": 32,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "SteeringWheelAngle",
+          "data_type": "Float32",
+          "offset": 36,
+          "count": 1,
+          "units": "rad"
+        },
+        {
+          "name": "FuelLevel",
+          "data_type": "Float32",
+          "offset": 40,
+          "count": 1,
+          "units": "l"
+        }
+      ]
+    },
+    {
+      "name": "profile_large",
+      "path": "test-data/ibt/profile_large.ibt",
+      "session_yaml_path": "test-data/session-yaml/profile_large.yaml",
+      "seed": 30003,
+      "tick_rate": 60,
+      "num_vars": 13,
+      "frame_size": 96,
+      "num_frames": 48,
+      "var_header_offset": 144,
+      "disk_sub_header_offset": 112,
+      "session_info_update": 0,
+      "session_info_len": 301,
+      "session_info_offset": 2016,
+      "num_buf": 1,
+      "disk_header": {
+        "start_date": 1775787000,
+        "start_time": 360.0,
+        "end_time": 360.8,
+        "lap_count": 8,
+        "record_count": 48
+      },
+      "sha256": "1d64ef18c5d9fa3c07fa610832df815a1934c5ea1efb4d96d5beeeff69e03171",
+      "required_variables": [
+        {
+          "name": "SessionTime",
+          "data_type": "Float64",
+          "offset": 0,
+          "count": 1,
+          "units": "s"
+        },
+        {
+          "name": "Speed",
+          "data_type": "Float32",
+          "offset": 8,
+          "count": 1,
+          "units": "m/s"
+        },
+        {
+          "name": "LapDist",
+          "data_type": "Float32",
+          "offset": 12,
+          "count": 1,
+          "units": "m"
+        },
+        {
+          "name": "LapCompleted",
+          "data_type": "Int32",
+          "offset": 16,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "Brake",
+          "data_type": "Float32",
+          "offset": 20,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "Throttle",
+          "data_type": "Float32",
+          "offset": 24,
+          "count": 1,
+          "units": "%"
+        },
+        {
+          "name": "RPM",
+          "data_type": "Float32",
+          "offset": 28,
+          "count": 1,
+          "units": "revs/min"
+        },
+        {
+          "name": "Gear",
+          "data_type": "Int32",
+          "offset": 32,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "SteeringWheelAngle",
+          "data_type": "Float32",
+          "offset": 36,
+          "count": 1,
+          "units": "rad"
+        },
+        {
+          "name": "FuelLevel",
+          "data_type": "Float32",
+          "offset": 40,
+          "count": 1,
+          "units": "l"
+        },
+        {
+          "name": "TrackTemp",
+          "data_type": "Float32",
+          "offset": 44,
+          "count": 1,
+          "units": "C"
+        },
+        {
+          "name": "OnPitRoad",
+          "data_type": "Bool",
+          "offset": 48,
+          "count": 1,
+          "units": ""
+        },
+        {
+          "name": "SessionFlags",
+          "data_type": "BitField",
+          "offset": 52,
+          "count": 1,
+          "units": ""
+        }
+      ]
+    }
+  ]
+}

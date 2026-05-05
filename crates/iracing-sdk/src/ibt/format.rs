@@ -488,364 +488,166 @@ mod tests {
 
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
     use test_utils::{
-        FIXTURE_INSTALL_GUIDANCE, require_ibt_fixtures, require_named_ibt_fixture,
-        require_smallest_ibt_fixture,
+        IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
     };
-
-    fn collect_files() -> Result<Vec<PathBuf>> {
-        Ok(require_ibt_fixtures()?)
-    }
-
-    fn find_fixture(expected: &str) -> Result<PathBuf> {
-        Ok(require_named_ibt_fixture(expected)?)
-    }
 
     fn open_buf_reader(path: &Path) -> Result<std::io::BufReader<File>> {
         let file = File::open(path).with_context(|| format!("Opening {}", path.display()))?;
         Ok(std::io::BufReader::new(file))
     }
 
-    #[test]
-    fn test_b_mustang_bristol_header() -> Result<()> {
-        let file_path = find_fixture("b_mustang_bristol_race.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 274);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1070);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 64288);
-        assert_eq!(header.session_info_offset, 39600);
-        assert_eq!(header.session_info_update, 0);
-
-        header.validate()?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_b_mustang_bristol_variables() -> Result<()> {
-        let file_path = find_fixture("b_mustang_bristol_race.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
-
-        // Ford Mustang B-class specific variable assertions
-        assert_eq!(schema.frame_size, 1070);
-        assert_eq!(schema.variable_count(), 274);
-
-        // Check for key variables and their exact offsets in B-class
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("SessionTime"));
-        assert!(schema.variables.contains_key("LapDist"));
-        assert!(schema.variables.contains_key("LapCompleted"));
-        assert!(schema.variables.contains_key("Brake"));
-        assert!(schema.variables.contains_key("Throttle"));
-
-        // Verify specific variable details for Ford Mustang GT4
-        let speed_var = &schema.variables["Speed"];
-        assert_eq!(speed_var.offset, 310);
-        assert_eq!(speed_var.data_type, VariableType::Float32);
-        assert_eq!(speed_var.units, "m/s");
-
-        let session_time_var = &schema.variables["SessionTime"];
-        assert_eq!(session_time_var.offset, 0);
-        assert_eq!(session_time_var.data_type, VariableType::Float64);
-        assert_eq!(session_time_var.units, "s");
-
-        let lap_dist_var = &schema.variables["LapDist"];
-        assert_eq!(lap_dist_var.offset, 217);
-        assert_eq!(lap_dist_var.data_type, VariableType::Float32);
-        assert_eq!(lap_dist_var.units, "m");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_b_mustang_bristol_frames() -> Result<()> {
-        let file_path = find_fixture("b_mustang_bristol_race.ibt")?;
-
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 133169);
-
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_jerez_header() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-
-        // Supercars Camaro Jerez specific header assertions
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 283);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1094);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 70555);
-        assert_eq!(header.session_info_offset, 40896);
-
-        header.validate()?;
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_jerez_variables() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
-
-        // Supercars specific variable assertions
-        assert_eq!(schema.frame_size, 1094);
-        assert_eq!(schema.variable_count(), 283);
-
-        // Verify Supercars-specific variables exist
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("SessionTime"));
-        assert!(schema.variables.contains_key("LapDist"));
-
-        // Supercars has different frame layout than GT4
-        let speed_var = &schema.variables["Speed"];
-        assert_eq!(speed_var.data_type, VariableType::Float32);
-        assert_eq!(speed_var.units, "m/s");
-        assert_eq!(speed_var.offset, 310); // Same offset as GT4
-
-        let session_time_var = &schema.variables["SessionTime"];
-        assert_eq!(session_time_var.offset, 0);
-        assert_eq!(session_time_var.data_type, VariableType::Float64);
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_jerez_frames() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 31221);
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_okayama_header() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-
-        // Supercars Camaro Okayama specific header assertions
-        assert_eq!(header.version, 2);
-        assert_eq!(header.tick_rate, 60);
-        assert_eq!(header.num_vars, 283);
-        assert_eq!(header.var_header_offset, 144);
-        assert_eq!(header.buf_len, 1094);
-        assert_eq!(header.num_buf, 1);
-        assert_eq!(header.session_info_len, 60847);
-        assert_eq!(header.session_info_offset, 40896);
-
-        header.validate()?;
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_okayama_variables() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
-
-        let mut buf_reader = open_buf_reader(&file_path)?;
-        let header = IbtHeader::parse_from_reader(&mut buf_reader)
-            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let _disk_header =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-        let schema = extract_variable_schema(&mut buf_reader, &header)
-            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
-
-        // Okayama session variable assertions
-        assert_eq!(schema.frame_size, 1094);
-        assert_eq!(schema.variable_count(), 283);
-
-        // Essential variables present
-        assert!(schema.variables.contains_key("Speed"));
-        assert!(schema.variables.contains_key("RPM"));
-        assert!(schema.variables.contains_key("Gear"));
-        assert!(schema.variables.contains_key("SessionTime"));
-
-        // Check variable types and units
-        let rpm_var = &schema.variables["RPM"];
-        assert_eq!(rpm_var.data_type, VariableType::Float32);
-        assert_eq!(rpm_var.units, "revs/min");
-
-        let gear_var = &schema.variables["Gear"];
-        assert_eq!(gear_var.data_type, VariableType::Int32);
-        assert_eq!(gear_var.units, "");
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_supercars_camaro_okayama_frames() -> Result<()> {
-        let file_path =
-            find_fixture("supercars chevycamarogen3_okayama full 2025-08-28 19-49-16.ibt")?;
-        let reader = crate::ibt::IbtReader::open(&file_path)
-            .with_context(|| format!("Opening {}", file_path.display()))?;
-        ensure!(
-            reader.total_frames() > 0,
-            "Fixture should contain telemetry frames"
-        );
-        assert_eq!(reader.total_frames(), 51183);
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn test_essential_variables_across_all_files() -> Result<()> {
-        let files = collect_files()?;
-        ensure!(
-            files.len() == 3,
-            "Expected 3 IBT fixtures, found {}. {}",
-            files.len(),
-            FIXTURE_INSTALL_GUIDANCE
-        );
-
-        for file_path in &files {
-            let mut buf_reader = open_buf_reader(file_path)?;
-            let header = IbtHeader::parse_from_reader(&mut buf_reader)
-                .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-            let _disk_header =
-                IbtDiskSubHeader::parse_from_reader_with_header(&mut buf_reader, &header)
-                    .with_context(|| format!("Parsing sub-header from {}", file_path.display()))?;
-            let schema = extract_variable_schema(&mut buf_reader, &header)
-                .with_context(|| format!("Extracting schema from {}", file_path.display()))?;
-
-            for key in [
-                "Speed",
-                "SessionTime",
-                "LapDist",
-                "LapCompleted",
-                "Brake",
-                "Throttle",
-            ] {
-                assert!(
-                    schema.variables.contains_key(key),
-                    "File {} missing {} variable",
-                    file_path.display(),
-                    key
-                );
-            }
-
-            assert!(
-                schema.variable_count() >= 280,
-                "File {} has too few variables: {}",
-                file_path.display(),
-                schema.variable_count()
-            );
-
-            assert!(
-                schema.frame_size >= 1000,
-                "File {} has unexpectedly small frame size: {}",
-                file_path.display(),
-                schema.frame_size
-            );
+    fn variable_type(expected: &str) -> VariableType {
+        match expected {
+            "Char" => VariableType::Char,
+            "Bool" => VariableType::Bool,
+            "Int32" => VariableType::Int32,
+            "BitField" => VariableType::BitField,
+            "Float32" => VariableType::Float32,
+            "Float64" => VariableType::Float64,
+            other => panic!("Unsupported manifest variable type: {}", other),
         }
+    }
+
+    fn assert_required_variable(actual: &VariableInfo, expected: &IbtVariableManifest) {
+        assert_eq!(actual.name, expected.name);
+        assert_eq!(actual.data_type, variable_type(&expected.data_type));
+        assert_eq!(actual.offset, expected.offset);
+        assert_eq!(actual.count, expected.count);
+        assert_eq!(actual.units, expected.units);
+    }
+
+    fn parse_fixture(
+        fixture: &IbtFixture,
+    ) -> Result<(IbtHeader, IbtDiskSubHeader, VariableSchema)> {
+        let file_path = fixture.fixture_path()?;
+        let mut reader = open_buf_reader(&file_path)?;
+        let header = IbtHeader::parse_from_reader(&mut reader)
+            .with_context(|| format!("Parsing header from {}", file_path.display()))?;
+        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
+            .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
+        let schema = extract_variable_schema(&mut reader, &header)
+            .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
+        Ok((header, disk_header, schema))
+    }
+
+    #[test]
+    fn test_generated_fixture_headers_match_manifest() -> Result<()> {
+        let manifest = load_fixture_manifest()?;
+        assert_eq!(manifest.layout.live_header_prefix_size, 112);
+        assert_eq!(manifest.layout.ibt_header_size, IbtHeader::HEADER_SIZE);
+        assert_eq!(
+            manifest.layout.disk_sub_header_size,
+            IbtDiskSubHeader::DISK_HEADER_SIZE
+        );
+        assert_eq!(manifest.layout.variable_header_size, IRSDK_VAR_HEADER_SIZE);
+
+        for fixture in &manifest.fixtures {
+            let (header, disk_header, _) = parse_fixture(fixture)?;
+
+            assert_eq!(header.version, 2);
+            assert_eq!(header.status, 1);
+            assert_eq!(header.tick_rate, fixture.tick_rate);
+            assert_eq!(header.num_vars, fixture.num_vars);
+            assert_eq!(header.var_header_offset, fixture.var_header_offset);
+            assert_eq!(header.var_header_offset, 144);
+            assert_eq!(header.buf_len, fixture.frame_size as i32);
+            assert_eq!(header.num_buf, fixture.num_buf);
+            assert_eq!(header.session_info_len, fixture.session_info_len);
+            assert_eq!(header.session_info_offset, fixture.session_info_offset);
+            assert_eq!(header.session_info_update, fixture.session_info_update);
+
+            assert_eq!(
+                fixture.disk_sub_header_offset,
+                header.var_header_offset - IbtDiskSubHeader::DISK_HEADER_SIZE as i32
+            );
+            assert_eq!(disk_header.start_date, fixture.disk_header.start_date);
+            assert!((disk_header.start_time - fixture.disk_header.start_time).abs() < f64::EPSILON);
+            assert!((disk_header.end_time - fixture.disk_header.end_time).abs() < f64::EPSILON);
+            assert_eq!(disk_header.lap_count, fixture.disk_header.lap_count);
+            assert_eq!(disk_header.record_count, fixture.disk_header.record_count);
+
+            header.validate()?;
+        }
+
         Ok(())
     }
 
     #[test]
-    #[ignore]
-    fn test_ford_vs_supercars_variable_differences() -> Result<()> {
-        let ford_file = find_fixture("fordmustanggt4_roadatlanta club 2025-09-13 11-30-23.ibt")?;
-        let supercars_file =
-            find_fixture("supercars chevycamarogen3_jerez moto 2025-08-07 20-35-12.ibt")?;
+    fn test_generated_fixture_variables_match_manifest() -> Result<()> {
+        let manifest = load_fixture_manifest()?;
 
-        let mut ford_reader = open_buf_reader(&ford_file)?;
-        let ford_header = IbtHeader::parse_from_reader(&mut ford_reader)
-            .with_context(|| format!("Parsing Ford header from {}", ford_file.display()))?;
-        let _ford_disk =
-            IbtDiskSubHeader::parse_from_reader_with_header(&mut ford_reader, &ford_header)
-                .with_context(|| format!("Parsing Ford sub-header from {}", ford_file.display()))?;
-        let ford_schema = extract_variable_schema(&mut ford_reader, &ford_header)
-            .with_context(|| format!("Extracting Ford schema from {}", ford_file.display()))?;
+        for fixture in &manifest.fixtures {
+            let (_, _, schema) = parse_fixture(fixture)?;
 
-        let mut supercars_reader = open_buf_reader(&supercars_file)?;
-        let supercars_header =
-            IbtHeader::parse_from_reader(&mut supercars_reader).with_context(|| {
-                format!("Parsing Supercars header from {}", supercars_file.display())
-            })?;
-        let _supercars_disk = IbtDiskSubHeader::parse_from_reader_with_header(
-            &mut supercars_reader,
-            &supercars_header,
-        )
-        .with_context(|| {
-            format!(
-                "Parsing Supercars sub-header from {}",
-                supercars_file.display()
-            )
-        })?;
-        let supercars_schema = extract_variable_schema(&mut supercars_reader, &supercars_header)
-            .with_context(|| {
-                format!(
-                    "Extracting Supercars schema from {}",
-                    supercars_file.display()
-                )
-            })?;
+            assert_eq!(schema.frame_size, fixture.frame_size);
+            assert_eq!(schema.variable_count(), fixture.num_vars as usize);
 
-        // Ford GT4 has more variables than Supercars
-        assert_eq!(ford_schema.variable_count(), 287);
-        assert_eq!(supercars_schema.variable_count(), 283);
-        assert!(ford_schema.variable_count() > supercars_schema.variable_count());
+            for expected in &fixture.required_variables {
+                let actual = schema.variables.get(&expected.name).with_context(|| {
+                    format!(
+                        "Fixture {} missing variable {}",
+                        fixture.name, expected.name
+                    )
+                })?;
+                assert_required_variable(actual, expected);
+            }
+        }
 
-        // Ford GT4 has larger frame size
-        assert_eq!(ford_schema.frame_size, 1107);
-        assert_eq!(supercars_schema.frame_size, 1094);
-        assert!(ford_schema.frame_size > supercars_schema.frame_size);
+        Ok(())
+    }
 
-        // Both should have Speed at same offset
+    #[test]
+    fn test_generated_fixture_frames_match_manifest() -> Result<()> {
+        let manifest = load_fixture_manifest()?;
 
-        assert_eq!(ford_schema.variables["Speed"].offset, 310);
-        assert_eq!(supercars_schema.variables["Speed"].offset, 310);
+        for fixture in &manifest.fixtures {
+            let file_path = fixture.fixture_path()?;
+            let reader = crate::ibt::IbtReader::open(&file_path)
+                .with_context(|| format!("Opening {}", file_path.display()))?;
+            ensure!(
+                reader.total_frames() > 0,
+                "Fixture should contain telemetry frames"
+            );
+            assert_eq!(reader.total_frames(), fixture.num_frames);
+            assert_eq!(reader.tick_rate(), fixture.tick_rate as f64);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_generated_fixture_profiles_cover_increasing_shapes() -> Result<()> {
+        let manifest = load_fixture_manifest()?;
+        ensure!(
+            manifest.fixtures.len() == 3,
+            "Expected exactly three generated IBT fixtures"
+        );
+
+        let small = manifest
+            .fixtures
+            .iter()
+            .find(|fixture| fixture.name == "profile_small")
+            .context("Missing profile_small fixture")?;
+        let medium = manifest
+            .fixtures
+            .iter()
+            .find(|fixture| fixture.name == "profile_medium")
+            .context("Missing profile_medium fixture")?;
+        let large = manifest
+            .fixtures
+            .iter()
+            .find(|fixture| fixture.name == "profile_large")
+            .context("Missing profile_large fixture")?;
+
+        assert!(small.num_vars < medium.num_vars);
+        assert!(medium.num_vars < large.num_vars);
+        assert!(small.frame_size < medium.frame_size);
+        assert!(medium.frame_size < large.frame_size);
+        assert!(small.num_frames < medium.num_frames);
+        assert!(medium.num_frames < large.num_frames);
+
         Ok(())
     }
 

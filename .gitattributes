@@ -18,3 +18,4 @@
 *.ico binary
 *.zip binary
 *.exe binary
+test-data/ibt/profile_*.ibt binary -filter -eol

@@ -6,15 +6,19 @@ This crate exists to keep integration tests consistent across crates by centrali
 
 - workspace root discovery (find the git checkout from any CWD)
 - `test-data/` path resolution
-- `.ibt` fixture discovery and “missing Git LFS fixtures” error messaging
+- generated `.ibt` fixture discovery and actionable regeneration messaging
 
 ## Fixture layout
 
-The `.ibt`-specific helpers (`get_ibt_test_files`, `require_ibt_fixtures`, …) look for recordings under:
+The `.ibt`-specific helpers (`get_ibt_test_files`, `require_ibt_fixtures`, …) prefer the generated fixture manifest:
 
-- `test-data/ibt/*.ibt`
+- `test-data/ibt/manifest.json`
 
-If you add new fixtures, place them in that directory so all crates can find them the same way.
+Manifest-listed fixtures are authoritative when the manifest exists. Regenerate them from the repository root with:
+
+```bash
+python3 scripts/check_test_fixtures.py
+```
 
 ## Key APIs
 
@@ -22,6 +26,7 @@ All public symbols are exported from `src/lib.rs`:
 
 - `FIXTURE_INSTALL_GUIDANCE`: shared guidance string appended to fixture-related errors.
 - `FixtureError`: lightweight error type used by the `require_*` helpers.
+- `load_fixture_manifest()`: load generated fixture invariants for parser/reader tests.
 - `find_git_repository_root()`: locate the git checkout root by walking up for `.git/`.
 - `get_test_data_dir()`: resolve `test-data/` relative to the git root.
 - `.ibt` discovery:
