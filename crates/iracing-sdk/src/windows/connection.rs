@@ -6,7 +6,6 @@
 use crate::{IRacingSDKError, Result};
 use std::ptr::NonNull;
 use std::time::Duration;
-use tracing::{debug, trace, warn};
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Memory::{
     FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile,
@@ -155,7 +154,7 @@ pub struct Connection {
 impl Connection {
     /// Attempt to connect to iRacing shared memory
     pub fn try_connect() -> Result<Self> {
-        trace!("Attempting to connect to iRacing shared memory");
+        tracing::trace!("Attempting to connect to iRacing shared memory");
 
         // Open the memory mapping
         let mapping = unsafe {
@@ -196,9 +195,9 @@ impl Connection {
         // Validate the connection
         connection.validate_connection()?;
 
-        debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
+        tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
 
-        debug!("Successfully connected to iRacing shared memory");
+        tracing::debug!("Successfully connected to iRacing shared memory");
         Ok(connection)
     }
 
@@ -216,17 +215,17 @@ impl Connection {
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
         let ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-        trace!(timeout_ms = ms, "Waiting for telemetry update");
+        tracing::tracing::trace!(timeout_ms = ms, "Waiting for telemetry update");
 
         let result = unsafe { WaitForSingleObject(self.event, ms) };
 
         match result {
             WAIT_OBJECT_0 => {
-                debug!("Telemetry update signaled");
+                tracing::debug!("Telemetry update signaled");
                 Ok(WaitResult::Signaled)
             }
             WAIT_TIMEOUT => {
-                trace!("Wait timed out");
+                tracing::trace!("Wait timed out");
                 Ok(WaitResult::Timeout)
             }
             _ => {
@@ -256,7 +255,7 @@ impl Connection {
         let timeout_ms = timeout.as_millis().min(u32::MAX as u128) as u32;
 
         tokio::task::spawn_blocking(move || {
-            trace!(timeout_ms, "Async waiting for Windows event");
+            tracing::trace!(timeout_ms, "Async waiting for Windows event");
 
             // Reconstruct HANDLE from raw pointer value
             // SAFETY: event_raw came from a valid HANDLE, kernel object is still alive
@@ -265,11 +264,11 @@ impl Connection {
 
             match result {
                 WAIT_OBJECT_0 => {
-                    trace!("Event signaled");
+                    tracing::trace!("Event signaled");
                     Ok(WaitResult::Signaled)
                 }
                 WAIT_TIMEOUT => {
-                    trace!("Event wait timed out");
+                    tracing::trace!("Event wait timed out");
                     Ok(WaitResult::Timeout)
                 }
                 _ => {
@@ -293,7 +292,7 @@ impl Connection {
     /// Get latest telemetry data if available
     pub fn get_new_data(&mut self) -> Option<&[u8]> {
         if !self.is_connected() {
-            debug!("Not connected to iRacing");
+            tracing::debug!("Not connected to iRacing");
             self.last_tick_count = i32::MAX;
             return None;
         }
@@ -304,22 +303,25 @@ impl Connection {
         let latest_buf_idx = self.find_latest_buffer(header);
         let latest_buf = &header.var_buf[latest_buf_idx];
 
-        debug!(
+        tracing::debug!(
             "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
-            self.last_tick_count, latest_buf.tick_count, latest_buf_idx
+            self.last_tick_count,
+            latest_buf.tick_count,
+            latest_buf_idx
         );
 
         // Check if we have new data
         if self.last_tick_count == latest_buf.tick_count {
-            trace!("No new data (same tick count)");
+            tracing::trace!("No new data (same tick count)");
             return None;
         }
 
         // Handle potential tick count reset or wraparound
         if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
-            debug!(
+            tracing::debug!(
                 "Tick count reset detected: {} -> {}",
-                self.last_tick_count, latest_buf.tick_count
+                self.last_tick_count,
+                latest_buf.tick_count
             );
         }
 
@@ -333,14 +335,14 @@ impl Connection {
 
             if tick_before == tick_after {
                 self.last_tick_count = tick_before;
-                debug!(
+                tracing::debug!(
                     "Returning new data: tick={}, size={} bytes",
                     tick_before,
                     data_slice.len()
                 );
                 return Some(data_slice);
             } else {
-                debug!(
+                tracing::debug!(
                     "Data consistency check failed on attempt {}: before={}, after={}",
                     attempt + 1,
                     tick_before,
@@ -349,7 +351,7 @@ impl Connection {
             }
         }
 
-        warn!("Failed consistency checks, no data returned");
+        tracing::warn!("Failed consistency checks, no data returned");
         None
     }
 
@@ -427,7 +429,7 @@ impl Connection {
             });
         }
 
-        debug!(
+        tracing::debug!(
             ver = header.ver,
             num_vars = header.num_vars,
             num_buf = header.num_buf,
