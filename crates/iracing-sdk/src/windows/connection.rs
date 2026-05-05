@@ -3,7 +3,7 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::{IRacingSDKError, Result};
+use crate::{IRacingSDKError, Result, yaml_utils};
 use std::ptr::NonNull;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
@@ -152,6 +152,30 @@ pub struct Connection {
 }
 
 impl Connection {
+    fn wait_for_event(event: HANDLE, timeout_ms: u32) -> Result<WaitResult> {
+        tracing::trace!(timeout_ms = timeout_ms, "Waiting for telemetry update");
+
+        let result = unsafe { WaitForSingleObject(event, timeout_ms) };
+
+        match result {
+            WAIT_OBJECT_0 => {
+                tracing::debug!("Telemetry update signaled");
+                Ok(WaitResult::Signaled)
+            }
+            WAIT_TIMEOUT => {
+                tracing::trace!("Wait timed out");
+                Ok(WaitResult::Timeout)
+            }
+            _ => {
+                let win_err = windows::core::Error::from_thread();
+                Err(IRacingSDKError::windows_api_error(
+                    "WaitForSingleObject",
+                    win_err,
+                ))
+            }
+        }
+    }
+
     /// Attempt to connect to iRacing shared memory
     pub fn try_connect() -> Result<Self> {
         tracing::trace!("Attempting to connect to iRacing shared memory");
@@ -215,27 +239,9 @@ impl Connection {
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
         let ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-        tracing::tracing::trace!(timeout_ms = ms, "Waiting for telemetry update");
+        tracing::trace!(timeout_ms = ms, "Waiting for telemetry update");
 
-        let result = unsafe { WaitForSingleObject(self.event, ms) };
-
-        match result {
-            WAIT_OBJECT_0 => {
-                tracing::debug!("Telemetry update signaled");
-                Ok(WaitResult::Signaled)
-            }
-            WAIT_TIMEOUT => {
-                tracing::trace!("Wait timed out");
-                Ok(WaitResult::Timeout)
-            }
-            _ => {
-                let win_err = windows::core::Error::from_thread();
-                Err(IRacingSDKError::windows_api_error(
-                    "WaitForSingleObject",
-                    win_err,
-                ))
-            }
-        }
+        Self::wait_for_event(self.event, ms)
     }
 
     /// Wait for new telemetry data (async - cooperative, non-blocking)
@@ -260,25 +266,7 @@ impl Connection {
             // Reconstruct HANDLE from raw pointer value
             // SAFETY: event_raw came from a valid HANDLE, kernel object is still alive
             let event = HANDLE(event_raw as *mut std::ffi::c_void);
-            let result = unsafe { WaitForSingleObject(event, timeout_ms) };
-
-            match result {
-                WAIT_OBJECT_0 => {
-                    tracing::trace!("Event signaled");
-                    Ok(WaitResult::Signaled)
-                }
-                WAIT_TIMEOUT => {
-                    tracing::trace!("Event wait timed out");
-                    Ok(WaitResult::Timeout)
-                }
-                _ => {
-                    let win_err = windows::core::Error::from_thread();
-                    Err(IRacingSDKError::windows_api_error(
-                        "WaitForSingleObject",
-                        win_err,
-                    ))
-                }
-            }
+            Self::wait_for_event(event, timeout_ms)
         })
         .await
         .map_err(|e| {
@@ -356,24 +344,19 @@ impl Connection {
     }
 
     /// Get session info YAML string
-    pub fn session_info(&self) -> Option<&str> {
+    pub fn session_info(&self) -> Option<String> {
         let header = self.header();
         if header.session_info_len <= 0 {
             return None;
         }
 
         unsafe {
+            // Get the slice of the session yaml
             let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
             let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
 
-            // Find null terminator - iRacing YAML is null-terminated
-            let null_pos = info_slice
-                .iter()
-                .position(|&b| b == 0)
-                .unwrap_or(info_slice.len());
-            let yaml_bytes = &info_slice[..null_pos];
-
-            std::str::from_utf8(yaml_bytes).ok()
+            // Parse and return
+            yaml_utils::extract_yaml_from_memory(info_slice, 0, header.session_info_len).ok()
         }
     }
 

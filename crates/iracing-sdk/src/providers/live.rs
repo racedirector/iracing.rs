@@ -64,7 +64,7 @@ impl Provider for LiveProvider {
         }
 
         // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(raw_yaml)?;
+        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
 
         info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
 

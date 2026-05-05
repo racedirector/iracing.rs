@@ -93,11 +93,16 @@ pub fn extract_yaml_from_memory(data: &[u8], offset: i32, length: i32) -> Result
     let yaml_len = yaml_data.iter().position(|&b| b == 0).unwrap_or(length);
     let candidate = &yaml_data[..yaml_len];
 
-    if let Ok(s) = std::str::from_utf8(candidate) {
+    decode_yaml_from_buffer(candidate)
+}
+
+/// Separate the decoding of the buffer; iRacing may change this to UTF-8 only soon, so keep it separate and testable.
+fn decode_yaml_from_buffer(buffer: &[u8]) -> Result<String> {
+    if let Ok(s) = std::str::from_utf8(buffer) {
         return Ok(s.to_string());
     }
 
-    let (decoded, _, had_errors) = WINDOWS_1252.decode(candidate);
+    let (decoded, _, had_errors) = WINDOWS_1252.decode(buffer);
 
     if had_errors {
         return Err(IRacingSDKError::Parse {
@@ -153,5 +158,28 @@ mod tests {
         let data = b"test";
         let result = extract_yaml_from_memory(data, 0, 100);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_yaml_from_buffer_utf8_with_special_characters() {
+        let input = "DriverInfo:\n  UserName: \"José 🚗\"\n  CarScreenName: \"Mazda MX-5 – Cup\"";
+        let result = decode_yaml_from_buffer(input.as_bytes()).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_decode_yaml_from_buffer_windows_1252() {
+        let input = [
+            b'D', b'r', b'i', b'v', b'e', b'r', b'I', b'n', b'f', b'o', b':', b'\n', b' ',
+            b' ', b'U', b's', b'e', b'r', b'N', b'a', b'm', b'e', b':', b' ', 0x93, b'J',
+            b'o', b's', 0xE9, 0x94, b'\n', b' ', b' ', b'C', b'a', b'r', b'S', b'c', b'r',
+            b'e', b'e', b'n', b'N', b'a', b'm', b'e', b':', b' ', b'M', b'a', b'z', b'd',
+            b'a', b' ', b'M', b'X', b'-', b'5', b' ', 0x96, b' ', b'C', b'u', b'p',
+        ];
+        let result = decode_yaml_from_buffer(&input).unwrap();
+        assert_eq!(
+            result,
+            "DriverInfo:\n  UserName: “José”\n  CarScreenName: Mazda MX-5 – Cup"
+        );
     }
 }

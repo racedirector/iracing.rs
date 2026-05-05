@@ -725,7 +725,7 @@ SessionState: Racing
 
         // Preprocess the YAML to handle control characters
         let preprocessed_yaml = parser
-            .preprocess_iracing_yaml(raw_yaml)
+            .preprocess_iracing_yaml(&raw_yaml)
             .expect("Failed to preprocess YAML");
 
         let session_info = parser
