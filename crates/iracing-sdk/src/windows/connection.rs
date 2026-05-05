@@ -291,7 +291,7 @@ impl Connection {
         let latest_buf_idx = self.find_latest_buffer(header);
         let latest_buf = &header.var_buf[latest_buf_idx];
 
-        tracing::debug!(
+        tracing::trace!(
             "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
             self.last_tick_count,
             latest_buf.tick_count,
@@ -306,7 +306,7 @@ impl Connection {
 
         // Handle potential tick count reset or wraparound
         if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
-            tracing::debug!(
+            tracing::trace!(
                 "Tick count reset detected: {} -> {}",
                 self.last_tick_count,
                 latest_buf.tick_count
@@ -323,14 +323,14 @@ impl Connection {
 
             if tick_before == tick_after {
                 self.last_tick_count = tick_before;
-                tracing::debug!(
+                tracing::trace!(
                     "Returning new data: tick={}, size={} bytes",
                     tick_before,
                     data_slice.len()
                 );
                 return Some(data_slice);
             } else {
-                tracing::debug!(
+                tracing::trace!(
                     "Data consistency check failed on attempt {}: before={}, after={}",
                     attempt + 1,
                     tick_before,
