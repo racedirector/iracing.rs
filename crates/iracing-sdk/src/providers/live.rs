@@ -39,12 +39,13 @@ impl LiveProvider {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Provider for LiveProvider {
-    fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
+    async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         Ok(None)
     }
 
-    fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
