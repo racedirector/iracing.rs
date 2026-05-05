@@ -155,7 +155,8 @@ impl FrameAdapter for Row {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -180,7 +181,7 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     if let Some(yml_output) = yml_output_path {
         tracing::info!("Parsing session information...");
-        if let Some(session) = ibt_provider.session_yaml(0)? {
+        if let Some(session) = ibt_provider.session_yaml(0).await? {
             fs::write(&yml_output, session)?;
             tracing::info!(session_output_path = %yml_output.display(), "Session information written.")
         }
@@ -194,7 +195,7 @@ fn main() -> Result<()> {
     );
 
     let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = ibt_provider.next_frame()? {
+    while let Some(packet) = ibt_provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         // Serialize row to CSV.
         writer.serialize(frame)?;

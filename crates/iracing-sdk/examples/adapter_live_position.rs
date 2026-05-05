@@ -6,7 +6,6 @@ use iracing_sdk::IRacingSDKError;
 use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
 #[cfg(windows)]
 use std::path::PathBuf;
-use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
 #[derive(Parser, Debug)]
@@ -149,12 +148,14 @@ impl FrameAdapter for Row {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
     // ------------------------------------------------------------
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     #[cfg(not(windows))]
@@ -181,7 +182,7 @@ fn main() -> anyhow::Result<()> {
         tracing::info!("Parsing frames from live connection");
 
         let shared_validation = Row::validate_schema(&schema)?;
-        while let Some(packet) = live_provider.next_frame()? {
+        while let Some(packet) = live_provider.next_frame().await? {
             let frame = Row::adapt(&packet, &shared_validation);
             writer.serialize(frame)?;
         }

@@ -78,46 +78,45 @@ impl FrameAdapter for TelemetryRow {
     }
 }
 
-fn main() -> Result<()> {
-    run()
-}
-
-#[cfg(windows)]
-fn run() -> Result<()> {
-    use iracing_sdk::Provider;
-
-    let args = Args::parse();
-    let mut provider = LiveProvider::new()?;
-    let validation = TelemetryRow::validate_schema(&provider.schema())?;
-
-    let mut seen = 0usize;
-    while let Some(packet) = provider.next_frame()? {
-        if seen >= args.max_frames {
-            break;
-        }
-
-        let row = TelemetryRow::adapt(&packet, &validation);
-
-        println!(
-            "tick={} state={:?} track={:?} caution={} mandatory_repair={}",
-            packet.tick,
-            row.session_state,
-            row.track_surface,
-            row.session_flags
-                .contains(iracing_sdk::SessionFlags::CAUTION),
-            row.engine_warnings
-                .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
-        );
-
-        seen += 1;
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    #[cfg(not(windows))]
+    {
+        Err(anyhow::anyhow!(
+            "enum-bitfields-live example is only supported on Windows"
+        ))
     }
 
-    Ok(())
-}
+    #[cfg(windows)]
+    {
+        use iracing_sdk::Provider;
 
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    Err(anyhow::anyhow!(
-        "enum-bitfields-live example is only supported on Windows"
-    ))
+        let args = Args::parse();
+        let mut provider = LiveProvider::new()?;
+        let validation = TelemetryRow::validate_schema(&provider.schema())?;
+
+        let mut seen = 0usize;
+        while let Some(packet) = provider.next_frame().await? {
+            if seen >= args.max_frames {
+                break;
+            }
+
+            let row = TelemetryRow::adapt(&packet, &validation);
+
+            println!(
+                "tick={} state={:?} track={:?} caution={} mandatory_repair={}",
+                packet.tick,
+                row.session_state,
+                row.track_surface,
+                row.session_flags
+                    .contains(iracing_sdk::SessionFlags::CAUTION),
+                row.engine_warnings
+                    .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
+            );
+
+            seen += 1;
+        }
+
+        Ok(())
+    }
 }
