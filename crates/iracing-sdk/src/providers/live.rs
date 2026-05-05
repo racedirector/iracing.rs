@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use crate::{Result, VariableSchema, WindowsConnection, yaml_utils};
-use tracing::{debug, info};
-
 use crate::Provider;
+use crate::{Result, VariableSchema, WindowsConnection, yaml_utils};
 
 /// A [`Provider`] that streams telemetry frames from an iRacing mmap file.
 pub struct LiveProvider {
@@ -47,13 +45,13 @@ impl Provider for LiveProvider {
     }
 
     fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        debug!("Fetching session YAML from shared memory");
+        tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
         let raw_yaml = match self.connection.session_info() {
             Some(yaml) => yaml,
             None => {
-                debug!("No session info available");
+                tracing::debug!("No session info available");
                 return Ok(None);
             }
         };
@@ -66,8 +64,12 @@ impl Provider for LiveProvider {
         // Preprocess to fix iRacing's YAML issues
         let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
 
-        info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
+        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
 
         Ok(Some(cleaned_yaml))
+    }
+
+    fn tick_rate(&self) -> f64 {
+        self.connection.header().tick_rate as f64
     }
 }

@@ -9,8 +9,6 @@ use iracing_sdk::{
 };
 #[cfg(windows)]
 use std::io::{self, Write};
-#[cfg(windows)]
-use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -261,7 +259,7 @@ fn execute_send(client: &Broadcast, command: SendCommand) -> Result<()> {
     let messages = command_to_messages(command)?;
     for message in messages {
         client.send_message(message.clone())?;
-        info!("sent broadcast message: {message:?}");
+        tracing::info!("sent broadcast message: {message:?}");
     }
     Ok(())
 }
@@ -601,7 +599,9 @@ fn prompt_u8<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u8_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -617,7 +617,9 @@ fn prompt_u16<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u16_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -633,7 +635,9 @@ fn prompt_u32<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u32_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -650,7 +654,7 @@ fn prompt_f32<P: PromptInput>(
         match parse_f32_input(&input, min, max) {
             Ok(value) => return Ok(value),
             Err(err) => {
-                warn!("{err}. Enter a numeric value, or press Enter/q to cancel.");
+                tracing::warn!("{err}. Enter a numeric value, or press Enter/q to cancel.");
             }
         }
     }
@@ -664,7 +668,7 @@ fn prompt_text<P: PromptInput>(prompter: &mut P, label: &str) -> Result<Option<S
             return Ok(None);
         }
         if input.trim().is_empty() {
-            warn!("value cannot be empty. Press Enter/q to cancel.");
+            tracing::warn!("value cannot be empty. Press Enter/q to cancel.");
             continue;
         }
         return Ok(Some(input));
@@ -937,10 +941,10 @@ fn run_interactive(client: &Broadcast) -> Result<()> {
             InteractiveAction::Send(messages) => {
                 for message in messages {
                     client.send_message(message.clone())?;
-                    info!("sent broadcast message from interactive mode: {message:?}");
+                    tracing::info!("sent broadcast message from interactive mode: {message:?}");
                 }
             }
-            InteractiveAction::Noop => info!("interactive action canceled"),
+            InteractiveAction::Noop => tracing::info!("interactive action canceled"),
             InteractiveAction::Exit => break,
         }
     }

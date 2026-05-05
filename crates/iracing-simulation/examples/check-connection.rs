@@ -9,7 +9,6 @@ use std::{
 
 use clap::Parser;
 use iracing_simulation::{DEFAULT_HOST, DEFAULT_PORT, Simulation};
-use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
 /// Checks whether the iRacing simulation is running on the local host.
@@ -64,15 +63,15 @@ fn main() {
 
     loop {
         let running = sim.check_sim_status();
-        debug!("running={}", running);
+        tracing::debug!("running={}", running);
 
         if running {
-            info!("Simulation is running.");
+            tracing::info!("Simulation is running.");
             return;
         }
 
         if timeout != 0 && start.elapsed() >= Duration::from_secs(timeout) {
-            debug!("Timed out after {} seconds.", timeout);
+            tracing::debug!("Timed out after {} seconds.", timeout);
             std::process::exit(1);
         }
 

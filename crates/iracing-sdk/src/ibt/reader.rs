@@ -35,7 +35,6 @@ use crate::{IRacingSDKError, Result, VariableSchema, yaml_utils};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use tracing::warn;
 
 /// IBT file reader for cross-platform replay.
 pub struct IbtReader {
@@ -141,9 +140,10 @@ impl IbtReader {
         if disk_header.record_count > 0 && total_frames > 0 {
             let expected_frames = disk_header.record_count as usize;
             if expected_frames != total_frames {
-                warn!(
+                tracing::warn!(
                     "Frame count mismatch: disk header reports {} records, calculated {} frames from file size",
-                    disk_header.record_count, total_frames
+                    disk_header.record_count,
+                    total_frames
                 );
             }
         }

@@ -6,7 +6,6 @@
 use super::SessionInfo;
 use crate::error::IRacingSDKError;
 use anyhow::Result;
-use tracing::debug;
 
 /// Session info cache entry with version tracking
 #[derive(Debug, Clone)]
@@ -66,11 +65,11 @@ impl SessionInfoParser {
         if let Some(cached) = &self.cache
             && cached.is_valid(session_version)
         {
-            debug!(version = session_version, "Using cached session info");
+            tracing::debug!(version = session_version, "Using cached session info");
             return Ok(cached.session_info.clone());
         }
 
-        debug!(
+        tracing::debug!(
             version = session_version,
             offset = session_info_offset,
             length = session_info_len,

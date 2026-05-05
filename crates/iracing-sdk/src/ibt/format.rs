@@ -23,7 +23,6 @@
 use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
-use tracing::{debug, trace};
 
 // Size constants for IBT format structures
 const IRSDK_HEADER_SIZE: usize = 144;
@@ -84,7 +83,7 @@ impl IbtHeader {
 
     /// Parses an [`IbtHeader`] from the current position of `reader`.
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
+        tracing::trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
         let mut header_data = [0u8; IRSDK_HEADER_SIZE];
         reader
             .read_exact(&mut header_data)
@@ -120,7 +119,7 @@ impl IbtHeader {
         let num_buf = parse_i32_le(&header_data, 32)?;
         let buf_len = parse_i32_le(&header_data, 36)?;
 
-        debug!(
+        tracing::debug!(
             "Parsed IBT header: version={}, status={}, tick_rate={}, session_info_update={}, session_info_len={}, session_info_offset={}, num_vars={}, var_header_offset={}, num_buf={} buf_len={}",
             version,
             status,
@@ -287,7 +286,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
     header: &IbtHeader,
 ) -> Result<VariableSchema> {
-    debug!(
+    tracing::debug!(
         "Extracting variable schema for {} variables",
         header.num_vars
     );
@@ -357,9 +356,10 @@ pub fn extract_variable_schema<R: Read + Seek>(
             5 => VariableType::Float64,  // double
             _ => {
                 // Log unknown types for diagnostics
-                debug!(
+                tracing::debug!(
                     "Skipping variable '{}' with unknown type {}",
-                    name, var_type
+                    name,
+                    var_type
                 );
                 continue;
             }
@@ -379,7 +379,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
         );
     }
 
-    debug!(
+    tracing::debug!(
         "Extracted {} variables with frame size {}",
         variables.len(),
         header.buf_len

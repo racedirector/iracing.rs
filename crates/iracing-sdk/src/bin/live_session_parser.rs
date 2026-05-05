@@ -78,8 +78,6 @@ use clap::Parser;
 use iracing_sdk::WindowsConnection;
 #[cfg(windows)]
 use std::{fs, path::PathBuf};
-#[cfg(windows)]
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live session parser.
@@ -120,7 +118,7 @@ fn run() -> Result<()> {
     } = Args::parse();
 
     let effective_live_only = if no_live_only { false } else { live_only };
-    info!("Opening iRacing connection...");
+    tracing::info!("Opening iRacing connection...");
     let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
     if effective_live_only && !connection.is_connected() {
         return Err(anyhow!("Live only is enabled."));
@@ -129,16 +127,16 @@ fn run() -> Result<()> {
     // ------------------------------------------------------------
     // Write session string to output path.
     // ------------------------------------------------------------
-    info!("Parsing session information");
+    tracing::info!("Parsing session information");
     if let Some(session) = connection.session_info() {
         if let Some(output_path) = output_path {
             fs::write(output_path, session)?;
         } else {
-            info!("\n{}", session);
+            tracing::info!("\n{}", session);
         }
     }
 
-    info!("Finished parsing session information.");
+    tracing::info!("Finished parsing session information.");
 
     Ok(())
 }

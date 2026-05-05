@@ -56,7 +56,6 @@
 
 use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
 use std::collections::HashMap;
-use tracing::{debug, trace, warn};
 
 /// Size constants matching iRacing SDK
 const IRSDK_MAX_STRING: usize = 32; // For name and unit fields
@@ -102,7 +101,7 @@ mod irsdk_var_type {
 impl IRSDKVarHeader {
     /// Parse variable header from raw memory bytes with validation
     pub fn parse_from_memory(memory: &[u8], offset: usize) -> Result<Self> {
-        trace!(offset, "Parsing variable header from memory");
+        tracing::trace!(offset, "Parsing variable header from memory");
 
         // Validate we have enough bytes for a complete header
         if offset + VAR_HEADER_SIZE > memory.len() {
@@ -163,7 +162,7 @@ impl IRSDKVarHeader {
             irsdk_var_type::IRSDK_FLOAT => VariableType::Float32,
             irsdk_var_type::IRSDK_DOUBLE => VariableType::Float64,
             _ => {
-                warn!(
+                tracing::warn!(
                     irsdk_type,
                     "Unknown iRacing variable type, defaulting to Int32"
                 );
@@ -198,9 +197,11 @@ pub fn parse_variable_schema(
     var_header_offset: i32,
     buffer_length: i32,
 ) -> Result<VariableSchema> {
-    debug!(
+    tracing::debug!(
         num_vars,
-        var_header_offset, buffer_length, "Parsing variable schema from memory"
+        var_header_offset,
+        buffer_length,
+        "Parsing variable schema from memory"
     );
 
     // Validate input parameters
@@ -249,14 +250,14 @@ pub fn parse_variable_schema(
 
                 // Check for duplicate names
                 if variables.contains_key(&var_info.name) {
-                    warn!(name = %var_info.name, "Duplicate variable name found");
+                    tracing::warn!(name = %var_info.name, "Duplicate variable name found");
                 }
 
                 variables.insert(var_info.name.clone(), var_info);
             }
             Err(e) => {
                 failed_count += 1;
-                warn!(
+                tracing::warn!(
                     error = %e,
                     header_index = i,
                     "Failed to parse variable header, skipping"
@@ -267,14 +268,14 @@ pub fn parse_variable_schema(
     }
 
     if failed_count > 0 {
-        warn!(
+        tracing::warn!(
             failed_count,
             total = num_vars,
             "Some variable headers failed to parse"
         );
     }
 
-    debug!(
+    tracing::debug!(
         parsed_count = variables.len(),
         expected_count = num_vars,
         "Variable parsing completed"

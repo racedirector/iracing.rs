@@ -30,8 +30,6 @@ use iracing_sdk::{VariableInfo, VariableType};
 use iracing_sdk::{WaitResult, WindowsConnection};
 #[cfg(windows)]
 use std::{path::PathBuf, time::Duration};
-#[cfg(windows)]
-use tracing::{debug, info, trace};
 use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
@@ -54,7 +52,7 @@ fn main() -> Result<()> {
 fn run() -> Result<()> {
     let Args { output_path } = Args::parse();
 
-    info!("Opening iRacing connection");
+    tracing::info!("Opening iRacing connection");
     let mut connection =
         WindowsConnection::try_connect().context("Failed to connect to iRacing shared memory")?;
 
@@ -62,7 +60,7 @@ fn run() -> Result<()> {
         return Err(anyhow!("iRacing is not connected."));
     }
 
-    info!(path = %output_path.display(), "Creating CSV output");
+    tracing::info!(path = %output_path.display(), "Creating CSV output");
     let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
 
     let mut variables = connection.get_variables();
@@ -82,7 +80,7 @@ fn run() -> Result<()> {
     let expected_column_count = headers.len();
     writer.write_record(&headers)?;
 
-    info!(
+    tracing::info!(
         variable_count = variables.len(),
         column_count = expected_column_count,
         "Starting live CSV export"
@@ -91,7 +89,7 @@ fn run() -> Result<()> {
     let mut frame_count = 0usize;
     loop {
         if !connection.is_connected() {
-            info!("iRacing disconnected; stopping live CSV export");
+            tracing::info!("iRacing disconnected; stopping live CSV export");
             break;
         }
 
@@ -120,22 +118,22 @@ fn run() -> Result<()> {
             frame_count += 1;
 
             if frame_count.is_multiple_of(10_000) {
-                debug!(frames_exported = frame_count, "CSV export progress");
+                tracing::debug!(frames_exported = frame_count, "CSV export progress");
             }
         }
 
         match connection.wait_for_update(Duration::from_millis(500))? {
             WaitResult::Signaled => {
-                trace!("Telemetry update signaled");
+                tracing::trace!("Telemetry update signaled");
             }
             WaitResult::Timeout => {
-                trace!("Wait timeout while polling live telemetry");
+                tracing::trace!("Wait timeout while polling live telemetry");
             }
         }
     }
 
     writer.flush()?;
-    info!(frames_exported = frame_count, "Finished live CSV export");
+    tracing::info!(frames_exported = frame_count, "Finished live CSV export");
 
     Ok(())
 }

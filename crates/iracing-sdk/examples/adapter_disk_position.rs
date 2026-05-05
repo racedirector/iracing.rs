@@ -5,7 +5,6 @@ use iracing_sdk::{
     AdapterValidation, FieldExtraction, FrameAdapter, IRacingSDKError, IbtProvider, Provider,
 };
 use std::{fs, path::PathBuf};
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -170,7 +169,7 @@ fn main() -> Result<()> {
         yml_output_path,
     } = Args::parse();
 
-    info!(path = %ibt_path.display(), "Opening IBT file");
+    tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
     let mut ibt_provider =
         IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
@@ -180,16 +179,16 @@ fn main() -> Result<()> {
     // Write session string to output path.
     // ------------------------------------------------------------
     if let Some(yml_output) = yml_output_path {
-        info!("Parsing session information...");
+        tracing::info!("Parsing session information...");
         if let Some(session) = ibt_provider.session_yaml(0)? {
             fs::write(&yml_output, session)?;
-            info!(session_output_path = %yml_output.display(), "Session information written.")
+            tracing::info!(session_output_path = %yml_output.display(), "Session information written.")
         }
     }
 
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    info!(
+    tracing::info!(
         total_frames = ibt_provider.total_frames(),
         "Parsing frames from IBT provider"
     );
@@ -202,7 +201,7 @@ fn main() -> Result<()> {
     }
 
     writer.flush()?;
-    info!(output_path = %csv_output_path.display(), "Finished processing frames");
+    tracing::info!(output_path = %csv_output_path.display(), "Finished processing frames");
 
     Ok(())
 }

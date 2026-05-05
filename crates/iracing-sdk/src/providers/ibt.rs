@@ -1,6 +1,5 @@
 use crate::{FramePacket, IbtReader, Provider, Result, VariableSchema};
 use std::{path::Path, sync::Arc};
-use tracing::{debug, trace};
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 pub struct IbtProvider {
@@ -41,21 +40,21 @@ impl Provider for IbtProvider {
     fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
         let total_frames = self.reader.total_frames();
         if self.reader.current_frame() >= total_frames {
-            debug!("End of IBT frames");
+            tracing::debug!("End of IBT frames");
             return Ok(None);
         }
 
         let (frame_data, tick, session_version) = match self.reader.read_next_frame()? {
             Some(data) => data,
             None => {
-                debug!("No more frames from reader");
+                tracing::debug!("No more frames from reader");
                 return Ok(None);
             }
         };
 
         let packet = FramePacket::new(frame_data, tick, session_version, Arc::clone(&self.schema));
 
-        trace!(
+        tracing::trace!(
             "Frame {}/{}: tick={}, session_version={}",
             self.reader.current_frame(),
             total_frames,
@@ -70,5 +69,9 @@ impl Provider for IbtProvider {
         // Get cleaned YAML from IBT file
         // IBT files have static session info, version parameter is ignored
         self.reader.session_yaml()
+    }
+
+    fn tick_rate(&self) -> f64 {
+        self.reader.tick_rate()
     }
 }
