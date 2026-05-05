@@ -95,7 +95,9 @@ pub enum IRacingSDKError {
     },
 
     /// The parsed telemetry schema did not pass validation rules.
-    #[error("Schema validation failed: {reason} (expected: {expected_version:?}, actual: {actual_version:?})")]
+    #[error(
+        "Schema validation failed: {reason} (expected: {expected_version:?}, actual: {actual_version:?})"
+    )]
     SchemaValidation {
         /// Human-readable explanation of the validation failure.
         reason: String,
@@ -495,7 +497,10 @@ mod tests {
         let telemetry_err = IRacingSDKError::file_error(path.clone(), io_err);
 
         match telemetry_err {
-            IRacingSDKError::File { path: err_path, source } => {
+            IRacingSDKError::File {
+                path: err_path,
+                source,
+            } => {
                 assert_eq!(err_path, path);
                 assert_eq!(source.to_string(), "test file");
             }
