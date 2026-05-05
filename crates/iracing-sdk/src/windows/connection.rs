@@ -239,8 +239,6 @@ impl Connection {
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
         let ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-        tracing::trace!(timeout_ms = ms, "Waiting for telemetry update");
-
         Self::wait_for_event(self.event, ms)
     }
 
@@ -347,6 +345,9 @@ impl Connection {
     pub fn session_info(&self) -> Option<String> {
         let header = self.header();
         if header.session_info_len <= 0 {
+            return None;
+        }
+        if header.session_info_offset < 0 {
             return None;
         }
 
