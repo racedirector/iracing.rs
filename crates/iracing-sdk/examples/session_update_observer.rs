@@ -55,7 +55,7 @@ fn main() -> Result<()> {
                         && let Some(session_info_yaml) = connection.session_info()
                     {
                         let session_info =
-                            SessionInfo::parse(session_info_yaml).map_err(|err| {
+                            SessionInfo::parse(&session_info_yaml).map_err(|err| {
                                 anyhow!(
                                     "failed to parse session info update {current_update}: {err}"
                                 )

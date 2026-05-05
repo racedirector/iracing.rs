@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 
                     if current_update != previous_session_info_update
                         && let Some(session_info_yaml) = connection.session_info()
-                        && let Some(session_info) = SessionInfo::parse(session_info_yaml).ok()
+                        && let Some(session_info) = SessionInfo::parse(&session_info_yaml).ok()
                     {
                         if let Some(setup) = session_info.car_setup
                             && previous_setup_update != setup.update_count

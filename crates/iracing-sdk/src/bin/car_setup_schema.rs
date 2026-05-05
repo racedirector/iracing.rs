@@ -72,7 +72,7 @@ fn parse_live_session() -> Result<SessionInfo> {
 
     let parser = SessionInfoParser::new();
 
-    parser.parse(raw_session_yaml)
+    parser.parse(&raw_session_yaml)
 }
 
 /// Non-Windows stub — always returns an error directing the caller to use `--ibt-path`.

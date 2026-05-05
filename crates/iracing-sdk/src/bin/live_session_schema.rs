@@ -58,7 +58,7 @@ fn run() -> Result<()> {
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
 
     let parser = SessionInfoParser::new();
-    let session = parser.parse(raw_session_yaml)?;
+    let session = parser.parse(&raw_session_yaml)?;
     let schema = schemars::schema_for_value!(session);
 
     let output_file = File::create(&output_path)?;
