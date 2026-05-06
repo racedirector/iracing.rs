@@ -53,7 +53,8 @@ struct Row {
     is_in_pit_box: bool,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -92,7 +93,7 @@ fn main() -> anyhow::Result<()> {
         let mut writer = Writer::from_path(&csv_output_path)?;
 
         let shared_validation = Row::validate_schema(&schema)?;
-        while let Some(packet) = provider.next_frame()? {
+        while let Some(packet) = provider.next_frame().await? {
             let frame = Row::adapt(&packet, &shared_validation);
             writer.serialize(frame)?;
         }

@@ -57,7 +57,8 @@ struct Row {
     is_in_pit_box: bool,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -89,7 +90,7 @@ fn main() -> Result<()> {
     );
 
     let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = provider.next_frame()? {
+    while let Some(packet) = provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         writer.serialize(frame)?;
     }

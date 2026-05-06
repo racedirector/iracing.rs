@@ -9,7 +9,6 @@ use iracing_sdk::{
 };
 #[cfg(windows)]
 use std::io::{self, Write};
-use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -218,18 +217,20 @@ enum ReplayStateArg {
 }
 
 fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
-
-fn run() -> Result<()> {
     let cli = Cli::parse();
 
     #[cfg(windows)]
     {
-        run_windows(cli)
+        let client = Broadcast::new().expect("Could not create iRacing broadcast client");
+
+        match cli.command {
+            Command::Send { command } => execute_send(&client, command),
+            Command::Interactive => run_interactive(&client),
+        }
     }
 
     #[cfg(not(windows))]
@@ -241,16 +242,6 @@ fn run() -> Result<()> {
         Err(anyhow::anyhow!(
             "broadcast-cli is only supported on Windows"
         ))
-    }
-}
-
-#[cfg(windows)]
-fn run_windows(cli: Cli) -> Result<()> {
-    let client = Broadcast::new().expect("Could not create iRacing broadcast client");
-
-    match cli.command {
-        Command::Send { command } => execute_send(&client, command),
-        Command::Interactive => run_interactive(&client),
     }
 }
 

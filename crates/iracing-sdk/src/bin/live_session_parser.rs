@@ -106,45 +106,43 @@ fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
-
-#[cfg(windows)]
-fn run() -> Result<()> {
-    let Args {
-        output_path,
-        live_only,
-        no_live_only,
-    } = Args::parse();
-
-    let effective_live_only = if no_live_only { false } else { live_only };
-    tracing::info!("Opening iRacing connection...");
-    let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-    if effective_live_only && !connection.is_connected() {
-        return Err(anyhow!("Live only is enabled."));
+    #[cfg(not(windows))]
+    {
+        tracing::warn!(
+            "live-session-parser is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        );
+        Err(anyhow!("live-session-parser is only supported on Windows"))
     }
 
-    // ------------------------------------------------------------
-    // Write session string to output path.
-    // ------------------------------------------------------------
-    tracing::info!("Parsing session information");
-    if let Some(session) = connection.session_info() {
-        if let Some(output_path) = output_path {
-            fs::write(output_path, session)?;
-        } else {
-            tracing::info!("\n{}", session);
+    #[cfg(windows)]
+    {
+        let Args {
+            output_path,
+            live_only,
+            no_live_only,
+        } = Args::parse();
+
+        let effective_live_only = if no_live_only { false } else { live_only };
+        tracing::info!("Opening iRacing connection...");
+        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
+        if effective_live_only && !connection.is_connected() {
+            return Err(anyhow!("Live only is enabled."));
         }
+
+        // ------------------------------------------------------------
+        // Write session string to output path.
+        // ------------------------------------------------------------
+        tracing::info!("Parsing session information");
+        if let Some(session) = connection.session_info() {
+            if let Some(output_path) = output_path {
+                fs::write(output_path, session)?;
+            } else {
+                tracing::info!("\n{}", session);
+            }
+        }
+
+        tracing::info!("Finished parsing session information.");
+
+        Ok(())
     }
-
-    tracing::info!("Finished parsing session information.");
-
-    Ok(())
-}
-
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    tracing::warn!(
-        "live-session-parser is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-    );
-    Err(anyhow!("live-session-parser is only supported on Windows"))
 }
