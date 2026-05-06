@@ -57,7 +57,7 @@ impl Provider for LiveProvider {
                 // Log periodically to avoid spam
                 if no_connection_count == 1 {
                     tracing::info!("Waiting for iRacing to start a session...");
-                } else if no_connection_count % 20 == 0 {
+                } else if no_connection_count.is_multiple_of(20) {
                     tracing::debug!(
                         "Still waiting for iRacing session ({}s elapsed)",
                         no_connection_count / 2

@@ -14,7 +14,6 @@
 //! live-variable-schema --output-path <SCHEMA.yml> [--allow-stale]
 //! ```
 
-use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::{ArgAction, Parser};
 #[cfg(windows)]
@@ -34,7 +33,7 @@ struct Args {
     allow_stale: bool,
 }
 
-pub fn main() -> Result<()> {
+pub fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -48,12 +47,12 @@ pub fn main() -> Result<()> {
         tracing::warn!(
             "live-telemetry-schema is only supported on Windows because it depends on iRacing shared memory APIs."
         );
-        Err(anyhow!(
+        Err(anyhow::anyhow!(
             "live-telemetry-schema is only supported on Windows"
         ))
     }
 
-    /// Connects to iRacing shared memory, generates the telemetry variable schema, and writes it to disk.
+    // Connects to iRacing shared memory, generates the telemetry variable schema, and writes it to disk.
     #[cfg(windows)]
     {
         use iracing_sdk::{VariableSchema, WindowsConnection};

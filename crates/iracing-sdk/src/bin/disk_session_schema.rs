@@ -8,9 +8,8 @@
 //! disk-session-schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
 //! ```
 
-use anyhow::{Result, anyhow};
 use clap::Parser;
-use iracing_sdk::{IbtProvider, IbtReader, Provider, SessionInfo};
+use iracing_sdk::{IbtProvider, Provider, SessionInfo};
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -28,7 +27,7 @@ struct Args {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
@@ -38,12 +37,12 @@ async fn main() -> Result<()> {
     } = Args::parse();
 
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
-    let provider = IbtProvider::from_path(&ibt_path)?;
+    let mut provider = IbtProvider::from_path(&ibt_path)?;
 
-    let session_info = provider
+    let session_yaml = provider
         .session_yaml(0)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("No session YAML found in IBT file"));
+        .ok_or_else(|| anyhow::anyhow!("No session YAML found in IBT file"))?;
 
     let session = SessionInfo::parse(&session_yaml)?;
     let schema = schemars::schema_for_value!(session);

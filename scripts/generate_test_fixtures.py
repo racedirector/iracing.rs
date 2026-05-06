@@ -279,7 +279,7 @@ def main() -> None:
         yaml_path = YAML_DIR / f"{profile.name}.yaml"
         ibt_path = IBT_DIR / f"{profile.name}.ibt"
 
-        yaml_path.write_text(yaml_text, encoding="utf-8")
+        yaml_path.write_bytes(yaml_bytes)
         ibt_bytes = build_ibt(profile, yaml_bytes)
         ibt_path.write_bytes(ibt_bytes)
 
@@ -324,7 +324,7 @@ def main() -> None:
         },
         "fixtures": fixtures,
     }
-    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    MANIFEST_PATH.write_bytes((json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
 
 
 if __name__ == "__main__":
