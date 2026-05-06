@@ -29,40 +29,39 @@ fn main() -> anyhow::Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    /// Non-Windows stub: always returns an error explaining the platform requirement.
     #[cfg(not(windows))]
     {
         tracing::warn!(
             "live_session_schema is only supported on Windows because it depends on iRacing shared memory APIs."
         );
-        Err(anyhow::anyhow!(
+
+        return Err(anyhow::anyhow!(
             "live_session_schema is only supported on Windows"
-        ))
+        ));
     }
 
-    let Args {
-        output_path,
-        allow_stale,
-    } = Args::parse();
-
-    /// Connects to iRacing shared memory, generates the session schema, and writes it to disk.
     #[cfg(windows)]
     {
         use iracing_sdk::{SessionInfoParser, WindowsConnection};
         use std::{fs::File, io::BufWriter};
 
+        let Args {
+            output_path,
+            allow_stale,
+        } = Args::parse();
+
         tracing::info!("Opening iRacing connection");
         let connection = WindowsConnection::try_connect()?;
 
         if !connection.is_connected() && !allow_stale {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "iRacing is not connected (pass --allow-stale to continue)."
             ));
         }
 
         let raw_session_yaml = connection
             .session_info()
-            .ok_or_else(|| anyhow!("No live session YAML is available"))?;
+            .ok_or_else(|| anyhow::anyhow!("No live session YAML is available"))?;
 
         let parser = SessionInfoParser::new();
         let session = parser.parse(&raw_session_yaml)?;
@@ -74,6 +73,6 @@ fn main() -> anyhow::Result<()> {
 
         tracing::info!(path = %output_path.display(), "Wrote live session schema");
 
-        Ok(())
+        return Ok(());
     }
 }
