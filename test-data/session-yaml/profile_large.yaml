@@ -1,0 +1,13 @@
+WeekendInfo:
+  TrackName: generated large
+  TrackDisplayName: Generated Large Circuit
+  TrackLength: "1.00 km"
+  TrackID: 9001
+SessionInfo:
+  CurrentSessionNum: 0
+  Sessions:
+    - SessionNum: 0
+      SessionLaps: unlimited
+      SessionTime: "600 sec"
+      SessionType: Race
+      SessionName: Race

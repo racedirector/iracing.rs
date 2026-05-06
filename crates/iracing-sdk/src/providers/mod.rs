@@ -6,6 +6,7 @@ use crate::{FramePacket, Result};
 /// `Ok(None)` (end of file) or an error. When `session_version` on a
 /// [`FramePacket`] changes, call [`Provider::session_yaml`] with the new
 /// version to retrieve updated session info YAML.
+
 #[async_trait::async_trait(?Send)]
 pub trait Provider {
     /// Return the next telemetry frame, or `Ok(None)` when the source is exhausted.

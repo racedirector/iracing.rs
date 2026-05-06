@@ -1,10 +1,9 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use crate::{Result, VariableSchema, WindowsConnection, yaml_utils};
-
 use crate::{
-    FramePacket, Provider,
+    FramePacket, Provider, Result, VariableSchema, WindowsConnection,
     runtime::{Timer, WaitRuntime},
+    yaml_utils,
 };
 
 /// Live Windows shared-memory provider parameterized by runtime hooks.
@@ -71,7 +70,7 @@ where
     TimerRuntime: Timer,
     WaitRuntimeImpl: WaitRuntime,
 {
-    async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
+    async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
         let mut no_connection_count = 0u32;
         const MAX_NO_CONNECTION_ATTEMPTS: u32 = 600;
         const NO_CONNECTION_SLEEP: Duration = Duration::from_millis(500);
@@ -130,11 +129,11 @@ where
 
             match WaitRuntimeImpl::wait_for_update(&self.connection, TIMEOUT).await? {
                 crate::WaitResult::Signaled => {
-                    tracing::trace!("Signaled, checking for new data!");
+                    tracing::trace!("Event signaled, checking for new data");
                     continue;
                 }
                 crate::WaitResult::Timeout => {
-                    tracing::trace!("Timeout, continuing.");
+                    tracing::trace!("Wait timeout, continuing to poll");
                     continue;
                 }
             }
@@ -144,35 +143,27 @@ where
     async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        // Get the last session version
         let session_version = self.connection.session_info_update() as u32;
-
-        // If session versions do not match, there is likely an update
-        if session_version != version {
-            // Attempt to read the session info
-            let raw_yaml = match self.connection.session_info() {
-                Some(yaml) => yaml,
-                None => {
-                    tracing::debug!("No session info available");
-                    return Ok(None);
-                }
-            };
-
-            // Handle empty string
-            if raw_yaml.trim().is_empty() {
-                return Ok(None);
-            }
-
-            // Parse the yaml string
-            let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-            // Return it
-            tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-            return Ok(Some(cleaned_yaml));
+        if session_version == version {
+            return Ok(None);
         }
 
-        // Session versions match, there is no update.
-        Ok(None)
+        let raw_yaml = match self.connection.session_info() {
+            Some(yaml) => yaml,
+            None => {
+                tracing::debug!("No session info available");
+                return Ok(None);
+            }
+        };
+
+        if raw_yaml.trim().is_empty() {
+            return Ok(None);
+        }
+
+        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
+
+        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
+        Ok(Some(cleaned_yaml))
     }
 
     fn tick_rate(&self) -> f64 {

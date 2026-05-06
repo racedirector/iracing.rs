@@ -6,7 +6,68 @@
 use std::path::{Path, PathBuf};
 
 /// Guidance shown when telemetry fixtures are missing from the repository checkout.
-pub const FIXTURE_INSTALL_GUIDANCE: &str = "Telemetry fixtures are stored under test-data/. Install Git LFS and run `git lfs pull` to download them.";
+pub const FIXTURE_INSTALL_GUIDANCE: &str = "Telemetry fixtures are generated under test-data/. Run `python3 scripts/generate_test_fixtures.py` from the repository root to recreate them.";
+
+/// Manifest for deterministic generated IBT fixtures.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FixtureManifest {
+    pub schema_version: u32,
+    pub generated_by: String,
+    pub layout: FixtureManifestLayout,
+    pub fixtures: Vec<IbtFixture>,
+}
+
+/// Binary layout constants used by generated IBT fixtures.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FixtureManifestLayout {
+    pub live_header_prefix_size: usize,
+    pub ibt_header_size: usize,
+    pub disk_sub_header_size: usize,
+    pub variable_header_size: usize,
+    pub disk_sub_header_offset_rule: String,
+}
+
+/// Manifest entry for a single generated IBT fixture.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct IbtFixture {
+    pub name: String,
+    pub path: String,
+    pub session_yaml_path: String,
+    pub seed: u64,
+    pub tick_rate: i32,
+    pub num_vars: i32,
+    pub frame_size: usize,
+    pub num_frames: usize,
+    pub var_header_offset: i32,
+    pub disk_sub_header_offset: i32,
+    pub session_info_update: i32,
+    pub session_info_len: i32,
+    pub session_info_offset: i32,
+    pub num_buf: i32,
+    pub disk_header: IbtDiskHeaderManifest,
+    pub sha256: String,
+    pub required_variables: Vec<IbtVariableManifest>,
+}
+
+/// Expected disk sub-header values for a fixture.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct IbtDiskHeaderManifest {
+    pub start_date: i64,
+    pub start_time: f64,
+    pub end_time: f64,
+    pub lap_count: i32,
+    pub record_count: i32,
+}
+
+/// Expected variable metadata for generated fixtures.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct IbtVariableManifest {
+    pub name: String,
+    pub data_type: String,
+    pub offset: usize,
+    pub count: usize,
+    pub units: String,
+}
 
 /// Error returned when a required telemetry fixture cannot be located.
 #[derive(Debug, Clone)]
@@ -30,10 +91,104 @@ impl std::fmt::Display for FixtureError {
 
 impl std::error::Error for FixtureError {}
 
+impl IbtFixture {
+    /// Resolve this fixture path relative to the git repository root.
+    pub fn fixture_path(&self) -> Result<PathBuf, FixtureError> {
+        let repo_root = find_git_repository_root().map_err(|err| {
+            FixtureError::new(format!(
+                "Failed to resolve repository root for fixture '{}': {}. {}",
+                self.name, err, FIXTURE_INSTALL_GUIDANCE
+            ))
+        })?;
+        Ok(repo_root.join(&self.path))
+    }
+
+    /// Resolve this fixture's canonical session YAML path relative to the repository root.
+    pub fn session_yaml_file(&self) -> Result<PathBuf, FixtureError> {
+        let repo_root = find_git_repository_root().map_err(|err| {
+            FixtureError::new(format!(
+                "Failed to resolve repository root for fixture '{}': {}. {}",
+                self.name, err, FIXTURE_INSTALL_GUIDANCE
+            ))
+        })?;
+        Ok(repo_root.join(&self.session_yaml_path))
+    }
+}
+
+/// Get the generated IBT fixture manifest path.
+pub fn get_fixture_manifest_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    Ok(get_test_data_dir()?.join("ibt").join("manifest.json"))
+}
+
+fn manifest_path_if_present() -> Option<PathBuf> {
+    let path = get_fixture_manifest_path().ok()?;
+    path.exists().then_some(path)
+}
+
+/// Load the deterministic generated fixture manifest.
+pub fn load_fixture_manifest() -> Result<FixtureManifest, FixtureError> {
+    let path = get_fixture_manifest_path().map_err(|err| {
+        FixtureError::new(format!(
+            "Failed to resolve fixture manifest path: {}. {}",
+            err, FIXTURE_INSTALL_GUIDANCE
+        ))
+    })?;
+
+    let contents = std::fs::read_to_string(&path).map_err(|err| {
+        FixtureError::new(format!(
+            "Failed to read fixture manifest {}: {}. {}",
+            path.display(),
+            err,
+            FIXTURE_INSTALL_GUIDANCE
+        ))
+    })?;
+
+    let manifest: FixtureManifest = serde_json::from_str(&contents).map_err(|err| {
+        FixtureError::new(format!(
+            "Failed to parse fixture manifest {}: {}. Regenerate fixtures with `python3 scripts/generate_test_fixtures.py`.",
+            path.display(),
+            err
+        ))
+    })?;
+
+    if manifest.schema_version != 1 {
+        return Err(FixtureError::new(format!(
+            "Unsupported fixture manifest schema_version {} in {}.",
+            manifest.schema_version,
+            path.display()
+        )));
+    }
+
+    Ok(manifest)
+}
+
+fn manifest_fixture_paths() -> Result<Option<Vec<PathBuf>>, FixtureError> {
+    if manifest_path_if_present().is_none() {
+        return Ok(None);
+    }
+
+    let manifest = load_fixture_manifest()?;
+    let mut paths = Vec::with_capacity(manifest.fixtures.len());
+    for fixture in &manifest.fixtures {
+        let path = fixture.fixture_path()?;
+        if !path.exists() {
+            return Err(FixtureError::new(format!(
+                "Manifest fixture '{}' is missing at {}. {}",
+                fixture.name,
+                path.display(),
+                FIXTURE_INSTALL_GUIDANCE
+            )));
+        }
+        paths.push(path);
+    }
+    paths.sort();
+    Ok(Some(paths))
+}
+
 /// Require that a specific telemetry fixture exists on disk.
 ///
 /// Returns the resolved [`PathBuf`] when the fixture exists, or a [`FixtureError`]
-/// that includes guidance for installing Git LFS when it does not.
+/// that includes guidance for regenerating fixtures when it does not.
 pub fn require_fixture<P: AsRef<Path>>(path: P) -> Result<PathBuf, FixtureError> {
     let path_ref = path.as_ref();
     if path_ref.exists() {
@@ -98,6 +253,10 @@ pub fn get_test_data_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 /// Returns a vector of paths to all `.ibt` files in the test-data/ibt directory.
 /// Returns an empty vector if the directory doesn't exist or contains no IBT files.
 pub fn get_ibt_test_files() -> Vec<PathBuf> {
+    if let Ok(Some(paths)) = manifest_fixture_paths() {
+        return paths;
+    }
+
     let test_data_dir = match get_test_data_dir() {
         Ok(dir) => dir,
         Err(_) => return vec![],
@@ -154,10 +313,14 @@ pub fn get_smallest_ibt_test_file() -> Option<PathBuf> {
 
 /// Require that at least one IBT telemetry fixture is available and return them.
 ///
-/// This is typically used by integration tests that rely on Git LFS-hosted
-/// `.ibt` recordings. Tests should use this helper instead of silently skipping
-/// when fixtures are missing so that CI surfaces actionable failures.
+/// Tests should use this helper instead of silently skipping when fixtures are
+/// missing so that CI surfaces actionable failures. When a generated fixture
+/// manifest is present, manifest-listed fixtures are authoritative.
 pub fn require_ibt_fixtures() -> Result<Vec<PathBuf>, FixtureError> {
+    if let Some(paths) = manifest_fixture_paths()? {
+        return Ok(paths);
+    }
+
     let fixtures = get_ibt_test_files();
     if fixtures.is_empty() {
         Err(FixtureError::new(format!(
@@ -267,6 +430,33 @@ mod tests {
     }
 
     #[test]
+    fn test_load_fixture_manifest() {
+        let manifest = load_fixture_manifest().expect("generated fixture manifest should load");
+
+        assert_eq!(manifest.schema_version, 1);
+        assert_eq!(manifest.layout.live_header_prefix_size, 112);
+        assert_eq!(manifest.layout.ibt_header_size, 144);
+        assert_eq!(manifest.layout.disk_sub_header_size, 32);
+        assert_eq!(manifest.fixtures.len(), 3);
+
+        for fixture in &manifest.fixtures {
+            assert!(
+                fixture
+                    .fixture_path()
+                    .expect("fixture path should resolve")
+                    .exists(),
+                "fixture {} should exist",
+                fixture.name
+            );
+            assert_eq!(fixture.var_header_offset, 144);
+            assert_eq!(
+                fixture.disk_sub_header_offset,
+                fixture.var_header_offset - manifest.layout.disk_sub_header_size as i32
+            );
+        }
+    }
+
+    #[test]
     fn test_get_smallest_ibt_test_file() {
         let smallest_file = get_smallest_ibt_test_file();
 
@@ -290,6 +480,6 @@ mod tests {
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
         assert!(message.contains("Missing telemetry fixture"));
-        assert!(message.contains("git lfs pull"));
+        assert!(message.contains("generate_test_fixtures.py"));
     }
 }

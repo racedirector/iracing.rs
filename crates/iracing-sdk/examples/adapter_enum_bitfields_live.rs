@@ -2,7 +2,7 @@ use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
+use iracing_sdk::{AdapterValidation, DefaultLiveProvider, FieldExtraction, FrameAdapter};
 #[cfg(windows)]
 use iracing_sdk::{BitField, IRacingSDKError, VarData};
 
@@ -80,45 +80,43 @@ impl FrameAdapter for TelemetryRow {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    run().await
-}
-
-#[cfg(windows)]
-async fn run() -> Result<()> {
-    use iracing_sdk::{DefaultLiveProvider, Provider};
-
-    let args = Args::parse();
-    let mut provider = DefaultLiveProvider::new()?;
-    let validation = TelemetryRow::validate_schema(&provider.schema())?;
-
-    let mut seen = 0usize;
-    while let Some(packet) = provider.next_frame().await? {
-        if seen >= args.max_frames {
-            break;
-        }
-
-        let row = TelemetryRow::adapt(&packet, &validation);
-
-        println!(
-            "tick={} state={:?} track={:?} caution={} mandatory_repair={}",
-            packet.tick,
-            row.session_state,
-            row.track_surface,
-            row.session_flags
-                .contains(iracing_sdk::SessionFlags::CAUTION),
-            row.engine_warnings
-                .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
-        );
-
-        seen += 1;
+    #[cfg(not(windows))]
+    {
+        Err(anyhow::anyhow!(
+            "enum-bitfields-live example is only supported on Windows"
+        ))
     }
 
-    Ok(())
-}
+    #[cfg(windows)]
+    {
+        use iracing_sdk::Provider;
 
-#[cfg(not(windows))]
-async fn run() -> Result<()> {
-    Err(anyhow::anyhow!(
-        "enum-bitfields-live example is only supported on Windows"
-    ))
+        let args = Args::parse();
+        let mut provider = DefaultLiveProvider::new()?;
+        let validation = TelemetryRow::validate_schema(&provider.schema())?;
+
+        let mut seen = 0usize;
+        while let Some(packet) = provider.next_frame().await? {
+            if seen >= args.max_frames {
+                break;
+            }
+
+            let row = TelemetryRow::adapt(&packet, &validation);
+
+            println!(
+                "tick={} state={:?} track={:?} caution={} mandatory_repair={}",
+                packet.tick,
+                row.session_state,
+                row.track_surface,
+                row.session_flags
+                    .contains(iracing_sdk::SessionFlags::CAUTION),
+                row.engine_warnings
+                    .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
+            );
+
+            seen += 1;
+        }
+
+        Ok(())
+    }
 }

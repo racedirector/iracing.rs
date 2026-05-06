@@ -103,6 +103,7 @@ pub enum Value {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "codegen")]
     use super::*;
 
     #[cfg(feature = "codegen")]

@@ -9,9 +9,6 @@ use iracing_sdk::{
 };
 #[cfg(windows)]
 use std::io::{self, Write};
-#[cfg(windows)]
-use tracing::{info, warn};
-use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -220,18 +217,20 @@ enum ReplayStateArg {
 }
 
 fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
-
-fn run() -> Result<()> {
     let cli = Cli::parse();
 
     #[cfg(windows)]
     {
-        run_windows(cli)
+        let client = Broadcast::new().expect("Could not create iRacing broadcast client");
+
+        match cli.command {
+            Command::Send { command } => execute_send(&client, command),
+            Command::Interactive => run_interactive(&client),
+        }
     }
 
     #[cfg(not(windows))]
@@ -247,21 +246,11 @@ fn run() -> Result<()> {
 }
 
 #[cfg(windows)]
-fn run_windows(cli: Cli) -> Result<()> {
-    let client = Broadcast::new().expect("Could not create iRacing broadcast client");
-
-    match cli.command {
-        Command::Send { command } => execute_send(&client, command),
-        Command::Interactive => run_interactive(&client),
-    }
-}
-
-#[cfg(windows)]
 fn execute_send(client: &Broadcast, command: SendCommand) -> Result<()> {
     let messages = command_to_messages(command)?;
     for message in messages {
         client.send_message(message.clone())?;
-        info!("sent broadcast message: {message:?}");
+        tracing::info!("sent broadcast message: {message:?}");
     }
     Ok(())
 }
@@ -576,16 +565,17 @@ fn parse_f32_input(input: &str, min: Option<f32>, max: Option<f32>) -> Result<Op
         return Ok(None);
     }
     let value = input.parse::<f32>()?;
-    if let Some(min) = min {
-        if value < min {
-            anyhow::bail!("value must be >= {min}");
-        }
+    if let Some(min) = min
+        && value < min
+    {
+        anyhow::bail!("value must be >= {min}");
     }
-    if let Some(max) = max {
-        if value > max {
-            anyhow::bail!("value must be <= {max}");
-        }
+    if let Some(max) = max
+        && value > max
+    {
+        anyhow::bail!("value must be <= {max}");
     }
+
     Ok(Some(value))
 }
 
@@ -600,7 +590,9 @@ fn prompt_u8<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u8_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -616,7 +608,9 @@ fn prompt_u16<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u16_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -632,7 +626,9 @@ fn prompt_u32<P: PromptInput>(
         let input = prompter.prompt_line(label)?;
         match parse_u32_input(&input, min, max) {
             Ok(value) => return Ok(value),
-            Err(err) => warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel."),
+            Err(err) => {
+                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
+            }
         }
     }
 }
@@ -649,7 +645,7 @@ fn prompt_f32<P: PromptInput>(
         match parse_f32_input(&input, min, max) {
             Ok(value) => return Ok(value),
             Err(err) => {
-                warn!("{err}. Enter a numeric value, or press Enter/q to cancel.");
+                tracing::warn!("{err}. Enter a numeric value, or press Enter/q to cancel.");
             }
         }
     }
@@ -663,7 +659,7 @@ fn prompt_text<P: PromptInput>(prompter: &mut P, label: &str) -> Result<Option<S
             return Ok(None);
         }
         if input.trim().is_empty() {
-            warn!("value cannot be empty. Press Enter/q to cancel.");
+            tracing::warn!("value cannot be empty. Press Enter/q to cancel.");
             continue;
         }
         return Ok(Some(input));
@@ -936,10 +932,10 @@ fn run_interactive(client: &Broadcast) -> Result<()> {
             InteractiveAction::Send(messages) => {
                 for message in messages {
                     client.send_message(message.clone())?;
-                    info!("sent broadcast message from interactive mode: {message:?}");
+                    tracing::info!("sent broadcast message from interactive mode: {message:?}");
                 }
             }
-            InteractiveAction::Noop => info!("interactive action canceled"),
+            InteractiveAction::Noop => tracing::info!("interactive action canceled"),
             InteractiveAction::Exit => break,
         }
     }

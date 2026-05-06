@@ -44,6 +44,7 @@ async-trait = "0.1.85"
 clap = { workspace = true }
 csv = { workspace = true }
 encoding_rs = "0.8.35"
+futures = "0.3"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
@@ -63,11 +64,24 @@ windows = { version = "0.62.0", features = [
 ] }
 windows-core = "0.62.0"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["rt", "macros", "time"] }
-
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-timers = { version = "0.3", features = ["futures"] }
+tokio = { version = "1", default-features = false, features = [
+  "sync",
+  "rt",
+  "time",
+] }
+tokio-stream = { version = "0.1", default-features = false, features = [
+  "sync",
+] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", default-features = false, features = [
+  "sync",
+] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 
 [dev-dependencies]
 criterion = "0.8.2"
@@ -76,6 +90,7 @@ proptest = "1.11.0"
 test-utils = { path = "../test-utils" }
 
 [features]
+default = ["derive"]
 benchmark = []
 codegen = ["dep:schemars"]
 derive = ["dep:iracing-sdk-derive"]
@@ -90,6 +105,10 @@ required-features = ["benchmark"]
 name = "frame_construction"
 harness = false
 required-features = ["benchmark"]
+
+[[example]]
+name = "car-setup-observer"
+path = "examples/car_setup_observer.rs"
 
 [[example]]
 name = "disk-position"

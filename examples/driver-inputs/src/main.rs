@@ -5,7 +5,6 @@ use csv::Writer;
 use driver_input::DriverInput;
 use iracing_sdk::{FrameAdapter, IbtProvider, Provider, SessionFlags};
 use std::{fs::File, path::PathBuf};
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -110,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
     let schema = ibt_provider.schema();
 
-    info!(
+    tracing::info!(
         total_frames = ibt_provider.total_frames(),
         "Parsing frames from IBT provider"
     );

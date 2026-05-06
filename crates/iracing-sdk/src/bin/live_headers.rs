@@ -47,33 +47,30 @@ fn main() -> Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
-}
+    #[cfg(not(windows))]
+    {
+        tracing::warn!(
+            "live-headers is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        );
+        Err(anyhow::anyhow!("live-headers is only supported on Windows"))
+    }
 
-#[cfg(windows)]
-fn run() -> Result<()> {
-    tracing::info!("Opening iRacing connection...");
-    let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
+    #[cfg(windows)]
+    {
+        tracing::info!("Opening iRacing connection...");
+        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
 
-    tracing::info!("Reading live header bytes");
-    let header_ptr = connection.header() as *const iracing_sdk::windows::IRSDKHeader as *const u8;
-    let header_bytes =
-        unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
+        tracing::info!("Reading live header bytes");
+        let header_ptr =
+            connection.header() as *const iracing_sdk::windows::IRSDKHeader as *const u8;
+        let header_bytes =
+            unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
 
-    tracing::info!("Parsing live header");
-    let header = IRSDKHeader::parse_from_memory(header_bytes)?;
+        tracing::info!("Parsing live header");
+        let header = IRSDKHeader::parse_from_memory(header_bytes)?;
 
-    tracing::info!("IRSDKHeader:\n{:#?}", header);
+        println!("IRSDKHeader:\n{:#?}", header);
 
-    Ok(())
-}
-
-#[cfg(not(windows))]
-fn run() -> Result<()> {
-    use anyhow::anyhow;
-
-    tracing::warn!(
-        "live-headers is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-    );
-    Err(anyhow!("live-headers is only supported on Windows"))
+        Ok(())
+    }
 }

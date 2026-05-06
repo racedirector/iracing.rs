@@ -104,12 +104,17 @@ fn main() -> Result<()> {
     // Write session string to output path.
     // ------------------------------------------------------------
     tracing::info!("Parsing session information");
-    if let Some(session) = reader.session_yaml()? {
-        if let Some(output_path) = output_path {
-            fs::write(output_path, session)?;
-        } else {
-            tracing::info!("\n{}", session);
-        }
+
+    let session_info_string = match reader.session_yaml() {
+        Ok(Some(session)) => session,
+        _ => return Err(anyhow::anyhow!("Could not parse session yaml.")),
+    };
+
+    // If we have an output path, write the result to the file, otherwise log
+    if let Some(output_path) = output_path {
+        fs::write(output_path, session_info_string)?;
+    } else {
+        tracing::info!("\n{}", session_info_string);
     }
 
     tracing::info!("Finished parsing session information.");

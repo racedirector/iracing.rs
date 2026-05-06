@@ -13,7 +13,7 @@ Compact guidance for future OpenCode sessions working in this repo.
 
 ## Test Data
 
-- Integration tests expect `.ibt` fixtures from Git LFS; run `git lfs install` once per machine and `git lfs pull` before running suites that touch `test-data/ibt/`.
+- Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
 - Use helpers from `crates/test-utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
 
 ## Workspace Map

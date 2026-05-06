@@ -42,14 +42,22 @@ pub struct VarBuf {
 #[repr(C)]
 #[derive(Debug)]
 pub struct IRSDKVarHeader {
-    pub var_type: i32,                    // Variable type (irsdk_VarType)
-    pub offset: i32,                      // Offset from start of buffer row
-    pub count: i32,                       // Number of entries (array)
-    pub count_as_time: bool,              // Values in array represent timeseries data
-    pub pad: [u8; 3],                     // 16-byte alignment padding
-    pub name: [std::os::raw::c_char; 32], // Variable name
-    pub desc: [std::os::raw::c_char; 64], // Variable description
-    pub unit: [std::os::raw::c_char; 32], // Variable units
+    /// Variable type (irsdk_VarType)
+    pub var_type: i32,
+    /// Offset from start of buffer row
+    pub offset: i32,
+    /// Number of entries (array)
+    pub count: i32,
+    /// Values in array represent timeseries data
+    pub count_as_time: bool,
+    /// 16-byte alignment padding
+    pub pad: [u8; 3],
+    /// Variable name
+    pub name: [std::os::raw::c_char; 32],
+    /// Variable description
+    pub desc: [std::os::raw::c_char; 64],
+    /// Variable units
+    pub unit: [std::os::raw::c_char; 32],
 }
 
 impl IRSDKVarHeader {
@@ -144,6 +152,30 @@ pub struct Connection {
 }
 
 impl Connection {
+    fn wait_for_event(event: HANDLE, timeout_ms: u32) -> Result<WaitResult> {
+        tracing::trace!(timeout_ms = timeout_ms, "Waiting for telemetry update");
+
+        let result = unsafe { WaitForSingleObject(event, timeout_ms) };
+
+        match result {
+            WAIT_OBJECT_0 => {
+                tracing::debug!("Telemetry update signaled");
+                Ok(WaitResult::Signaled)
+            }
+            WAIT_TIMEOUT => {
+                tracing::trace!("Wait timed out");
+                Ok(WaitResult::Timeout)
+            }
+            _ => {
+                let win_err = windows::core::Error::from_thread();
+                Err(IRacingSDKError::windows_api_error(
+                    "WaitForSingleObject",
+                    win_err,
+                ))
+            }
+        }
+    }
+
     /// Attempt to connect to iRacing shared memory
     pub fn try_connect() -> Result<Self> {
         tracing::trace!("Attempting to connect to iRacing shared memory");
@@ -223,30 +255,6 @@ impl Connection {
         Self::wait_for_event(event, timeout_ms)
     }
 
-    fn wait_for_event(event: HANDLE, timeout_ms: u32) -> Result<WaitResult> {
-        tracing::trace!(timeout_ms, "Waiting for telemetry update");
-
-        let result = unsafe { WaitForSingleObject(event, timeout_ms) };
-
-        match result {
-            WAIT_OBJECT_0 => {
-                tracing::debug!("Telemetry update signaled");
-                Ok(WaitResult::Signaled)
-            }
-            WAIT_TIMEOUT => {
-                tracing::trace!("Wait timed out");
-                Ok(WaitResult::Timeout)
-            }
-            _ => {
-                let win_err = windows::core::Error::from_thread();
-                Err(IRacingSDKError::windows_api_error(
-                    "WaitForSingleObject",
-                    win_err,
-                ))
-            }
-        }
-    }
-
     /// Get latest telemetry data if available
     pub fn get_new_data(&mut self) -> Option<&[u8]> {
         if !self.is_connected() {
@@ -319,8 +327,12 @@ impl Connection {
         if header.session_info_len <= 0 {
             return None;
         }
+        if header.session_info_offset < 0 {
+            return None;
+        }
 
         unsafe {
+            // Get the slice of the session yaml
             let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
             let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
 

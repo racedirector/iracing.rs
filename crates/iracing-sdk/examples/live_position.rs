@@ -7,8 +7,6 @@ use csv::Writer;
 use iracing_sdk::{VariableSchema, WaitResult, WindowsConnection, types::VarData};
 #[cfg(windows)]
 use std::{path::PathBuf, sync::Arc, thread, time::Duration};
-#[cfg(windows)]
-use tracing::{debug, info, trace};
 use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
@@ -102,7 +100,7 @@ fn run() -> Result<()> {
         let is_connected = connection.is_connected();
 
         if was_connected && !is_connected {
-            info!("iRacing disconnected; stopping telemetry capture.");
+            tracing::info!("iRacing disconnected; stopping telemetry capture.");
             break;
         }
 
@@ -110,9 +108,9 @@ fn run() -> Result<()> {
             wait_ticks += 1;
 
             if wait_ticks == 1 {
-                info!("Waiting for iRacing to start a session...");
+                tracing::info!("Waiting for iRacing to start a session...");
             } else if wait_ticks.is_multiple_of(20) {
-                debug!(
+                tracing::debug!(
                     "Still waiting for iRacing session ({}s elapsed)",
                     wait_ticks / 2
                 );
@@ -124,7 +122,7 @@ fn run() -> Result<()> {
 
         // Reset counter when we get a connection
         if wait_ticks > 0 {
-            info!("iRacing session detected, resuming telemetry");
+            tracing::info!("iRacing session detected, resuming telemetry");
             wait_ticks = 0;
         }
 
@@ -156,18 +154,18 @@ fn run() -> Result<()> {
 
         match connection.wait_for_update(Duration::from_millis(500))? {
             WaitResult::Signaled => {
-                trace!("Event signaled, checking for new data");
+                tracing::trace!("Event signaled, checking for new data");
                 continue;
             }
             WaitResult::Timeout => {
-                trace!("Wait timeout, continuing to poll");
+                tracing::trace!("Wait timeout, continuing to poll");
                 continue;
             }
         }
     }
 
     writer.flush()?;
-    info!("Finished processing frames");
+    tracing::info!("Finished processing frames");
 
     Ok(())
 }

@@ -1,4 +1,3 @@
-use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
@@ -55,7 +54,7 @@ struct Row {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -64,44 +63,43 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run().await
-}
-
-#[cfg(windows)]
-async fn run() -> Result<()> {
-    use csv::Writer;
-    use iracing_sdk::{DefaultLiveProvider, FrameAdapter, Provider};
-
-    // ------------------------------------------------------------
-    // Parse CLI arguments
-    // ------------------------------------------------------------
-    let Args { csv_output_path } = Args::parse();
-
-    tracing::info!("Opening Live iRacing connection");
-    // ------------------------------------------------------------
-    // Open telemetry reader and CSV writer
-    // ------------------------------------------------------------
-    let mut provider = DefaultLiveProvider::new()?;
-    let schema = provider.schema();
-    let mut writer = Writer::from_path(&csv_output_path)?;
-
-    let shared_validation = Row::validate_schema(&schema)?;
-    while let Some(packet) = provider.next_frame().await? {
-        let frame = Row::adapt(&packet, &shared_validation);
-        writer.serialize(frame)?;
+    #[cfg(not(windows))]
+    {
+        tracing::warn!(
+            "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+        );
+        Err(anyhow::anyhow!(
+            "live-position example is only supported on Windows"
+        ))
     }
 
-    writer.flush()?;
+    #[cfg(windows)]
+    {
+        use csv::Writer;
+        use iracing_sdk::{DefaultLiveProvider, FrameAdapter, Provider};
 
-    Ok(())
-}
+        // ------------------------------------------------------------
+        // Parse CLI arguments
+        // ------------------------------------------------------------
+        let Args { csv_output_path } = Args::parse();
 
-#[cfg(not(windows))]
-async fn run() -> Result<()> {
-    tracing::warn!(
-        "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-    );
-    Err(anyhow::anyhow!(
-        "live-position example is only supported on Windows"
-    ))
+        tracing::info!("Opening Live iRacing connection");
+
+        // ------------------------------------------------------------
+        // Open telemetry reader and CSV writer
+        // ------------------------------------------------------------
+        let mut provider = DefaultLiveProvider::new()?;
+        let schema = provider.schema();
+        let mut writer = Writer::from_path(&csv_output_path)?;
+
+        let shared_validation = Row::validate_schema(&schema)?;
+        while let Some(packet) = provider.next_frame().await? {
+            let frame = Row::adapt(&packet, &shared_validation);
+            writer.serialize(frame)?;
+        }
+
+        writer.flush()?;
+
+        Ok(())
+    }
 }

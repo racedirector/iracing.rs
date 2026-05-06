@@ -302,8 +302,9 @@ impl SessionInfo {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    use anyhow::{Context, Result};
     use proptest::prelude::*;
-    use test_utils::find_git_repository_root;
+    use test_utils::{find_git_repository_root, require_test_data_file};
 
     #[test]
     fn find_git_repository_root_works() {
@@ -324,10 +325,13 @@ mod tests {
 
         println!("Found git repository root: {:?}", repo_root);
 
+        let repo_path_name = repo_root.file_name().unwrap();
+
         // The path should end with 'pitwall' (our project name)
         assert!(
-            repo_root.file_name().unwrap() == "iracing-rs",
-            "Repository root should be named 'iracing-rs'"
+            repo_path_name == "iracing.rs",
+            "Repository root should be named 'iracing.rs'. Received: {:?}",
+            repo_path_name
         );
     }
 
@@ -440,70 +444,71 @@ AbbrevName: O'Con
         }
     }
 
-    // #[test]
-    // fn parses_real_iracing_yaml_snapshot() -> Result<()> {
-    //     // Test with real YAML data captured from live iRacing
+    #[test]
+    #[ignore = "Need to implement known test structures"]
+    fn parses_real_iracing_yaml_snapshot() -> Result<()> {
+        // Test with real YAML data captured from live iRacing
 
-    //     let snapshot_path = require_test_data_file("live_session_snapshot.yml")?;
+        let snapshot_path = require_test_data_file("live_session_snapshot.yml")?;
 
-    //     let yaml_content = std::fs::read_to_string(&snapshot_path)
-    //         .with_context(|| format!("Reading YAML snapshot from {}", snapshot_path.display()))?;
+        let yaml_content = std::fs::read_to_string(&snapshot_path)
+            .with_context(|| format!("Reading YAML snapshot from {}", snapshot_path.display()))?;
 
-    //     println!(
-    //         "Testing with real iRacing YAML snapshot ({} bytes)",
-    //         yaml_content.len()
-    //     );
+        println!(
+            "Testing with real iRacing YAML snapshot ({} bytes)",
+            yaml_content.len()
+        );
 
-    //     // Parse with our SessionInfoParser
-    //     let parser = SessionInfoParser::new();
-    //     let preprocessed = parser
-    //         .preprocess_iracing_yaml(&yaml_content)
-    //         .expect("Failed to preprocess YAML");
+        // Parse with our SessionInfoParser
+        let parser = SessionInfoParser::new();
+        let preprocessed = parser
+            .preprocess_iracing_yaml(&yaml_content)
+            .expect("Failed to preprocess YAML");
 
-    //     let session_info: SessionInfo = serde_yaml_ng::from_str(&preprocessed)
-    //         .context("Failed to parse YAML to SessionInfo")?;
+        let session_info: SessionInfo = serde_yaml_ng::from_str(&preprocessed)
+            .context("Failed to parse YAML to SessionInfo")?;
 
-    //     // Validate the parsed structure matches what we expect from real data
-    //     assert_eq!(
-    //         session_info.weekend_info.track_name,
-    //         "watkinsglen 2021 fullcourse"
-    //     );
-    //     assert_eq!(session_info.weekend_info.track_display_name, "Watkins Glen");
-    //     assert_eq!(session_info.weekend_info.track_id, Some(434));
-    //     assert_eq!(session_info.session_info.current_session_num, 0);
-    //     assert_eq!(session_info.session_info.sessions.len(), 1);
-    //     assert_eq!(
-    //         session_info.session_info.sessions[0].session_type,
-    //         "Offline Testing"
-    //     );
+        // Validate the parsed structure matches what we expect from real data
+        assert_eq!(
+            session_info.weekend_info.track_name,
+            "watkinsglen 2021 fullcourse"
+        );
+        assert_eq!(session_info.weekend_info.track_display_name, "Watkins Glen");
+        assert_eq!(session_info.weekend_info.track_id, Some(434));
+        assert_eq!(session_info.session_info.current_session_num, 0);
+        assert_eq!(session_info.session_info.sessions.len(), 1);
+        assert_eq!(
+            session_info.session_info.sessions[0].session_type,
+            "Offline Testing"
+        );
 
-    //     // Validate driver info
-    //     let driver_info = session_info
-    //         .driver_info
-    //         .as_ref()
-    //         .expect("Should have driver info");
-    //     assert_eq!(driver_info.driver_car_idx, Some(0));
-    //     assert_eq!(driver_info.driver_user_id, Some(932438));
+        // Validate driver info
+        let driver_info = session_info
+            .driver_info
+            .as_ref()
+            .expect("Should have driver info");
+        assert_eq!(driver_info.driver_car_idx, Some(0));
+        assert_eq!(driver_info.driver_user_id, Some(932438));
 
-    //     let drivers = driver_info
-    //         .drivers
-    //         .as_ref()
-    //         .expect("Should have drivers list");
-    //     assert_eq!(drivers.len(), 1);
-    //     assert_eq!(drivers[0].user_name, "Kevin A O Neill");
-    //     assert_eq!(drivers[0].car_idx, 0);
-    //     assert_eq!(drivers[0].car_number, Some("037".to_string()));
+        let drivers = driver_info
+            .drivers
+            .as_ref()
+            .expect("Should have drivers list");
+        assert_eq!(drivers.len(), 1);
+        assert_eq!(drivers[0].user_name, "Kevin A O Neill");
+        assert_eq!(drivers[0].car_idx, 0);
+        assert_eq!(drivers[0].car_number, Some("037".to_string()));
 
-    //     println!("✅ Real YAML snapshot parsing test passed!");
-    //     println!(
-    //         "   Track: {} ({})",
-    //         session_info.weekend_info.track_name, session_info.weekend_info.track_display_name
-    //     );
-    //     println!("   Drivers: {}", drivers.len());
-    //     println!("   Sessions: {}", session_info.session_info.sessions.len());
+        println!("✅ Real YAML snapshot parsing test passed!");
+        println!(
+            "   Track: {} ({})",
+            session_info.weekend_info.track_name, session_info.weekend_info.track_display_name
+        );
+        println!("   Drivers: {}", drivers.len());
+        println!("   Sessions: {}", session_info.session_info.sessions.len());
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     fn create_test_session_info() -> SessionInfo {
         SessionInfo {

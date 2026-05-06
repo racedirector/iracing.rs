@@ -25,6 +25,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
@@ -32,6 +37,9 @@ jobs:
         run: |
           rustc --version
           cargo --version
+
+      - name: Verify generated fixtures
+        run: python scripts/check_test_fixtures.py
 
       - name: Check formatting
         run: cargo fmt --all -- --check

@@ -16,7 +16,6 @@ use std::thread;
 use std::time::Duration;
 
 use iracing_simulation::Simulation;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 fn main() {
@@ -27,16 +26,16 @@ fn main() {
     let poll_interval = Duration::from_secs(1);
 
     // --- Phase 1: wait for connection ---
-    info!("Waiting for iRacing simulation connection...");
+    tracing::info!("Waiting for iRacing simulation connection...");
     while !sim.check_sim_status() {
         thread::sleep(poll_interval);
     }
 
     // --- Phase 2: wait for disconnection ---
-    info!("Connection established, waiting for disconnect...");
+    tracing::info!("Connection established, waiting for disconnect...");
     while sim.check_sim_status() {
         thread::sleep(poll_interval);
     }
 
-    info!("Disconnected!");
+    tracing::info!("Disconnected!");
 }

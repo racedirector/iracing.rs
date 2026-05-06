@@ -77,7 +77,6 @@
 
 use crate::{IRacingSDKError, Result};
 use std::mem;
-use tracing::{debug, trace};
 
 /// The expected iRacing SDK version
 pub const IRSDK_VER: i32 = 2;
@@ -131,7 +130,7 @@ impl IRSDKHeader {
     /// Parse header from raw memory bytes with validation
     /// Optimized for <1ms latency requirement with zero-copy techniques
     pub fn parse_from_memory(memory: &[u8]) -> Result<Self> {
-        trace!(
+        tracing::trace!(
             memory_len = memory.len(),
             "Parsing iRacing header from memory"
         );
@@ -150,7 +149,7 @@ impl IRSDKHeader {
         // Safety: We've validated the memory length above and use read_unaligned for robustness
         let header = unsafe { std::ptr::read_unaligned(memory.as_ptr() as *const IRSDKHeader) };
 
-        debug!(
+        tracing::debug!(
             ver = header.ver,
             status = header.status,
             tick_rate = header.tick_rate,
