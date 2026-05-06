@@ -35,9 +35,9 @@ fn main() -> anyhow::Result<()> {
             "live_session_schema is only supported on Windows because it depends on iRacing shared memory APIs."
         );
 
-        return Err(anyhow::anyhow!(
+        Err(anyhow::anyhow!(
             "live_session_schema is only supported on Windows"
-        ));
+        ))
     }
 
     #[cfg(windows)]
@@ -73,6 +73,6 @@ fn main() -> anyhow::Result<()> {
 
         tracing::info!(path = %output_path.display(), "Wrote live session schema");
 
-        return Ok(());
+        Ok(())
     }
 }
