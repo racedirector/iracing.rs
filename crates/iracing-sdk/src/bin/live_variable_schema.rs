@@ -71,7 +71,7 @@ pub fn main() -> anyhow::Result<()> {
         // ------------------------------------------------------------
         let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
         if !connection.is_connected() && !allow_stale {
-            return Err(anyhow!(
+            return Err(anyhow::anyhow!(
                 "iRacing is not connected (pass --allow-stale to continue)."
             ));
         }
