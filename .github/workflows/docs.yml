@@ -64,7 +64,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iracing-sdk-docs-${{ matrix.os }}
           path: target/doc
@@ -99,7 +99,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk-derive --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iracing-sdk-derive-docs-${{ matrix.os }}
           path: target/doc
@@ -134,7 +134,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-simulation --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iracing-simulation-docs-${{ matrix.os }}
           path: target/doc
