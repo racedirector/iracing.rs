@@ -3,12 +3,16 @@ use tonic::{Request, Response, Status, transport::Server};
 use broadcast::broadcast_server::{Broadcast, BroadcastServer};
 use broadcast::*;
 
+use iracing_sdk::{Broadcast as BroadcastClient, BroadcastCommand};
+
 pub mod broadcast {
     tonic::include_proto!("iracing.broadcast");
 }
 
 #[derive(Debug, Default)]
-pub struct BroadcastService {}
+pub struct BroadcastService {
+    client: BroadcastClient,
+}
 
 fn unimplemented_response<T>(method: &str) -> Result<Response<T>, Status> {
     tracing::info!(method, "broadcast RPC not implemented");
@@ -78,9 +82,20 @@ impl Broadcast for BroadcastService {
 
     async fn reload_textures(
         &self,
-        _request: Request<ReloadTexturesRequest>,
+        request: Request<ReloadTexturesRequest>,
     ) -> Result<Response<ReloadTexturesResponse>, Status> {
-        unimplemented_response("reload_textures")
+        let ReloadTexturesRequest { car_idx } = request.into_inner();
+
+        let result = match car_idx {
+            Some(index) => self
+                .client
+                .send_message(BroadcastCommand::ReloadTextures(index)),
+            None => self
+                .client
+                .send_message(BroadcastCommand::ReloadAllTextures),
+        };
+
+        Ok(Response::new(ReloadTexturesResponse {}))
     }
 
     async fn chat_command(

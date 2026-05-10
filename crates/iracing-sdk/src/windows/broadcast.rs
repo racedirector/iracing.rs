@@ -140,7 +140,7 @@ pub enum BroadcastCommand {
     /// Reload all textures.
     ReloadAllTextures,
     /// Reload textures for a specific car index.
-    ReloadTextures(u8),
+    ReloadTextures(u32),
     /// Send a chat command.
     ChatCommand(ChatCommandMode),
     /// Send a chat macro by number.
@@ -243,6 +243,7 @@ impl BroadcastCommand {
 }
 
 /// Client for sending iRacing broadcast commands over the Win32 broadcast channel.
+#[derive(Debug, Default)]
 pub struct Broadcast {
     message_id: u32,
 }
