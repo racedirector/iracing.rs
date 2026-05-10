@@ -1,6 +1,6 @@
 # iracing.rs
 
-_Big thanks to Kevin O'Neill ([werace.au](werace.au)] and his [`pitwall`](https://crates.io/crates/pitwall) and [`pitwall-derive`](https://crates.io/crates/pitwall-derive) library.
+_Big thanks to Kevin O'Neill ([werace.au](werace.au)] and their [`pitwall`](https://crates.io/crates/pitwall) and [`pitwall-derive`](https://crates.io/crates/pitwall-derive) library.
 This library is heavily influenced by their initial implementation._
 
 Rust workspace for working with iRacing telemetry and simulation state:
