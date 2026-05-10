@@ -1,12 +1,16 @@
 //! IBT connection for IBT files
 
-use futures::{Stream, StreamExt, stream};
+use futures::{Stream, StreamExt};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::time::Duration;
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
+use tokio_util::sync::CancellationToken;
 
+use crate::FramePacket;
+use crate::UpdateRate;
+use crate::emitter::TelemetryEmitter;
 use crate::providers::IbtProvider;
 use crate::providers::Provider;
 
@@ -14,20 +18,20 @@ use crate::{FrameAdapter, Result, SessionInfo, VariableSchema};
 
 /// IBT connection from file
 pub struct IbtConnection {
-    /// Replay provider consumed by the first subscriber.
-    provider: Mutex<Option<IbtProvider>>,
+    /// Frame watch receiver
+    frames: watch::Receiver<Option<Arc<FramePacket>>>,
 
     /// Session watch receiver
     sessions: watch::Receiver<Option<Arc<SessionInfo>>>,
-
-    /// Session watch sender
-    session_tx: watch::Sender<Option<Arc<SessionInfo>>>,
 
     /// Variable schema
     schema: Arc<VariableSchema>,
 
     /// Source frequency
     source_hz: f64,
+
+    /// Cancellation token for stopping tasks
+    cancel: CancellationToken,
 }
 
 impl IbtConnection {
@@ -49,16 +53,17 @@ impl IbtConnection {
     pub async fn with_provider(provider: IbtProvider) -> Result<Self> {
         let schema = provider.schema();
         let source_hz = provider.tick_rate();
-        let (session_tx, session_rx) = watch::channel(None);
+
+        let channels = TelemetryEmitter::spawn(provider);
 
         tracing::info!("IBT connection opened ({}Hz)", source_hz);
 
         Ok(Self {
-            provider: Mutex::new(Some(provider)),
-            sessions: session_rx,
-            session_tx,
+            frames: channels.frames,
+            sessions: channels.sessions,
             schema,
             source_hz,
+            cancel: channels.cancel,
         })
     }
 
@@ -66,95 +71,35 @@ impl IbtConnection {
     ///
     /// IBT replay is a finite one-shot stream. The first subscriber consumes the
     /// replay from disk as the stream is polled; additional subscriptions panic.
-    pub fn subscribe<T>(&self) -> impl Stream<Item = T> + 'static
+    pub fn subscribe<T>(&self, rate: UpdateRate) -> impl Stream<Item = T> + 'static
     where
         T: FrameAdapter + Send + 'static,
     {
         // Validate schema once at subscription time
         let validation = T::validate_schema(&self.schema).expect("Schema validation failed");
 
-        let provider = self
-            .provider
-            .lock()
-            .expect("IBT provider mutex poisoned")
-            .take()
-            .expect("IBT replay stream already has a subscriber");
-        let session_tx = self.session_tx.clone();
+        // Create base frame stream from watch channel
+        let frames = WatchStream::new(self.frames.clone()).filter_map(|opt| async move { opt });
 
-        stream::unfold(
-            (provider, None),
-            move |(mut provider, mut last_session_version)| {
-                let validation = validation.clone();
-                let session_tx = session_tx.clone();
+        // Apply rate control and adaptation
+        let effective_rate = rate.normalize(self.source_hz);
 
-                async move {
-                    loop {
-                        match provider.next_frame().await {
-                            Ok(Some(packet)) => {
-                                let version = packet.session_version;
-
-                                if last_session_version != Some(version) {
-                                    tracing::debug!(
-                                        "Session version changed: {} -> {}",
-                                        last_session_version.unwrap_or(0),
-                                        version
-                                    );
-
-                                    match provider.session_yaml(version).await {
-                                        Ok(Some(yaml)) => {
-                                            tracing::debug!(
-                                                "Fetched session YAML ({} bytes) for version {}",
-                                                yaml.len(),
-                                                version
-                                            );
-
-                                            match SessionInfo::parse(&yaml) {
-                                                Ok(session) => {
-                                                    tracing::debug!("Session parsed");
-                                                    let _ =
-                                                        session_tx.send(Some(Arc::new(session)));
-                                                }
-                                                Err(e) => {
-                                                    tracing::warn!(
-                                                        "Failed to parse session YAML: {}",
-                                                        e
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        Ok(None) => {
-                                            tracing::debug!(
-                                                "No session YAML for version {}",
-                                                version
-                                            );
-                                        }
-                                        Err(e) => {
-                                            tracing::warn!("Failed to get session YAML: {}", e);
-                                        }
-                                    }
-
-                                    last_session_version = Some(version);
-                                }
-
-                                let adapted = T::adapt(&packet, &validation);
-                                return Some((adapted, (provider, last_session_version)));
-                            }
-                            Ok(None) => {
-                                tracing::debug!("End of IBT replay stream");
-                                let _ = session_tx.send(None);
-                                return None;
-                            }
-                            Err(e) => {
-                                tracing::error!("Provider error: {}", e);
-                                let _ = session_tx.send(None);
-                                return None;
-                            }
-                        }
-                    }
-                }
-            },
-        )
-        .boxed()
+        match effective_rate {
+            UpdateRate::Native => {
+                // Direct adaptation, no throttling
+                frames
+                    .map(move |packet| T::adapt(&packet, &validation))
+                    .boxed()
+            }
+            UpdateRate::Max(hz) => {
+                // Throttle then adapt
+                let interval = Duration::from_secs_f64(1.0 / hz as f64);
+                frames
+                    .throttle(interval)
+                    .map(move |packet| T::adapt(&packet, &validation))
+                    .boxed()
+            }
+        }
     }
 
     /// Get session updates as a stream
