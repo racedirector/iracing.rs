@@ -1,0 +1,313 @@
+syntax = "proto3";
+
+package iracing.broadcast;
+import public "google/protobuf/empty.proto";
+
+option java_package = "com.iracing.broadcast";
+option java_outer_classname = "BroadcastMessageProto";
+option java_multiple_files = true;
+option objc_class_prefix = "IR";
+
+enum TelemetryCommandMode {
+  TELEMETRY_COMMAND_MODE_UNKNOWN = 0;
+  TELEMETRY_COMMAND_MODE_STOP = 1;
+  TELEMETRY_COMMAND_MODE_START = 2;
+  TELEMETRY_COMMAND_MODE_RESTART = 3;
+}
+
+enum ChatCommandMode {
+  CHAT_COMMAND_MODE_UNKNOWN = 0;
+  CHAT_COMMAND_MODE_MACRO = 1;
+  CHAT_COMMAND_MODE_BEGIN_CHAT = 2;
+  CHAT_COMMAND_MODE_REPLY = 3;
+  CHAT_COMMAND_MODE_CANCEL = 4;
+}
+
+enum CameraState {
+  CAMERA_STATE_UNKNOWN = 0;
+  CAMERA_STATE_CAMERA_TOOL_ACTIVE = 1;
+  CAMERA_STATE_UI_HIDDEN = 2;
+  CAMERA_STATE_USE_AUTO_SHOT_SELECTION = 3;
+  CAMERA_STATE_USE_TEMPORARY_EDITS = 4;
+  CAMERA_STATE_USE_KEY_ACCELERATION = 5;
+  CAMERA_STATE_USE_KEY10X_ACCELERATION = 6;
+  CAMERA_STATE_USE_MOUSE_AIM_MODE = 7;
+}
+
+enum ReplayPositionMode {
+  REPLAY_POSITION_MODE_UNKNOWN = 0;
+  REPLAY_POSITION_MODE_BEGIN = 1;
+  REPLAY_POSITION_MODE_CURRENT = 2;
+  REPLAY_POSITION_MODE_END = 3;
+}
+
+enum ReplaySearchMode {
+  REPLAY_SEARCH_MODE_UNKNOWN = 0;
+  REPLAY_SEARCH_MODE_TO_START = 1;
+  REPLAY_SEARCH_MODE_TO_END = 2;
+  REPLAY_SEARCH_MODE_PREVIOUS_SESSION = 3;
+  REPLAY_SEARCH_MODE_NEXT_SESSION = 4;
+  REPLAY_SEARCH_MODE_PREVIOUS_LAP = 5;
+  REPLAY_SEARCH_MODE_NEXT_LAP = 6;
+  REPLAY_SEARCH_MODE_PREVIOUS_FRAME = 7;
+  REPLAY_SEARCH_MODE_NEXT_FRAME = 8;
+  REPLAY_SEARCH_MODE_PREVIOUS_INCIDENT = 9;
+  REPLAY_SEARCH_MODE_NEXT_INCIDENT = 10;
+}
+
+enum PitCommandMode {
+  PIT_COMMAND_MODE_UNKNOWN = 0;
+  PIT_COMMAND_MODE_CLEAR = 1;
+  PIT_COMMAND_MODE_TEAR_OFF = 2;
+  PIT_COMMAND_MODE_FUEL = 3;
+  PIT_COMMAND_MODE_LF_TIRE = 4;
+  PIT_COMMAND_MODE_RF_TIRE = 5;
+  PIT_COMMAND_MODE_LR_TIRE = 6;
+  PIT_COMMAND_MODE_RR_TIRE = 7;
+  PIT_COMMAND_MODE_CLEAR_TIRES = 8;
+  PIT_COMMAND_MODE_FAST_REPAIR = 9;
+  PIT_COMMAND_MODE_CLEAR_TEAR_OFF = 10;
+  PIT_COMMAND_MODE_CLEAR_FAST_REPAIR = 11;
+  PIT_COMMAND_MODE_CLEAR_FUEL = 12;
+}
+
+enum ReplayStateMode {
+  REPLAY_STATE_MODE_UNKNOWN = 0;
+  REPLAY_STATE_MODE_ERASE_TAPE = 1;
+}
+
+enum VideoCaptureMode {
+  VIDEO_CAPTURE_MODE_UNKNOWN = 0;
+  VIDEO_CAPTURE_MODE_SCREENSHOT = 1;
+  VIDEO_CAPTURE_MODE_START = 2;
+  VIDEO_CAPTURE_MODE_STOP = 3;
+  VIDEO_CAPTURE_MODE_TOGGLE = 4;
+  VIDEO_CAPTURE_MODE_SHOW_TIMER = 5;
+  VIDEO_CAPTURE_MODE_HIDE_TIMER = 6;
+}
+
+enum ForceFeedbackCommandMode {
+  FORCE_FEEDBACK_COMMAND_MODE_UNKNOWN = 0;
+  FORCE_FEEDBACK_COMMAND_MODE_MAX_FORCE = 1;
+}
+
+message CameraSwitchPositionRequest {
+  optional uint32 position = 1;
+  optional uint32 group = 2;
+  optional uint32 camera = 3;
+}
+message CameraSwitchPositionResponse {
+  uint32 car_index = 1;
+  uint32 group = 2;
+  uint32 camera = 3;
+}
+
+message CameraSwitchNumberRequest {
+  optional string car_number = 1;
+  optional uint32 group = 2;
+  optional uint32 camera = 3;
+}
+message CameraSwitchNumberResponse {
+  uint32 car_index = 1;
+  uint32 group = 2;
+  uint32 camera = 3;
+}
+
+message CameraSetStateRequest { optional CameraState state = 1; }
+message CameraSetStateResponse { CameraState state = 1; }
+
+message ReplaySetPlaySpeedRequest {
+  optional uint32 speed = 1;
+  optional bool is_slow_motion = 2;
+}
+message ReplaySetPlaySpeedResponse {
+  uint32 speed = 1;
+  bool is_slow_motion = 2;
+}
+
+message ReplaySetPlayPositionRequest {
+  optional ReplayPositionMode mode = 1;
+  optional uint32 frame = 2;
+}
+message ReplaySetPlayPositionResponse { uint32 frame = 1; }
+
+message ReplaySearchRequest { optional ReplaySearchMode mode = 1; }
+message ReplaySearchResponse {
+  uint32 frame = 1;
+  uint32 session_number = 2;
+  float session_time = 3;
+}
+
+message ReplaySetStateRequest { optional ReplayStateMode state = 1; }
+message ReplaySetStateResponse {}
+
+message ReloadTexturesRequest { optional uint32 car_idx = 1; }
+message ReloadTexturesResponse {}
+
+message ChatCommandRequest {
+  optional ChatCommandMode mode = 1;
+  optional uint32 macro = 2;
+}
+message ChatCommandResponse {}
+
+message PitCommandRequest {
+  optional PitCommandMode mode = 1;
+  optional float value = 2;
+}
+message PitCommandResponse {
+  uint32 service_flags = 1;
+  float fuel = 2;
+  float lf_pressure = 3;
+  float rf_pressure = 4;
+  float lr_pressure = 5;
+  float rr_pressure = 6;
+  uint32 tire_compound = 7;
+}
+
+message TelemetryCommandRequest { optional TelemetryCommandMode mode = 1; }
+message TelemetryCommandResponse {
+  bool is_disk_logging_enabled = 1;
+  bool is_disk_logging_active = 2;
+}
+
+message ForceFeedbackCommandRequest {
+  optional ForceFeedbackCommandMode mode = 1;
+  optional float value = 2;
+}
+message ForceFeedbackCommandResponse { float max_force = 1; }
+
+message ReplaySearchSessionTimeRequest {
+  optional uint32 session_number = 1;
+  optional float session_time_ms = 2;
+}
+message ReplaySearchSessionTimeResponse {}
+
+message VideoCaptureRequest { optional VideoCaptureMode mode = 1; }
+message VideoCaptureResponse {}
+
+message CameraDetail {
+  optional uint32 number = 1;
+  optional string name = 2;
+}
+
+message CameraGroup {
+  uint32 number = 1;
+  string name = 2;
+  repeated CameraDetail cameras = 3;
+}
+
+message GetAvailableCamerasResponse {
+  repeated CameraGroup camera_groups = 1;
+  uint32 car_index = 2;
+  uint32 group = 3;
+  uint32 camera = 4;
+}
+
+//
+// A service for interacting with iRacing broadcast features.
+service Broadcast {
+  //
+  // A client-to-server RPC
+  //
+  // Returns the available camera groups and cameras per-group,
+  // as well as the current camera information.
+  rpc GetAvailableCameras(google.protobuf.Empty)
+      returns (GetAvailableCamerasResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Switches the camera to a new position. Returns the new camera position.
+  rpc CameraSwitchPosition(CameraSwitchPositionRequest)
+      returns (CameraSwitchPositionResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Switches the camera to a new number. Returns the new camera position.
+  rpc CameraSwitchNumber(CameraSwitchNumberRequest)
+      returns (CameraSwitchNumberResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sets the state of the camera
+  rpc CameraSetState(CameraSetStateRequest) returns (CameraSetStateResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sets the play speed of the replay
+  rpc ReplaySetPlaySpeed(ReplaySetPlaySpeedRequest)
+      returns (ReplaySetPlaySpeedResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sets the play position of the replay
+  rpc ReplaySetPlayPosition(ReplaySetPlayPositionRequest)
+      returns (ReplaySetPlayPositionResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Searches the replay
+  rpc ReplaySearch(ReplaySearchRequest) returns (ReplaySearchResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sets the state of the replay
+  rpc ReplaySetState(ReplaySetStateRequest) returns (ReplaySetStateResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Reloads the textures
+  rpc ReloadTextures(ReloadTexturesRequest) returns (ReloadTexturesResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sends a chat command
+  rpc ChatCommand(ChatCommandRequest) returns (ChatCommandResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sends a pit command
+  rpc PitCommand(PitCommandRequest) returns (PitCommandResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sends mutliple pit commands and returns the service flags
+  rpc PitCommandStream(stream PitCommandRequest) returns (PitCommandResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sends a telemetry command
+  rpc TelemetryCommand(TelemetryCommandRequest)
+      returns (TelemetryCommandResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Sends a force feedback command
+  rpc ForceFeedbackCommand(ForceFeedbackCommandRequest)
+      returns (ForceFeedbackCommandResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Searches the replay by session time
+  rpc ReplaySearchSessionTime(ReplaySearchSessionTimeRequest)
+      returns (ReplaySearchSessionTimeResponse) {}
+
+  //
+  // A client-to-server RPC
+  //
+  // Captures video
+  rpc VideoCapture(VideoCaptureRequest) returns (VideoCaptureResponse) {}
+}

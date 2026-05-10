@@ -158,6 +158,10 @@ pub enum BroadcastCommand {
 }
 
 impl BroadcastCommand {
+    fn encode_pit(command: PitCommand) -> (u16, u16) {
+        command.encode()
+    }
+
     fn encode(self) -> (RawBroadcastMessage, u16, u16, u16) {
         match self {
             BroadcastCommand::CameraSwitchPosition(position, group, camera) => (
@@ -210,7 +214,7 @@ impl BroadcastCommand {
                 0,
             ),
             BroadcastCommand::PitCommand(pit_command_mode) => {
-                let (var1, var2) = encode_pit(pit_command_mode);
+                let (var1, var2) = Self::encode_pit(pit_command_mode);
                 (RawBroadcastMessage::PitCommand, var1, var2, 0)
             }
             BroadcastCommand::TelemetryCommand(mode) => {
@@ -236,10 +240,6 @@ impl BroadcastCommand {
             }
         }
     }
-}
-
-fn encode_pit(command: PitCommand) -> (u16, u16) {
-    command.encode()
 }
 
 /// Client for sending iRacing broadcast commands over the Win32 broadcast channel.
