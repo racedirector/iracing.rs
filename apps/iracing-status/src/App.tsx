@@ -1,50 +1,173 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+type ConnectionStatus = "disconnected" | "checking" | "connected";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+type IRacingConnectionState = {
+  process: ConnectionStatus;
+  sim: ConnectionStatus;
+  telemetry: ConnectionStatus;
+};
+
+type StatusIndicatorProps = {
+  label: string;
+  status: ConnectionStatus;
+};
+
+type StatusLightProps = {
+  status: ConnectionStatus;
+};
+
+const CONNECTION_STATE_CHANGED_EVENT = "iracing://connection-state-changed";
+
+const initialConnectionState: IRacingConnectionState = {
+  process: "checking",
+  sim: "disconnected",
+  telemetry: "disconnected",
+};
+
+const disconnectedConnectionState: IRacingConnectionState = {
+  process: "disconnected",
+  sim: "disconnected",
+  telemetry: "disconnected",
+};
+
+function getConnectionStatus(
+  connectionState: IRacingConnectionState,
+): ConnectionStatus {
+  const statuses = Object.values(connectionState);
+
+  if (statuses.every((status) => status === "connected")) {
+    return "connected";
   }
 
+  if (statuses.every((status) => status === "disconnected")) {
+    return "disconnected";
+  }
+
+  return "checking";
+}
+
+function formatStatus(status: ConnectionStatus) {
+  return status[0].toUpperCase() + status.slice(1);
+}
+
+function StatusLight({ status }: StatusLightProps) {
+  return <span className={`status-light status-light--${status}`} />;
+}
+
+function StatusDetail({ label, status }: StatusIndicatorProps) {
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="status-detail">
+      <StatusLight status={status} />
+      <div className="status-copy">
+        <span className="status-label">{label}</span>
+        <span className="status-value">{formatStatus(status)}</span>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+    </div>
+  );
+}
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+function App() {
+  const [connectionState, setConnectionState] = useState<IRacingConnectionState>(
+    initialConnectionState,
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    let shouldUnlisten = false;
+    let unlisten: (() => void) | undefined;
+
+    async function observeConnectionState() {
+      try {
+        unlisten = await listen<IRacingConnectionState>(
+          CONNECTION_STATE_CHANGED_EVENT,
+          (event) => {
+            if (isMounted) {
+              setConnectionState(event.payload);
+            }
+          },
+        );
+
+        if (shouldUnlisten) {
+          unlisten();
+          return;
+        }
+
+        const initialState = await invoke<IRacingConnectionState>(
+          "observe_connection_state",
+        );
+
+        if (isMounted) {
+          setConnectionState(initialState);
+        }
+      } catch {
+        if (isMounted) {
+          setConnectionState(disconnectedConnectionState);
+        }
+      }
+    }
+
+    observeConnectionState();
+
+    return () => {
+      isMounted = false;
+      shouldUnlisten = true;
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
+
+  const lifecycleStatus: StatusIndicatorProps[] = [
+    { label: "iRacing Process", status: connectionState.process },
+    { label: "Sim Status", status: connectionState.sim },
+    { label: "Live Telemetry", status: connectionState.telemetry },
+  ];
+  const aggregateStatus = getConnectionStatus(connectionState);
+
+  return (
+    <div className="app-shell">
+      <header className="app-nav">
+        <h1 className="app-title">iRacing Status</h1>
+
+        <div className="connection-summary">
+          <button
+            className="connection-trigger"
+            type="button"
+            aria-describedby="connection-popover"
+            aria-label={`iRacing connection ${formatStatus(aggregateStatus)}`}
+          >
+            <StatusLight status={aggregateStatus} />
+            <span>iRacing connection</span>
+            <span className="status-value">{formatStatus(aggregateStatus)}</span>
+          </button>
+
+          <div
+            className="connection-popover"
+            id="connection-popover"
+            role="status"
+            aria-live="polite"
+            aria-label="iRacing connection details"
+          >
+            {lifecycleStatus.map((item) => (
+              <StatusDetail
+                key={item.label}
+                label={item.label}
+                status={item.status}
+              />
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main
+        className="app-content"
+        aria-label="iRacing status workspace"
+      />
+    </div>
   );
 }
 
