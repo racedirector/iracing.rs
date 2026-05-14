@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "apps/iracing-status/src-tauri",
   "crates/iracing-broadcast-grpc-service",
   "crates/iracing-sdk",
   "crates/iracing-sdk-derive",
