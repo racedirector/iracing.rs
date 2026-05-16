@@ -1,203 +1,18 @@
-use std::{sync::Arc, thread, time::Duration};
-
 use tonic::{Request, Response, Status};
 
 use crate::broadcast::broadcast_server::Broadcast;
 use crate::broadcast::*;
 
-use iracing_sdk::{
-    Broadcast as BroadcastClient, BroadcastCommand, FramePacket, IRacingSDKError, LiveProvider,
-    PitCommand, Provider, VarData, VariableSchema,
-};
-use tokio::sync::{Mutex, watch};
-
-const DEFAULT_TELEMETRY_TIMEOUT_MS: u64 = 750;
-
-/// The latest telemetry frame seen by the background observer.
-///
-/// This deliberately keeps the raw `FramePacket`; RPCs can experiment with field
-/// names and decoding rules locally while the schema is still moving.
-#[derive(Debug, Default)]
-struct TelemetrySnapshot {
-    sequence: u64,
-    frame: Option<FramePacket>,
-}
-
-impl TelemetrySnapshot {
-    fn sequence(&self) -> u64 {
-        self.sequence
-    }
-
-    fn has_frame(&self) -> bool {
-        self.frame.is_some()
-    }
-
-    fn i32(&self, field: &str) -> Option<i32> {
-        let frame = self.frame.as_ref()?;
-        let variable = frame.schema.get_variable(field)?;
-
-        i32::from_bytes(frame.data.as_ref(), variable).ok()
-    }
-}
-
-/// Passive telemetry reader shared by RPC handlers.
-///
-/// The observer owns `LiveProvider` on a dedicated current-thread runtime because
-/// the provider trait is intentionally `?Send`. It stores the connection schema
-/// once, then publishes raw frame snapshots through a `watch` channel.
-#[derive(Debug, Clone)]
-struct TelemetryObserver {
-    schema: Arc<VariableSchema>,
-    rx: watch::Receiver<Arc<TelemetrySnapshot>>,
-}
-
-impl TelemetryObserver {
-    fn start(provider: LiveProvider) -> TelemetryObserver {
-        let schema = provider.schema();
-        let (tx, rx) = watch::channel(Arc::new(TelemetrySnapshot::default()));
-
-        thread::Builder::new()
-            .name("iracing-telemetry-observer".to_string())
-            .spawn(move || Self::run_provider(provider, tx))
-            .expect("failed to spawn telemetry observer thread");
-
-        TelemetryObserver { schema, rx }
-    }
-
-    fn snapshot(&self) -> Arc<TelemetrySnapshot> {
-        self.rx.borrow().clone()
-    }
-
-    fn has_fields(&self, fields: &[&str]) -> bool {
-        fields
-            .iter()
-            .all(|field| self.schema.get_variable(field).is_some())
-    }
-
-    async fn wait_for(
-        &self,
-        timeout: Duration,
-        mut predicate: impl FnMut(&TelemetrySnapshot) -> bool + Send + 'static,
-    ) -> Result<Arc<TelemetrySnapshot>, Status> {
-        let mut rx = self.rx.clone();
-
-        let wait = async move {
-            loop {
-                let snapshot = rx.borrow_and_update().clone();
-                if predicate(&snapshot) {
-                    return Ok(snapshot);
-                }
-
-                rx.changed()
-                    .await
-                    .map_err(|_| Status::unavailable("telemetry observer stopped"))?;
-            }
-        };
-
-        tokio::time::timeout(timeout, wait)
-            .await
-            .map_err(|_| Status::deadline_exceeded("camera switch was not observed in telemetry"))?
-    }
-
-    async fn observe(mut provider: LiveProvider, tx: watch::Sender<Arc<TelemetrySnapshot>>) {
-        let mut sequence = 0u64;
-
-        loop {
-            match provider.next_frame().await {
-                Ok(Some(frame)) => {
-                    sequence = sequence.saturating_add(1);
-
-                    if tx
-                        .send(Arc::new(TelemetrySnapshot {
-                            sequence,
-                            frame: Some(frame),
-                        }))
-                        .is_err()
-                    {
-                        tracing::debug!("telemetry observer has no receivers; stopping");
-                        break;
-                    }
-                }
-                Ok(None) => {
-                    tracing::warn!("live telemetry provider ended");
-                    break;
-                }
-                Err(error) => {
-                    tracing::warn!(error = %error, "live telemetry observer failed");
-                    break;
-                }
-            }
-        }
-    }
-
-    fn run_provider(provider: LiveProvider, tx: watch::Sender<Arc<TelemetrySnapshot>>) {
-        let runtime = match tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(runtime) => runtime,
-            Err(error) => {
-                tracing::error!(error = %error, "failed to start telemetry observer runtime");
-                return;
-            }
-        };
-
-        runtime.block_on(Self::observe(provider, tx));
-    }
-}
-
-/// Minimal telemetry projection needed by `CameraSwitchPosition`.
-///
-/// This is intentionally validation-lite: the field names are declared in one
-/// place, and decoding happens only when this RPC needs it.
-#[derive(Debug, Clone, Copy)]
-struct CameraSwitchPositionTelemetry {
-    car_index: i32,
-    group: i32,
-    camera: i32,
-}
-
-impl CameraSwitchPositionTelemetry {
-    const CAR_INDEX: &'static str = "CamCarIdx";
-    const GROUP: &'static str = "CamGroupNumber";
-    const CAMERA: &'static str = "CamCameraNumber";
-    const FIELDS: &'static [&'static str] = &[Self::CAR_INDEX, Self::GROUP, Self::CAMERA];
-
-    fn from_snapshot(snapshot: &TelemetrySnapshot) -> Option<Self> {
-        Some(Self {
-            car_index: snapshot.i32(Self::CAR_INDEX)?,
-            group: snapshot.i32(Self::GROUP)?,
-            camera: snapshot.i32(Self::CAMERA)?,
-        })
-    }
-
-    fn matches_request(&self, position: u16, group: u16, camera: u16) -> bool {
-        self.car_index == i32::from(position)
-            && self.group == i32::from(group)
-            && self.camera == i32::from(camera)
-    }
-}
+use iracing_sdk::{Broadcast as BroadcastClient, BroadcastCommand, IRacingSDKError, PitCommand};
 
 #[derive(Debug, Default)]
 pub struct BroadcastServiceBuilder {
     client: Option<BroadcastClient>,
-    provider: Option<LiveProvider>,
-    telemetry_timeout: Option<Duration>,
 }
 
 impl BroadcastServiceBuilder {
     pub fn with_client(mut self, client: BroadcastClient) -> Self {
         self.client = Some(client);
-        self
-    }
-
-    pub fn with_provider(mut self, provider: LiveProvider) -> Self {
-        self.provider = Some(provider);
-        self
-    }
-
-    pub fn with_telemetry_timeout(mut self, timeout: Duration) -> Self {
-        self.telemetry_timeout = Some(timeout);
         self
     }
 
@@ -207,34 +22,13 @@ impl BroadcastServiceBuilder {
             None => BroadcastClient::new()?,
         };
 
-        let provider = match self.provider {
-            Some(p) => p,
-            None => LiveProvider::new()?,
-        };
-
-        let telemetry = TelemetryObserver::start(provider);
-
-        let telemetry_timeout = match self.telemetry_timeout {
-            Some(t) => t,
-            None => Duration::from_millis(DEFAULT_TELEMETRY_TIMEOUT_MS),
-        };
-
-        Ok(BroadcastService {
-            client,
-            telemetry,
-            command_lock: Mutex::new(()),
-            telemetry_timeout,
-        })
+        Ok(BroadcastService { client })
     }
 }
 
 #[derive(Debug)]
 pub struct BroadcastService {
     client: BroadcastClient,
-    telemetry: TelemetryObserver,
-    command_lock: Mutex<()>,
-
-    telemetry_timeout: Duration,
 }
 
 impl BroadcastService {
@@ -534,7 +328,7 @@ impl Broadcast for BroadcastService {
         _request: Request<()>,
     ) -> Result<Response<GetAvailableCamerasResponse>, Status> {
         // TODO: Read camera groups/cameras from session data.
-        // TODO: Return the current camera once the shared telemetry response pattern exists.
+        // TODO: Return the current camera once a shared response pattern exists.
         Ok(Response::new(GetAvailableCamerasResponse {
             camera_groups: Vec::new(),
             car_index: 0,
@@ -557,46 +351,19 @@ impl Broadcast for BroadcastService {
         let group = Self::required_proto_u16("group", group)?;
         let camera = Self::required_proto_u16("camera", camera)?;
 
-        let _command_guard = self.command_lock.lock().await;
-        let before = self.telemetry.snapshot();
-
-        if !before.has_frame() {
-            return Err(Status::unavailable(
-                "no live telemetry frame is available yet",
-            ));
-        }
-
-        if !self
-            .telemetry
-            .has_fields(CameraSwitchPositionTelemetry::FIELDS)
-        {
-            return Err(Status::failed_precondition(
-                "live telemetry does not expose the camera switch fields",
-            ));
-        }
-
-        let before_sequence = before.sequence();
+        // TODO: Get previous camera position.
 
         self.send_message(BroadcastCommand::CameraSwitchPosition(
             position, group, camera,
         ))?;
 
-        let snapshot = self
-            .telemetry
-            .wait_for(self.telemetry_timeout, move |snapshot| {
-                snapshot.sequence() > before_sequence
-                    && CameraSwitchPositionTelemetry::from_snapshot(snapshot)
-                        .is_some_and(|telemetry| telemetry.matches_request(position, group, camera))
-            })
-            .await?;
-
-        let telemetry = CameraSwitchPositionTelemetry::from_snapshot(&snapshot)
-            .ok_or_else(|| Status::unavailable("camera telemetry observer stopped"))?;
+        // TODO: Wait for camera position to change.
+        // TODO: Resolve the selected position back to a car index.
 
         Ok(Response::new(CameraSwitchPositionResponse {
-            car_index: telemetry.car_index as u32,
-            group: telemetry.group as u32,
-            camera: telemetry.camera as u32,
+            car_index: u32::from(position),
+            group: u32::from(group),
+            camera: u32::from(camera),
         }))
     }
 
