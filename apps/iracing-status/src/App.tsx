@@ -1,74 +1,25 @@
 import { useEffect, useState } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { Header } from "./components/Header";
+import {
+  CONNECTION_STATE_CHANGED_EVENT,
+  disconnectedConnectionState,
+  initialConnectionState,
+  type IRacingConnectionState,
+} from "./connection";
+import { IbtScreen } from "./screens/IbtScreen";
+import { LiveScreen } from "./screens/LiveScreen";
 import "./App.css";
 
-type ConnectionStatus = "disconnected" | "checking" | "connected";
-
-type IRacingConnectionState = {
-  process: ConnectionStatus;
-  sim: ConnectionStatus;
-  telemetry: ConnectionStatus;
+type RootTabParamList = {
+  Live: undefined;
+  Ibt: undefined;
 };
 
-type StatusIndicatorProps = {
-  label: string;
-  status: ConnectionStatus;
-};
-
-type StatusLightProps = {
-  status: ConnectionStatus;
-};
-
-const CONNECTION_STATE_CHANGED_EVENT = "iracing://connection-state-changed";
-
-const initialConnectionState: IRacingConnectionState = {
-  process: "checking",
-  sim: "disconnected",
-  telemetry: "disconnected",
-};
-
-const disconnectedConnectionState: IRacingConnectionState = {
-  process: "disconnected",
-  sim: "disconnected",
-  telemetry: "disconnected",
-};
-
-function getConnectionStatus(
-  connectionState: IRacingConnectionState,
-): ConnectionStatus {
-  const statuses = Object.values(connectionState);
-
-  if (statuses.every((status) => status === "connected")) {
-    return "connected";
-  }
-
-  if (statuses.every((status) => status === "disconnected")) {
-    return "disconnected";
-  }
-
-  return "checking";
-}
-
-function formatStatus(status: ConnectionStatus) {
-  return status[0].toUpperCase() + status.slice(1);
-}
-
-function StatusLight({ status }: StatusLightProps) {
-  return <span className={`status-light status-light--${status}`} />;
-}
-
-function StatusDetail({ label, status }: StatusIndicatorProps) {
-  return (
-    <div className="status-detail">
-      <StatusLight status={status} />
-      <div className="status-copy">
-        <span className="status-label">{label}</span>
-        <span className="status-value">{formatStatus(status)}</span>
-      </div>
-    </div>
-  );
-}
+const Tab = createMaterialTopTabNavigator<RootTabParamList>();
 
 function App() {
   const [connectionState, setConnectionState] = useState<IRacingConnectionState>(
@@ -121,52 +72,51 @@ function App() {
     };
   }, []);
 
-  const lifecycleStatus: StatusIndicatorProps[] = [
-    { label: "iRacing Process", status: connectionState.process },
-    { label: "Sim Status", status: connectionState.sim },
-    { label: "Live Telemetry", status: connectionState.telemetry },
-  ];
-  const aggregateStatus = getConnectionStatus(connectionState);
-
   return (
     <div className="app-shell">
-      <header className="app-nav">
-        <h1 className="app-title">iRacing Status</h1>
-
-        <div className="connection-summary">
-          <button
-            className="connection-trigger"
-            type="button"
-            aria-describedby="connection-popover"
-            aria-label={`iRacing connection ${formatStatus(aggregateStatus)}`}
-          >
-            <StatusLight status={aggregateStatus} />
-            <span>iRacing connection</span>
-            <span className="status-value">{formatStatus(aggregateStatus)}</span>
-          </button>
-
-          <div
-            className="connection-popover"
-            id="connection-popover"
-            role="status"
-            aria-live="polite"
-            aria-label="iRacing connection details"
-          >
-            {lifecycleStatus.map((item) => (
-              <StatusDetail
-                key={item.label}
-                label={item.label}
-                status={item.status}
-              />
-            ))}
-          </div>
-        </div>
-      </header>
+      <Header connectionState={connectionState} />
 
       <main
         className="app-content"
         aria-label="iRacing status workspace"
-      />
+      >
+        <NavigationContainer>
+          <Tab.Navigator
+            initialRouteName="Live"
+            screenOptions={{
+              tabBarActiveTintColor: "#17202a",
+              tabBarInactiveTintColor: "#607085",
+              tabBarIndicatorStyle: {
+                backgroundColor: "#3074d4",
+                height: 3,
+              },
+              tabBarLabelStyle: {
+                fontSize: 13,
+                fontWeight: "800",
+                textTransform: "uppercase",
+              },
+              tabBarStyle: {
+                backgroundColor: "#ffffff",
+                borderBottomColor: "#d8dee6",
+                borderBottomWidth: 1,
+                elevation: 0,
+                shadowOpacity: 0,
+              },
+            }}
+          >
+            <Tab.Screen
+              name="Live"
+              component={LiveScreen}
+              options={{ title: "Live" }}
+            />
+            <Tab.Screen
+              name="Ibt"
+              component={IbtScreen}
+              options={{ title: "IBT" }}
+            />
+          </Tab.Navigator>
+        </NavigationContainer>
+      </main>
     </div>
   );
 }

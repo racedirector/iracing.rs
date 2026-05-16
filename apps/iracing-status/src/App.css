@@ -21,6 +21,10 @@ body {
   min-height: 100vh;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 button {
   font: inherit;
 }
@@ -165,6 +169,20 @@ button {
   min-height: calc(100vh - 64px);
 }
 
+.screen-placeholder {
+  display: grid;
+  min-height: calc(100vh - 113px);
+  place-items: center;
+  padding: 32px;
+}
+
+.screen-placeholder h2 {
+  margin: 0;
+  color: #17202a;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
 @media (max-width: 560px) {
   .app-nav {
     align-items: flex-start;
@@ -207,7 +225,8 @@ button {
 
   .app-title,
   .connection-trigger,
-  .status-label {
+  .status-label,
+  .screen-placeholder h2 {
     color: #f8fafc;
   }
 
