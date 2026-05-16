@@ -16,12 +16,13 @@ workspace = true
 iracing-sdk = { version = "0.1.0", path = '../iracing-sdk' }
 prost = "0.14"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-tonic-prost = "*"
-tonic = "*"
+tonic-prost = "0.14"
+tonic = "0.14"
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [build-dependencies]
-tonic-prost-build = "*"
+tonic-prost-build = "0.14"
 
 [[bin]]
 name = "iracing-broadcast-server"

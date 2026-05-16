@@ -124,19 +124,12 @@ impl BroadcastGrpcClient {
 
     pub async fn replay_set_play_speed(
         &mut self,
-        speed: u16,
+        speed: i16,
         is_slow_motion: bool,
     ) -> BroadcastGrpcResult<ReplaySetPlaySpeedResponse> {
-        if speed > i16::MAX as u16 {
-            return Err(Status::invalid_argument(format!(
-                "speed must be in the range 0..={}, got {speed}",
-                i16::MAX
-            )));
-        }
-
         self.inner
             .replay_set_play_speed(ReplaySetPlaySpeedRequest {
-                speed: Some(u32::from(speed)),
+                speed: Some(i32::from(speed)),
                 is_slow_motion: Some(is_slow_motion),
             })
             .await
@@ -146,7 +139,7 @@ impl BroadcastGrpcClient {
     pub async fn replay_set_play_position(
         &mut self,
         mode: iracing_sdk::ReplayPositionMode,
-        frame: u16,
+        frame: u32,
     ) -> BroadcastGrpcResult<ReplaySetPlayPositionResponse> {
         self.inner
             .replay_set_play_position(ReplaySetPlayPositionRequest {
@@ -208,6 +201,12 @@ impl BroadcastGrpcClient {
         &mut self,
         macro_number: u16,
     ) -> BroadcastGrpcResult<ChatCommandResponse> {
+        if !(1..=15).contains(&macro_number) {
+            return Err(Status::invalid_argument(format!(
+                "macro_number must be in the range 1..=15, got {macro_number}"
+            )));
+        }
+
         self.inner
             .chat_command(ChatCommandRequest {
                 mode: Some(ProtoChatCommandMode::Macro as i32),

@@ -43,9 +43,10 @@
 //! ```
 
 use crate::{
-    BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, IRacingSDKError,
-    PitCommandMode, ReplayPositionMode, ReplaySearchMode, ReplayStateMode, Result,
-    TelemetryCommandMode, VideoCaptureMode, windows::utils::pad_car_number,
+    BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, FfbCommandMode,
+    IRacingSDKError, PitCommandMode, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
+    ReplayStateMode, Result, TelemetryCommandMode, VideoCaptureMode,
+    windows::utils::pad_car_number,
 };
 use {
     windows::Win32::{
@@ -65,7 +66,7 @@ pub enum PitCommand {
     /// Request a windshield tearoff.
     Tearoff,
     /// Set fuel amount in gallons.
-    Fuel(u8),
+    Fuel(u16),
     /// Set left-front tire pressure in PSI.
     LF(u16),
     /// Set right-front tire pressure in PSI.
@@ -93,7 +94,7 @@ impl PitCommand {
         match self {
             PitCommand::Clear => (Id::Clear.into(), 0),
             PitCommand::Tearoff => (Id::Ws.into(), 0),
-            PitCommand::Fuel(gal) => (Id::Fuel.into(), gal as u16),
+            PitCommand::Fuel(gal) => (Id::Fuel.into(), gal),
             PitCommand::LF(pressure) => (Id::Lf.into(), pressure),
             PitCommand::RF(pressure) => (Id::Rf.into(), pressure),
             PitCommand::LR(pressure) => (Id::Lr.into(), pressure),
@@ -131,8 +132,8 @@ pub enum BroadcastCommand {
     CameraSetState(CameraState),
     /// Set the replay play speed, with an optional slow-motion toggle.
     ReplaySetPlaySpeed(i16, bool),
-    /// Jump to a replay position, with the frame number encoded in `var2`.
-    ReplaySetPlayPosition(ReplayPositionMode, u16),
+    /// Jump to a replay position, with the frame number split across `var2`/`var3`.
+    ReplaySetPlayPosition(ReplayPositionMode, u32),
     /// Perform a replay search according to the provided mode.
     ReplaySearch(ReplaySearchMode),
     /// Toggle the replay state on or off.
@@ -165,6 +166,10 @@ impl BroadcastCommand {
 
 type BroadcastMessageFormat = (RawBroadcastMessage, u16, u16, u16);
 
+fn split_u32_words(value: u32) -> (u16, u16) {
+    ((value & 0xFFFF) as u16, ((value >> 16) & 0xFFFF) as u16)
+}
+
 impl From<BroadcastCommand> for BroadcastMessageFormat {
     fn from(command: BroadcastCommand) -> Self {
         match command {
@@ -189,22 +194,33 @@ impl From<BroadcastCommand> for BroadcastMessageFormat {
                 slow_motion.into(),
                 0,
             ),
-            BroadcastCommand::ReplaySetPlayPosition(mode, frame_number) => (
-                RawBroadcastMessage::ReplaySetPlayPosition,
-                mode.into(),
-                frame_number,
-                0,
-            ),
+            BroadcastCommand::ReplaySetPlayPosition(mode, frame_number) => {
+                let (low, high) = split_u32_words(frame_number);
+                (
+                    RawBroadcastMessage::ReplaySetPlayPosition,
+                    mode.into(),
+                    low,
+                    high,
+                )
+            }
             BroadcastCommand::ReplaySearch(mode) => {
                 (RawBroadcastMessage::ReplaySearch, mode.into(), 0, 0)
             }
             BroadcastCommand::ReplaySetState(mode) => {
                 (RawBroadcastMessage::ReplaySetState, mode.into(), 0, 0)
             }
-            BroadcastCommand::ReloadAllTextures => (RawBroadcastMessage::ReloadTextures, 0, 0, 0),
-            BroadcastCommand::ReloadTextures(car_index) => {
-                (RawBroadcastMessage::ReloadTextures, car_index, 0, 0)
-            }
+            BroadcastCommand::ReloadAllTextures => (
+                RawBroadcastMessage::ReloadTextures,
+                ReloadTexturesMode::All.into(),
+                0,
+                0,
+            ),
+            BroadcastCommand::ReloadTextures(car_index) => (
+                RawBroadcastMessage::ReloadTextures,
+                ReloadTexturesMode::CarIdx.into(),
+                car_index,
+                0,
+            ),
             BroadcastCommand::ChatCommand(mode) => {
                 (RawBroadcastMessage::ChatCommand, mode.into(), 0, 0)
             }
@@ -223,19 +239,23 @@ impl From<BroadcastCommand> for BroadcastMessageFormat {
             }
             BroadcastCommand::FFBCommand(value) => {
                 let bits = value.to_bits();
+                let (low, high) = split_u32_words(bits);
                 (
                     RawBroadcastMessage::FfbCommand,
-                    0,
-                    (bits & 0xFFFF) as u16,
-                    ((bits >> 16) & 0xFFFF) as u16,
+                    FfbCommandMode::MaxForce.into(),
+                    low,
+                    high,
                 )
             }
-            BroadcastCommand::ReplaySearchSessionTime(session_number, session_time_ms) => (
-                RawBroadcastMessage::ReplaySearchSessionTime,
-                session_number,
-                (session_time_ms & 0xFFFF) as u16,
-                ((session_time_ms >> 16) & 0xFFFF) as u16,
-            ),
+            BroadcastCommand::ReplaySearchSessionTime(session_number, session_time_ms) => {
+                let (low, high) = split_u32_words(session_time_ms);
+                (
+                    RawBroadcastMessage::ReplaySearchSessionTime,
+                    session_number,
+                    low,
+                    high,
+                )
+            }
             BroadcastCommand::VideoCapture(mode) => {
                 (RawBroadcastMessage::VideoCapture, mode.into(), 0, 0)
             }
@@ -244,7 +264,7 @@ impl From<BroadcastCommand> for BroadcastMessageFormat {
 }
 
 /// Client for sending iRacing broadcast commands over the Win32 broadcast channel.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Broadcast {
     message_id: u32,
 }
@@ -277,8 +297,8 @@ impl Broadcast {
     /// # Errors
     ///
     /// Returns [`IRacingSDKError`] if `SendNotifyMessageW` reports a Win32 error.
-    pub fn send_message(&self, message: BroadcastMessageFormat) -> Result<()> {
-        let (broadcast_type, var1, var2, var3) = message;
+    pub fn send_message(&self, message: BroadcastCommand) -> Result<()> {
+        let (broadcast_type, var1, var2, var3) = message.into();
 
         // Pack the low/high words to match the Windows broadcast contract.
         let wparam_value = (broadcast_type.to_raw() as usize) | ((var1 as usize) << 16);
@@ -326,7 +346,12 @@ mod tests {
 
         assert_eq!(
             reload_all_textures_message,
-            (RawBroadcastMessage::ReloadTextures, 0, 0, 0)
+            (
+                RawBroadcastMessage::ReloadTextures,
+                ReloadTexturesMode::All.into(),
+                0,
+                0
+            )
         );
 
         let reload_index_textures_message: BroadcastMessageFormat =
@@ -334,7 +359,12 @@ mod tests {
 
         assert_eq!(
             reload_index_textures_message,
-            (RawBroadcastMessage::ReloadTextures, 7, 0, 0)
+            (
+                RawBroadcastMessage::ReloadTextures,
+                ReloadTexturesMode::CarIdx.into(),
+                7,
+                0
+            )
         );
     }
 
@@ -356,14 +386,14 @@ mod tests {
         );
 
         let set_play_position_message: BroadcastMessageFormat =
-            BroadcastCommand::ReplaySetPlayPosition(ReplayPositionMode::Current, 120).into();
+            BroadcastCommand::ReplaySetPlayPosition(ReplayPositionMode::Current, 100_000).into();
         assert_eq!(
             set_play_position_message,
             (
                 RawBroadcastMessage::ReplaySetPlayPosition,
                 ReplayPositionMode::Current.into(),
-                120,
-                0
+                0x86A0,
+                0x0001
             )
         );
 
@@ -462,7 +492,7 @@ mod tests {
     fn encodes_ffb_max_force_bits() {
         let (_, var1, var2, var3) = BroadcastCommand::FFBCommand(20.9998).into();
         let bits = 20.9998f32.to_bits();
-        assert_eq!(var1, 0);
+        assert_eq!(var1, u16::from(FfbCommandMode::MaxForce));
         assert_eq!(var2, (bits & 0xFFFF) as u16);
         assert_eq!(var3, ((bits >> 16) & 0xFFFF) as u16);
     }

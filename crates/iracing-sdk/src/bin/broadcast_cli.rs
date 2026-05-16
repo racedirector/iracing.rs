@@ -66,19 +66,19 @@ enum SendCommand {
 enum CameraCommand {
     SwitchPosition {
         #[arg(long)]
-        position: u8,
+        position: u16,
         #[arg(long)]
-        group: u8,
+        group: u16,
         #[arg(long, default_value_t = 0)]
-        camera: u8,
+        camera: u16,
     },
     SwitchNumber {
         #[arg(long)]
         car_number: String,
         #[arg(long)]
-        group: u8,
+        group: u16,
         #[arg(long, default_value_t = 0)]
-        camera: u8,
+        camera: u16,
     },
     SetState(CameraStateArgs),
 }
@@ -118,7 +118,7 @@ enum ReplayCommand {
         #[arg(value_enum)]
         mode: ReplayPositionArg,
         #[arg(long)]
-        frame: u16,
+        frame: u32,
     },
     SetState {
         #[arg(value_enum, default_value_t = ReplayStateArg::EraseTape)]
@@ -126,7 +126,7 @@ enum ReplayCommand {
     },
     SearchSessionTime {
         #[arg(long)]
-        session: u8,
+        session: u16,
         #[arg(long)]
         time_ms: u32,
     },
@@ -141,15 +141,15 @@ enum ChatCommand {
     Reply,
     Begin,
     Macro {
-        #[arg(value_parser = clap::value_parser!(u8).range(0..=14))]
-        index: u8,
+        #[arg(value_parser = clap::value_parser!(u16).range(1..=15))]
+        index: u16,
     },
 }
 
 #[derive(Subcommand, Debug, Clone, PartialEq)]
 enum PitCliCommand {
     Clear,
-    Fuel { gallons: u8 },
+    Fuel { gallons: u16 },
     Lf { psi: u16 },
     Rf { psi: u16 },
     Lr { psi: u16 },
@@ -165,7 +165,7 @@ enum PitCliCommand {
 #[derive(Subcommand, Debug, Clone, PartialEq)]
 enum TextureCommand {
     ReloadAll,
-    ReloadCar { car_idx: u8 },
+    ReloadCar { car_idx: u16 },
 }
 
 #[derive(Subcommand, Debug, Clone, PartialEq)]
@@ -467,7 +467,7 @@ struct InteractiveState {
     slow_motion: bool,
     replay_search_idx: usize,
     replay_position_idx: usize,
-    replay_frame: u16,
+    replay_frame: u32,
     camera_state_enabled: bool,
 }
 
@@ -524,17 +524,6 @@ fn is_cancel(s: &str) -> bool {
 }
 
 #[cfg(windows)]
-fn parse_u8_input(input: &str, min: u8, max: u8) -> Result<Option<u8>> {
-    if is_cancel(input) {
-        return Ok(None);
-    }
-    let value = input.parse::<u8>()?;
-    if value < min || value > max {
-        anyhow::bail!("value must be in range {min}..={max}");
-    }
-    Ok(Some(value))
-}
-
 #[cfg(windows)]
 fn parse_u16_input(input: &str, min: u16, max: u16) -> Result<Option<u16>> {
     if is_cancel(input) {
@@ -577,24 +566,6 @@ fn parse_f32_input(input: &str, min: Option<f32>, max: Option<f32>) -> Result<Op
     }
 
     Ok(Some(value))
-}
-
-#[cfg(windows)]
-fn prompt_u8<P: PromptInput>(
-    prompter: &mut P,
-    label: &str,
-    min: u8,
-    max: u8,
-) -> Result<Option<u8>> {
-    loop {
-        let input = prompter.prompt_line(label)?;
-        match parse_u8_input(&input, min, max) {
-            Ok(value) => return Ok(value),
-            Err(err) => {
-                tracing::warn!("{err}. Enter a value in {min}..={max}, or press Enter/q to cancel.")
-            }
-        }
-    }
 }
 
 #[cfg(windows)]
@@ -698,10 +669,10 @@ fn interactive_action_for_key<P: PromptInput>(
             else {
                 return Ok(InteractiveAction::Noop);
             };
-            let Some(group) = prompt_u8(prompter, "Camera group", 0, u8::MAX)? else {
+            let Some(group) = prompt_u16(prompter, "Camera group", 0, u16::MAX)? else {
                 return Ok(InteractiveAction::Noop);
             };
-            let Some(camera) = prompt_u8(prompter, "Camera index", 0, u8::MAX)? else {
+            let Some(camera) = prompt_u16(prompter, "Camera index", 0, u16::MAX)? else {
                 return Ok(InteractiveAction::Noop);
             };
             InteractiveAction::Send(vec![BroadcastCommand::CameraSwitchNumber(
@@ -760,14 +731,14 @@ fn interactive_action_for_key<P: PromptInput>(
             ChatCommandMode::BeginChat,
         )]),
         'l' => {
-            let Some(macro_id) = prompt_u8(prompter, "Chat macro index", 0, 14)? else {
+            let Some(macro_id) = prompt_u16(prompter, "Chat macro index", 1, 15)? else {
                 return Ok(InteractiveAction::Noop);
             };
             InteractiveAction::Send(vec![BroadcastCommand::ChatCommandMacro(macro_id)])
         }
         'm' => InteractiveAction::Send(vec![BroadcastCommand::PitCommand(PitCommand::Clear)]),
         'n' => {
-            let Some(gallons) = prompt_u8(prompter, "Fuel to add (gallons)", 0, u8::MAX)? else {
+            let Some(gallons) = prompt_u16(prompter, "Fuel to add (gallons)", 0, u16::MAX)? else {
                 return Ok(InteractiveAction::Noop);
             };
             InteractiveAction::Send(vec![BroadcastCommand::PitCommand(PitCommand::Fuel(
@@ -798,7 +769,7 @@ fn interactive_action_for_key<P: PromptInput>(
         'q' => InteractiveAction::Send(vec![BroadcastCommand::PitCommand(PitCommand::ClearTires)]),
         'r' => InteractiveAction::Send(vec![BroadcastCommand::ReloadAllTextures]),
         's' => {
-            let Some(car_idx) = prompt_u8(prompter, "Car index", 0, u8::MAX)? else {
+            let Some(car_idx) = prompt_u16(prompter, "Car index", 0, u16::MAX)? else {
                 return Ok(InteractiveAction::Noop);
             };
             InteractiveAction::Send(vec![BroadcastCommand::ReloadTextures(car_idx)])
@@ -828,7 +799,7 @@ fn interactive_action_for_key<P: PromptInput>(
             InteractiveAction::Send(vec![BroadcastCommand::FFBCommand(force_nm)])
         }
         'A' => {
-            let Some(session) = prompt_u8(prompter, "Session number", 0, u8::MAX)? else {
+            let Some(session) = prompt_u16(prompter, "Session number", 0, u16::MAX)? else {
                 return Ok(InteractiveAction::Noop);
             };
             let Some(time_ms) = prompt_u32(prompter, "Session time (ms)", 0, u32::MAX)? else {
@@ -960,12 +931,12 @@ mod tests {
 
     #[test]
     fn parses_chat_macro() {
-        let cli = Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "14"]).unwrap();
+        let cli = Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "15"]).unwrap();
         assert_eq!(
             cli.command,
             Command::Send {
                 command: SendCommand::Chat {
-                    command: ChatCommand::Macro { index: 14 }
+                    command: ChatCommand::Macro { index: 15 }
                 }
             }
         );
@@ -974,9 +945,9 @@ mod tests {
     #[test]
     fn rejects_out_of_range_macro() {
         let err =
-            Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "15"]).unwrap_err();
+            Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "16"]).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("0..=14"));
+        assert!(msg.contains("1..=15"));
     }
 
     #[cfg(windows)]
@@ -1002,17 +973,17 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn parse_prompt_u8_valid_and_cancel() {
-        assert_eq!(parse_u8_input("14", 0, 20).unwrap(), Some(14));
-        assert_eq!(parse_u8_input("", 0, 20).unwrap(), None);
-        assert_eq!(parse_u8_input("q", 0, 20).unwrap(), None);
+    fn parse_prompt_u16_valid_and_cancel() {
+        assert_eq!(parse_u16_input("14", 0, 20).unwrap(), Some(14));
+        assert_eq!(parse_u16_input("", 0, 20).unwrap(), None);
+        assert_eq!(parse_u16_input("q", 0, 20).unwrap(), None);
     }
 
     #[cfg(windows)]
     #[test]
-    fn parse_prompt_u8_rejects_out_of_range() {
-        let err = parse_u8_input("15", 0, 14).unwrap_err();
-        assert!(err.to_string().contains("0..=14"));
+    fn parse_prompt_u16_rejects_out_of_range() {
+        let err = parse_u16_input("16", 1, 15).unwrap_err();
+        assert!(err.to_string().contains("1..=15"));
     }
 
     #[cfg(windows)]

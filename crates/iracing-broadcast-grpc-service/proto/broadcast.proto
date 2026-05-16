@@ -106,11 +106,11 @@ message CameraSetStateRequest { optional uint32 state = 1; }
 message CameraSetStateResponse { uint32 state = 1; }
 
 message ReplaySetPlaySpeedRequest {
-  optional uint32 speed = 1;
+  optional int32 speed = 1;
   optional bool is_slow_motion = 2;
 }
 message ReplaySetPlaySpeedResponse {
-  uint32 speed = 1;
+  int32 speed = 1;
   bool is_slow_motion = 2;
 }
 

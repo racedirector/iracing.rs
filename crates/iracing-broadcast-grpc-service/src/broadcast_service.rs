@@ -65,7 +65,7 @@ impl BroadcastService {
 
     fn send_message(&self, message: BroadcastCommand) -> Result<(), Status> {
         self.client
-            .send_message(message.into())
+            .send_message(message)
             .map_err(Self::broadcast_error_to_status)
     }
 
@@ -78,11 +78,12 @@ impl BroadcastService {
         })
     }
 
-    fn proto_u32_to_i16(field_name: &'static str, value: u32) -> Result<i16, Status> {
+    fn proto_i32_to_i16(field_name: &'static str, value: i32) -> Result<i16, Status> {
         i16::try_from(value).map_err(|_| {
             Status::invalid_argument(format!(
-                "{field_name} must be in the range 0..={}, got {value}",
-                i16::MAX,
+                "{field_name} must be in the range {}..={}, got {value}",
+                i16::MIN,
+                i16::MAX
             ))
         })
     }
@@ -94,9 +95,9 @@ impl BroadcastService {
         }
     }
 
-    fn required_proto_i16(field_name: &'static str, value: Option<u32>) -> Result<i16, Status> {
+    fn required_proto_i16(field_name: &'static str, value: Option<i32>) -> Result<i16, Status> {
         match value {
-            Some(value) => Self::proto_u32_to_i16(field_name, value),
+            Some(value) => Self::proto_i32_to_i16(field_name, value),
             None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
         }
     }
@@ -116,6 +117,17 @@ impl BroadcastService {
             ))),
             None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
         }
+    }
+
+    fn required_chat_macro(value: Option<u32>) -> Result<u16, Status> {
+        let macro_number = Self::required_proto_u16("macro", value)?;
+        if !(1..=15).contains(&macro_number) {
+            return Err(Status::invalid_argument(format!(
+                "`macro` must be in the range 1..=15, got {macro_number}"
+            )));
+        }
+
+        Ok(macro_number)
     }
 
     fn required_proto_enum<E>(field_name: &'static str, value: Option<i32>) -> Result<E, Status>
@@ -149,17 +161,6 @@ impl BroadcastService {
         }
     }
 
-    fn proto_f32_to_u8(field_name: &'static str, value: f32) -> Result<u8, Status> {
-        if value < 0.0 || value > f32::from(u8::MAX) || value.fract() != 0.0 {
-            return Err(Status::invalid_argument(format!(
-                "`{field_name}` must be an integer in the range 0..={}, got {value}",
-                u8::MAX
-            )));
-        }
-
-        Ok(value as u8)
-    }
-
     fn proto_f32_to_u16(field_name: &'static str, value: f32) -> Result<u16, Status> {
         if value < 0.0 || value > f32::from(u16::MAX) || value.fract() != 0.0 {
             return Err(Status::invalid_argument(format!(
@@ -172,7 +173,15 @@ impl BroadcastService {
     }
 
     fn proto_f32_to_u32(field_name: &'static str, value: f32) -> Result<u32, Status> {
-        if value < 0.0 || value > u32::MAX as f32 || value.fract() != 0.0 {
+        if !value.is_finite() || value < 0.0 || value.fract() != 0.0 {
+            return Err(Status::invalid_argument(format!(
+                "`{field_name}` must be an integer in the range 0..={}, got {value}",
+                u32::MAX
+            )));
+        }
+
+        let value = value as u64;
+        if value > u64::from(u32::MAX) {
             return Err(Status::invalid_argument(format!(
                 "`{field_name}` must be an integer in the range 0..={}, got {value}",
                 u32::MAX
@@ -220,7 +229,7 @@ impl BroadcastService {
 
         Ok(match mode {
             ChatCommandMode::Macro => {
-                let macro_number = Self::required_proto_u16("macro", r#macro)?;
+                let macro_number = Self::required_chat_macro(r#macro)?;
                 BroadcastCommand::ChatCommandMacro(macro_number)
             }
             ChatCommandMode::BeginChat => {
@@ -245,7 +254,7 @@ impl BroadcastService {
             PitCommandMode::TearOff => PitCommand::Tearoff,
             PitCommandMode::Fuel => {
                 let value = Self::required_proto_f32("value", value)?;
-                PitCommand::Fuel(Self::proto_f32_to_u8("value", value)?)
+                PitCommand::Fuel(Self::proto_f32_to_u16("value", value)?)
             }
             PitCommandMode::LfTire => {
                 let value = Self::required_proto_f32("value", value)?;
@@ -422,7 +431,7 @@ impl Broadcast for BroadcastService {
         // TODO: Wait for replay play speed to change.
 
         Ok(Response::new(ReplaySetPlaySpeedResponse {
-            speed: speed as u32,
+            speed: i32::from(speed),
             is_slow_motion,
         }))
     }
@@ -434,7 +443,7 @@ impl Broadcast for BroadcastService {
         let ReplaySetPlayPositionRequest { mode, frame } = request.into_inner();
 
         let mode = Self::required_proto_enum::<ReplayPositionMode>("mode", mode)?;
-        let frame = Self::required_proto_u16("frame", frame)?;
+        let frame = frame.ok_or_else(|| Status::invalid_argument("Missing `frame`"))?;
 
         // TODO: Get previous replay frame.
 
