@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package iracing.broadcast;
-import public "google/protobuf/empty.proto";
+import "google/protobuf/empty.proto";
 
 option java_package = "com.iracing.broadcast";
 option java_outer_classname = "BroadcastMessageProto";
