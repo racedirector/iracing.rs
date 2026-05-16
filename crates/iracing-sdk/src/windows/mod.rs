@@ -40,6 +40,7 @@ mod broadcast;
 mod connection;
 mod utils;
 
-pub use broadcast::{Broadcast, BroadcastCommand, PitCommand};
+pub use crate::PitCommand;
+pub use broadcast::{Broadcast, BroadcastCommand};
 pub use connection::{Connection, IRSDKHeader, VarBuf, WaitResult};
 pub use utils::wide_string;

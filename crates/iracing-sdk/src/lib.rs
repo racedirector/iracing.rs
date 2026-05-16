@@ -20,7 +20,8 @@
 //!   - [`yaml_utils`] for iRacing YAML cleanup
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
-//!   - `Broadcast`, `BroadcastCommand`, `PitCommand`
+//!   - `Broadcast`, `BroadcastCommand`
+//!   - [`PitCommand`] is cross-platform typed data for pit-service broadcast commands.
 //!
 //! # Quick start
 //!
@@ -92,7 +93,7 @@ pub mod windows;
 // Windows memory exports
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
-pub use windows::{Broadcast, Connection as WindowsConnection, WaitResult};
+pub use windows::BroadcastCommand;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
-pub use windows::{BroadcastCommand, PitCommand};
+pub use windows::{Broadcast, Connection as WindowsConnection, WaitResult};
