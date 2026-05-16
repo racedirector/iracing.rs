@@ -144,7 +144,7 @@ impl BroadcastGrpcClient {
         self.inner
             .replay_set_play_position(ReplaySetPlayPositionRequest {
                 mode: Some(replay_position_mode(mode)? as i32),
-                frame: Some(u32::from(frame)),
+                frame: Some(frame),
             })
             .await
             .map(tonic::Response::into_inner)

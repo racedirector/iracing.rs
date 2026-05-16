@@ -524,7 +524,6 @@ fn is_cancel(s: &str) -> bool {
 }
 
 #[cfg(windows)]
-#[cfg(windows)]
 fn parse_u16_input(input: &str, min: u16, max: u16) -> Result<Option<u16>> {
     if is_cancel(input) {
         return Ok(None);

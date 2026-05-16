@@ -454,9 +454,7 @@ impl Broadcast for BroadcastService {
 
         // TODO: Wait for replay frame to change.
 
-        Ok(Response::new(ReplaySetPlayPositionResponse {
-            frame: u32::from(frame),
-        }))
+        Ok(Response::new(ReplaySetPlayPositionResponse { frame }))
     }
 
     async fn replay_search(
