@@ -1,19 +1,15 @@
 use std::{sync::Arc, thread, time::Duration};
 
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{Request, Response, Status};
 
-use broadcast::broadcast_server::{Broadcast, BroadcastServer};
-use broadcast::*;
+use crate::broadcast::broadcast_server::Broadcast;
+use crate::broadcast::*;
 
 use iracing_sdk::{
     Broadcast as BroadcastClient, BroadcastCommand, FramePacket, IRacingSDKError, LiveProvider,
-    Provider, VarData, VariableSchema,
+    PitCommand, Provider, VarData, VariableSchema,
 };
 use tokio::sync::{Mutex, watch};
-
-pub mod broadcast {
-    tonic::include_proto!("iracing.broadcast");
-}
 
 const DEFAULT_TELEMETRY_TIMEOUT_MS: u64 = 750;
 
@@ -252,14 +248,6 @@ impl BroadcastService {
             .map_err(Self::broadcast_error_to_status)
     }
 
-    fn unimplemented_response<T>(method: &str) -> Result<Response<T>, Status> {
-        tracing::info!(method, "broadcast RPC not implemented");
-
-        Err(Status::unimplemented(format!(
-            "{method} is not yet implemented"
-        )))
-    }
-
     fn broadcast_error_to_status(error: IRacingSDKError) -> Status {
         let message = error.to_string();
         let retryable = error.is_retryable();
@@ -296,10 +284,245 @@ impl BroadcastService {
         })
     }
 
+    fn proto_i32_to_u32(field_name: &'static str, value: i32) -> Result<u32, Status> {
+        u32::try_from(value).map_err(|_| {
+            Status::invalid_argument(format!("{field_name} must be non-negative, got {value}",))
+        })
+    }
+
+    fn proto_u32_to_i16(field_name: &'static str, value: u32) -> Result<i16, Status> {
+        i16::try_from(value).map_err(|_| {
+            Status::invalid_argument(format!(
+                "{field_name} must be in the range 0..={}, got {value}",
+                i16::MAX,
+            ))
+        })
+    }
+
     fn required_proto_u16(field_name: &'static str, value: Option<u32>) -> Result<u16, Status> {
         match value {
             Some(value) => Self::proto_u32_to_u16(field_name, value),
             None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
+        }
+    }
+
+    fn required_proto_u32(field_name: &'static str, value: Option<i32>) -> Result<u32, Status> {
+        match value {
+            Some(value) => Self::proto_i32_to_u32(field_name, value),
+            None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
+        }
+    }
+
+    fn required_proto_i16(field_name: &'static str, value: Option<u32>) -> Result<i16, Status> {
+        match value {
+            Some(value) => Self::proto_u32_to_i16(field_name, value),
+            None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
+        }
+    }
+
+    fn required_proto_bool(field_name: &'static str, value: Option<bool>) -> Result<bool, Status> {
+        value.ok_or_else(|| Status::invalid_argument(format!("Missing `{field_name}`")))
+    }
+
+    fn required_proto_string(
+        field_name: &'static str,
+        value: Option<String>,
+    ) -> Result<String, Status> {
+        match value {
+            Some(value) if !value.is_empty() => Ok(value),
+            Some(_) => Err(Status::invalid_argument(format!(
+                "`{field_name}` must not be empty"
+            ))),
+            None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
+        }
+    }
+
+    fn required_proto_enum<E>(field_name: &'static str, value: Option<i32>) -> Result<E, Status>
+    where
+        E: TryFrom<i32>,
+    {
+        let value =
+            value.ok_or_else(|| Status::invalid_argument(format!("Missing `{field_name}`")))?;
+
+        if value == 0 {
+            return Err(Status::invalid_argument(format!(
+                "`{field_name}` must not be UNKNOWN"
+            )));
+        }
+
+        E::try_from(value).map_err(|_| {
+            Status::invalid_argument(format!("Invalid `{field_name}` enum value: {value}"))
+        })
+    }
+
+    fn required_proto_f32(field_name: &'static str, value: Option<f32>) -> Result<f32, Status> {
+        let value =
+            value.ok_or_else(|| Status::invalid_argument(format!("Missing `{field_name}`")))?;
+
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(Status::invalid_argument(format!(
+                "`{field_name}` must be finite, got {value}"
+            )))
+        }
+    }
+
+    fn proto_f32_to_u8(field_name: &'static str, value: f32) -> Result<u8, Status> {
+        if value < 0.0 || value > f32::from(u8::MAX) || value.fract() != 0.0 {
+            return Err(Status::invalid_argument(format!(
+                "`{field_name}` must be an integer in the range 0..={}, got {value}",
+                u8::MAX
+            )));
+        }
+
+        Ok(value as u8)
+    }
+
+    fn proto_f32_to_u16(field_name: &'static str, value: f32) -> Result<u16, Status> {
+        if value < 0.0 || value > f32::from(u16::MAX) || value.fract() != 0.0 {
+            return Err(Status::invalid_argument(format!(
+                "`{field_name}` must be an integer in the range 0..={}, got {value}",
+                u16::MAX
+            )));
+        }
+
+        Ok(value as u16)
+    }
+
+    fn proto_f32_to_u32(field_name: &'static str, value: f32) -> Result<u32, Status> {
+        if value < 0.0 || value > u32::MAX as f32 || value.fract() != 0.0 {
+            return Err(Status::invalid_argument(format!(
+                "`{field_name}` must be an integer in the range 0..={}, got {value}",
+                u32::MAX
+            )));
+        }
+
+        Ok(value as u32)
+    }
+
+    fn replay_position_mode(mode: ReplayPositionMode) -> iracing_sdk::ReplayPositionMode {
+        match mode {
+            ReplayPositionMode::Begin => iracing_sdk::ReplayPositionMode::Begin,
+            ReplayPositionMode::Current => iracing_sdk::ReplayPositionMode::Current,
+            ReplayPositionMode::End => iracing_sdk::ReplayPositionMode::End,
+            ReplayPositionMode::Unknown => unreachable!("unknown replay position mode is rejected"),
+        }
+    }
+
+    fn replay_search_mode(mode: ReplaySearchMode) -> iracing_sdk::ReplaySearchMode {
+        match mode {
+            ReplaySearchMode::ToStart => iracing_sdk::ReplaySearchMode::ToStart,
+            ReplaySearchMode::ToEnd => iracing_sdk::ReplaySearchMode::ToEnd,
+            ReplaySearchMode::PreviousSession => iracing_sdk::ReplaySearchMode::PrevSession,
+            ReplaySearchMode::NextSession => iracing_sdk::ReplaySearchMode::NextSession,
+            ReplaySearchMode::PreviousLap => iracing_sdk::ReplaySearchMode::PrevLap,
+            ReplaySearchMode::NextLap => iracing_sdk::ReplaySearchMode::NextLap,
+            ReplaySearchMode::PreviousFrame => iracing_sdk::ReplaySearchMode::PrevFrame,
+            ReplaySearchMode::NextFrame => iracing_sdk::ReplaySearchMode::NextFrame,
+            ReplaySearchMode::PreviousIncident => iracing_sdk::ReplaySearchMode::PrevIncident,
+            ReplaySearchMode::NextIncident => iracing_sdk::ReplaySearchMode::NextIncident,
+            ReplaySearchMode::Unknown => unreachable!("unknown replay search mode is rejected"),
+        }
+    }
+
+    fn replay_state_mode(mode: ReplayStateMode) -> iracing_sdk::ReplayStateMode {
+        match mode {
+            ReplayStateMode::EraseTape => iracing_sdk::ReplayStateMode::EraseTape,
+            ReplayStateMode::Unknown => unreachable!("unknown replay state mode is rejected"),
+        }
+    }
+
+    fn chat_command(request: ChatCommandRequest) -> Result<BroadcastCommand, Status> {
+        let ChatCommandRequest { mode, r#macro } = request;
+        let mode = Self::required_proto_enum::<ChatCommandMode>("mode", mode)?;
+
+        Ok(match mode {
+            ChatCommandMode::Macro => {
+                let macro_number = Self::required_proto_u16("macro", r#macro)?;
+                BroadcastCommand::ChatCommandMacro(macro_number)
+            }
+            ChatCommandMode::BeginChat => {
+                BroadcastCommand::ChatCommand(iracing_sdk::ChatCommandMode::BeginChat)
+            }
+            ChatCommandMode::Reply => {
+                BroadcastCommand::ChatCommand(iracing_sdk::ChatCommandMode::Reply)
+            }
+            ChatCommandMode::Cancel => {
+                BroadcastCommand::ChatCommand(iracing_sdk::ChatCommandMode::Cancel)
+            }
+            ChatCommandMode::Unknown => unreachable!("unknown chat command mode is rejected"),
+        })
+    }
+
+    fn pit_command(request: PitCommandRequest) -> Result<PitCommand, Status> {
+        let PitCommandRequest { mode, value } = request;
+        let mode = Self::required_proto_enum::<PitCommandMode>("mode", mode)?;
+
+        Ok(match mode {
+            PitCommandMode::Clear => PitCommand::Clear,
+            PitCommandMode::TearOff => PitCommand::Tearoff,
+            PitCommandMode::Fuel => {
+                let value = Self::required_proto_f32("value", value)?;
+                PitCommand::Fuel(Self::proto_f32_to_u8("value", value)?)
+            }
+            PitCommandMode::LfTire => {
+                let value = Self::required_proto_f32("value", value)?;
+                PitCommand::LF(Self::proto_f32_to_u16("value", value)?)
+            }
+            PitCommandMode::RfTire => {
+                let value = Self::required_proto_f32("value", value)?;
+                PitCommand::RF(Self::proto_f32_to_u16("value", value)?)
+            }
+            PitCommandMode::LrTire => {
+                let value = Self::required_proto_f32("value", value)?;
+                PitCommand::LR(Self::proto_f32_to_u16("value", value)?)
+            }
+            PitCommandMode::RrTire => {
+                let value = Self::required_proto_f32("value", value)?;
+                PitCommand::RR(Self::proto_f32_to_u16("value", value)?)
+            }
+            PitCommandMode::ClearTires => PitCommand::ClearTires,
+            PitCommandMode::FastRepair => PitCommand::FastRepair,
+            PitCommandMode::ClearTearOff => PitCommand::ClearTearoff,
+            PitCommandMode::ClearFastRepair => PitCommand::ClearFastRepair,
+            PitCommandMode::ClearFuel => PitCommand::ClearFuel,
+            PitCommandMode::Unknown => unreachable!("unknown pit command mode is rejected"),
+        })
+    }
+
+    fn telemetry_command_mode(mode: TelemetryCommandMode) -> iracing_sdk::TelemetryCommandMode {
+        match mode {
+            TelemetryCommandMode::Stop => iracing_sdk::TelemetryCommandMode::Stop,
+            TelemetryCommandMode::Start => iracing_sdk::TelemetryCommandMode::Start,
+            TelemetryCommandMode::Restart => iracing_sdk::TelemetryCommandMode::Restart,
+            TelemetryCommandMode::Unknown => {
+                unreachable!("unknown telemetry command mode is rejected")
+            }
+        }
+    }
+
+    fn video_capture_mode(mode: VideoCaptureMode) -> iracing_sdk::VideoCaptureMode {
+        match mode {
+            VideoCaptureMode::Screenshot => iracing_sdk::VideoCaptureMode::TriggerScreenShot,
+            VideoCaptureMode::Start => iracing_sdk::VideoCaptureMode::StartVideoCapture,
+            VideoCaptureMode::Stop => iracing_sdk::VideoCaptureMode::EndVideoCapture,
+            VideoCaptureMode::Toggle => iracing_sdk::VideoCaptureMode::ToggleVideoCapture,
+            VideoCaptureMode::ShowTimer => iracing_sdk::VideoCaptureMode::ShowVideoTimer,
+            VideoCaptureMode::HideTimer => iracing_sdk::VideoCaptureMode::HideVideoTimer,
+            VideoCaptureMode::Unknown => unreachable!("unknown video capture mode is rejected"),
+        }
+    }
+
+    fn empty_pit_command_response() -> PitCommandResponse {
+        PitCommandResponse {
+            service_flags: 0,
+            fuel: 0.0,
+            lf_pressure: 0.0,
+            rf_pressure: 0.0,
+            lr_pressure: 0.0,
+            rr_pressure: 0.0,
+            tire_compound: 0,
         }
     }
 }
@@ -310,7 +533,14 @@ impl Broadcast for BroadcastService {
         &self,
         _request: Request<()>,
     ) -> Result<Response<GetAvailableCamerasResponse>, Status> {
-        Self::unimplemented_response("get_available_cameras")
+        // TODO: Read camera groups/cameras from session data.
+        // TODO: Return the current camera once the shared telemetry response pattern exists.
+        Ok(Response::new(GetAvailableCamerasResponse {
+            camera_groups: Vec::new(),
+            car_index: 0,
+            group: 0,
+            camera: 0,
+        }))
     }
 
     async fn camera_switch_position(
@@ -372,44 +602,142 @@ impl Broadcast for BroadcastService {
 
     async fn camera_switch_number(
         &self,
-        _request: Request<CameraSwitchNumberRequest>,
+        request: Request<CameraSwitchNumberRequest>,
     ) -> Result<Response<CameraSwitchNumberResponse>, Status> {
-        Self::unimplemented_response("camera_switch_number")
+        let CameraSwitchNumberRequest {
+            car_number,
+            group,
+            camera,
+        } = request.into_inner();
+
+        let car_number = Self::required_proto_string("car_number", car_number)?;
+        let group = Self::required_proto_u16("group", group)?;
+        let camera = Self::required_proto_u16("camera", camera)?;
+
+        // TODO: Get previous camera position.
+
+        self.send_message(BroadcastCommand::CameraSwitchNumber(
+            car_number, group, camera,
+        ))?;
+
+        // TODO: Wait for camera position to change.
+        // TODO: Resolve the selected car number back to a car index.
+
+        Ok(Response::new(CameraSwitchNumberResponse {
+            car_index: 0,
+            group: u32::from(group),
+            camera: u32::from(camera),
+        }))
     }
 
     async fn camera_set_state(
         &self,
-        _request: Request<CameraSetStateRequest>,
+        request: Request<CameraSetStateRequest>,
     ) -> Result<Response<CameraSetStateResponse>, Status> {
-        Self::unimplemented_response("camera_set_state")
+        let CameraSetStateRequest { state } = request.into_inner();
+
+        let state = Self::required_proto_u32("state", state)?;
+
+        // TODO: Get previous state
+
+        self.send_message(BroadcastCommand::CameraSetState(
+            iracing_sdk::CameraState::from_bits_retain(state),
+        ))?;
+
+        // TODO: Wait for state to change
+
+        Ok(Response::new(CameraSetStateResponse {
+            state: state as i32,
+        }))
     }
 
     async fn replay_set_play_speed(
         &self,
-        _request: Request<ReplaySetPlaySpeedRequest>,
+        request: Request<ReplaySetPlaySpeedRequest>,
     ) -> Result<Response<ReplaySetPlaySpeedResponse>, Status> {
-        Self::unimplemented_response("replay_set_play_speed")
+        let ReplaySetPlaySpeedRequest {
+            speed,
+            is_slow_motion,
+        } = request.into_inner();
+
+        let speed = Self::required_proto_i16("speed", speed)?;
+        let is_slow_motion = Self::required_proto_bool("is_slow_motion", is_slow_motion)?;
+
+        // TODO: Get previous replay play speed.
+
+        self.send_message(BroadcastCommand::ReplaySetPlaySpeed(speed, is_slow_motion))?;
+
+        // TODO: Wait for replay play speed to change.
+
+        Ok(Response::new(ReplaySetPlaySpeedResponse {
+            speed: speed as u32,
+            is_slow_motion,
+        }))
     }
 
     async fn replay_set_play_position(
         &self,
-        _request: Request<ReplaySetPlayPositionRequest>,
+        request: Request<ReplaySetPlayPositionRequest>,
     ) -> Result<Response<ReplaySetPlayPositionResponse>, Status> {
-        Self::unimplemented_response("replay_set_play_position")
+        let ReplaySetPlayPositionRequest { mode, frame } = request.into_inner();
+
+        let mode = Self::required_proto_enum::<ReplayPositionMode>("mode", mode)?;
+        let frame = Self::required_proto_u16("frame", frame)?;
+
+        // TODO: Get previous replay frame.
+
+        self.send_message(BroadcastCommand::ReplaySetPlayPosition(
+            Self::replay_position_mode(mode),
+            frame,
+        ))?;
+
+        // TODO: Wait for replay frame to change.
+
+        Ok(Response::new(ReplaySetPlayPositionResponse {
+            frame: u32::from(frame),
+        }))
     }
 
     async fn replay_search(
         &self,
-        _request: Request<ReplaySearchRequest>,
+        request: Request<ReplaySearchRequest>,
     ) -> Result<Response<ReplaySearchResponse>, Status> {
-        Self::unimplemented_response("replay_search")
+        let ReplaySearchRequest { mode } = request.into_inner();
+
+        let mode = Self::required_proto_enum::<ReplaySearchMode>("mode", mode)?;
+
+        // TODO: Get previous replay frame/session position.
+
+        self.send_message(BroadcastCommand::ReplaySearch(Self::replay_search_mode(
+            mode,
+        )))?;
+
+        // TODO: Wait for replay search result and return frame/session/time.
+
+        Ok(Response::new(ReplaySearchResponse {
+            frame: 0,
+            session_number: 0,
+            session_time: 0.0,
+        }))
     }
 
     async fn replay_set_state(
         &self,
-        _request: Request<ReplaySetStateRequest>,
+        request: Request<ReplaySetStateRequest>,
     ) -> Result<Response<ReplaySetStateResponse>, Status> {
-        Self::unimplemented_response("replay_set_state")
+        let ReplaySetStateRequest { state } = request.into_inner();
+
+        let state = Self::required_proto_enum::<ReplayStateMode>("state", state)?;
+
+        // TODO: Get previous replay state.
+
+        self.send_message(BroadcastCommand::ReplaySetState(Self::replay_state_mode(
+            state,
+        )))?;
+
+        // TODO: Wait for replay state to change.
+
+        Ok(Response::new(ReplaySetStateResponse {}))
     }
 
     async fn reload_textures(
@@ -428,50 +756,142 @@ impl Broadcast for BroadcastService {
 
     async fn chat_command(
         &self,
-        _request: Request<ChatCommandRequest>,
+        request: Request<ChatCommandRequest>,
     ) -> Result<Response<ChatCommandResponse>, Status> {
-        Self::unimplemented_response("chat_command")
+        // TODO: Get previous chat state if iRacing exposes one.
+
+        self.send_message(Self::chat_command(request.into_inner())?)?;
+
+        // TODO: Wait for chat command acknowledgement/state if available.
+
+        Ok(Response::new(ChatCommandResponse {}))
     }
 
     async fn pit_command(
         &self,
-        _request: Request<PitCommandRequest>,
+        request: Request<PitCommandRequest>,
     ) -> Result<Response<PitCommandResponse>, Status> {
-        Self::unimplemented_response("pit_command")
+        let command = Self::pit_command(request.into_inner())?;
+
+        // TODO: Get previous pit service state.
+
+        self.send_message(BroadcastCommand::PitCommand(command))?;
+
+        // TODO: Wait for pit service state to change and return selected values.
+
+        Ok(Response::new(Self::empty_pit_command_response()))
     }
 
     async fn pit_command_stream(
         &self,
-        _request: Request<tonic::Streaming<PitCommandRequest>>,
+        request: Request<tonic::Streaming<PitCommandRequest>>,
     ) -> Result<Response<PitCommandResponse>, Status> {
-        Self::unimplemented_response("pit_command_stream")
+        let mut stream = request.into_inner();
+
+        // TODO: Get previous pit service state.
+
+        while let Some(request) = stream.message().await? {
+            let command = Self::pit_command(request)?;
+            self.send_message(BroadcastCommand::PitCommand(command))?;
+        }
+
+        // TODO: Wait for pit service state to change and return selected values.
+
+        Ok(Response::new(Self::empty_pit_command_response()))
     }
 
     async fn telemetry_command(
         &self,
-        _request: Request<TelemetryCommandRequest>,
+        request: Request<TelemetryCommandRequest>,
     ) -> Result<Response<TelemetryCommandResponse>, Status> {
-        Self::unimplemented_response("telemetry_command")
+        let TelemetryCommandRequest { mode } = request.into_inner();
+
+        let mode = Self::required_proto_enum::<TelemetryCommandMode>("mode", mode)?;
+
+        // TODO: Get previous disk telemetry logging state.
+
+        self.send_message(BroadcastCommand::TelemetryCommand(
+            Self::telemetry_command_mode(mode),
+        ))?;
+
+        // TODO: Wait for disk telemetry logging state to change.
+
+        Ok(Response::new(TelemetryCommandResponse {
+            is_disk_logging_enabled: false,
+            is_disk_logging_active: false,
+        }))
     }
 
     async fn force_feedback_command(
         &self,
-        _request: Request<ForceFeedbackCommandRequest>,
+        request: Request<ForceFeedbackCommandRequest>,
     ) -> Result<Response<ForceFeedbackCommandResponse>, Status> {
-        Self::unimplemented_response("force_feedback_command")
+        let ForceFeedbackCommandRequest { mode, value } = request.into_inner();
+
+        let mode = Self::required_proto_enum::<ForceFeedbackCommandMode>("mode", mode)?;
+        let value = Self::required_proto_f32("value", value)?;
+
+        match mode {
+            ForceFeedbackCommandMode::MaxForce => {
+                // TODO: Get previous force feedback max force.
+
+                self.send_message(BroadcastCommand::FFBCommand(value))?;
+
+                // TODO: Wait for force feedback max force to change.
+
+                Ok(Response::new(ForceFeedbackCommandResponse {
+                    max_force: value,
+                }))
+            }
+            ForceFeedbackCommandMode::Unknown => {
+                unreachable!("unknown force feedback command mode is rejected")
+            }
+        }
     }
 
     async fn replay_search_session_time(
         &self,
-        _request: Request<ReplaySearchSessionTimeRequest>,
+        request: Request<ReplaySearchSessionTimeRequest>,
     ) -> Result<Response<ReplaySearchSessionTimeResponse>, Status> {
-        Self::unimplemented_response("replay_search_session_time")
+        let ReplaySearchSessionTimeRequest {
+            session_number,
+            session_time_ms,
+        } = request.into_inner();
+
+        let session_number = Self::required_proto_u16("session_number", session_number)?;
+        let session_time_ms = Self::proto_f32_to_u32(
+            "session_time_ms",
+            Self::required_proto_f32("session_time_ms", session_time_ms)?,
+        )?;
+
+        // TODO: Get previous replay frame/session position.
+
+        self.send_message(BroadcastCommand::ReplaySearchSessionTime(
+            session_number,
+            session_time_ms,
+        ))?;
+
+        // TODO: Wait for replay search result.
+
+        Ok(Response::new(ReplaySearchSessionTimeResponse {}))
     }
 
     async fn video_capture(
         &self,
-        _request: Request<VideoCaptureRequest>,
+        request: Request<VideoCaptureRequest>,
     ) -> Result<Response<VideoCaptureResponse>, Status> {
-        Self::unimplemented_response("video_capture")
+        let VideoCaptureRequest { mode } = request.into_inner();
+
+        let mode = Self::required_proto_enum::<VideoCaptureMode>("mode", mode)?;
+
+        // TODO: Get previous video capture state if iRacing exposes one.
+
+        self.send_message(BroadcastCommand::VideoCapture(Self::video_capture_mode(
+            mode,
+        )))?;
+
+        // TODO: Wait for video capture state/acknowledgement if available.
+
+        Ok(Response::new(VideoCaptureResponse {}))
     }
 }
