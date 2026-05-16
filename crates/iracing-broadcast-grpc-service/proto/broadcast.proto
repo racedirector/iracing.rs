@@ -23,17 +23,6 @@ enum ChatCommandMode {
   CHAT_COMMAND_MODE_CANCEL = 4;
 }
 
-enum CameraState {
-  CAMERA_STATE_UNKNOWN = 0;
-  CAMERA_STATE_CAMERA_TOOL_ACTIVE = 1;
-  CAMERA_STATE_UI_HIDDEN = 2;
-  CAMERA_STATE_USE_AUTO_SHOT_SELECTION = 3;
-  CAMERA_STATE_USE_TEMPORARY_EDITS = 4;
-  CAMERA_STATE_USE_KEY_ACCELERATION = 5;
-  CAMERA_STATE_USE_KEY10X_ACCELERATION = 6;
-  CAMERA_STATE_USE_MOUSE_AIM_MODE = 7;
-}
-
 enum ReplayPositionMode {
   REPLAY_POSITION_MODE_UNKNOWN = 0;
   REPLAY_POSITION_MODE_BEGIN = 1;
@@ -113,8 +102,8 @@ message CameraSwitchNumberResponse {
   uint32 camera = 3;
 }
 
-message CameraSetStateRequest { optional CameraState state = 1; }
-message CameraSetStateResponse { CameraState state = 1; }
+message CameraSetStateRequest { optional uint32 state = 1; }
+message CameraSetStateResponse { uint32 state = 1; }
 
 message ReplaySetPlaySpeedRequest {
   optional uint32 speed = 1;

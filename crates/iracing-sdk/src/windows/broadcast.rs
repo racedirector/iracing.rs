@@ -165,9 +165,9 @@ impl BroadcastCommand {
 
 type BroadcastMessageFormat = (RawBroadcastMessage, u16, u16, u16);
 
-impl Into<BroadcastMessageFormat> for BroadcastCommand {
-    fn into(self) -> BroadcastMessageFormat {
-        match self {
+impl From<BroadcastCommand> for BroadcastMessageFormat {
+    fn from(command: BroadcastCommand) -> Self {
+        match command {
             BroadcastCommand::CameraSwitchPosition(position, group, camera) => {
                 (RawBroadcastMessage::CamSwitchPos, position, group, camera)
             }
@@ -215,7 +215,7 @@ impl Into<BroadcastMessageFormat> for BroadcastCommand {
                 0,
             ),
             BroadcastCommand::PitCommand(pit_command_mode) => {
-                let (var1, var2) = Self::encode_pit(pit_command_mode);
+                let (var1, var2) = BroadcastCommand::encode_pit(pit_command_mode);
                 (RawBroadcastMessage::PitCommand, var1, var2, 0)
             }
             BroadcastCommand::TelemetryCommand(mode) => {
@@ -232,7 +232,7 @@ impl Into<BroadcastMessageFormat> for BroadcastCommand {
             }
             BroadcastCommand::ReplaySearchSessionTime(session_number, session_time_ms) => (
                 RawBroadcastMessage::ReplaySearchSessionTime,
-                session_number.into(),
+                session_number,
                 (session_time_ms & 0xFFFF) as u16,
                 ((session_time_ms >> 16) & 0xFFFF) as u16,
             ),

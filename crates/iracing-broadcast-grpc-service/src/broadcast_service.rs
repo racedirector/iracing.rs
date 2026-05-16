@@ -78,12 +78,6 @@ impl BroadcastService {
         })
     }
 
-    fn proto_i32_to_u32(field_name: &'static str, value: i32) -> Result<u32, Status> {
-        u32::try_from(value).map_err(|_| {
-            Status::invalid_argument(format!("{field_name} must be non-negative, got {value}",))
-        })
-    }
-
     fn proto_u32_to_i16(field_name: &'static str, value: u32) -> Result<i16, Status> {
         i16::try_from(value).map_err(|_| {
             Status::invalid_argument(format!(
@@ -96,13 +90,6 @@ impl BroadcastService {
     fn required_proto_u16(field_name: &'static str, value: Option<u32>) -> Result<u16, Status> {
         match value {
             Some(value) => Self::proto_u32_to_u16(field_name, value),
-            None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
-        }
-    }
-
-    fn required_proto_u32(field_name: &'static str, value: Option<i32>) -> Result<u32, Status> {
-        match value {
-            Some(value) => Self::proto_i32_to_u32(field_name, value),
             None => Err(Status::invalid_argument(format!("Missing `{field_name}`"))),
         }
     }
@@ -403,7 +390,7 @@ impl Broadcast for BroadcastService {
     ) -> Result<Response<CameraSetStateResponse>, Status> {
         let CameraSetStateRequest { state } = request.into_inner();
 
-        let state = Self::required_proto_u32("state", state)?;
+        let state = state.ok_or_else(|| Status::invalid_argument("Missing `state`"))?;
 
         // TODO: Get previous state
 
@@ -413,9 +400,7 @@ impl Broadcast for BroadcastService {
 
         // TODO: Wait for state to change
 
-        Ok(Response::new(CameraSetStateResponse {
-            state: state as i32,
-        }))
+        Ok(Response::new(CameraSetStateResponse { state }))
     }
 
     async fn replay_set_play_speed(
@@ -514,8 +499,9 @@ impl Broadcast for BroadcastService {
         let ReloadTexturesRequest { car_idx } = request.into_inner();
 
         self.send_message(match car_idx {
-            Some(index) => Self::proto_u32_to_u16("car_idx", index)
-                .map(|i| BroadcastCommand::ReloadTextures(i))?,
+            Some(index) => {
+                Self::proto_u32_to_u16("car_idx", index).map(BroadcastCommand::ReloadTextures)?
+            }
             None => BroadcastCommand::ReloadAllTextures,
         })
         .map(|_| Response::new(ReloadTexturesResponse {}))
