@@ -25,6 +25,28 @@ export default defineConfig(async () => ({
       ".json",
     ],
   },
+  optimizeDeps: {
+    exclude: [
+      "react-native",
+      "react-native-pager-view",
+      "react-native-safe-area-context",
+      "react-native-screens",
+    ],
+    esbuildOptions: {
+      resolveExtensions: [
+        ".web.tsx",
+        ".web.ts",
+        ".web.jsx",
+        ".web.js",
+        ".mjs",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".json",
+      ],
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
