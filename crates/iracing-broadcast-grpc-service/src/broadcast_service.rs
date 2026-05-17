@@ -172,25 +172,6 @@ impl BroadcastService {
         Ok(value as u16)
     }
 
-    fn proto_f32_to_u32(field_name: &'static str, value: f32) -> Result<u32, Status> {
-        if !value.is_finite() || value < 0.0 || value.fract() != 0.0 {
-            return Err(Status::invalid_argument(format!(
-                "`{field_name}` must be an integer in the range 0..={}, got {value}",
-                u32::MAX
-            )));
-        }
-
-        let value = value as u64;
-        if value > u64::from(u32::MAX) {
-            return Err(Status::invalid_argument(format!(
-                "`{field_name}` must be an integer in the range 0..={}, got {value}",
-                u32::MAX
-            )));
-        }
-
-        Ok(value as u32)
-    }
-
     fn replay_position_mode(mode: ReplayPositionMode) -> iracing_sdk::ReplayPositionMode {
         match mode {
             ReplayPositionMode::Begin => iracing_sdk::ReplayPositionMode::Begin,
@@ -619,10 +600,8 @@ impl Broadcast for BroadcastService {
         } = request.into_inner();
 
         let session_number = Self::required_proto_u16("session_number", session_number)?;
-        let session_time_ms = Self::proto_f32_to_u32(
-            "session_time_ms",
-            Self::required_proto_f32("session_time_ms", session_time_ms)?,
-        )?;
+        let session_time_ms =
+            session_time_ms.ok_or_else(|| Status::invalid_argument("Missing `session_time_ms`"))?;
 
         // TODO: Get previous replay frame/session position.
 
