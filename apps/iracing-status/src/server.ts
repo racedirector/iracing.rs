@@ -18,8 +18,7 @@ export type ServerSettings = {
 
 export type TransportRuntimeStatus =
   | { kind: "disabled" }
-  | { kind: "running"; endpoint: string }
-  | { kind: "placeholder"; message: string };
+  | { kind: "running"; endpoint: string };
 
 export type ServerRuntimeStatus = {
   http: TransportRuntimeStatus;
@@ -97,7 +96,5 @@ export function formatTransportStatus(status: TransportRuntimeStatus) {
       return "Disabled";
     case "running":
       return `Running at ${status.endpoint}`;
-    case "placeholder":
-      return status.message;
   }
 }

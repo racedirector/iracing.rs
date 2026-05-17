@@ -10,6 +10,8 @@ pub use broadcast::*;
 pub use broadcast_service::BroadcastService;
 pub use client::{BroadcastGrpcClient, BroadcastGrpcResult};
 
+pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("iracing.broadcast");
+
 pub mod broadcast {
     tonic::include_proto!("iracing.broadcast");
 }

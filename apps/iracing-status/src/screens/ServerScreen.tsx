@@ -29,7 +29,7 @@ const transportLabels: Record<TransportKey, string> = {
 const transportDescriptions: Record<TransportKey, string> = {
   http: "Serves local status and health responses over HTTP.",
   websocket: "Accepts local WebSocket clients for future live status streams.",
-  grpc: "Reserved for a tonic service once protobuf contracts are defined.",
+  grpc: "Serves iRacing broadcast controls over tonic gRPC.",
 };
 
 export function ServerScreen() {

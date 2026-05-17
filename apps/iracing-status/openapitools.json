@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.22.0",
+    "generators": {
+      "iracing-status-http": {
+        "generatorName": "rust-axum",
+        "inputSpec": "openapi.yaml",
+        "output": "src-tauri/generated/http-api",
+        "additionalProperties": {
+          "packageName": "iracing_status_http_api",
+          "packageVersion": "0.1.0",
+          "allowBlockingResponseSerialize": true,
+          "allowBlockingValidator": true
+        }
+      }
+    }
+  }
+}

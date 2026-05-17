@@ -1,0 +1,79 @@
+openapi: 3.1.0
+info:
+  title: iRacing Status HTTP API
+  version: 0.1.0
+  description: Local HTTP API exposed by the iRacing Status app when the HTTP transport is enabled.
+servers:
+  - url: http://{host}:{port}
+    description: Configurable local HTTP transport
+    variables:
+      host:
+        default: 127.0.0.1
+        description: HTTP bind host from the app server settings.
+      port:
+        default: "32080"
+        description: HTTP bind port from the app server settings.
+paths:
+  /:
+    get:
+      operationId: getRoot
+      summary: Service banner
+      description: Returns a plain-text banner for the local HTTP server.
+      responses:
+        "200":
+          description: HTTP server banner.
+          content:
+            text/plain:
+              schema:
+                type: string
+                examples:
+                  - "iRacing status HTTP server\n"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns the static health status for the local HTTP server.
+      responses:
+        "200":
+          description: The HTTP server is running and able to respond.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: iracing-status
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  responses:
+    NotFound:
+      description: No HTTP endpoint is registered for the requested path.
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - "Not found\n"
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          description: Static health status.
+          enum:
+            - ok
+        service:
+          type: string
+          description: Static service identifier.
+          enum:
+            - iracing-status
