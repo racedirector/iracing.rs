@@ -270,13 +270,13 @@ impl Broadcast {
     /// Returns [`IRacingSDKError`] if `SendNotifyMessageW` reports a Win32 error.
     pub fn send_message(&self, message: BroadcastCommand) -> Result<()> {
         // Validate ChatCommandMacro range before encoding
-        if let BroadcastCommand::ChatCommandMacro(macro_id) = &message {
-            if !(1..=15).contains(macro_id) {
-                return Err(IRacingSDKError::Parse {
-                    context: "chat macro validation".to_string(),
-                    details: format!("macro id must be in range 1..=15, got {macro_id}"),
-                });
-            }
+        if let BroadcastCommand::ChatCommandMacro(macro_id) = &message
+            && !(1..=15).contains(macro_id)
+        {
+            return Err(IRacingSDKError::Parse {
+                context: "chat macro validation".to_string(),
+                details: format!("macro id must be in range 1..=15, got {macro_id}"),
+            });
         }
 
         let (broadcast_type, var1, var2, var3) = message.into();
