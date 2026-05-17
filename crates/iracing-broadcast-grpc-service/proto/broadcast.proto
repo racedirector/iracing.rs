@@ -167,7 +167,7 @@ message ForceFeedbackCommandResponse { float max_force = 1; }
 
 message ReplaySearchSessionTimeRequest {
   optional uint32 session_number = 1;
-  optional float session_time_ms = 2;
+  optional uint32 session_time_ms = 2;
 }
 message ReplaySearchSessionTimeResponse {}
 

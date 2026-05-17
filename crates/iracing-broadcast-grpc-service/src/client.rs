@@ -291,8 +291,6 @@ impl BroadcastGrpcClient {
         session_number: u16,
         session_time_ms: u32,
     ) -> BroadcastGrpcResult<ReplaySearchSessionTimeResponse> {
-        let session_time_ms = u32_as_proto_float("session_time_ms", session_time_ms)?;
-
         self.inner
             .replay_search_session_time(ReplaySearchSessionTimeRequest {
                 session_number: Some(u32::from(session_number)),
@@ -449,18 +447,6 @@ fn unsupported_sdk_enum(variant: &'static str) -> Status {
     Status::invalid_argument(format!("Unsupported broadcast enum variant: {variant}"))
 }
 
-fn u32_as_proto_float(field_name: &'static str, value: u32) -> BroadcastGrpcResult<f32> {
-    let encoded = value as f32;
-
-    if encoded as u32 == value {
-        Ok(encoded)
-    } else {
-        Err(Status::invalid_argument(format!(
-            "`{field_name}` cannot be represented by the broadcast protobuf float without changing value: {value}"
-        )))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -486,10 +472,5 @@ mod tests {
     #[test]
     fn rejects_unsupported_sdk_enum_variant() {
         assert!(replay_search_mode(iracing_sdk::ReplaySearchMode::Last).is_err());
-    }
-
-    #[test]
-    fn rejects_float_rounding_for_session_time() {
-        assert!(u32_as_proto_float("session_time_ms", 16_777_217).is_err());
     }
 }
