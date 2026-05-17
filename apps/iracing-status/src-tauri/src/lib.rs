@@ -9,6 +9,7 @@
 //! The observer state is registered with `Builder::manage` so command handlers
 //! can coordinate one background monitor for the app process.
 
+mod server;
 mod state;
 
 /// Configure and run the Tauri application.
@@ -27,10 +28,13 @@ mod state;
 pub fn run() {
     tauri::Builder::default()
         .manage(state::ConnectionStateObserver::default())
+        .manage(server::ServerManager::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             state::get_connection_state,
-            state::observe_connection_state
+            state::observe_connection_state,
+            server::get_server_state,
+            server::set_server_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -20,6 +20,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 iracing-sdk = { path = "../../../crates/iracing-sdk", default-features = false }
 iracing-simulation = { path = "../../../crates/iracing-simulation" }
+base64 = "0.22"
+ring = "0.17"
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }

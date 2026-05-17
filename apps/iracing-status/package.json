@@ -10,17 +10,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@react-navigation/material-top-tabs": "^7.4.27",
-    "@react-navigation/native": "^7.2.4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-native": "^0.85.3",
-    "react-native-pager-view": "^8.0.1",
-    "react-native-safe-area-context": "^5.7.0",
-    "react-native-screens": "^4.25.0",
-    "react-native-web": "^0.21.2"
+    "react-hook-form": "^7.75.0",
+    "react-router": "^7.15.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
