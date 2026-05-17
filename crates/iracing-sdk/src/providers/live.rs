@@ -5,6 +5,7 @@ use crate::{
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing mmap file.
+#[derive(Debug)]
 pub struct LiveProvider {
     connection: WindowsConnection,
     schema: Arc<VariableSchema>,

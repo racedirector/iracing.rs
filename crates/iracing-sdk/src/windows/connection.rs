@@ -144,6 +144,7 @@ pub enum WaitResult {
 }
 
 /// Direct connection to iRacing shared memory
+#[derive(Debug)]
 pub struct Connection {
     mapping: HANDLE,
     base: NonNull<u8>,
