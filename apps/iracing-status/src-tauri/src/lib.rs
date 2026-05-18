@@ -13,6 +13,9 @@ mod broadcast_client;
 mod server;
 mod state;
 
+use std::sync::Arc;
+use tauri::Manager;
+
 /// Configure and run the Tauri application.
 ///
 /// This is separated from `main.rs` by the default Tauri template so the app can
@@ -27,9 +30,17 @@ mod state;
 ///   connection-state observer.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let observer = Arc::new(state::ConnectionStateObserver::default());
+
     tauri::Builder::default()
-        .manage(state::ConnectionStateObserver::default())
-        .manage(server::ServerManager::default())
+        .setup(move |app| {
+            app.manage(Arc::clone(&observer));
+            app.manage(server::ServerManager::new(
+                app.handle().clone(),
+                Arc::clone(&observer),
+            ));
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             state::get_connection_state,

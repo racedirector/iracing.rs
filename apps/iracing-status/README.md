@@ -4,7 +4,19 @@ Tauri + React status app for local iRacing connection state.
 
 ## HTTP API Routes
 
-The source of truth for HTTP routes is [`openapi.yaml`](openapi.yaml). Do not add new HTTP routes directly to `src-tauri/src/server/http.rs`.
+The source of truth for HTTP routes is [`openapi.yaml`](docs/specs/openapi.yaml). Do not add new HTTP routes directly to `src-tauri/src/server/http.rs`.
+
+## WebSocket API Routes
+
+The source of truth for WebSocket routes is [`asyncapi.yaml`](docs/specs/asyncapi.yaml). Keep the documented route list there even when a route is only reserved for future implementation.
+
+Remote-client HTTP smoke checks are available as a Postman collection at
+[`postman/iracing-status.postman_collection.json`](postman/iracing-status.postman_collection.json).
+Import gRPC requests separately from
+[`postman/iracing-status-grpc.postman_collection.json`](postman/iracing-status-grpc.postman_collection.json)
+because Postman does not save gRPC requests into HTTP collections. Enable the
+matching transports in the app settings, then update the collection host and
+port variables.
 
 Route workflow:
 

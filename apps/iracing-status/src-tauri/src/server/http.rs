@@ -1,69 +1,54 @@
-use std::{
-    net::TcpListener,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::sync::Arc;
 
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
-    Router,
 };
 use axum_extra::extract::CookieJar;
 use headers::Host;
 use http::Method;
 use iracing_status_http_api::{
     apis::{
-        default::{Default as HttpApi, GetHealthResponse, GetRootResponse, GetSchemaResponse},
+        health::{GetHealthResponse, Health as HealthApi},
+        meta::{GetRootResponse, GetSchemaResponse, Meta as MetaApi},
+        status::{GetStatusResponse, Status as StatusApi},
         ErrorHandler,
     },
-    models::HealthResponse,
+    models::{ConnectionStateResponse, ConnectionStatus as HttpConnectionStatus, HealthResponse},
 };
 
 use super::{
     settings::TransportSettings,
-    transport::{start_listener_transport, ServerHandle, ACCEPT_POLL_INTERVAL},
+    transport::{start_axum_transport, ServerHandle},
 };
+use crate::state::{ConnectionStateObserver, ConnectionStatus, IRacingConnectionState};
 
-const OPENAPI_SCHEMA: &str = include_str!("../../../openapi.yaml");
+const OPENAPI_SCHEMA: &str = include_str!("../../../docs/specs/openapi.yaml");
 
-pub(super) fn start_http_server(settings: TransportSettings) -> Result<ServerHandle, String> {
-    start_listener_transport(settings, "HTTP", "http", run_http_server)
+pub(super) fn start_http_server(
+    settings: TransportSettings,
+    observer: Arc<ConnectionStateObserver>,
+) -> Result<ServerHandle, String> {
+    start_axum_transport(settings, "HTTP", "http", move |_shutdown| {
+        iracing_status_http_api::server::new(Arc::new(StatusHttpApi::new(Arc::clone(
+            &observer,
+        ))))
+        .fallback(not_found)
+    })
 }
 
-fn run_http_server(listener: TcpListener, shutdown: Arc<AtomicBool>) {
-    let Ok(runtime) = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    else {
-        return;
-    };
-
-    runtime.block_on(async move {
-        let Ok(listener) = tokio::net::TcpListener::from_std(listener) else {
-            return;
-        };
-
-        let _ = axum::serve(listener, router())
-            .with_graceful_shutdown(async move {
-                while !shutdown.load(Ordering::Acquire) {
-                    tokio::time::sleep(ACCEPT_POLL_INTERVAL).await;
-                }
-            })
-            .await;
-    });
+struct StatusHttpApi {
+    observer: Arc<ConnectionStateObserver>,
 }
 
-fn router() -> Router {
-    iracing_status_http_api::server::new(Arc::new(StatusHttpApi)).fallback(not_found)
+impl StatusHttpApi {
+    fn new(observer: Arc<ConnectionStateObserver>) -> Self {
+        Self { observer }
+    }
 }
-
-struct StatusHttpApi;
 
 #[async_trait::async_trait]
-impl HttpApi for StatusHttpApi {
+impl HealthApi for StatusHttpApi {
     async fn get_health(
         &self,
         _method: &Method,
@@ -76,7 +61,10 @@ impl HttpApi for StatusHttpApi {
             ),
         )
     }
+}
 
+#[async_trait::async_trait]
+impl MetaApi for StatusHttpApi {
     async fn get_root(
         &self,
         _method: &Method,
@@ -102,7 +90,37 @@ impl HttpApi for StatusHttpApi {
     }
 }
 
+#[async_trait::async_trait]
+impl StatusApi for StatusHttpApi {
+    async fn get_status(
+        &self,
+        _method: &Method,
+        _host: &Host,
+        _cookies: &CookieJar,
+    ) -> Result<GetStatusResponse, ()> {
+        Ok(GetStatusResponse::Status200_TheCurrentConnectionStateSnapshot(
+            map_connection_state(self.observer.current_state()),
+        ))
+    }
+}
+
 impl ErrorHandler for StatusHttpApi {}
+
+fn map_connection_state(state: IRacingConnectionState) -> ConnectionStateResponse {
+    ConnectionStateResponse::new(
+        map_connection_status(state.process),
+        map_connection_status(state.sim),
+        map_connection_status(state.telemetry),
+    )
+}
+
+fn map_connection_status(status: ConnectionStatus) -> HttpConnectionStatus {
+    match status {
+        ConnectionStatus::Disconnected => HttpConnectionStatus::Disconnected,
+        ConnectionStatus::Checking => HttpConnectionStatus::Checking,
+        ConnectionStatus::Connected => HttpConnectionStatus::Connected,
+    }
+}
 
 async fn not_found() -> Response {
     (StatusCode::NOT_FOUND, "Not found\n").into_response()

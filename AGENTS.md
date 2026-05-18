@@ -37,7 +37,7 @@ Compact guidance for future OpenCode sessions working in this repo.
 - Frame extraction is little-endian; always rely on `VarData::from_bytes` rather than manual decoding to avoid drift.
 - Session YAML parsing is cached via `SessionInfoParser`; reuse it when adding code so you don't reparse on every frame.
 - Live telemetry only compiles on Windows. Non-Windows builds will skip those modules, so gate new APIs and tests accordingly to preserve cross-platform builds.
-- For `apps/iracing-status` HTTP routes, update `apps/iracing-status/openapi.yaml` first, run `pnpm --dir apps/iracing-status run openapi:validate`, then run `pnpm --dir apps/iracing-status run openapi:generate`, and implement the generated trait methods in `apps/iracing-status/src-tauri/src/server/http.rs`. Treat `src-tauri/generated/http-api` as generated output; do not hand-edit route contracts there.
+- For `apps/iracing-status` HTTP routes, update `apps/iracing-status/docs/specs/openapi.yaml` first, run `pnpm --dir apps/iracing-status run openapi:validate`, then run `pnpm --dir apps/iracing-status run openapi:generate`, and implement the generated trait methods in `apps/iracing-status/src-tauri/src/server/http.rs`. Treat `src-tauri/generated/http-api` as generated output; do not hand-edit route contracts there.
 
 ## CI & Release
 

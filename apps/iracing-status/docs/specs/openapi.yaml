@@ -3,6 +3,8 @@ info:
   title: iRacing Status HTTP API
   version: 0.1.0
   description: Local HTTP API exposed by the iRacing Status app when the HTTP transport is enabled.
+  contact:
+    email: justin@treehousetechnology.io
 servers:
   - url: http://{host}:{port}
     description: Configurable local HTTP transport
@@ -13,12 +15,21 @@ servers:
       port:
         default: "32080"
         description: HTTP bind port from the app server settings.
+tags:
+  - name: meta
+    description: Service metadata and schema endpoints.
+  - name: health
+    description: Service health and readiness endpoints.
+  - name: status
+    description: Current iRacing connection lifecycle state.
 paths:
   /:
     get:
       operationId: getRoot
       summary: Service banner
       description: Returns a plain-text banner for the local HTTP server.
+      tags:
+        - meta
       responses:
         "200":
           description: HTTP server banner.
@@ -35,6 +46,8 @@ paths:
       operationId: getHealth
       summary: Health check
       description: Returns the static health status for the local HTTP server.
+      tags:
+        - health
       responses:
         "200":
           description: The HTTP server is running and able to respond.
@@ -49,11 +62,40 @@ paths:
                     service: iracing-status
         "404":
           $ref: "#/components/responses/NotFound"
+  /status:
+    get:
+      operationId: getStatus
+      summary: Full connection state
+      description: Returns the current iRacing connection lifecycle state maintained by the app.
+      tags:
+        - status
+      responses:
+        "200":
+          description: The current connection state snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionStateResponse"
+              examples:
+                disconnected:
+                  value:
+                    process: disconnected
+                    sim: disconnected
+                    telemetry: disconnected
+                connected:
+                  value:
+                    process: connected
+                    sim: connected
+                    telemetry: connected
+        "404":
+          $ref: "#/components/responses/NotFound"
   /schema:
     get:
       operationId: getSchema
       summary: OpenAPI schema
       description: Returns the OpenAPI schema that defines the local HTTP server.
+      tags:
+        - meta
       responses:
         "200":
           description: The OpenAPI schema for this HTTP server.
@@ -74,6 +116,27 @@ components:
             examples:
               - "Not found\n"
   schemas:
+    ConnectionStatus:
+      type: string
+      description: Status of one iRacing lifecycle checkpoint.
+      enum:
+        - disconnected
+        - checking
+        - connected
+    ConnectionStateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - process
+        - sim
+        - telemetry
+      properties:
+        process:
+          $ref: "#/components/schemas/ConnectionStatus"
+        sim:
+          $ref: "#/components/schemas/ConnectionStatus"
+        telemetry:
+          $ref: "#/components/schemas/ConnectionStatus"
     HealthResponse:
       type: object
       additionalProperties: false

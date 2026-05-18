@@ -34,6 +34,7 @@ use tauri::State;
 use crate::server::ServerManager;
 
 #[derive(Debug, Deserialize)]
+#[allow(clippy::enum_variant_names)]
 #[serde(tag = "message", content = "values")]
 pub enum BroadcastClientRequest {
     CameraSetStateRequest(CameraSetStateRequest),
@@ -263,6 +264,7 @@ pub enum VideoCaptureMode {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(clippy::enum_variant_names)]
 #[serde(tag = "message", content = "values")]
 pub enum BroadcastClientResponse {
     CameraSetStateResponse(CameraSetStateResponse),

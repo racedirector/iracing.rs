@@ -74,17 +74,29 @@ impl GrpcServices {
     }
 
     fn add_reflection_service(&mut self) -> Result<(), String> {
+        let reflection_v1 = self
+            .reflection_builder()
+            .build_v1()
+            .map_err(|error| format!("gRPC failed to initialize v1 reflection service: {error}"))?;
+        self.routes.add_service(reflection_v1);
+
+        let reflection_v1alpha = self
+            .reflection_builder()
+            .build_v1alpha()
+            .map_err(|error| {
+                format!("gRPC failed to initialize v1alpha reflection service: {error}")
+            })?;
+        self.routes.add_service(reflection_v1alpha);
+
+        Ok(())
+    }
+
+    fn reflection_builder(&self) -> tonic_reflection::server::Builder<'static> {
         let mut builder = tonic_reflection::server::Builder::configure();
         for descriptor_set in &self.reflection_descriptor_sets {
             builder = builder.register_encoded_file_descriptor_set(descriptor_set);
         }
-
-        let reflection = builder
-            .build_v1()
-            .map_err(|error| format!("gRPC failed to initialize reflection service: {error}"))?;
-        self.routes.add_service(reflection);
-
-        Ok(())
+        builder
     }
 
     fn into_routes(self) -> GrpcRoutes {

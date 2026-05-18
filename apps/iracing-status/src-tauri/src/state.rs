@@ -31,6 +31,7 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
+use tokio::sync::watch;
 
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
@@ -87,26 +88,52 @@ const SIM_STATUS_TIMEOUT: Duration = Duration::from_millis(250);
 pub struct ConnectionStateObserver {
     started: AtomicBool,
     state: Arc<Mutex<IRacingConnectionState>>,
+    updates: watch::Sender<IRacingConnectionState>,
 }
 
 impl Default for ConnectionStateObserver {
     fn default() -> Self {
+        let initial_state = IRacingConnectionState::waiting_for_process();
+        let (updates, _) = watch::channel(initial_state);
         Self {
             started: AtomicBool::new(false),
-            state: Arc::new(Mutex::new(IRacingConnectionState::waiting_for_process())),
+            state: Arc::new(Mutex::new(initial_state)),
+            updates,
         }
     }
 }
 
 impl ConnectionStateObserver {
     /// Return the last snapshot published by the background monitor.
-    fn current_state(&self) -> IRacingConnectionState {
+    pub fn current_state(&self) -> IRacingConnectionState {
         *lock_state(&self.state)
     }
 
     /// Clone the shared snapshot handle for use by the monitor thread.
     fn state_handle(&self) -> Arc<Mutex<IRacingConnectionState>> {
         Arc::clone(&self.state)
+    }
+
+    /// Subscribe to connection-state updates.
+    pub fn subscribe(&self) -> watch::Receiver<IRacingConnectionState> {
+        self.updates.subscribe()
+    }
+
+    /// Ensure the background monitor is running and return the current snapshot.
+    pub fn ensure_started(&self, app: AppHandle) -> IRacingConnectionState {
+        let current_state = self.current_state();
+
+        if self
+            .started
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+        {
+            let state = self.state_handle();
+            let updates = self.updates.clone();
+            let _ = thread::spawn(move || monitor_connection_state(app, state, updates));
+        }
+
+        current_state
     }
 }
 
@@ -213,7 +240,7 @@ impl IRacingConnectionState {
 /// connection.
 #[tauri::command]
 pub fn get_connection_state(
-    observer: State<'_, ConnectionStateObserver>,
+    observer: State<'_, Arc<ConnectionStateObserver>>,
 ) -> IRacingConnectionState {
     observer.current_state()
 }
@@ -234,20 +261,9 @@ pub fn get_connection_state(
 #[tauri::command]
 pub fn observe_connection_state(
     app: AppHandle,
-    observer: State<'_, ConnectionStateObserver>,
+    observer: State<'_, Arc<ConnectionStateObserver>>,
 ) -> IRacingConnectionState {
-    let current_state = observer.current_state();
-
-    if observer
-        .started
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_ok()
-    {
-        let state = observer.state_handle();
-        let _ = thread::spawn(move || monitor_connection_state(app, state));
-    }
-
-    current_state
+    observer.ensure_started(app)
 }
 
 /// Run the owned lifecycle monitor.
@@ -255,13 +271,22 @@ pub fn observe_connection_state(
 /// The Windows implementation owns the real state machine and telemetry
 /// connection. The non-Windows implementation publishes a stable disconnected
 /// state so the example remains buildable and understandable on every platform.
-fn monitor_connection_state(app: AppHandle, state: Arc<Mutex<IRacingConnectionState>>) {
+fn monitor_connection_state(
+    app: AppHandle,
+    state: Arc<Mutex<IRacingConnectionState>>,
+    updates: watch::Sender<IRacingConnectionState>,
+) {
     #[cfg(windows)]
-    monitor_windows_connection_state(app, state);
+    monitor_windows_connection_state(app, state, updates);
 
     #[cfg(not(windows))]
     {
-        publish_state(&app, &state, IRacingConnectionState::disconnected());
+        publish_state(
+            &app,
+            &state,
+            &updates,
+            IRacingConnectionState::disconnected(),
+        );
         loop {
             thread::sleep(POLL_INTERVAL);
         }
@@ -276,6 +301,7 @@ fn monitor_connection_state(app: AppHandle, state: Arc<Mutex<IRacingConnectionSt
 fn publish_state(
     app: &AppHandle,
     state: &Arc<Mutex<IRacingConnectionState>>,
+    updates: &watch::Sender<IRacingConnectionState>,
     next_state: IRacingConnectionState,
 ) {
     let changed = {
@@ -289,6 +315,7 @@ fn publish_state(
     };
 
     if changed {
+        let _ = updates.send(next_state);
         let _ = app.emit(CONNECTION_STATE_CHANGED_EVENT, next_state);
     }
 }
@@ -343,18 +370,22 @@ enum MonitorPhase {
 /// lifecycle while avoiding repeated process checks, repeated sim-status checks,
 /// and repeated telemetry connections once the backend has a live connection.
 #[cfg(windows)]
-fn monitor_windows_connection_state(app: AppHandle, state: Arc<Mutex<IRacingConnectionState>>) {
+fn monitor_windows_connection_state(
+    app: AppHandle,
+    state: Arc<Mutex<IRacingConnectionState>>,
+    updates: watch::Sender<IRacingConnectionState>,
+) {
     let mut phase = MonitorPhase::WaitingForProcess;
 
     loop {
         phase = match phase {
-            MonitorPhase::WaitingForProcess => wait_for_process(&app, &state),
+            MonitorPhase::WaitingForProcess => wait_for_process(&app, &state, &updates),
             MonitorPhase::WaitingForSimulation { simulation } => {
-                wait_for_simulation(&app, &state, simulation)
+                wait_for_simulation(&app, &state, &updates, simulation)
             }
-            MonitorPhase::WaitingForTelemetry => wait_for_telemetry(&app, &state),
+            MonitorPhase::WaitingForTelemetry => wait_for_telemetry(&app, &state, &updates),
             MonitorPhase::Connected { connection } => {
-                monitor_telemetry_connection(&app, &state, connection)
+                monitor_telemetry_connection(&app, &state, &updates, connection)
             }
         };
 
@@ -364,20 +395,34 @@ fn monitor_windows_connection_state(app: AppHandle, state: Arc<Mutex<IRacingConn
 
 /// Check only for the iRacing process until it is observed.
 #[cfg(windows)]
-fn wait_for_process(app: &AppHandle, state: &Arc<Mutex<IRacingConnectionState>>) -> MonitorPhase {
+fn wait_for_process(
+    app: &AppHandle,
+    state: &Arc<Mutex<IRacingConnectionState>>,
+    updates: &watch::Sender<IRacingConnectionState>,
+) -> MonitorPhase {
     match is_iracing_process_running() {
         Ok(true) => {
-            publish_state(app, state, IRacingConnectionState::waiting_for_sim());
+            publish_state(
+                app,
+                state,
+                updates,
+                IRacingConnectionState::waiting_for_sim(),
+            );
             MonitorPhase::WaitingForSimulation {
                 simulation: Simulation::local().with_timeout(SIM_STATUS_TIMEOUT),
             }
         }
         Ok(false) => {
-            publish_state(app, state, IRacingConnectionState::disconnected());
+            publish_state(app, state, updates, IRacingConnectionState::disconnected());
             MonitorPhase::WaitingForProcess
         }
         Err(_) => {
-            publish_state(app, state, IRacingConnectionState::waiting_for_process());
+            publish_state(
+                app,
+                state,
+                updates,
+                IRacingConnectionState::waiting_for_process(),
+            );
             MonitorPhase::WaitingForProcess
         }
     }
@@ -392,13 +437,24 @@ fn wait_for_process(app: &AppHandle, state: &Arc<Mutex<IRacingConnectionState>>)
 fn wait_for_simulation(
     app: &AppHandle,
     state: &Arc<Mutex<IRacingConnectionState>>,
+    updates: &watch::Sender<IRacingConnectionState>,
     simulation: Simulation,
 ) -> MonitorPhase {
     if simulation.check_sim_status() {
-        publish_state(app, state, IRacingConnectionState::waiting_for_telemetry());
+        publish_state(
+            app,
+            state,
+            updates,
+            IRacingConnectionState::waiting_for_telemetry(),
+        );
         MonitorPhase::WaitingForTelemetry
     } else {
-        publish_state(app, state, IRacingConnectionState::waiting_for_process());
+        publish_state(
+            app,
+            state,
+            updates,
+            IRacingConnectionState::waiting_for_process(),
+        );
         MonitorPhase::WaitingForProcess
     }
 }
@@ -409,14 +465,23 @@ fn wait_for_simulation(
 /// steps back to sim-status checking so the monitor can confirm that the
 /// prerequisite is still present before attempting telemetry again.
 #[cfg(windows)]
-fn wait_for_telemetry(app: &AppHandle, state: &Arc<Mutex<IRacingConnectionState>>) -> MonitorPhase {
+fn wait_for_telemetry(
+    app: &AppHandle,
+    state: &Arc<Mutex<IRacingConnectionState>>,
+    updates: &watch::Sender<IRacingConnectionState>,
+) -> MonitorPhase {
     match WindowsConnection::try_connect() {
         Ok(connection) if connection.is_connected() => {
-            publish_state(app, state, IRacingConnectionState::connected());
+            publish_state(app, state, updates, IRacingConnectionState::connected());
             MonitorPhase::Connected { connection }
         }
         Ok(_) | Err(_) => {
-            publish_state(app, state, IRacingConnectionState::waiting_for_sim());
+            publish_state(
+                app,
+                state,
+                updates,
+                IRacingConnectionState::waiting_for_sim(),
+            );
             MonitorPhase::WaitingForSimulation {
                 simulation: Simulation::local().with_timeout(SIM_STATUS_TIMEOUT),
             }
@@ -436,10 +501,11 @@ fn wait_for_telemetry(app: &AppHandle, state: &Arc<Mutex<IRacingConnectionState>
 fn monitor_telemetry_connection(
     app: &AppHandle,
     state: &Arc<Mutex<IRacingConnectionState>>,
+    updates: &watch::Sender<IRacingConnectionState>,
     connection: WindowsConnection,
 ) -> MonitorPhase {
     if connection.is_connected() {
-        publish_state(app, state, IRacingConnectionState::connected());
+        publish_state(app, state, updates, IRacingConnectionState::connected());
         return MonitorPhase::Connected { connection };
     }
 
@@ -447,10 +513,20 @@ fn monitor_telemetry_connection(
 
     let simulation = Simulation::local().with_timeout(SIM_STATUS_TIMEOUT);
     if simulation.check_sim_status() {
-        publish_state(app, state, IRacingConnectionState::waiting_for_telemetry());
+        publish_state(
+            app,
+            state,
+            updates,
+            IRacingConnectionState::waiting_for_telemetry(),
+        );
         return MonitorPhase::WaitingForTelemetry;
     }
 
-    publish_state(app, state, IRacingConnectionState::waiting_for_process());
+    publish_state(
+        app,
+        state,
+        updates,
+        IRacingConnectionState::waiting_for_process(),
+    );
     MonitorPhase::WaitingForProcess
 }

@@ -6,7 +6,7 @@
     "generators": {
       "iracing-status-http": {
         "generatorName": "rust-axum",
-        "inputSpec": "openapi.yaml",
+        "inputSpec": "docs/specs/openapi.yaml",
         "output": "src-tauri/generated/http-api",
         "additionalProperties": {
           "packageName": "iracing_status_http_api",

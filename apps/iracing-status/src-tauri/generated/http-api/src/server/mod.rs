@@ -20,54 +20,86 @@ use crate::{
     models::check_xss_string, models::check_xss_vec_string,
 };
 
+
 /// Setup API Server.
 pub fn new<I, A, E>(api_impl: I) -> Router
 where
     I: AsRef<A> + Clone + Send + Sync + 'static,
-    A: apis::default::Default<E> + Send + Sync + 'static,
+    A: apis::health::Health<E> + apis::meta::Meta<E> + apis::status::Status<E> + Send + Sync + 'static,
     E: std::fmt::Debug + Send + Sync + 'static,
+    
 {
     // build our application with a route
     Router::new()
-        .route("/", get(get_root::<I, A, E>))
-        .route("/health", get(get_health::<I, A, E>))
-        .route("/schema", get(get_schema::<I, A, E>))
+        .route("/",
+            get(get_root::<I, A, E>)
+        )
+        .route("/health",
+            get(get_health::<I, A, E>)
+        )
+        .route("/schema",
+            get(get_schema::<I, A, E>)
+        )
+        .route("/status",
+            get(get_status::<I, A, E>)
+        )
         .with_state(api_impl)
 }
 
+
 #[tracing::instrument(skip_all)]
-fn get_health_validation() -> std::result::Result<(), ValidationErrors> {
-    Ok(())
+fn get_health_validation(
+) -> std::result::Result<(
+), ValidationErrors>
+{
+
+Ok((
+))
 }
 /// GetHealth - GET /health
 #[tracing::instrument(skip_all)]
 async fn get_health<I, A, E>(
-    method: Method,
-    TypedHeader(host): TypedHeader<Host>,
-    cookies: CookieJar,
-    State(api_impl): State<I>,
+  method: Method,
+  TypedHeader(host): TypedHeader<Host>,
+  cookies: CookieJar,
+ State(api_impl): State<I>,
 ) -> Result<Response, StatusCode>
 where
     I: AsRef<A> + Send + Sync,
-    A: apis::default::Default<E> + Send + Sync,
+    A: apis::health::Health<E> + Send + Sync,
     E: std::fmt::Debug + Send + Sync + 'static,
-{
-    let validation = get_health_validation();
+        {
 
-    let Ok(()) = validation else {
-        return Response::builder()
+
+
+
+      let validation =
+    get_health_validation(
+    )
+  ;
+
+  let Ok((
+  )) = validation else {
+    return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(validation.unwrap_err().to_string()))
             .map_err(|_| StatusCode::BAD_REQUEST);
-    };
+  };
 
-    let result = api_impl.as_ref().get_health(&method, &host, &cookies).await;
 
-    let mut response = Response::builder();
 
-    let resp = match result {
+let result = api_impl.as_ref().get_health(
+      
+      &method,
+      &host,
+      &cookies,
+  ).await;
+
+  let mut response = Response::builder();
+
+  let resp = match result {
                                             Ok(rsp) => match rsp {
-                                                apis::default::GetHealthResponse::Status200_TheHTTPServerIsRunningAndAbleToRespond
+                                                apis::health::GetHealthResponse::Status200_TheHTTPServerIsRunningAndAbleToRespond
                                                     (body)
                                                 => {
                                                   let mut response = response.status(200);
@@ -85,7 +117,7 @@ where
                                                       })?;
                                                   response.body(Body::from(body_content))
                                                 },
-                                                apis::default::GetHealthResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
+                                                apis::health::GetHealthResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
                                                     (body)
                                                 => {
                                                   let mut response = response.status(404);
@@ -107,45 +139,64 @@ where
                                             },
                                         };
 
-    resp.map_err(|e| {
-        error!(error = ?e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+
+                                        resp.map_err(|e| { error!(error = ?e); StatusCode::INTERNAL_SERVER_ERROR })
 }
 
+
 #[tracing::instrument(skip_all)]
-fn get_root_validation() -> std::result::Result<(), ValidationErrors> {
-    Ok(())
+fn get_root_validation(
+) -> std::result::Result<(
+), ValidationErrors>
+{
+
+Ok((
+))
 }
 /// GetRoot - GET /
 #[tracing::instrument(skip_all)]
 async fn get_root<I, A, E>(
-    method: Method,
-    TypedHeader(host): TypedHeader<Host>,
-    cookies: CookieJar,
-    State(api_impl): State<I>,
+  method: Method,
+  TypedHeader(host): TypedHeader<Host>,
+  cookies: CookieJar,
+ State(api_impl): State<I>,
 ) -> Result<Response, StatusCode>
 where
     I: AsRef<A> + Send + Sync,
-    A: apis::default::Default<E> + Send + Sync,
+    A: apis::meta::Meta<E> + Send + Sync,
     E: std::fmt::Debug + Send + Sync + 'static,
-{
-    let validation = get_root_validation();
+        {
 
-    let Ok(()) = validation else {
-        return Response::builder()
+
+
+
+      let validation =
+    get_root_validation(
+    )
+  ;
+
+  let Ok((
+  )) = validation else {
+    return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(validation.unwrap_err().to_string()))
             .map_err(|_| StatusCode::BAD_REQUEST);
-    };
+  };
 
-    let result = api_impl.as_ref().get_root(&method, &host, &cookies).await;
 
-    let mut response = Response::builder();
 
-    let resp = match result {
+let result = api_impl.as_ref().get_root(
+      
+      &method,
+      &host,
+      &cookies,
+  ).await;
+
+  let mut response = Response::builder();
+
+  let resp = match result {
                                             Ok(rsp) => match rsp {
-                                                apis::default::GetRootResponse::Status200_HTTPServerBanner
+                                                apis::meta::GetRootResponse::Status200_HTTPServerBanner
                                                     (body)
                                                 => {
                                                   let mut response = response.status(200);
@@ -159,7 +210,7 @@ where
                                                   let body_content = body;
                                                   response.body(Body::from(body_content))
                                                 },
-                                                apis::default::GetRootResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
+                                                apis::meta::GetRootResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
                                                     (body)
                                                 => {
                                                   let mut response = response.status(404);
@@ -181,45 +232,64 @@ where
                                             },
                                         };
 
-    resp.map_err(|e| {
-        error!(error = ?e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+
+                                        resp.map_err(|e| { error!(error = ?e); StatusCode::INTERNAL_SERVER_ERROR })
 }
 
+
 #[tracing::instrument(skip_all)]
-fn get_schema_validation() -> std::result::Result<(), ValidationErrors> {
-    Ok(())
+fn get_schema_validation(
+) -> std::result::Result<(
+), ValidationErrors>
+{
+
+Ok((
+))
 }
 /// GetSchema - GET /schema
 #[tracing::instrument(skip_all)]
 async fn get_schema<I, A, E>(
-    method: Method,
-    TypedHeader(host): TypedHeader<Host>,
-    cookies: CookieJar,
-    State(api_impl): State<I>,
+  method: Method,
+  TypedHeader(host): TypedHeader<Host>,
+  cookies: CookieJar,
+ State(api_impl): State<I>,
 ) -> Result<Response, StatusCode>
 where
     I: AsRef<A> + Send + Sync,
-    A: apis::default::Default<E> + Send + Sync,
+    A: apis::meta::Meta<E> + Send + Sync,
     E: std::fmt::Debug + Send + Sync + 'static,
-{
-    let validation = get_schema_validation();
+        {
 
-    let Ok(()) = validation else {
-        return Response::builder()
+
+
+
+      let validation =
+    get_schema_validation(
+    )
+  ;
+
+  let Ok((
+  )) = validation else {
+    return Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from(validation.unwrap_err().to_string()))
             .map_err(|_| StatusCode::BAD_REQUEST);
-    };
+  };
 
-    let result = api_impl.as_ref().get_schema(&method, &host, &cookies).await;
 
-    let mut response = Response::builder();
 
-    let resp = match result {
+let result = api_impl.as_ref().get_schema(
+      
+      &method,
+      &host,
+      &cookies,
+  ).await;
+
+  let mut response = Response::builder();
+
+  let resp = match result {
                                             Ok(rsp) => match rsp {
-                                                apis::default::GetSchemaResponse::Status200_TheOpenAPISchemaForThisHTTPServer
+                                                apis::meta::GetSchemaResponse::Status200_TheOpenAPISchemaForThisHTTPServer
                                                     (body)
                                                 => {
                                                   let mut response = response.status(200);
@@ -233,7 +303,7 @@ where
                                                   let body_content = body;
                                                   response.body(Body::from(body_content))
                                                 },
-                                                apis::default::GetSchemaResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
+                                                apis::meta::GetSchemaResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
                                                     (body)
                                                 => {
                                                   let mut response = response.status(404);
@@ -255,17 +325,113 @@ where
                                             },
                                         };
 
-    resp.map_err(|e| {
-        error!(error = ?e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+
+                                        resp.map_err(|e| { error!(error = ?e); StatusCode::INTERNAL_SERVER_ERROR })
 }
+
+
+#[tracing::instrument(skip_all)]
+fn get_status_validation(
+) -> std::result::Result<(
+), ValidationErrors>
+{
+
+Ok((
+))
+}
+/// GetStatus - GET /status
+#[tracing::instrument(skip_all)]
+async fn get_status<I, A, E>(
+  method: Method,
+  TypedHeader(host): TypedHeader<Host>,
+  cookies: CookieJar,
+ State(api_impl): State<I>,
+) -> Result<Response, StatusCode>
+where
+    I: AsRef<A> + Send + Sync,
+    A: apis::status::Status<E> + Send + Sync,
+    E: std::fmt::Debug + Send + Sync + 'static,
+        {
+
+
+
+
+      let validation =
+    get_status_validation(
+    )
+  ;
+
+  let Ok((
+  )) = validation else {
+    return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(Body::from(validation.unwrap_err().to_string()))
+            .map_err(|_| StatusCode::BAD_REQUEST);
+  };
+
+
+
+let result = api_impl.as_ref().get_status(
+      
+      &method,
+      &host,
+      &cookies,
+  ).await;
+
+  let mut response = Response::builder();
+
+  let resp = match result {
+                                            Ok(rsp) => match rsp {
+                                                apis::status::GetStatusResponse::Status200_TheCurrentConnectionStateSnapshot
+                                                    (body)
+                                                => {
+                                                  let mut response = response.status(200);
+                                                  {
+                                                    let mut response_headers = response.headers_mut().unwrap();
+                                                    response_headers.insert(
+                                                        CONTENT_TYPE,
+                                                        HeaderValue::from_static("application/json"));
+                                                  }
+
+                                                  let body_content =
+                                                      serde_json::to_vec(&body).map_err(|e| {
+                                                        error!(error = ?e);
+                                                        StatusCode::INTERNAL_SERVER_ERROR
+                                                      })?;
+                                                  response.body(Body::from(body_content))
+                                                },
+                                                apis::status::GetStatusResponse::Status404_NoHTTPEndpointIsRegisteredForTheRequestedPath
+                                                    (body)
+                                                => {
+                                                  let mut response = response.status(404);
+                                                  {
+                                                    let mut response_headers = response.headers_mut().unwrap();
+                                                    response_headers.insert(
+                                                        CONTENT_TYPE,
+                                                        HeaderValue::from_static("text/plain"));
+                                                  }
+
+                                                  let body_content = body;
+                                                  response.body(Body::from(body_content))
+                                                },
+                                            },
+                                            Err(why) => {
+                                                    // Application code returned an error. This should not happen, as the implementation should
+                                                    // return a valid response.
+                                                    return api_impl.as_ref().handle_error(&method, &host, &cookies, why).await;
+                                            },
+                                        };
+
+
+                                        resp.map_err(|e| { error!(error = ?e); StatusCode::INTERNAL_SERVER_ERROR })
+}
+
 
 #[allow(dead_code)]
 #[inline]
 fn response_with_status_code_only(code: StatusCode) -> Result<Response, StatusCode> {
-    Response::builder()
-        .status(code)
-        .body(Body::empty())
-        .map_err(|_| code)
+   Response::builder()
+          .status(code)
+          .body(Body::empty())
+          .map_err(|_| code)
 }

@@ -8,6 +8,8 @@ use std::{
     time::Duration,
 };
 
+use axum::Router;
+
 use super::settings::{TransportRuntimeStatus, TransportSettings};
 
 pub(super) const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -38,6 +40,17 @@ pub(super) fn start_listener_transport(
     })
 }
 
+pub(super) fn start_axum_transport(
+    settings: TransportSettings,
+    label: &str,
+    scheme: &str,
+    build_router: impl FnOnce(Arc<AtomicBool>) -> Router + Send + 'static,
+) -> Result<ServerHandle, String> {
+    start_listener_transport(settings, label, scheme, move |listener, shutdown| {
+        run_axum_transport(listener, shutdown, build_router);
+    })
+}
+
 pub(super) fn stop_transport(handle: &mut Option<ServerHandle>) {
     if let Some(mut handle) = handle.take() {
         handle.shutdown.store(true, Ordering::Release);
@@ -64,4 +77,32 @@ fn bind_listener(settings: &TransportSettings, label: &str) -> Result<TcpListene
         .set_nonblocking(true)
         .map_err(|error| format!("{label} failed to enter non-blocking mode: {error}"))?;
     Ok(listener)
+}
+
+fn run_axum_transport(
+    listener: TcpListener,
+    shutdown: Arc<AtomicBool>,
+    build_router: impl FnOnce(Arc<AtomicBool>) -> Router,
+) {
+    let Ok(runtime) = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    else {
+        return;
+    };
+
+    runtime.block_on(async move {
+        let Ok(listener) = tokio::net::TcpListener::from_std(listener) else {
+            return;
+        };
+
+        let router = build_router(Arc::clone(&shutdown));
+        let _ = axum::serve(listener, router)
+            .with_graceful_shutdown(async move {
+                while !shutdown.load(Ordering::Acquire) {
+                    tokio::time::sleep(ACCEPT_POLL_INTERVAL).await;
+                }
+            })
+            .await;
+    });
 }

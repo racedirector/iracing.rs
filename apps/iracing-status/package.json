@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "openapi:clean": "node -e \"require('node:fs').rmSync('src-tauri/generated/http-api',{recursive:true,force:true})\"",
     "openapi:generate": "pnpm run openapi:clean && openapi-generator-cli generate --generator-key iracing-status-http",
-    "openapi:validate": "openapi-generator-cli validate -i openapi.yaml",
+    "openapi:validate": "openapi-generator-cli validate -i docs/specs/openapi.yaml",
     "openapi:version": "openapi-generator-cli version",
     "preview": "vite preview",
     "tauri": "tauri"

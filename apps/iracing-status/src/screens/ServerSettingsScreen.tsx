@@ -19,7 +19,6 @@ type ServerSection = "general" | TransportKey;
 type ServerNavigationItem = {
   key: ServerSection;
   label: string;
-  disabled: boolean;
 };
 
 const transportLabels: Record<TransportKey, string> = {
@@ -91,7 +90,7 @@ export function ServerSettingsScreen() {
     applySettings(draftSettings, transport);
   }
 
-  const navigationItems = getNavigationItems(draftSettings);
+  const navigationItems = getNavigationItems();
 
   return (
     <section className="server-screen" aria-labelledby="server-screen-title">
@@ -119,7 +118,6 @@ export function ServerSettingsScreen() {
                   ? "server-sidebar__item server-sidebar__item--active"
                   : "server-sidebar__item"
               }
-              disabled={item.disabled}
               key={item.key}
               onClick={() => setActiveSection(item.key)}
               type="button"
@@ -358,24 +356,12 @@ function ServerStatusSummary({ serverState }: { serverState: ServerState }) {
   );
 }
 
-function getNavigationItems(settings: ServerSettings): ServerNavigationItem[] {
+function getNavigationItems(): ServerNavigationItem[] {
   return [
-    { key: "general", label: "General", disabled: false },
-    {
-      key: "http",
-      label: "HTTP",
-      disabled: !settings.general.httpEnabled,
-    },
-    {
-      key: "websocket",
-      label: "WebSocket",
-      disabled: !settings.general.websocketEnabled,
-    },
-    {
-      key: "grpc",
-      label: "gRPC",
-      disabled: !settings.general.grpcEnabled,
-    },
+    { key: "general", label: "General" },
+    { key: "http", label: "HTTP" },
+    { key: "websocket", label: "WebSocket" },
+    { key: "grpc", label: "gRPC" },
   ];
 }
 

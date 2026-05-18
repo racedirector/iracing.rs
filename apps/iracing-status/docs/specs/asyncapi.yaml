@@ -1,0 +1,140 @@
+asyncapi: 3.0.0
+info:
+  title: iRacing Status WebSocket API
+  version: 0.1.0
+  description: Local WebSocket API exposed by the iRacing Status app when the WebSocket transport is enabled.
+servers:
+  local:
+    host: "{host}:{port}"
+    protocol: ws
+    description: Configurable local WebSocket transport
+    variables:
+      host:
+        default: 127.0.0.1
+        description: WebSocket bind host from the app server settings.
+      port:
+        default: "32081"
+        description: WebSocket bind port from the app server settings.
+channels:
+  /status:
+    address: /status
+    messages:
+      connectionState:
+        $ref: "#/components/messages/ConnectionStateMessage"
+  /session:
+    address: /session
+    messages:
+      sessionSnapshot:
+        $ref: "#/components/messages/SessionSnapshotMessage"
+  /telemetry:
+    address: /telemetry
+    messages:
+      telemetrySnapshot:
+        $ref: "#/components/messages/TelemetrySnapshotMessage"
+  /capabilities:
+    address: /capabilities
+    messages:
+      capabilitiesSnapshot:
+        $ref: "#/components/messages/CapabilitiesSnapshotMessage"
+  /available-schema:
+    address: /available-schema
+    messages:
+      availableSchemaSnapshot:
+        $ref: "#/components/messages/AvailableSchemaSnapshotMessage"
+operations:
+  receiveConnectionState:
+    action: receive
+    channel:
+      $ref: "#/channels/~1status"
+    summary: Stream connection-state snapshots to subscribed listeners.
+    messages:
+      - $ref: "#/channels/~1status/messages/connectionState"
+  receiveSessionSnapshot:
+    action: receive
+    channel:
+      $ref: "#/channels/~1session"
+    summary: Reserved for future session snapshot streaming.
+    messages:
+      - $ref: "#/channels/~1session/messages/sessionSnapshot"
+  receiveTelemetrySnapshot:
+    action: receive
+    channel:
+      $ref: "#/channels/~1telemetry"
+    summary: Reserved for future telemetry snapshot streaming.
+    messages:
+      - $ref: "#/channels/~1telemetry/messages/telemetrySnapshot"
+  receiveCapabilitiesSnapshot:
+    action: receive
+    channel:
+      $ref: "#/channels/~1capabilities"
+    summary: Reserved for future capability announcements.
+    messages:
+      - $ref: "#/channels/~1capabilities/messages/capabilitiesSnapshot"
+  receiveAvailableSchemaSnapshot:
+    action: receive
+    channel:
+      $ref: "#/channels/~1available-schema"
+    summary: Reserved for future available-schema announcements.
+    messages:
+      - $ref: "#/channels/~1available-schema/messages/availableSchemaSnapshot"
+components:
+  messages:
+    ConnectionStateMessage:
+      name: connectionState
+      title: Connection state snapshot
+      payload:
+        $ref: "#/components/schemas/IRacingConnectionState"
+    SessionSnapshotMessage:
+      name: sessionSnapshot
+      title: Session snapshot
+      payload:
+        $ref: "#/components/schemas/ReservedSnapshot"
+    TelemetrySnapshotMessage:
+      name: telemetrySnapshot
+      title: Telemetry snapshot
+      payload:
+        $ref: "#/components/schemas/ReservedSnapshot"
+    CapabilitiesSnapshotMessage:
+      name: capabilitiesSnapshot
+      title: Capabilities snapshot
+      payload:
+        $ref: "#/components/schemas/ReservedSnapshot"
+    AvailableSchemaSnapshotMessage:
+      name: availableSchemaSnapshot
+      title: Available schema snapshot
+      payload:
+        $ref: "#/components/schemas/ReservedSnapshot"
+  schemas:
+    ConnectionStatus:
+      type: string
+      enum:
+        - disconnected
+        - checking
+        - connected
+    IRacingConnectionState:
+      type: object
+      additionalProperties: false
+      required:
+        - process
+        - sim
+        - telemetry
+      properties:
+        process:
+          $ref: "#/components/schemas/ConnectionStatus"
+        sim:
+          $ref: "#/components/schemas/ConnectionStatus"
+        telemetry:
+          $ref: "#/components/schemas/ConnectionStatus"
+    ReservedSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - implemented
+      properties:
+        implemented:
+          type: boolean
+          enum:
+            - false
+        route:
+          type: string
+          description: Reserved route identifier.

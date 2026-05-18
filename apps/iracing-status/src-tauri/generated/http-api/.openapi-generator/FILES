@@ -2,8 +2,10 @@
 .openapi-generator-ignore
 Cargo.toml
 README.md
-src/apis/default.rs
+src/apis/health.rs
+src/apis/meta.rs
 src/apis/mod.rs
+src/apis/status.rs
 src/header.rs
 src/lib.rs
 src/models.rs
