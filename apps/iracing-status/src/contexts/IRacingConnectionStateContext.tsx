@@ -7,25 +7,33 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import {
-  CONNECTION_STATE_CHANGED_EVENT,
-  disconnectedConnectionState,
-  initialConnectionState,
-  type IRacingConnectionState,
-} from "../connection";
+
+export const CONNECTION_STATE_CHANGED_EVENT =
+  "iracing://connection-state-changed";
+export type ConnectionStatus = "disconnected" | "checking" | "connected";
+
+export type IRacingConnectionState = {
+  process: ConnectionStatus;
+  sim: ConnectionStatus;
+  telemetry: ConnectionStatus;
+};
 
 const IRacingConnectionStateContext =
   createContext<IRacingConnectionState | null>(null);
 
-type IRacingConnectionStateProviderProps = {
+interface IRacingConnectionStateProviderProps {
   children: ReactNode;
-};
+}
 
 export function IRacingConnectionStateProvider({
   children,
 }: IRacingConnectionStateProviderProps) {
   const [connectionState, setConnectionState] =
-    useState<IRacingConnectionState>(initialConnectionState);
+    useState<IRacingConnectionState>({
+      process: "checking",
+      sim: "disconnected",
+      telemetry: "disconnected",
+    });
 
   useEffect(() => {
     let isMounted = true;
@@ -57,7 +65,11 @@ export function IRacingConnectionStateProvider({
         }
       } catch {
         if (isMounted) {
-          setConnectionState(disconnectedConnectionState);
+          setConnectionState({
+            process: "disconnected",
+            sim: "disconnected",
+            telemetry: "disconnected",
+          });
         }
       }
     }
