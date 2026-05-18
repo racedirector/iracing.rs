@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { IbtFileForm } from "../components/IbtFileForm";
 import { useServerState } from "../contexts/ServerStateContext";
 import {
   defaultServerState,
   formatTransportStatus,
   getTransportEnabled,
   setTransportEnabled,
+  type ServerDataSourceSettings,
   type ServerSettings,
   type ServerState,
   type TransportKey,
@@ -32,9 +34,15 @@ const transportDescriptions: Record<TransportKey, string> = {
   grpc: "Serves iRacing broadcast controls over tonic gRPC.",
 };
 
-export function ServerScreen() {
-  const { applyServerSettings, error, isLoading, isSaving, serverState } =
-    useServerState();
+export function ServerSettingsScreen() {
+  const {
+    applyServerSettings,
+    error,
+    isLoading,
+    isSaving,
+    serverState,
+    setDataSourceSettings,
+  } = useServerState();
   const [activeSection, setActiveSection] = useState<ServerSection>("general");
   const [draftSettings, setDraftSettings] = useState<ServerSettings>(
     defaultServerState.settings,
@@ -89,8 +97,8 @@ export function ServerScreen() {
     <section className="server-screen" aria-labelledby="server-screen-title">
       <div className="server-screen__header">
         <div>
-          <h2 id="server-screen-title">Server</h2>
-          <p>Manage local transports exposed by this app process.</p>
+          <h2 id="server-screen-title">Settings</h2>
+          <p>Manage telemetry data sources and local transports.</p>
         </div>
         <ServerStatusSummary serverState={serverState} />
       </div>
@@ -130,6 +138,17 @@ export function ServerScreen() {
             <GeneralSettingsPanel
               isSaving={isSaving}
               settings={draftSettings}
+              onDataSourceClear={() =>
+                setDataSourceSettings({ kind: "live" })
+              }
+              onDataSourceLoad={(file) =>
+                setDataSourceSettings({
+                  kind: "ibtFile",
+                  fileName: file.name,
+                  fileSize: file.size,
+                  lastModified: file.lastModified,
+                })
+              }
               onToggle={handleTransportToggle}
             />
           ) : null}
@@ -156,14 +175,24 @@ export function ServerScreen() {
 function GeneralSettingsPanel({
   isSaving,
   settings,
+  onDataSourceClear,
+  onDataSourceLoad,
   onToggle,
 }: {
   isSaving: boolean;
   settings: ServerSettings;
+  onDataSourceClear: () => void;
+  onDataSourceLoad: (file: File) => void;
   onToggle: (transport: TransportKey, enabled: boolean) => void;
 }) {
   return (
     <div className="server-panel__content">
+      <DataSourcePanel
+        dataSource={settings.dataSource}
+        onClear={onDataSourceClear}
+        onLoad={onDataSourceLoad}
+      />
+
       <div className="server-panel__heading">
         <h3>Transports</h3>
         <p>Enable only the transports that should bind local ports.</p>
@@ -188,6 +217,52 @@ function GeneralSettingsPanel({
         ))}
       </div>
     </div>
+  );
+}
+
+function DataSourcePanel({
+  dataSource,
+  onClear,
+  onLoad,
+}: {
+  dataSource: ServerDataSourceSettings;
+  onClear: () => void;
+  onLoad: (file: File) => void;
+}) {
+  const isMockingFromFile = dataSource.kind === "ibtFile";
+
+  return (
+    <section
+      className="server-data-source"
+      aria-labelledby="server-data-source-title"
+    >
+      <div className="server-panel__heading">
+        <h3 id="server-data-source-title">Data Source</h3>
+        <p>
+          Select an IBT file to use as a mock telemetry source. Without a file,
+          telemetry defaults to live.
+        </p>
+      </div>
+
+      <IbtFileForm onClear={onClear} onLoad={onLoad} />
+
+      <div className="server-data-source__state" role="status">
+        <span
+          className={
+            isMockingFromFile
+              ? "server-data-source__badge server-data-source__badge--mock"
+              : "server-data-source__badge"
+          }
+        >
+          {isMockingFromFile ? "IBT mock" : "Live"}
+        </span>
+        <span>
+          {isMockingFromFile
+            ? `${dataSource.fileName} (${formatFileSize(dataSource.fileSize)})`
+            : "No IBT file selected. Live telemetry is the active source."}
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -270,11 +345,15 @@ function ServerStatusSummary({ serverState }: { serverState: ServerState }) {
     serverState.status.websocket,
     serverState.status.grpc,
   ].filter((status) => status.kind === "running").length;
+  const dataSource = serverState.settings.dataSource;
 
   return (
     <div className="server-summary" aria-label="Running transports">
       <strong>{runningCount}</strong>
       <span>running</span>
+      <small>
+        {dataSource.kind === "ibtFile" ? "IBT mock source" : "Live source"}
+      </small>
     </div>
   );
 }
@@ -298,4 +377,21 @@ function getNavigationItems(settings: ServerSettings): ServerNavigationItem[] {
       disabled: !settings.general.grpcEnabled,
     },
   ];
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = bytes / 1024;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }

@@ -1,5 +1,4 @@
 import {
-  HashRouter,
   Navigate,
   NavLink,
   Route,
@@ -8,9 +7,7 @@ import {
   useMatch,
 } from "react-router";
 import { BroadcastClientScreen } from "../screens/BroadcastClientScreen";
-import { IbtScreen } from "../screens/IbtScreen";
-import { LiveScreen } from "../screens/LiveScreen";
-import { ServerScreen } from "../screens/ServerScreen";
+import { ServerSettingsScreen } from "../screens/ServerSettingsScreen";
 
 type RootTab = {
   label: string;
@@ -19,14 +16,11 @@ type RootTab = {
 };
 
 const tabs: RootTab[] = [
-  { label: "Live", path: "/live", panelId: "live-panel" },
-  { label: "IBT", path: "/ibt", panelId: "ibt-panel" },
   {
     label: "Broadcast",
     path: "/broadcast",
     panelId: "broadcast-panel",
   },
-  { label: "Server", path: "/server", panelId: "server-panel" },
 ];
 
 function AppNavigationTab({ tab }: { tab: RootTab }) {
@@ -48,30 +42,30 @@ function AppNavigationTab({ tab }: { tab: RootTab }) {
 
 function RoutedNavigation() {
   const location = useLocation();
-  const activeTab =
-    tabs.find((tab) => location.pathname === tab.path) ?? tabs[0];
+  const activeTab = tabs.find((tab) => location.pathname === tab.path);
+  const isSettingsRoute = location.pathname === "/settings";
 
   return (
     <>
-      <nav className="tab-bar" role="tablist" aria-label="Status views">
-        {tabs.map((tab) => (
-          <AppNavigationTab key={tab.path} tab={tab} />
-        ))}
-      </nav>
+      {!isSettingsRoute ? (
+        <nav className="tab-bar" role="tablist" aria-label="Status views">
+          {tabs.map((tab) => (
+            <AppNavigationTab key={tab.path} tab={tab} />
+          ))}
+        </nav>
+      ) : null}
 
       <div
-        className="tab-panel"
-        id={activeTab.panelId}
-        role="tabpanel"
-        aria-labelledby={`${activeTab.panelId}-tab`}
+        className={isSettingsRoute ? "tab-panel tab-panel--full" : "tab-panel"}
+        id={activeTab?.panelId}
+        role={activeTab ? "tabpanel" : undefined}
+        aria-labelledby={activeTab ? `${activeTab.panelId}-tab` : undefined}
       >
         <Routes>
-          <Route index element={<Navigate replace to="/live" />} />
-          <Route path="/live" element={<LiveScreen />} />
-          <Route path="/ibt" element={<IbtScreen />} />
+          <Route index element={<Navigate replace to="/broadcast" />} />
           <Route path="/broadcast" element={<BroadcastClientScreen />} />
-          <Route path="/server" element={<ServerScreen />} />
-          <Route path="*" element={<Navigate replace to="/live" />} />
+          <Route path="/settings" element={<ServerSettingsScreen />} />
+          <Route path="*" element={<Navigate replace to="/broadcast" />} />
         </Routes>
       </div>
     </>
@@ -79,9 +73,5 @@ function RoutedNavigation() {
 }
 
 export function AppNavigation() {
-  return (
-    <HashRouter>
-      <RoutedNavigation />
-    </HashRouter>
-  );
+  return <RoutedNavigation />;
 }

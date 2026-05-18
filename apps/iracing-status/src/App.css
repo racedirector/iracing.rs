@@ -58,6 +58,45 @@ button {
   line-height: 1.2;
 }
 
+.app-nav__actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.app-settings-button {
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  color: #607085;
+  background: #ffffff;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.app-settings-button:hover,
+.app-settings-button:focus-visible,
+.app-settings-button--active {
+  border-color: #3074d4;
+  color: #17202a;
+}
+
+.app-settings-button--active {
+  background: #edf4ff;
+}
+
+.app-settings-button:focus-visible {
+  outline: 2px solid #3074d4;
+  outline-offset: 2px;
+}
+
 .connection-summary {
   position: relative;
   display: flex;
@@ -220,6 +259,14 @@ button {
 
 .tab-panel {
   min-height: calc(100vh - 113px);
+}
+
+.tab-panel--full {
+  min-height: calc(100vh - 64px);
+}
+
+.tab-panel--full .server-screen {
+  min-height: calc(100vh - 64px);
 }
 
 .screen-placeholder {
@@ -749,6 +796,13 @@ button {
   text-transform: uppercase;
 }
 
+.server-summary small {
+  color: #607085;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .server-layout {
   width: min(1040px, 100%);
   display: grid;
@@ -808,6 +862,44 @@ button {
 .server-panel__content {
   display: grid;
   gap: 20px;
+}
+
+.server-data-source {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #d8dee6;
+}
+
+.server-data-source__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #176c46;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.server-data-source__badge {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #9cdaba;
+  border-radius: 8px;
+  color: #176c46;
+  background: #effaf4;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.server-data-source__badge--mock {
+  border-color: #f3d37c;
+  color: #7a5600;
+  background: #fff8df;
 }
 
 .server-panel__heading {
@@ -966,6 +1058,10 @@ button {
     width: 100%;
   }
 
+  .app-nav__actions {
+    width: 100%;
+  }
+
   .connection-trigger {
     grid-template-columns: 12px 1fr auto;
   }
@@ -1056,6 +1152,9 @@ button {
   }
 
   .app-title,
+  .app-settings-button:hover,
+  .app-settings-button:focus-visible,
+  .app-settings-button--active,
   .connection-trigger,
   .status-label,
   .broadcast-client-screen__header h2,
@@ -1087,6 +1186,7 @@ button {
 
   .connection-trigger,
   .connection-popover,
+  .app-settings-button,
   .broadcast-action-list__item,
   .broadcast-client-panel,
   .broadcast-checkbox-field,
@@ -1108,6 +1208,10 @@ button {
 
   .ibt-picker__secondary-button {
     color: #f8fafc;
+  }
+
+  .app-settings-button--active {
+    background: #202c3d;
   }
 
   .ibt-picker__secondary-button:hover {
@@ -1156,7 +1260,8 @@ button {
   .broadcast-action-list__item,
   .broadcast-client-panel__heading p,
   .broadcast-select-trigger__icon,
-  .server-summary span {
+  .server-summary span,
+  .server-summary small {
     color: #9fb0c3;
   }
 
@@ -1174,6 +1279,22 @@ button {
   .server-runtime {
     border-color: #2a3646;
     background: #111827;
+  }
+
+  .server-data-source {
+    border-color: #2a3646;
+  }
+
+  .server-data-source__badge {
+    border-color: #176c46;
+    color: #7dd7a7;
+    background: #10231a;
+  }
+
+  .server-data-source__badge--mock {
+    border-color: #7a5600;
+    color: #ffe08a;
+    background: #2a210f;
   }
 
   .ibt-picker__error {
@@ -1205,6 +1326,10 @@ button {
   }
 
   .ibt-screen__status {
+    color: #7dd7a7;
+  }
+
+  .server-data-source__state {
     color: #7dd7a7;
   }
 }

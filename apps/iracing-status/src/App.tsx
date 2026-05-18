@@ -1,3 +1,4 @@
+import { HashRouter } from "react-router";
 import { Header } from "./components/Header";
 import { useIRacingConnectionState } from "./contexts/IRacingConnectionStateContext";
 import { AppNavigation } from "./navigation";
@@ -7,13 +8,15 @@ function App() {
   const connectionState = useIRacingConnectionState();
 
   return (
-    <div className="app-shell">
-      <Header connectionState={connectionState} />
+    <HashRouter>
+      <div className="app-shell">
+        <Header connectionState={connectionState} />
 
-      <main className="app-content" aria-label="iRacing status workspace">
-        <AppNavigation />
-      </main>
-    </div>
+        <main className="app-content" aria-label="iRacing status workspace">
+          <AppNavigation />
+        </main>
+      </div>
+    </HashRouter>
   );
 }
 

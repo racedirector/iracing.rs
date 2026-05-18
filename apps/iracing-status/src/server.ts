@@ -4,12 +4,22 @@ export type ServerGeneralSettings = {
   grpcEnabled: boolean;
 };
 
+export type ServerDataSourceSettings =
+  | { kind: "live" }
+  | {
+      kind: "ibtFile";
+      fileName: string;
+      fileSize: number;
+      lastModified: number;
+    };
+
 export type TransportSettings = {
   host: string;
   port: number;
 };
 
 export type ServerSettings = {
+  dataSource: ServerDataSourceSettings;
   general: ServerGeneralSettings;
   http: TransportSettings;
   websocket: TransportSettings;
@@ -34,6 +44,9 @@ export type ServerState = {
 export type TransportKey = "http" | "websocket" | "grpc";
 
 export const defaultServerSettings: ServerSettings = {
+  dataSource: {
+    kind: "live",
+  },
   general: {
     httpEnabled: false,
     websocketEnabled: false,

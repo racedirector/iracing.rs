@@ -48,7 +48,7 @@ export function getLifecycleStatus(
   return [
     { label: "iRacing Process", status: connectionState.process },
     { label: "Sim Status", status: connectionState.sim },
-    { label: "Live Telemetry", status: connectionState.telemetry },
+    { label: "Telemetry", status: connectionState.telemetry },
   ];
 }
 
