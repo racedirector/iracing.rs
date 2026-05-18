@@ -51,6 +51,7 @@ impl GrpcServices {
         };
 
         services.add_broadcast_service()?;
+        services.add_telemetry_service()?;
         services.add_reflection_service()?;
 
         Ok(services)
@@ -62,6 +63,13 @@ impl GrpcServices {
         self.routes.add_service(BroadcastServer::new(broadcast));
         self.reflection_descriptor_sets
             .push(BROADCAST_FILE_DESCRIPTOR_SET);
+
+        Ok(())
+    }
+
+    fn add_telemetry_service(&mut self) -> Result<(), String> {
+        tracing::debug!("TODO: Add the telemetry service");
+
         Ok(())
     }
 
@@ -75,6 +83,7 @@ impl GrpcServices {
             .build_v1()
             .map_err(|error| format!("gRPC failed to initialize reflection service: {error}"))?;
         self.routes.add_service(reflection);
+
         Ok(())
     }
 

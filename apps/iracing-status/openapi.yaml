@@ -49,6 +49,20 @@ paths:
                     service: iracing-status
         "404":
           $ref: "#/components/responses/NotFound"
+  /schema:
+    get:
+      operationId: getSchema
+      summary: OpenAPI schema
+      description: Returns the OpenAPI schema that defines the local HTTP server.
+      responses:
+        "200":
+          description: The OpenAPI schema for this HTTP server.
+          content:
+            application/yaml:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   responses:
     NotFound:

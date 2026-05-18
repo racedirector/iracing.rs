@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { useServerState } from "../contexts/ServerStateContext";
 import {
   defaultServerState,
   formatTransportStatus,
@@ -33,58 +33,23 @@ const transportDescriptions: Record<TransportKey, string> = {
 };
 
 export function ServerScreen() {
-  const [activeSection, setActiveSection] =
-    useState<ServerSection>("general");
-  const [serverState, setServerState] =
-    useState<ServerState>(defaultServerState);
+  const { applyServerSettings, error, isLoading, isSaving, serverState } =
+    useServerState();
+  const [activeSection, setActiveSection] = useState<ServerSection>("general");
   const [draftSettings, setDraftSettings] = useState<ServerSettings>(
     defaultServerState.settings,
   );
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadServerState() {
-      try {
-        const nextState = await invoke<ServerState>("get_server_state");
-        if (isMounted) {
-          setServerState(nextState);
-          setDraftSettings(nextState.settings);
-          setError(null);
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setError(formatInvokeError(loadError));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadServerState();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    setDraftSettings(serverState.settings);
+  }, [serverState.settings]);
 
   async function applySettings(
     settings: ServerSettings,
     fallbackSection: ServerSection = activeSection,
   ) {
-    setIsSaving(true);
-    setError(null);
-
     try {
-      const nextState = await invoke<ServerState>("set_server_settings", {
-        settings,
-      });
-      setServerState(nextState);
+      const nextState = await applyServerSettings(settings);
       setDraftSettings(nextState.settings);
 
       if (
@@ -93,20 +58,13 @@ export function ServerScreen() {
       ) {
         setActiveSection("general");
       }
-    } catch (saveError) {
+    } catch {
       setDraftSettings(serverState.settings);
-      setError(formatInvokeError(saveError));
-    } finally {
-      setIsSaving(false);
     }
   }
 
   function handleTransportToggle(transport: TransportKey, enabled: boolean) {
-    const nextSettings = setTransportEnabled(
-      draftSettings,
-      transport,
-      enabled,
-    );
+    const nextSettings = setTransportEnabled(draftSettings, transport, enabled);
     setDraftSettings(nextSettings);
     applySettings(nextSettings, transport);
   }
@@ -144,10 +102,7 @@ export function ServerScreen() {
       ) : null}
 
       <div className="server-layout">
-        <nav
-          className="server-sidebar"
-          aria-label="Server settings sections"
-        >
+        <nav className="server-sidebar" aria-label="Server settings sections">
           {navigationItems.map((item) => (
             <button
               aria-current={activeSection === item.key ? "page" : undefined}
@@ -210,29 +165,27 @@ function GeneralSettingsPanel({
   return (
     <div className="server-panel__content">
       <div className="server-panel__heading">
-        <h3>General</h3>
+        <h3>Transports</h3>
         <p>Enable only the transports that should bind local ports.</p>
       </div>
 
       <div className="server-toggle-list">
-        {(["http", "websocket", "grpc"] as TransportKey[]).map(
-          (transport) => (
-            <label className="server-toggle" key={transport}>
-              <span>
-                <strong>{transportLabels[transport]}</strong>
-                <small>{transportDescriptions[transport]}</small>
-              </span>
-              <input
-                checked={getTransportEnabled(settings, transport)}
-                disabled={isSaving}
-                onChange={(event) =>
-                  onToggle(transport, event.currentTarget.checked)
-                }
-                type="checkbox"
-              />
-            </label>
-          ),
-        )}
+        {(["http", "websocket", "grpc"] as TransportKey[]).map((transport) => (
+          <label className="server-toggle" key={transport}>
+            <span>
+              <strong>{transportLabels[transport]}</strong>
+              <small>{transportDescriptions[transport]}</small>
+            </span>
+            <input
+              checked={getTransportEnabled(settings, transport)}
+              disabled={isSaving}
+              onChange={(event) =>
+                onToggle(transport, event.currentTarget.checked)
+              }
+              type="checkbox"
+            />
+          </label>
+        ))}
       </div>
     </div>
   );
@@ -345,12 +298,4 @@ function getNavigationItems(settings: ServerSettings): ServerNavigationItem[] {
       disabled: !settings.general.grpcEnabled,
     },
   ];
-}
-
-function formatInvokeError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
 }

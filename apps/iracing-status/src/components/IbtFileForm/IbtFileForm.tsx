@@ -1,4 +1,6 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { IbtFileInput } from "./IbtFileInput";
 import { IbtFormActions } from "./IbtFormActions";
 
@@ -11,17 +13,19 @@ interface IbtFileFormProps {
   onLoad: (file: File) => void;
 }
 
-function validateIbtFile(file: File | null) {
-  if (!file) {
-    return "Choose an iRacing telemetry file before loading.";
-  }
-
-  if (!file.name.toLowerCase().endsWith(".ibt")) {
-    return "Choose an iRacing telemetry file with a .ibt extension.";
-  }
-
-  return true;
-}
+const ibtFileFormSchema = z.object({
+  ibtFile: z
+    .custom<File | null>(
+      (file) => file === null || file instanceof File,
+      "Choose an iRacing telemetry file before loading.",
+    )
+    .refine((file) => file instanceof File, {
+      message: "Choose an iRacing telemetry file before loading.",
+    })
+    .refine((file) => file.name.toLowerCase().endsWith(".ibt"), {
+      message: "Choose an iRacing telemetry file with a .ibt extension.",
+    }),
+});
 
 function IbtFileForm({ onClear, onLoad }: IbtFileFormProps) {
   const {
@@ -36,6 +40,7 @@ function IbtFileForm({ onClear, onLoad }: IbtFileFormProps) {
       ibtFile: null,
     },
     mode: "onChange",
+    resolver: zodResolver(ibtFileFormSchema),
   });
 
   const selectedFile = watch("ibtFile");
@@ -61,7 +66,6 @@ function IbtFileForm({ onClear, onLoad }: IbtFileFormProps) {
       <Controller
         control={control}
         name="ibtFile"
-        rules={{ validate: validateIbtFile }}
         render={({ fieldState }) => (
           <IbtFileInput
             id="ibt-file"

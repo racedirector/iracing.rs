@@ -8,7 +8,7 @@ type HeaderProps = {
 export function Header({ connectionState }: HeaderProps) {
   return (
     <header className="app-nav">
-      <h1 className="app-title">iRacing Status</h1>
+      <h1 className="app-title">iRacing Telemetry</h1>
       <ConnectionStatus connectionState={connectionState} />
     </header>
   );

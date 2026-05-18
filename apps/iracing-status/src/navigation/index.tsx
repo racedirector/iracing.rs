@@ -7,6 +7,7 @@ import {
   useLocation,
   useMatch,
 } from "react-router";
+import { BroadcastClientScreen } from "../screens/BroadcastClientScreen";
 import { IbtScreen } from "../screens/IbtScreen";
 import { LiveScreen } from "../screens/LiveScreen";
 import { ServerScreen } from "../screens/ServerScreen";
@@ -20,6 +21,11 @@ type RootTab = {
 const tabs: RootTab[] = [
   { label: "Live", path: "/live", panelId: "live-panel" },
   { label: "IBT", path: "/ibt", panelId: "ibt-panel" },
+  {
+    label: "Broadcast",
+    path: "/broadcast",
+    panelId: "broadcast-panel",
+  },
   { label: "Server", path: "/server", panelId: "server-panel" },
 ];
 
@@ -63,6 +69,7 @@ function RoutedNavigation() {
           <Route index element={<Navigate replace to="/live" />} />
           <Route path="/live" element={<LiveScreen />} />
           <Route path="/ibt" element={<IbtScreen />} />
+          <Route path="/broadcast" element={<BroadcastClientScreen />} />
           <Route path="/server" element={<ServerScreen />} />
           <Route path="*" element={<Navigate replace to="/live" />} />
         </Routes>

@@ -18,8 +18,18 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"] }
+async-trait = "0.1"
+axum = { version = "0.8", default-features = false, features = [
+  "http1",
+  "json",
+  "tokio",
+  "ws",
+] }
+axum-extra = { version = "0.12", features = ["cookie", "typed-header"] }
+headers = "0.4"
+http = "1"
 iracing-broadcast-grpc-service = { path = "../../../crates/iracing-broadcast-grpc-service" }
+iracing_status_http_api = { path = "generated/http-api" }
 iracing-sdk = { path = "../../../crates/iracing-sdk", default-features = false }
 iracing-simulation = { path = "../../../crates/iracing-simulation" }
 tauri = { version = "2", features = [] }
@@ -30,3 +40,5 @@ tokio = { version = "1", features = ["net", "rt-multi-thread", "time"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = "0.14"
 tonic-reflection = "0.14"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }

@@ -14,7 +14,7 @@ use tauri::State;
 
 use grpc::start_grpc_server;
 use http::start_http_server;
-use settings::ServerRuntimeStatus;
+use settings::{ServerRuntimeStatus, TransportRuntimeStatus};
 pub use settings::{ServerSettings, ServerState};
 use transport::{stop_transport, transport_status, ServerHandle};
 use websocket::start_websocket_server;
@@ -56,6 +56,13 @@ impl Drop for ServerManager {
 }
 
 impl ServerManager {
+    pub(crate) fn grpc_endpoint(&self) -> Result<String, String> {
+        match self.current_status().grpc {
+            TransportRuntimeStatus::Running { endpoint } => Ok(endpoint),
+            TransportRuntimeStatus::Disabled => Err("gRPC service is not running.".to_string()),
+        }
+    }
+
     fn current_state(&self) -> ServerState {
         let settings = lock(&self.settings).clone();
         ServerState {
