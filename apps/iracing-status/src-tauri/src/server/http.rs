@@ -6,7 +6,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use headers::Host;
-use http::Method;
+use http::{Method, Uri};
 use iracing_status_http_api::{
     apis::{
         health::{GetHealthResponse, Health as HealthApi},
@@ -29,11 +29,10 @@ pub(super) fn start_http_server(
     settings: TransportSettings,
     observer: Arc<ConnectionStateObserver>,
 ) -> Result<ServerHandle, String> {
+    tracing::debug!(settings = ?settings, "starting HTTP server");
     start_axum_transport(settings, "HTTP", "http", move |_shutdown| {
-        iracing_status_http_api::server::new(Arc::new(StatusHttpApi::new(Arc::clone(
-            &observer,
-        ))))
-        .fallback(not_found)
+        iracing_status_http_api::server::new(Arc::new(StatusHttpApi::new(Arc::clone(&observer))))
+            .fallback(not_found)
     })
 }
 
@@ -51,10 +50,16 @@ impl StatusHttpApi {
 impl HealthApi for StatusHttpApi {
     async fn get_health(
         &self,
-        _method: &Method,
-        _host: &Host,
+        method: &Method,
+        host: &Host,
         _cookies: &CookieJar,
     ) -> Result<GetHealthResponse, ()> {
+        tracing::debug!(
+            method = %method,
+            host = ?host,
+            route = "/health",
+            "HTTP request"
+        );
         Ok(
             GetHealthResponse::Status200_TheHTTPServerIsRunningAndAbleToRespond(
                 HealthResponse::new("ok".to_string(), "iracing-status".to_string()),
@@ -67,10 +72,16 @@ impl HealthApi for StatusHttpApi {
 impl MetaApi for StatusHttpApi {
     async fn get_root(
         &self,
-        _method: &Method,
-        _host: &Host,
+        method: &Method,
+        host: &Host,
         _cookies: &CookieJar,
     ) -> Result<GetRootResponse, ()> {
+        tracing::debug!(
+            method = %method,
+            host = ?host,
+            route = "/",
+            "HTTP request"
+        );
         Ok(GetRootResponse::Status200_HTTPServerBanner(
             "iRacing status HTTP server\n".to_string(),
         ))
@@ -78,10 +89,16 @@ impl MetaApi for StatusHttpApi {
 
     async fn get_schema(
         &self,
-        _method: &Method,
-        _host: &Host,
+        method: &Method,
+        host: &Host,
         _cookies: &CookieJar,
     ) -> Result<GetSchemaResponse, ()> {
+        tracing::debug!(
+            method = %method,
+            host = ?host,
+            route = "/schema",
+            "HTTP request"
+        );
         Ok(
             GetSchemaResponse::Status200_TheOpenAPISchemaForThisHTTPServer(
                 OPENAPI_SCHEMA.to_string(),
@@ -94,13 +111,23 @@ impl MetaApi for StatusHttpApi {
 impl StatusApi for StatusHttpApi {
     async fn get_status(
         &self,
-        _method: &Method,
-        _host: &Host,
+        method: &Method,
+        host: &Host,
         _cookies: &CookieJar,
     ) -> Result<GetStatusResponse, ()> {
-        Ok(GetStatusResponse::Status200_TheCurrentConnectionStateSnapshot(
-            map_connection_state(self.observer.current_state()),
-        ))
+        let state = self.observer.current_state();
+        tracing::debug!(
+            method = %method,
+            host = ?host,
+            route = "/status",
+            state = ?state,
+            "HTTP request"
+        );
+        Ok(
+            GetStatusResponse::Status200_TheCurrentConnectionStateSnapshot(map_connection_state(
+                state,
+            )),
+        )
     }
 }
 
@@ -122,6 +149,7 @@ fn map_connection_status(status: ConnectionStatus) -> HttpConnectionStatus {
     }
 }
 
-async fn not_found() -> Response {
+async fn not_found(uri: Uri) -> Response {
+    tracing::debug!(route = %uri, "HTTP request not found");
     (StatusCode::NOT_FOUND, "Not found\n").into_response()
 }

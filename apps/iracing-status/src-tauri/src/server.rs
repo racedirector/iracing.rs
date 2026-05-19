@@ -61,6 +61,8 @@ impl ServerManager {
 
 impl Drop for ServerManager {
     fn drop(&mut self) {
+        tracing::debug!("stopping server manager transports");
+
         if let Ok(mut handle) = self.http.lock() {
             stop_transport(&mut handle);
         }
@@ -77,6 +79,8 @@ impl Drop for ServerManager {
 
 impl ServerManager {
     pub(crate) fn grpc_endpoint(&self) -> Result<String, String> {
+        tracing::debug!("resolving gRPC endpoint");
+
         match self.current_status().grpc {
             TransportRuntimeStatus::Running { endpoint } => Ok(endpoint),
             TransportRuntimeStatus::Disabled => Err("gRPC service is not running.".to_string()),
@@ -84,6 +88,8 @@ impl ServerManager {
     }
 
     fn current_state(&self) -> ServerState {
+        tracing::debug!("reading server state");
+
         let settings = lock(&self.settings).clone();
         ServerState {
             settings,
@@ -100,16 +106,29 @@ impl ServerManager {
     }
 
     fn apply_settings(&self, settings: ServerSettings) -> Result<ServerState, String> {
+        tracing::debug!(settings = ?settings, "applying server settings");
         settings.validate()?;
 
         let previous_settings = lock(&self.settings).clone();
+        tracing::debug!(
+            previous_settings = ?previous_settings,
+            next_settings = ?settings,
+            "server settings validated"
+        );
 
         if let Err(error) = self.reconcile_settings(&previous_settings, &settings) {
+            tracing::debug!(
+                error = %error,
+                previous_settings = ?previous_settings,
+                rejected_settings = ?settings,
+                "server settings reconciliation failed; rolling back transports"
+            );
             let _ = self.reconcile_settings(&settings, &previous_settings);
             return Err(error);
         }
 
         *lock(&self.settings) = settings;
+        tracing::debug!(state = ?self.current_status(), "server settings applied");
 
         Ok(self.current_state())
     }
@@ -120,6 +139,7 @@ impl ServerManager {
         settings: &ServerSettings,
     ) -> Result<(), String> {
         self.reconcile_transport(
+            "HTTP",
             previous_settings.general.http_enabled,
             settings.general.http_enabled,
             previous_settings.http != settings.http,
@@ -132,6 +152,7 @@ impl ServerManager {
             },
         )?;
         self.reconcile_transport(
+            "WebSocket",
             previous_settings.general.websocket_enabled,
             settings.general.websocket_enabled,
             previous_settings.websocket != settings.websocket,
@@ -139,6 +160,7 @@ impl ServerManager {
             || start_websocket_server(settings.websocket.clone(), self.websocket_runtime.clone()),
         )?;
         self.reconcile_transport(
+            "gRPC",
             previous_settings.general.grpc_enabled,
             settings.general.grpc_enabled,
             previous_settings.grpc != settings.grpc,
@@ -151,6 +173,7 @@ impl ServerManager {
 
     fn reconcile_transport(
         &self,
+        label: &str,
         did_run: bool,
         should_run: bool,
         config_changed: bool,
@@ -159,11 +182,36 @@ impl ServerManager {
     ) -> Result<(), String> {
         let mut handle = lock(handle);
         if did_run && (!should_run || config_changed) {
+            tracing::debug!(
+                transport = label,
+                did_run,
+                should_run,
+                config_changed,
+                "stopping transport"
+            );
             stop_transport(&mut handle);
         }
 
         if should_run && (!did_run || config_changed || handle.is_none()) {
+            tracing::debug!(
+                transport = label,
+                did_run,
+                should_run,
+                config_changed,
+                handle_present = handle.is_some(),
+                "starting transport"
+            );
             *handle = Some(start()?);
+            tracing::debug!(transport = label, "transport started");
+        } else {
+            tracing::debug!(
+                transport = label,
+                did_run,
+                should_run,
+                config_changed,
+                handle_present = handle.is_some(),
+                "transport unchanged"
+            );
         }
 
         Ok(())
@@ -173,6 +221,7 @@ impl ServerManager {
 /// Return current server settings and runtime status.
 #[tauri::command]
 pub fn get_server_state(manager: State<'_, ServerManager>) -> ServerState {
+    tracing::debug!("get_server_state request");
     manager.current_state()
 }
 
@@ -182,6 +231,7 @@ pub fn set_server_settings(
     manager: State<'_, ServerManager>,
     settings: ServerSettings,
 ) -> Result<ServerState, String> {
+    tracing::debug!(settings = ?settings, "set_server_settings request");
     manager.apply_settings(settings)
 }
 
@@ -228,7 +278,10 @@ mod tests {
         assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
         assert!(response.contains(r#""process":"checking""#), "{response}");
         assert!(response.contains(r#""sim":"disconnected""#), "{response}");
-        assert!(response.contains(r#""telemetry":"disconnected""#), "{response}");
+        assert!(
+            response.contains(r#""telemetry":"disconnected""#),
+            "{response}"
+        );
 
         settings.http.port = second_port;
         let state = manager.apply_settings(settings).unwrap();
@@ -339,6 +392,48 @@ mod tests {
                     .iter()
                     .map(|service| service.name.clone())
                     .collect::<Vec<_>>()
+            );
+            assert!(
+                services
+                    .iter()
+                    .any(|service| service.name == "grpc.health.v1.Health"),
+                "registered services were: {:?}",
+                services
+                    .iter()
+                    .map(|service| service.name.clone())
+                    .collect::<Vec<_>>()
+            );
+
+            let mut health_client = eventually_async(|| async {
+                tonic::transport::Endpoint::new(endpoint.clone())
+                    .map_err(|error| error.to_string())?
+                    .connect()
+                    .await
+                    .map_err(|error| error.to_string())
+                    .map(tonic_health::pb::health_client::HealthClient::new)
+            })
+            .await;
+            let whole_server_health = health_client
+                .check(tonic_health::pb::HealthCheckRequest {
+                    service: String::new(),
+                })
+                .await
+                .expect("whole-server health should be callable")
+                .into_inner();
+            assert_eq!(
+                whole_server_health.status,
+                tonic_health::ServingStatus::Serving as i32
+            );
+            let broadcast_health = health_client
+                .check(tonic_health::pb::HealthCheckRequest {
+                    service: "iracing.broadcast.Broadcast".to_string(),
+                })
+                .await
+                .expect("broadcast health should be callable")
+                .into_inner();
+            assert_eq!(
+                broadcast_health.status,
+                tonic_health::ServingStatus::Serving as i32
             );
 
             let mut client = eventually_async(|| async {

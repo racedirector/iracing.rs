@@ -9,7 +9,6 @@
 //! The observer state is registered with `Builder::manage` so command handlers
 //! can coordinate one background monitor for the app process.
 
-mod broadcast_client;
 mod server;
 mod state;
 
@@ -45,7 +44,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             state::get_connection_state,
             state::observe_connection_state,
-            broadcast_client::send_broadcast_client_request,
             server::get_server_state,
             server::set_server_settings
         ])

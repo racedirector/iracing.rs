@@ -32,9 +32,11 @@ impl Default for ServerSettings {
 
 impl ServerSettings {
     pub(super) fn validate(&self) -> Result<(), String> {
+        tracing::debug!(settings = ?self, "validating server settings");
         self.http.validate("HTTP")?;
         self.websocket.validate("WebSocket")?;
         self.grpc.validate("gRPC")?;
+        tracing::debug!("server settings validation succeeded");
         Ok(())
     }
 }
@@ -59,13 +61,27 @@ pub struct TransportSettings {
 impl TransportSettings {
     pub(super) fn validate(&self, label: &str) -> Result<(), String> {
         if self.host.trim().is_empty() {
+            tracing::debug!(
+                transport = label,
+                "transport validation failed: host is required"
+            );
             return Err(format!("{label} host is required."));
         }
 
         if self.port == 0 {
+            tracing::debug!(
+                transport = label,
+                "transport validation failed: port is zero"
+            );
             return Err(format!("{label} port must be between 1 and 65535."));
         }
 
+        tracing::debug!(
+            transport = label,
+            host = %self.host,
+            port = self.port,
+            "transport settings validation succeeded"
+        );
         Ok(())
     }
 }
