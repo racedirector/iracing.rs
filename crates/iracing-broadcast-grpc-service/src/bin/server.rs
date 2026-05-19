@@ -2,6 +2,9 @@
 use iracing_broadcast_grpc_service::{BroadcastServer, BroadcastService};
 
 #[cfg(windows)]
+use tonic_health::ServingStatus;
+
+#[cfg(windows)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
@@ -10,8 +13,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "[::1]:50051".to_string())
         .parse()?;
     let broadcast = BroadcastService::new()?;
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_service_status("", ServingStatus::Serving)
+        .await;
+    health_reporter
+        .set_serving::<BroadcastServer<BroadcastService>>()
+        .await;
 
     tonic::transport::Server::builder()
+        .add_service(health_service)
         .add_service(BroadcastServer::new(broadcast))
         .serve(addr)
         .await?;

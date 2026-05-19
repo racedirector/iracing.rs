@@ -18,6 +18,7 @@ prost = "0.14"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tonic-prost = "0.14"
 tonic = "0.14"
+tonic-health = "0.14"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
