@@ -1,11 +1,47 @@
-import { useMemo } from "react";
+import { PropsWithChildren, useMemo, useRef } from "react";
 import { HashRouter, useLocation, useNavigate } from "react-router";
 import { Header } from "./components/Header";
-import { useIRacingConnectionState } from "./contexts/IRacingConnectionStateContext";
+import {
+  IRacingConnectionStateProvider,
+  useIRacingConnectionState,
+} from "./contexts/IRacingConnectionStateContext";
 import { AppNavigation } from "./navigation";
 import "./App.css";
+import { BroadcastClientProvider } from "./contexts/BroadcastClient";
+import {
+  ServerStateProvider,
+  useGRPCServerSettings,
+} from "./contexts/ServerStateContext";
+import { BroadcastClient } from "./constants/broadcast-client";
 
-function App() {
+function GRPCBroadcastProvider({ children }: PropsWithChildren<unknown>) {
+  const serverSettings = useGRPCServerSettings();
+  const connectionUrl = useMemo(() => {
+    return new URL(`http://${serverSettings.host}:${serverSettings.port}`);
+  }, [serverSettings]);
+
+  const client = useRef(new BroadcastClient(connectionUrl.toString()));
+
+  return (
+    <BroadcastClientProvider client={client.current}>
+      {children}
+    </BroadcastClientProvider>
+  );
+}
+
+function Providers({ children }: PropsWithChildren<unknown>) {
+  return (
+    <IRacingConnectionStateProvider>
+      <ServerStateProvider>
+        <GRPCBroadcastProvider>
+          <HashRouter>{children}</HashRouter>
+        </GRPCBroadcastProvider>
+      </ServerStateProvider>
+    </IRacingConnectionStateProvider>
+  );
+}
+
+function InnerApp() {
   const state = useIRacingConnectionState();
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,22 +83,28 @@ function App() {
   }, [state]);
 
   return (
-    <HashRouter>
-      <div className="app-shell">
-        <Header
-          connectionStatus={connectionStatus}
-          items={headerItems}
-          isEnabled={isSettingsRoute}
-          onToggleSettings={(isEnabled) => {
-            navigate(isEnabled ? "/settings" : "/broadcast");
-          }}
-        />
+    <div className="app-shell">
+      <Header
+        connectionStatus={connectionStatus}
+        items={headerItems}
+        isEnabled={isSettingsRoute}
+        onToggleSettings={(isEnabled) => {
+          navigate(isEnabled ? "/settings" : "/broadcast");
+        }}
+      />
 
-        <main className="app-content" aria-label="iRacing status workspace">
-          <AppNavigation />
-        </main>
-      </div>
-    </HashRouter>
+      <main className="app-content" aria-label="iRacing status workspace">
+        <AppNavigation />
+      </main>
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <Providers>
+      <InnerApp />
+    </Providers>
   );
 }
 

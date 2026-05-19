@@ -168,6 +168,16 @@ export function useServerState() {
   return serverState;
 }
 
+export function useServerSettings() {
+  const state = useServerState();
+  return state.serverState.settings;
+}
+
+export function useGRPCServerSettings() {
+  const settings = useServerSettings();
+  return settings.grpc;
+}
+
 function formatError(error: unknown) {
   if (error instanceof Error) {
     return error.message;
