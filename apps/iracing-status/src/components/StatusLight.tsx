@@ -1,4 +1,4 @@
-import type { ConnectionStatus } from "../connection";
+import type { ConnectionStatus } from "../contexts/IRacingConnectionStateContext";
 
 type StatusLightProps = {
   status: ConnectionStatus;

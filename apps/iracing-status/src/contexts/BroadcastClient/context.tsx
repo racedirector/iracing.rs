@@ -21,7 +21,7 @@ export function BroadcastClientProvider<T extends BroadcastClientAPI>({
     () => ({
       client,
     }),
-    [],
+    [client],
   );
 
   return (

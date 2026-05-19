@@ -1,8 +1,7 @@
 allowBuilds:
+  '@bufbuild/buf': set this to true or false
   "@nestjs/core": true
   "@openapitools/openapi-generator-cli": true
   esbuild: true
-  grpc-tools: true
+  grpc-tools: set this to true or false
   protobufjs: true
-  protoc-gen-grpc-web: true
-  protoc-gen-js: true

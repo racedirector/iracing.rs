@@ -1,6 +1,5 @@
 import { useLocation } from "react-router";
 import { ConnectionStatus, ConnectionStatusProps } from "./ConnectionStatus";
-import { useEffect } from "react";
 
 interface HeaderProps extends ConnectionStatusProps {
   isEnabled: boolean;
@@ -15,10 +14,6 @@ export function Header({
 }: HeaderProps) {
   const location = useLocation();
   const isSettingsRoute = location.pathname === "/settings";
-
-  useEffect(() => {
-    onToggleSettings(isEnabled);
-  }, [isEnabled, onToggleSettings]);
 
   return (
     <header className="app-nav">

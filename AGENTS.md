@@ -11,6 +11,7 @@ Compact guidance for future OpenCode sessions working in this repo.
 - `cargo check -p iracing-sdk --lib --target wasm32-unknown-unknown --all-features` mirrors the wasm compatibility gate; install the target with `rustup target add wasm32-unknown-unknown` if needed.
 - For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p <crate> --examples --bins`.
 - Codegen binaries require `cargo build -p iracing-sdk --features codegen,schema-discovery` when you need schema outputs.
+- When JavaScript dependencies need to change, edit `package.json`/config files and ask the user to run the install command; do not run `pnpm install`, `pnpm add`, or equivalent package-manager install commands yourself.
 
 ## Quality Gates
 

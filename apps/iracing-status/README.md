@@ -42,3 +42,43 @@ Route workflow:
    ```
 
 The generated crate under `src-tauri/generated/http-api` owns routing, request validation, and response enum definitions. The app-owned HTTP service only supplies behavior by implementing the generated API trait.
+
+## gRPC Client Generation
+
+The source of truth for the generated gRPC clients is
+[`crates/iracing-broadcast-grpc-service/proto/broadcast.proto`](../../crates/iracing-broadcast-grpc-service/proto/broadcast.proto).
+Do not hand-author frontend request/response types once the generated client is in use.
+
+Generation workflow:
+
+1. Install the required tools:
+
+   - app dependencies via `pnpm install` so the local `buf` and `protoc-gen-es` binaries are available
+
+2. Optionally verify the tooling without generating files:
+
+   ```sh
+   pnpm run grpc:check
+   ```
+
+3. Generate the browser client into `src/generated/grpc-web`:
+
+   ```sh
+   pnpm run grpc:generate
+   ```
+
+   This emits `src/generated/grpc-web/broadcast_pb.ts`.
+
+4. Re-run the app checks you need, at minimum:
+
+   ```sh
+   pnpm build
+   ```
+
+Notes:
+
+- Browser client generation uses Buf with `@bufbuild/protoc-gen-es` and `target=ts`.
+- The npm scripts set `BUF_CACHE_DIR` to `.buf-cache` by default so Buf does not need to write to the user profile cache.
+- The generated browser client is consumed through `@connectrpc/connect` and `@connectrpc/connect-web`.
+- gRPC-Web does not support client-side or bidirectional streaming. `broadcast.proto` currently includes `PitCommandStream(stream PitCommandRequest)`, so that RPC is not used by the browser integration client.
+- The generated browser client speaks the gRPC-Web protocol. The current in-process Tauri server still serves tonic gRPC, so runtime calls require a gRPC-Web-compatible transport layer or proxy.

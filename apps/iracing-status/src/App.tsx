@@ -1,4 +1,4 @@
-import { PropsWithChildren, useMemo, useRef } from "react";
+import { PropsWithChildren, useMemo } from "react";
 import { HashRouter, useLocation, useNavigate } from "react-router";
 import { Header } from "./components/Header";
 import {
@@ -20,12 +20,13 @@ function GRPCBroadcastProvider({ children }: PropsWithChildren<unknown>) {
     return new URL(`http://${serverSettings.host}:${serverSettings.port}`);
   }, [serverSettings]);
 
-  const client = useRef(new BroadcastClient(connectionUrl.toString()));
+  const client = useMemo(
+    () => new BroadcastClient(connectionUrl.toString()),
+    [connectionUrl],
+  );
 
   return (
-    <BroadcastClientProvider client={client.current}>
-      {children}
-    </BroadcastClientProvider>
+    <BroadcastClientProvider client={client}>{children}</BroadcastClientProvider>
   );
 }
 
