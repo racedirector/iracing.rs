@@ -1,4 +1,8 @@
 allowBuilds:
-  '@nestjs/core': true
-  '@openapitools/openapi-generator-cli': true
+  "@nestjs/core": true
+  "@openapitools/openapi-generator-cli": true
   esbuild: true
+  grpc-tools: true
+  protobufjs: true
+  protoc-gen-grpc-web: true
+  protoc-gen-js: true
