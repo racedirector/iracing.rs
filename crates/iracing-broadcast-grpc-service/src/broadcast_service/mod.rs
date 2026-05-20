@@ -420,10 +420,25 @@ fn non_negative_u32(field_name: &'static str, value: i32) -> Result<u32, Status>
 
 #[tonic::async_trait]
 impl Broadcast for BroadcastService {
+    #[tracing::instrument(
+        name = "grpc.get_available_cameras",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "GetAvailableCameras",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn get_available_cameras(
         &self,
-        _request: Request<()>,
+        request: Request<()>,
     ) -> Result<Response<GetAvailableCamerasResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let observation = self.observation()?;
         let current = observation.camera_selection_snapshot()?;
         let camera_groups = observation.available_camera_groups(current.session_version)?;
@@ -436,10 +451,28 @@ impl Broadcast for BroadcastService {
         }))
     }
 
+    #[tracing::instrument(
+        name = "grpc.camera_switch_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CameraSwitchPosition",
+            client.address = tracing::field::Empty,
+            broadcast.position = tracing::field::Empty,
+            broadcast.group = tracing::field::Empty,
+            broadcast.camera = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn camera_switch_position(
         &self,
         request: Request<CameraSwitchPositionRequest>,
     ) -> Result<Response<CameraSwitchPositionResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let CameraSwitchPositionRequest {
             position,
             group,
@@ -449,6 +482,10 @@ impl Broadcast for BroadcastService {
         let position = request_impl::required_u16("position", position)?;
         let group = request_impl::required_u16("group", group)?;
         let camera = request_impl::required_u16("camera", camera)?;
+        let span = tracing::Span::current();
+        span.record("broadcast.position", position);
+        span.record("broadcast.group", group);
+        span.record("broadcast.camera", camera);
         let expected = CameraSelectionExpectation {
             car_index: None,
             group: u32::from(group),
@@ -466,10 +503,28 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.camera_switch_number",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CameraSwitchNumber",
+            client.address = tracing::field::Empty,
+            broadcast.car_number = tracing::field::Empty,
+            broadcast.group = tracing::field::Empty,
+            broadcast.camera = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn camera_switch_number(
         &self,
         request: Request<CameraSwitchNumberRequest>,
     ) -> Result<Response<CameraSwitchNumberResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let CameraSwitchNumberRequest {
             car_number,
             group,
@@ -479,6 +534,10 @@ impl Broadcast for BroadcastService {
         let car_number = request_impl::required_string("car_number", car_number)?;
         let group = request_impl::required_u16("group", group)?;
         let camera = request_impl::required_u16("camera", camera)?;
+        let span = tracing::Span::current();
+        span.record("broadcast.car_number", tracing::field::display(&car_number));
+        span.record("broadcast.group", group);
+        span.record("broadcast.camera", camera);
         let observation = self.observation()?;
         let previous = observation.camera_selection_snapshot()?;
         let car_index =
@@ -506,19 +565,53 @@ impl Broadcast for BroadcastService {
         }))
     }
 
+    #[tracing::instrument(
+        name = "grpc.camera_set_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CameraSetState",
+            client.address = tracing::field::Empty,
+            broadcast.has_state = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn camera_set_state(
         &self,
         request: Request<CameraSetStateRequest>,
     ) -> Result<Response<CameraSetStateResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let CameraSetStateRequest { state } = request.into_inner();
+        tracing::Span::current().record("broadcast.has_state", state.is_some());
         let _state = state.ok_or_else(|| Status::invalid_argument("Missing `state`"))?;
         Err(unsupported_state_resolution("camera_set_state"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.replay_set_play_speed",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReplaySetPlaySpeed",
+            client.address = tracing::field::Empty,
+            replay.speed = tracing::field::Empty,
+            replay.is_slow_motion = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn replay_set_play_speed(
         &self,
         request: Request<ReplaySetPlaySpeedRequest>,
     ) -> Result<Response<ReplaySetPlaySpeedResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReplaySetPlaySpeedRequest {
             speed,
             is_slow_motion,
@@ -526,6 +619,9 @@ impl Broadcast for BroadcastService {
 
         let speed = request_impl::required_i16("speed", speed)?;
         let is_slow_motion = request_impl::required_bool("is_slow_motion", is_slow_motion)?;
+        let span = tracing::Span::current();
+        span.record("replay.speed", speed);
+        span.record("replay.is_slow_motion", is_slow_motion);
         let expected = ReplaySpeedExpectation {
             speed: i32::from(speed),
             is_slow_motion,
@@ -542,11 +638,34 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.replay_set_play_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReplaySetPlayPosition",
+            client.address = tracing::field::Empty,
+            replay.mode = tracing::field::Empty,
+            replay.has_frame = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn replay_set_play_position(
         &self,
         request: Request<ReplaySetPlayPositionRequest>,
     ) -> Result<Response<ReplaySetPlayPositionResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReplaySetPlayPositionRequest { mode, frame } = request.into_inner();
+        let span = tracing::Span::current();
+        span.record(
+            "replay.mode",
+            tracing::field::display(format_args!("{mode:?}")),
+        );
+        span.record("replay.has_frame", frame.is_some());
 
         let _mode = request_impl::required_enum::<ReplayPositionMode>("mode", mode)?;
         let _frame = frame.ok_or_else(|| Status::invalid_argument("Missing `frame`"))?;
@@ -554,22 +673,62 @@ impl Broadcast for BroadcastService {
         Err(unsupported_state_resolution("replay_set_play_position"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.replay_search",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReplaySearch",
+            client.address = tracing::field::Empty,
+            replay.mode = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn replay_search(
         &self,
         request: Request<ReplaySearchRequest>,
     ) -> Result<Response<ReplaySearchResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReplaySearchRequest { mode } = request.into_inner();
+        tracing::Span::current().record(
+            "replay.mode",
+            tracing::field::display(format_args!("{mode:?}")),
+        );
 
         let _mode = request_impl::required_enum::<ReplaySearchMode>("mode", mode)?;
 
         Err(unsupported_state_resolution("replay_search"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.replay_set_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReplaySetState",
+            client.address = tracing::field::Empty,
+            replay.state = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn replay_set_state(
         &self,
         request: Request<ReplaySetStateRequest>,
     ) -> Result<Response<ReplaySetStateResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReplaySetStateRequest { state } = request.into_inner();
+        tracing::Span::current().record(
+            "replay.state",
+            tracing::field::display(format_args!("{state:?}")),
+        );
 
         let state = request_impl::required_enum::<ReplayStateMode>("state", state)?;
 
@@ -580,11 +739,31 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.reload_textures",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReloadTextures",
+            client.address = tracing::field::Empty,
+            broadcast.car_idx = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn reload_textures(
         &self,
         request: Request<ReloadTexturesRequest>,
     ) -> Result<Response<ReloadTexturesResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReloadTexturesRequest { car_idx } = request.into_inner();
+        tracing::Span::current().record(
+            "broadcast.car_idx",
+            tracing::field::display(format_args!("{car_idx:?}")),
+        );
 
         self.execute_ack(
             match car_idx {
@@ -597,10 +776,25 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.chat_command",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ChatCommand",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn chat_command(
         &self,
         request: Request<ChatCommandRequest>,
     ) -> Result<Response<ChatCommandResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         self.execute_ack(
             command_impl::chat_command(request.into_inner())?,
             ChatCommandResponse {},
@@ -608,18 +802,48 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.pit_command",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "PitCommand",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn pit_command(
         &self,
         request: Request<PitCommandRequest>,
     ) -> Result<Response<PitCommandResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let _command = command_impl::pit_command(request.into_inner())?;
         Err(unsupported_state_resolution("pit_command"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.pit_command_stream",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "PitCommandStream",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn pit_command_stream(
         &self,
         request: Request<tonic::Streaming<PitCommandRequest>>,
     ) -> Result<Response<PitCommandResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let mut stream = request.into_inner();
 
         while let Some(request) = stream.message().await? {
@@ -629,20 +853,66 @@ impl Broadcast for BroadcastService {
         Err(unsupported_state_resolution("pit_command_stream"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.telemetry_command",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "TelemetryCommand",
+            client.address = tracing::field::Empty,
+            telemetry.mode = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn telemetry_command(
         &self,
         request: Request<TelemetryCommandRequest>,
     ) -> Result<Response<TelemetryCommandResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let TelemetryCommandRequest { mode } = request.into_inner();
+        tracing::Span::current().record(
+            "telemetry.mode",
+            tracing::field::display(format_args!("{mode:?}")),
+        );
         let _mode = request_impl::required_enum::<TelemetryCommandMode>("mode", mode)?;
         Err(unsupported_state_resolution("telemetry_command"))
     }
 
+    #[tracing::instrument(
+        name = "grpc.force_feedback_command",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ForceFeedbackCommand",
+            client.address = tracing::field::Empty,
+            feedback.mode = tracing::field::Empty,
+            feedback.value = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn force_feedback_command(
         &self,
         request: Request<ForceFeedbackCommandRequest>,
     ) -> Result<Response<ForceFeedbackCommandResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ForceFeedbackCommandRequest { mode, value } = request.into_inner();
+        let span = tracing::Span::current();
+        span.record(
+            "feedback.mode",
+            tracing::field::display(format_args!("{mode:?}")),
+        );
+        span.record(
+            "feedback.value",
+            tracing::field::display(format_args!("{value:?}")),
+        );
 
         let mode = request_impl::required_enum::<ForceFeedbackCommandMode>("mode", mode)?;
         let _value = request_impl::required_f32("value", value)?;
@@ -657,14 +927,37 @@ impl Broadcast for BroadcastService {
         }
     }
 
+    #[tracing::instrument(
+        name = "grpc.replay_search_session_time",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "ReplaySearchSessionTime",
+            client.address = tracing::field::Empty,
+            replay.session_number = tracing::field::Empty,
+            replay.has_session_time_ms = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn replay_search_session_time(
         &self,
         request: Request<ReplaySearchSessionTimeRequest>,
     ) -> Result<Response<ReplaySearchSessionTimeResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let ReplaySearchSessionTimeRequest {
             session_number,
             session_time_ms,
         } = request.into_inner();
+        let span = tracing::Span::current();
+        span.record(
+            "replay.session_number",
+            tracing::field::display(format_args!("{session_number:?}")),
+        );
+        span.record("replay.has_session_time_ms", session_time_ms.is_some());
 
         let session_number = request_impl::required_u16("session_number", session_number)?;
         let session_time_ms =
@@ -677,11 +970,31 @@ impl Broadcast for BroadcastService {
         .await
     }
 
+    #[tracing::instrument(
+        name = "grpc.video_capture",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "VideoCapture",
+            client.address = tracing::field::Empty,
+            video.mode = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
     async fn video_capture(
         &self,
         request: Request<VideoCaptureRequest>,
     ) -> Result<Response<VideoCaptureResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
         let VideoCaptureRequest { mode } = request.into_inner();
+        tracing::Span::current().record(
+            "video.mode",
+            tracing::field::display(format_args!("{mode:?}")),
+        );
 
         let mode = request_impl::required_enum::<VideoCaptureMode>("mode", mode)?;
 
