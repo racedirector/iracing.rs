@@ -3,6 +3,38 @@ use std::{error::Error as StdError, fmt, sync::Arc, time::Duration};
 use iracing_sdk::{FrameAdapter, IRacingSDKError, Provider, VariableSchema};
 use tokio::sync::Mutex;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct CameraSelectionTelemetry {
+    #[field_name = "CamCarIdx"]
+    #[fail_if_missing]
+    pub car_index: i32,
+
+    #[field_name = "CamGroupNumber"]
+    #[fail_if_missing]
+    pub group: i32,
+
+    #[field_name = "CamCameraNumber"]
+    #[fail_if_missing]
+    pub camera: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct ReplaySpeedTelemetry {
+    #[field_name = "ReplayPlaySpeed"]
+    #[fail_if_missing]
+    pub speed: i32,
+
+    #[field_name = "ReplayPlaySlowMotion"]
+    #[fail_if_missing]
+    pub is_slow_motion: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ObservedValue<A> {
+    pub value: A,
+    pub session_version: u32,
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum TelemetryObserverError {
@@ -72,6 +104,15 @@ where
     where
         A: FrameAdapter,
     {
+        Ok(self.snapshot_observed().await?.value)
+    }
+
+    pub(crate) async fn snapshot_observed<A>(
+        &self,
+    ) -> Result<ObservedValue<A>, TelemetryObserverError>
+    where
+        A: FrameAdapter,
+    {
         let validation = A::validate_schema(&self.schema)?;
         let mut provider = self.provider.lock().await;
         let packet = provider
@@ -79,7 +120,10 @@ where
             .await?
             .ok_or(TelemetryObserverError::EndOfSource)?;
 
-        Ok(A::adapt(&packet, &validation))
+        Ok(ObservedValue {
+            value: A::adapt(&packet, &validation),
+            session_version: packet.session_version,
+        })
     }
 
     pub(crate) async fn wait_for_change_matching<A>(
@@ -88,6 +132,21 @@ where
         timeout: Duration,
         matches: impl Fn(&A) -> bool,
     ) -> Result<A, TelemetryObserverError>
+    where
+        A: FrameAdapter + PartialEq,
+    {
+        Ok(self
+            .wait_for_change_matching_observed(previous, timeout, matches)
+            .await?
+            .value)
+    }
+
+    pub(crate) async fn wait_for_change_matching_observed<A>(
+        &self,
+        previous: A,
+        timeout: Duration,
+        matches: impl Fn(&A) -> bool,
+    ) -> Result<ObservedValue<A>, TelemetryObserverError>
     where
         A: FrameAdapter + PartialEq,
     {
@@ -115,7 +174,10 @@ where
 
             let current = A::adapt(&packet, &validation);
             if current != previous && matches(&current) {
-                return Ok(current);
+                return Ok(ObservedValue {
+                    value: current,
+                    session_version: packet.session_version,
+                });
             }
         }
     }
@@ -137,33 +199,9 @@ mod tests {
     };
     use tokio::sync::Mutex;
 
-    use super::{TelemetryObserver, TelemetryObserverError};
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
-    pub(crate) struct CameraSelectionTelemetry {
-        #[field_name = "CamCarIdx"]
-        #[fail_if_missing]
-        pub car_index: i32,
-
-        #[field_name = "CamGroupNumber"]
-        #[fail_if_missing]
-        pub group: i32,
-
-        #[field_name = "CamCameraNumber"]
-        #[fail_if_missing]
-        pub camera: i32,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
-    pub(crate) struct ReplaySpeedTelemetry {
-        #[field_name = "ReplayPlaySpeed"]
-        #[fail_if_missing]
-        pub speed: i32,
-
-        #[field_name = "ReplayPlaySlowMotion"]
-        #[fail_if_missing]
-        pub is_slow_motion: bool,
-    }
+    use super::{
+        CameraSelectionTelemetry, ReplaySpeedTelemetry, TelemetryObserver, TelemetryObserverError,
+    };
 
     struct BroadcastRpcHarness<P> {
         telemetry: TelemetryObserver<P>,
@@ -557,7 +595,10 @@ mod tests {
         let observer = TelemetryObserver::new(Arc::clone(&provider), schema);
         let cloned = observer.clone();
 
-        let (left, right) = tokio::join!(
+        let (left, right): (
+            Result<CameraSelectionTelemetry, TelemetryObserverError>,
+            Result<CameraSelectionTelemetry, TelemetryObserverError>,
+        ) = tokio::join!(
             observer.snapshot::<CameraSelectionTelemetry>(),
             cloned.snapshot::<CameraSelectionTelemetry>()
         );
