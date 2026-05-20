@@ -15,7 +15,12 @@ workspace = true
 [dependencies]
 iracing-sdk = { version = "0.1.0", path = '../iracing-sdk' }
 prost = "0.14"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.0", features = [
+  "macros",
+  "rt-multi-thread",
+  "sync",
+  "time",
+] }
 tonic-prost = "0.14"
 tonic = "0.14"
 tonic-health = "0.14"
@@ -32,7 +37,3 @@ tonic-prost-build = "0.14"
 [[bin]]
 name = "iracing-broadcast-server"
 path = "src/bin/server.rs"
-
-# [[bin]]
-# name = "iracing-broadcast-client"
-# path = "src/client.rs"
