@@ -7,6 +7,9 @@ pub use broadcast::*;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use broadcast_service::BroadcastService;
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use broadcast_service::BroadcastServiceBuilder;
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("iracing.broadcast");
 
