@@ -1,5 +1,7 @@
 #[cfg(windows)]
 mod broadcast_service;
+#[cfg(windows)]
+mod telemetry_observer;
 
 pub use broadcast::broadcast_client::BroadcastClient as RawBroadcastClient;
 pub use broadcast::broadcast_server::{Broadcast, BroadcastServer};
