@@ -76,19 +76,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     tracing::debug!("creating dual-stack tcp listener");
-    let socket = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
-    socket.set_only_v6(false)?;
+    let socket = if addr.is_ipv4() {
+        Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?
+    } else {
+        let socket = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))?;
+        socket.set_only_v6(false)?;
+        socket
+    };
     socket.bind(&addr.into())?;
     socket.listen(1024)?;
     socket.set_nonblocking(true)?;
     let listener = TcpListener::from_std(socket.into())?;
+    let port = addr.port();
     tracing::info!(
         %addr,
-        dual_stack = true,
+        dual_stack = !addr.is_ipv4(),
         reflection = true,
         health = true,
-        reachable_ipv4 = "127.0.0.1:50051",
-        reachable_ipv6 = "[::1]:50051",
+        reachable_ipv4 = format!("127.0.0.1:{}", port),
+        reachable_ipv6 = format!("[::1]:{}", port),
         "listener bound",
     );
 

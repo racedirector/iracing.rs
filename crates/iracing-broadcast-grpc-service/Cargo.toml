@@ -22,7 +22,7 @@ tokio = { version = "1.0", features = [
   "sync",
   "time",
 ] }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["net"] }
 tonic-prost = "0.14"
 tonic = "0.14"
 tonic-health = "0.14"

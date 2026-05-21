@@ -124,6 +124,13 @@ where
         }
     }
 
+    /// Blocks the current thread to wait for an async operation to complete.
+    ///
+    /// # Panics
+    ///
+    /// This method requires a **multi-threaded Tokio runtime** (`rt-multi-thread`).
+    /// It will panic if called from a single-threaded runtime (`current_thread`)
+    /// because `tokio::task::block_in_place` cannot run on single-threaded executors.
     fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
         tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
     }
