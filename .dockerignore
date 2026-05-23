@@ -1,9 +1,0 @@
-.git/
-.github/
-target/
-
-**/node_modules/
-**/dist/
-**/target/
-
-test-data/
