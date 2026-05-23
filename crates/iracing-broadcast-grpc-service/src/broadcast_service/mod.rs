@@ -2,427 +2,53 @@ mod builder;
 mod command;
 mod error;
 mod request;
+mod response;
 
-use std::{
-    future::Future,
-    sync::{Arc, Mutex as StdMutex},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
 
 use crate::broadcast::broadcast_server::Broadcast;
 use crate::broadcast::*;
-use crate::telemetry_observer::{
-    CameraSelectionTelemetry, ObservedValue, ReplaySpeedTelemetry, TelemetryObserver,
-    TelemetryObserverError,
-};
-
-use iracing_sdk::{
-    Broadcast as BroadcastClient, BroadcastCommand, FrameAdapter, IRacingSDKError, LiveProvider,
-    Provider, SessionInfo, SessionInfoParser, VariableSchema,
-};
+use crate::broadcast_app::BroadcastUseCases;
 
 pub use builder::BroadcastServiceBuilder;
 use command as command_impl;
 use error::broadcast_error_to_status;
 use request as request_impl;
+use response as response_impl;
 
 const DEFAULT_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(2);
 
-trait BroadcastCommandSender: Send + Sync {
-    fn send_message(&self, message: BroadcastCommand) -> Result<(), IRacingSDKError>;
-}
-
-impl BroadcastCommandSender for BroadcastClient {
-    fn send_message(&self, message: BroadcastCommand) -> Result<(), IRacingSDKError> {
-        BroadcastClient::send_message(self, message)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct CameraSelectionExpectation {
-    car_index: Option<u32>,
-    group: u32,
-    camera: u32,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ReplaySpeedExpectation {
-    speed: i32,
-    is_slow_motion: bool,
-}
-
-trait ObservationBackend: Send + Sync {
-    fn available_camera_groups(&self, session_version: u32) -> Result<Vec<CameraGroup>, Status>;
-    fn camera_selection_snapshot(&self) -> Result<ObservedValue<CameraSelectionTelemetry>, Status>;
-    fn wait_for_camera_selection(
-        &self,
-        previous: ObservedValue<CameraSelectionTelemetry>,
-        expected: CameraSelectionExpectation,
-        timeout: Duration,
-    ) -> Result<ObservedValue<CameraSelectionTelemetry>, Status>;
-    fn resolve_car_index_by_number(
-        &self,
-        session_version: u32,
-        car_number: &str,
-    ) -> Result<u32, Status>;
-    fn replay_speed_snapshot(&self) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status>;
-    fn wait_for_replay_speed(
-        &self,
-        previous: ObservedValue<ReplaySpeedTelemetry>,
-        expected: ReplaySpeedExpectation,
-        timeout: Duration,
-    ) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status>;
-}
-
-#[derive(Debug, Clone)]
-struct CachedSessionInfo {
-    version: u32,
-    session: SessionInfo,
-}
-
-struct ServiceObservation<P> {
-    provider: Arc<Mutex<P>>,
-    telemetry: TelemetryObserver<P>,
-    session_parser: Arc<StdMutex<SessionInfoParser>>,
-    session_cache: Arc<StdMutex<Option<CachedSessionInfo>>>,
-    camera_selection_available: bool,
-    replay_speed_available: bool,
-}
-
-impl ServiceObservation<LiveProvider> {
-    fn live() -> Result<Self, IRacingSDKError> {
-        let provider = LiveProvider::new()?;
-        let schema = provider.schema();
-        Ok(Self::from_provider(provider, schema))
-    }
-}
-
-impl<P> ServiceObservation<P>
-where
-    P: Provider + Send + 'static,
-{
-    fn from_provider(provider: P, schema: Arc<VariableSchema>) -> Self {
-        let provider = Arc::new(Mutex::new(provider));
-        let telemetry = TelemetryObserver::new(Arc::clone(&provider), schema);
-
-        Self {
-            provider,
-            camera_selection_available: Self::validate_capability::<CameraSelectionTelemetry>(
-                &telemetry,
-                "camera selection",
-            ),
-            replay_speed_available: Self::validate_capability::<ReplaySpeedTelemetry>(
-                &telemetry,
-                "replay speed",
-            ),
-            telemetry,
-            session_parser: Arc::new(StdMutex::new(SessionInfoParser::new())),
-            session_cache: Arc::new(StdMutex::new(None)),
-        }
-    }
-
-    /// Blocks the current thread to wait for an async operation to complete.
-    ///
-    /// # Panics
-    ///
-    /// This method requires a **multi-threaded Tokio runtime** (`rt-multi-thread`).
-    /// It will panic if called from a single-threaded runtime (`current_thread`)
-    /// because `tokio::task::block_in_place` cannot run on single-threaded executors.
-    fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
-        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(future))
-    }
-
-    fn validate_capability<A>(telemetry: &TelemetryObserver<P>, name: &'static str) -> bool
-    where
-        A: FrameAdapter,
-    {
-        match telemetry.validate::<A>() {
-            Ok(()) => true,
-            Err(error) => {
-                tracing::debug!(%error, capability = name, "broadcast observation capability unavailable");
-                false
-            }
-        }
-    }
-
-    fn require_capability(&self, enabled: bool, capability: &'static str) -> Result<(), Status> {
-        if enabled {
-            Ok(())
-        } else {
-            Err(Status::failed_precondition(format!(
-                "{capability} telemetry is unavailable"
-            )))
-        }
-    }
-
-    fn map_telemetry_error(error: TelemetryObserverError) -> Status {
-        match error {
-            TelemetryObserverError::Timeout => {
-                Status::deadline_exceeded("telemetry observation timed out")
-            }
-            TelemetryObserverError::EndOfSource => {
-                Status::unavailable("telemetry source ended before the requested state change")
-            }
-            TelemetryObserverError::Sdk(error) => broadcast_error_to_status(error),
-        }
-    }
-
-    fn session_info(&self, version: u32) -> Result<SessionInfo, Status> {
-        if let Some(cached) = self
-            .session_cache
-            .lock()
-            .expect("session cache mutex poisoned")
-            .clone()
-            .filter(|cached| cached.version == version)
-        {
-            return Ok(cached.session);
-        }
-
-        let yaml = self.block_on(async {
-            let mut provider = self.provider.lock().await;
-            provider
-                .session_yaml(version)
-                .await
-                .map_err(broadcast_error_to_status)
-        })?;
-
-        let yaml = yaml.ok_or_else(|| {
-            Status::failed_precondition(format!(
-                "session data is unavailable for telemetry version {version}"
-            ))
-        })?;
-
-        let session = self
-            .session_parser
-            .lock()
-            .expect("session parser mutex poisoned")
-            .parse(&yaml)
-            .map_err(|error| Status::failed_precondition(error.to_string()))?;
-
-        *self
-            .session_cache
-            .lock()
-            .expect("session cache mutex poisoned") = Some(CachedSessionInfo {
-            version,
-            session: session.clone(),
-        });
-
-        Ok(session)
-    }
-}
-
-impl<P> ObservationBackend for ServiceObservation<P>
-where
-    P: Provider + Send + 'static,
-{
-    fn available_camera_groups(&self, session_version: u32) -> Result<Vec<CameraGroup>, Status> {
-        self.require_capability(self.camera_selection_available, "camera selection")?;
-
-        let session = self.session_info(session_version)?;
-        let groups = session
-            .camera_info
-            .and_then(|camera_info| camera_info.groups)
-            .ok_or_else(|| Status::failed_precondition("session camera groups are unavailable"))?;
-
-        Ok(groups
-            .into_iter()
-            .filter_map(|group| {
-                let number = group
-                    .group_num
-                    .and_then(|value| u32::try_from(value).ok())?;
-                Some(CameraGroup {
-                    number,
-                    name: group.group_name.unwrap_or_default(),
-                    cameras: group
-                        .cameras
-                        .unwrap_or_default()
-                        .into_iter()
-                        .filter_map(|camera| {
-                            let number = camera
-                                .camera_num
-                                .and_then(|value| u32::try_from(value).ok())?;
-                            Some(CameraDetail {
-                                number: Some(number),
-                                name: camera.camera_name,
-                            })
-                        })
-                        .collect(),
-                })
-            })
-            .collect())
-    }
-
-    fn camera_selection_snapshot(&self) -> Result<ObservedValue<CameraSelectionTelemetry>, Status> {
-        self.require_capability(self.camera_selection_available, "camera selection")?;
-        self.block_on(
-            self.telemetry
-                .snapshot_observed::<CameraSelectionTelemetry>(),
-        )
-        .map_err(Self::map_telemetry_error)
-    }
-
-    fn wait_for_camera_selection(
-        &self,
-        previous: ObservedValue<CameraSelectionTelemetry>,
-        expected: CameraSelectionExpectation,
-        timeout: Duration,
-    ) -> Result<ObservedValue<CameraSelectionTelemetry>, Status> {
-        self.require_capability(self.camera_selection_available, "camera selection")?;
-        self.block_on(self.telemetry.wait_for_change_matching_observed(
-            previous.value,
-            timeout,
-            |current| {
-                let current_car_index = u32::try_from(current.car_index).ok();
-                let current_group = u32::try_from(current.group).ok();
-                let current_camera = u32::try_from(current.camera).ok();
-
-                current_group == Some(expected.group)
-                    && current_camera == Some(expected.camera)
-                    && expected
-                        .car_index
-                        .is_none_or(|car_index| current_car_index == Some(car_index))
-            },
-        ))
-        .map_err(Self::map_telemetry_error)
-    }
-
-    fn resolve_car_index_by_number(
-        &self,
-        session_version: u32,
-        car_number: &str,
-    ) -> Result<u32, Status> {
-        let session = self.session_info(session_version)?;
-        let drivers = session
-            .driver_info
-            .and_then(|driver_info| driver_info.drivers)
-            .ok_or_else(|| Status::failed_precondition("session driver list is unavailable"))?;
-
-        let driver = drivers
-            .into_iter()
-            .find(|driver| driver.car_number.as_deref() == Some(car_number))
-            .ok_or_else(|| {
-                Status::failed_precondition(format!(
-                    "car number `{car_number}` was not found in session driver info"
-                ))
-            })?;
-
-        u32::try_from(driver.car_idx).map_err(|_| {
-            Status::failed_precondition(format!(
-                "car number `{car_number}` resolved to invalid car index {}",
-                driver.car_idx
-            ))
-        })
-    }
-
-    fn replay_speed_snapshot(&self) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status> {
-        self.require_capability(self.replay_speed_available, "replay speed")?;
-        self.block_on(self.telemetry.snapshot_observed::<ReplaySpeedTelemetry>())
-            .map_err(Self::map_telemetry_error)
-    }
-
-    fn wait_for_replay_speed(
-        &self,
-        previous: ObservedValue<ReplaySpeedTelemetry>,
-        expected: ReplaySpeedExpectation,
-        timeout: Duration,
-    ) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status> {
-        self.require_capability(self.replay_speed_available, "replay speed")?;
-        self.block_on(self.telemetry.wait_for_change_matching_observed(
-            previous.value,
-            timeout,
-            |current| {
-                current.speed == expected.speed && current.is_slow_motion == expected.is_slow_motion
-            },
-        ))
-        .map_err(Self::map_telemetry_error)
-    }
-}
-
+/// Tonic adapter that serves the iRacing broadcast gRPC API on Windows.
+///
+/// `BroadcastService` is intentionally thin: request parsing and protobuf
+/// response mapping stay at this boundary, while command orchestration is
+/// delegated to internal use cases. Construct it with [`BroadcastService::new`]
+/// or [`BroadcastService::builder`].
 pub struct BroadcastService {
-    sender: Arc<dyn BroadcastCommandSender>,
-    observation: Option<Arc<dyn ObservationBackend>>,
-    observation_timeout: Duration,
+    use_cases: Arc<BroadcastUseCases>,
 }
 
 impl BroadcastService {
+    /// Create a builder for configuring the live broadcast service.
     pub fn builder() -> crate::BroadcastServiceBuilder {
         crate::BroadcastServiceBuilder::default()
     }
 
+    /// Create a live broadcast service with default settings.
+    ///
+    /// This opens the iRacing Win32 broadcast channel and live telemetry
+    /// observation path. Use [`BroadcastServiceBuilder::without_observation`] if
+    /// the service should expose ack-only commands without telemetry-backed
+    /// state resolution.
     pub fn new() -> Result<Self, Status> {
         Self::builder().build().map_err(broadcast_error_to_status)
     }
 
-    fn observation(&self) -> Result<&dyn ObservationBackend, Status> {
-        self.observation.as_deref().ok_or_else(|| {
-            Status::failed_precondition("broadcast service observation support is disabled")
-        })
+    pub(crate) fn from_use_cases(use_cases: Arc<BroadcastUseCases>) -> Self {
+        Self { use_cases }
     }
-
-    fn send_message(&self, message: BroadcastCommand) -> Result<(), Status> {
-        self.sender
-            .send_message(message)
-            .map_err(broadcast_error_to_status)
-    }
-
-    async fn execute_ack<R>(
-        &self,
-        command: BroadcastCommand,
-        response: R,
-    ) -> Result<Response<R>, Status> {
-        self.send_message(command)?;
-        Ok(Response::new(response))
-    }
-
-    async fn execute_observed<Previous, Current, R>(
-        &self,
-        snapshot: impl FnOnce(&dyn ObservationBackend) -> Result<Previous, Status>,
-        command: BroadcastCommand,
-        wait: impl FnOnce(&dyn ObservationBackend, Previous, Duration) -> Result<Current, Status>,
-        resolve: impl FnOnce(Current) -> Result<R, Status>,
-    ) -> Result<Response<R>, Status> {
-        let observation = self.observation()?;
-        let previous = snapshot(observation)?;
-        self.send_message(command)?;
-        let current = wait(observation, previous, self.observation_timeout)?;
-        Ok(Response::new(resolve(current)?))
-    }
-}
-
-fn camera_switch_response(
-    observed: ObservedValue<CameraSelectionTelemetry>,
-) -> Result<CameraSwitchPositionResponse, Status> {
-    Ok(CameraSwitchPositionResponse {
-        car_index: non_negative_u32("car_index", observed.value.car_index)?,
-        group: non_negative_u32("group", observed.value.group)?,
-        camera: non_negative_u32("camera", observed.value.camera)?,
-    })
-}
-
-fn replay_speed_response(
-    observed: ObservedValue<ReplaySpeedTelemetry>,
-) -> ReplaySetPlaySpeedResponse {
-    ReplaySetPlaySpeedResponse {
-        speed: observed.value.speed,
-        is_slow_motion: observed.value.is_slow_motion,
-    }
-}
-
-fn unsupported_state_resolution(operation: &'static str) -> Status {
-    Status::failed_precondition(format!(
-        "{operation} does not have validated telemetry-backed state resolution"
-    ))
-}
-
-fn non_negative_u32(field_name: &'static str, value: i32) -> Result<u32, Status> {
-    u32::try_from(value).map_err(|_| {
-        Status::failed_precondition(format!(
-            "observed `{field_name}` must be non-negative, got {value}"
-        ))
-    })
 }
 
 #[tonic::async_trait]
@@ -446,16 +72,14 @@ impl Broadcast for BroadcastService {
             "client.address",
             tracing::field::display(format_args!("{:?}", request.remote_addr())),
         );
-        let observation = self.observation()?;
-        let current = observation.camera_selection_snapshot()?;
-        let camera_groups = observation.available_camera_groups(current.session_version)?;
 
-        Ok(Response::new(GetAvailableCamerasResponse {
-            camera_groups,
-            car_index: non_negative_u32("car_index", current.value.car_index)?,
-            group: non_negative_u32("group", current.value.group)?,
-            camera: non_negative_u32("camera", current.value.camera)?,
-        }))
+        let cameras = self
+            .use_cases
+            .get_available_cameras()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::available_cameras(cameras)))
     }
 
     #[tracing::instrument(
@@ -493,21 +117,16 @@ impl Broadcast for BroadcastService {
         span.record("broadcast.position", position);
         span.record("broadcast.group", group);
         span.record("broadcast.camera", camera);
-        let expected = CameraSelectionExpectation {
-            car_index: None,
-            group: u32::from(group),
-            camera: u32::from(camera),
-        };
 
-        self.execute_observed(
-            |observation| observation.camera_selection_snapshot(),
-            BroadcastCommand::CameraSwitchPosition(position, group, camera),
-            move |observation, previous, timeout| {
-                observation.wait_for_camera_selection(previous, expected, timeout)
-            },
-            camera_switch_response,
-        )
-        .await
+        let snapshot = self
+            .use_cases
+            .camera_switch_position(position, group, camera)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::camera_switch_position(
+            snapshot,
+        )))
     }
 
     #[tracing::instrument(
@@ -545,31 +164,14 @@ impl Broadcast for BroadcastService {
         span.record("broadcast.car_number", tracing::field::display(&car_number));
         span.record("broadcast.group", group);
         span.record("broadcast.camera", camera);
-        let observation = self.observation()?;
-        let previous = observation.camera_selection_snapshot()?;
-        let car_index =
-            observation.resolve_car_index_by_number(previous.session_version, &car_number)?;
 
-        self.send_message(BroadcastCommand::CameraSwitchNumber(
-            car_number, group, camera,
-        ))?;
+        let snapshot = self
+            .use_cases
+            .camera_switch_number(car_number, group, camera)
+            .await
+            .map_err(Status::from)?;
 
-        let current = observation.wait_for_camera_selection(
-            previous,
-            CameraSelectionExpectation {
-                car_index: Some(car_index),
-                group: u32::from(group),
-                camera: u32::from(camera),
-            },
-            self.observation_timeout,
-        )?;
-
-        let response = camera_switch_response(current)?;
-        Ok(Response::new(CameraSwitchNumberResponse {
-            car_index: response.car_index,
-            group: response.group,
-            camera: response.camera,
-        }))
+        Ok(Response::new(response_impl::camera_switch_number(snapshot)))
     }
 
     #[tracing::instrument(
@@ -594,8 +196,15 @@ impl Broadcast for BroadcastService {
         );
         let CameraSetStateRequest { state } = request.into_inner();
         tracing::Span::current().record("broadcast.has_state", state.is_some());
-        let _state = state.ok_or_else(|| Status::invalid_argument("Missing `state`"))?;
-        Err(unsupported_state_resolution("camera_set_state"))
+        let state = request_impl::required_u32("state", state)?;
+
+        let snapshot = self
+            .use_cases
+            .camera_set_state(command_impl::camera_state(state))
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::camera_set_state(snapshot)))
     }
 
     #[tracing::instrument(
@@ -629,20 +238,16 @@ impl Broadcast for BroadcastService {
         let span = tracing::Span::current();
         span.record("replay.speed", speed);
         span.record("replay.is_slow_motion", is_slow_motion);
-        let expected = ReplaySpeedExpectation {
-            speed: i32::from(speed),
-            is_slow_motion,
-        };
 
-        self.execute_observed(
-            |observation| observation.replay_speed_snapshot(),
-            BroadcastCommand::ReplaySetPlaySpeed(speed, is_slow_motion),
-            move |observation, previous, timeout| {
-                observation.wait_for_replay_speed(previous, expected, timeout)
-            },
-            |current| Ok(replay_speed_response(current)),
-        )
-        .await
+        let snapshot = self
+            .use_cases
+            .replay_set_play_speed(speed, is_slow_motion)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::replay_set_play_speed(
+            snapshot,
+        )))
     }
 
     #[tracing::instrument(
@@ -674,10 +279,18 @@ impl Broadcast for BroadcastService {
         );
         span.record("replay.has_frame", frame.is_some());
 
-        let _mode = request_impl::required_enum::<ReplayPositionMode>("mode", mode)?;
-        let _frame = frame.ok_or_else(|| Status::invalid_argument("Missing `frame`"))?;
+        let mode = request_impl::required_enum::<ReplayPositionMode>("mode", mode)?;
+        let frame = request_impl::required_u32("frame", frame)?;
 
-        Err(unsupported_state_resolution("replay_set_play_position"))
+        let snapshot = self
+            .use_cases
+            .replay_set_play_position(command_impl::replay_position_mode(mode), frame)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::replay_set_play_position(
+            snapshot,
+        )))
     }
 
     #[tracing::instrument(
@@ -706,9 +319,15 @@ impl Broadcast for BroadcastService {
             tracing::field::display(format_args!("{mode:?}")),
         );
 
-        let _mode = request_impl::required_enum::<ReplaySearchMode>("mode", mode)?;
+        let mode = request_impl::required_enum::<ReplaySearchMode>("mode", mode)?;
 
-        Err(unsupported_state_resolution("replay_search"))
+        let snapshot = self
+            .use_cases
+            .replay_search(command_impl::replay_search_mode(mode))
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::replay_search(snapshot)))
     }
 
     #[tracing::instrument(
@@ -739,11 +358,12 @@ impl Broadcast for BroadcastService {
 
         let state = request_impl::required_enum::<ReplayStateMode>("state", state)?;
 
-        self.execute_ack(
-            BroadcastCommand::ReplaySetState(command_impl::replay_state_mode(state)),
-            ReplaySetStateResponse {},
-        )
-        .await
+        self.use_cases
+            .replay_set_state(command_impl::replay_state_mode(state))
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(ReplaySetStateResponse {}))
     }
 
     #[tracing::instrument(
@@ -772,15 +392,16 @@ impl Broadcast for BroadcastService {
             tracing::field::display(format_args!("{car_idx:?}")),
         );
 
-        self.execute_ack(
-            match car_idx {
-                Some(index) => request_impl::u32_to_u16("car_idx", index)
-                    .map(BroadcastCommand::ReloadTextures)?,
-                None => BroadcastCommand::ReloadAllTextures,
-            },
-            ReloadTexturesResponse {},
-        )
-        .await
+        let car_idx = car_idx
+            .map(|index| request_impl::u32_to_u16("car_idx", index))
+            .transpose()?;
+
+        self.use_cases
+            .reload_textures(car_idx)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(ReloadTexturesResponse {}))
     }
 
     #[tracing::instrument(
@@ -802,11 +423,12 @@ impl Broadcast for BroadcastService {
             "client.address",
             tracing::field::display(format_args!("{:?}", request.remote_addr())),
         );
-        self.execute_ack(
-            command_impl::chat_command(request.into_inner())?,
-            ChatCommandResponse {},
-        )
-        .await
+        self.use_cases
+            .chat_command(command_impl::chat_command(request.into_inner())?)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(ChatCommandResponse {}))
     }
 
     #[tracing::instrument(
@@ -828,8 +450,13 @@ impl Broadcast for BroadcastService {
             "client.address",
             tracing::field::display(format_args!("{:?}", request.remote_addr())),
         );
-        let _command = command_impl::pit_command(request.into_inner())?;
-        Err(unsupported_state_resolution("pit_command"))
+        let snapshot = self
+            .use_cases
+            .pit_command(command_impl::pit_command(request.into_inner())?)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::pit_command(snapshot)))
     }
 
     #[tracing::instrument(
@@ -853,11 +480,24 @@ impl Broadcast for BroadcastService {
         );
         let mut stream = request.into_inner();
 
+        let mut commands = Vec::new();
         while let Some(request) = stream.message().await? {
-            let _command = command_impl::pit_command(request)?;
+            commands.push(command_impl::pit_command(request)?);
         }
 
-        Err(unsupported_state_resolution("pit_command_stream"))
+        if commands.is_empty() {
+            return Err(Status::invalid_argument(
+                "`pit_command_stream` requires at least one command",
+            ));
+        }
+
+        let snapshot = self
+            .use_cases
+            .pit_command_stream(commands)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::pit_command(snapshot)))
     }
 
     #[tracing::instrument(
@@ -885,8 +525,15 @@ impl Broadcast for BroadcastService {
             "telemetry.mode",
             tracing::field::display(format_args!("{mode:?}")),
         );
-        let _mode = request_impl::required_enum::<TelemetryCommandMode>("mode", mode)?;
-        Err(unsupported_state_resolution("telemetry_command"))
+        let mode = request_impl::required_enum::<TelemetryCommandMode>("mode", mode)?;
+
+        let snapshot = self
+            .use_cases
+            .telemetry_command(command_impl::telemetry_command_mode(mode))
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::telemetry_command(snapshot)))
     }
 
     #[tracing::instrument(
@@ -922,11 +569,17 @@ impl Broadcast for BroadcastService {
         );
 
         let mode = request_impl::required_enum::<ForceFeedbackCommandMode>("mode", mode)?;
-        let _value = request_impl::required_f32("value", value)?;
+        let value = request_impl::required_f32("value", value)?;
 
         match mode {
             ForceFeedbackCommandMode::MaxForce => {
-                Err(unsupported_state_resolution("force_feedback_command"))
+                let snapshot = self
+                    .use_cases
+                    .force_feedback_command(value)
+                    .await
+                    .map_err(Status::from)?;
+
+                Ok(Response::new(response_impl::force_feedback(snapshot)))
             }
             ForceFeedbackCommandMode::Unknown => {
                 unreachable!("unknown force feedback command mode is rejected")
@@ -970,11 +623,12 @@ impl Broadcast for BroadcastService {
         let session_time_ms =
             session_time_ms.ok_or_else(|| Status::invalid_argument("Missing `session_time_ms`"))?;
 
-        self.execute_ack(
-            BroadcastCommand::ReplaySearchSessionTime(session_number, session_time_ms),
-            ReplaySearchSessionTimeResponse {},
-        )
-        .await
+        self.use_cases
+            .replay_search_session_time(session_number, session_time_ms)
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(ReplaySearchSessionTimeResponse {}))
     }
 
     #[tracing::instrument(
@@ -1005,11 +659,12 @@ impl Broadcast for BroadcastService {
 
         let mode = request_impl::required_enum::<VideoCaptureMode>("mode", mode)?;
 
-        self.execute_ack(
-            BroadcastCommand::VideoCapture(command_impl::video_capture_mode(mode)),
-            VideoCaptureResponse {},
-        )
-        .await
+        self.use_cases
+            .video_capture(command_impl::video_capture_mode(mode))
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(VideoCaptureResponse {}))
     }
 }
 
@@ -1018,220 +673,311 @@ mod tests {
     use std::{
         collections::{HashMap, VecDeque},
         sync::{Arc, Mutex as StdMutex},
+        time::Duration,
     };
 
+    use async_trait::async_trait;
+    use iracing_sdk::BroadcastCommand;
+
     use super::*;
+    use crate::broadcast_app::{
+        AvailableCamera, AvailableCameraGroup, BroadcastCommandPort, BroadcastError,
+        CameraSelectionExpectation, CameraSelectionSnapshot, CameraStateExpectation,
+        CameraStatePort, CameraStateSnapshot, DisabledObservationPort, ReplayPositionExpectation,
+        ReplayPositionSnapshot, ReplaySpeedExpectation, ReplaySpeedSnapshot, ReplayStatePort,
+    };
 
     #[derive(Default)]
-    struct FakeSender {
+    struct FakeCommands {
         sent: StdMutex<Vec<BroadcastCommand>>,
     }
 
-    impl FakeSender {
+    impl FakeCommands {
         fn sent(&self) -> Vec<BroadcastCommand> {
             self.sent.lock().expect("sender mutex poisoned").clone()
         }
     }
 
-    impl BroadcastCommandSender for FakeSender {
-        fn send_message(&self, message: BroadcastCommand) -> Result<(), IRacingSDKError> {
+    #[async_trait]
+    impl BroadcastCommandPort for FakeCommands {
+        async fn send(&self, command: BroadcastCommand) -> Result<(), BroadcastError> {
             self.sent
                 .lock()
                 .expect("sender mutex poisoned")
-                .push(message);
+                .push(command);
             Ok(())
         }
     }
 
     #[derive(Default)]
-    struct FakeObservation {
-        available_camera_groups: StdMutex<VecDeque<Result<Vec<CameraGroup>, Status>>>,
-        camera_snapshots:
-            StdMutex<VecDeque<Result<ObservedValue<CameraSelectionTelemetry>, Status>>>,
-        camera_waits: StdMutex<VecDeque<Result<ObservedValue<CameraSelectionTelemetry>, Status>>>,
-        car_number_resolutions: StdMutex<HashMap<String, Result<u32, Status>>>,
-        replay_snapshots: StdMutex<VecDeque<Result<ObservedValue<ReplaySpeedTelemetry>, Status>>>,
-        replay_waits: StdMutex<VecDeque<Result<ObservedValue<ReplaySpeedTelemetry>, Status>>>,
+    struct FakeCamera {
+        snapshots: StdMutex<VecDeque<Result<CameraSelectionSnapshot, BroadcastError>>>,
+        waits: StdMutex<VecDeque<Result<CameraSelectionSnapshot, BroadcastError>>>,
+        groups: StdMutex<VecDeque<Result<Vec<AvailableCameraGroup>, BroadcastError>>>,
+        resolutions: StdMutex<HashMap<String, u32>>,
     }
 
-    impl FakeObservation {
-        fn with_camera_snapshot(
-            self,
-            value: Result<ObservedValue<CameraSelectionTelemetry>, Status>,
-        ) -> Self {
-            self.camera_snapshots
+    impl FakeCamera {
+        fn with_snapshot(self, value: Result<CameraSelectionSnapshot, BroadcastError>) -> Self {
+            self.snapshots
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .push_back(value);
             self
         }
 
-        fn with_camera_wait(
-            self,
-            value: Result<ObservedValue<CameraSelectionTelemetry>, Status>,
-        ) -> Self {
-            self.camera_waits
+        fn with_wait(self, value: Result<CameraSelectionSnapshot, BroadcastError>) -> Self {
+            self.waits
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .push_back(value);
             self
         }
 
-        fn with_replay_snapshot(
-            self,
-            value: Result<ObservedValue<ReplaySpeedTelemetry>, Status>,
-        ) -> Self {
-            self.replay_snapshots
+        fn with_groups(self, value: Result<Vec<AvailableCameraGroup>, BroadcastError>) -> Self {
+            self.groups
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .push_back(value);
             self
         }
 
-        fn with_replay_wait(
-            self,
-            value: Result<ObservedValue<ReplaySpeedTelemetry>, Status>,
-        ) -> Self {
-            self.replay_waits
+        fn with_resolution(self, car_number: &str, car_index: u32) -> Self {
+            self.resolutions
                 .lock()
-                .expect("observation mutex poisoned")
-                .push_back(value);
-            self
-        }
-
-        fn with_car_resolution(self, car_number: &str, car_index: Result<u32, Status>) -> Self {
-            self.car_number_resolutions
-                .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .insert(car_number.to_string(), car_index);
             self
         }
     }
 
-    impl ObservationBackend for FakeObservation {
-        fn available_camera_groups(
-            &self,
-            _session_version: u32,
-        ) -> Result<Vec<CameraGroup>, Status> {
-            self.available_camera_groups
+    #[async_trait]
+    impl CameraStatePort for FakeCamera {
+        async fn selection_snapshot(&self) -> Result<CameraSelectionSnapshot, BroadcastError> {
+            self.snapshots
                 .lock()
-                .expect("observation mutex poisoned")
-                .pop_front()
-                .unwrap_or_else(|| Ok(Vec::new()))
-        }
-
-        fn camera_selection_snapshot(
-            &self,
-        ) -> Result<ObservedValue<CameraSelectionTelemetry>, Status> {
-            self.camera_snapshots
-                .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .pop_front()
                 .expect("camera snapshot should be configured")
         }
 
-        fn wait_for_camera_selection(
+        async fn wait_for_selection(
             &self,
-            _previous: ObservedValue<CameraSelectionTelemetry>,
+            _previous: CameraSelectionSnapshot,
             _expected: CameraSelectionExpectation,
             _timeout: Duration,
-        ) -> Result<ObservedValue<CameraSelectionTelemetry>, Status> {
-            self.camera_waits
+        ) -> Result<CameraSelectionSnapshot, BroadcastError> {
+            self.waits
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .pop_front()
                 .expect("camera wait should be configured")
         }
 
-        fn resolve_car_index_by_number(
+        async fn state_snapshot(&self) -> Result<CameraStateSnapshot, BroadcastError> {
+            Err(BroadcastError::ObservationDisabled)
+        }
+
+        async fn wait_for_state(
+            &self,
+            _previous: CameraStateSnapshot,
+            _expected: CameraStateExpectation,
+            _timeout: Duration,
+        ) -> Result<CameraStateSnapshot, BroadcastError> {
+            Err(BroadcastError::ObservationDisabled)
+        }
+
+        async fn available_camera_groups(
+            &self,
+            _session_version: u32,
+        ) -> Result<Vec<AvailableCameraGroup>, BroadcastError> {
+            self.groups
+                .lock()
+                .expect("camera mutex poisoned")
+                .pop_front()
+                .unwrap_or_else(|| Ok(Vec::new()))
+        }
+
+        async fn resolve_car_index_by_number(
             &self,
             _session_version: u32,
             car_number: &str,
-        ) -> Result<u32, Status> {
-            self.car_number_resolutions
+        ) -> Result<u32, BroadcastError> {
+            self.resolutions
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("camera mutex poisoned")
                 .get(car_number)
-                .cloned()
-                .unwrap_or_else(|| {
-                    Err(Status::failed_precondition(format!(
+                .copied()
+                .ok_or_else(|| {
+                    BroadcastError::FailedPrecondition(format!(
                         "no fake car resolution configured for `{car_number}`"
-                    )))
+                    ))
                 })
         }
+    }
 
-        fn replay_speed_snapshot(&self) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status> {
-            self.replay_snapshots
+    #[derive(Default)]
+    struct FakeReplay {
+        snapshots: StdMutex<VecDeque<Result<ReplaySpeedSnapshot, BroadcastError>>>,
+        waits: StdMutex<VecDeque<Result<ReplaySpeedSnapshot, BroadcastError>>>,
+    }
+
+    impl FakeReplay {
+        fn with_snapshot(self, value: Result<ReplaySpeedSnapshot, BroadcastError>) -> Self {
+            self.snapshots
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("replay mutex poisoned")
+                .push_back(value);
+            self
+        }
+
+        fn with_wait(self, value: Result<ReplaySpeedSnapshot, BroadcastError>) -> Self {
+            self.waits
+                .lock()
+                .expect("replay mutex poisoned")
+                .push_back(value);
+            self
+        }
+    }
+
+    #[async_trait]
+    impl ReplayStatePort for FakeReplay {
+        async fn speed_snapshot(&self) -> Result<ReplaySpeedSnapshot, BroadcastError> {
+            self.snapshots
+                .lock()
+                .expect("replay mutex poisoned")
                 .pop_front()
                 .expect("replay snapshot should be configured")
         }
 
-        fn wait_for_replay_speed(
+        async fn wait_for_speed(
             &self,
-            _previous: ObservedValue<ReplaySpeedTelemetry>,
+            _previous: ReplaySpeedSnapshot,
             _expected: ReplaySpeedExpectation,
             _timeout: Duration,
-        ) -> Result<ObservedValue<ReplaySpeedTelemetry>, Status> {
-            self.replay_waits
+        ) -> Result<ReplaySpeedSnapshot, BroadcastError> {
+            self.waits
                 .lock()
-                .expect("observation mutex poisoned")
+                .expect("replay mutex poisoned")
                 .pop_front()
                 .expect("replay wait should be configured")
         }
-    }
 
-    fn observed_camera(
-        session_version: u32,
-        car_index: i32,
-        group: i32,
-        camera: i32,
-    ) -> ObservedValue<CameraSelectionTelemetry> {
-        ObservedValue {
-            value: CameraSelectionTelemetry {
-                car_index,
-                group,
-                camera,
-            },
-            session_version,
+        async fn position_snapshot(&self) -> Result<ReplayPositionSnapshot, BroadcastError> {
+            Err(BroadcastError::ObservationDisabled)
+        }
+
+        async fn wait_for_position(
+            &self,
+            _previous: ReplayPositionSnapshot,
+            _expected: ReplayPositionExpectation,
+            _timeout: Duration,
+        ) -> Result<ReplayPositionSnapshot, BroadcastError> {
+            Err(BroadcastError::ObservationDisabled)
         }
     }
 
-    fn observed_replay(
+    fn camera_snapshot(
         session_version: u32,
-        speed: i32,
-        is_slow_motion: bool,
-    ) -> ObservedValue<ReplaySpeedTelemetry> {
-        ObservedValue {
-            value: ReplaySpeedTelemetry {
-                speed,
-                is_slow_motion,
-            },
+        car_index: u32,
+        group: u32,
+        camera: u32,
+    ) -> CameraSelectionSnapshot {
+        CameraSelectionSnapshot {
             session_version,
+            car_index,
+            group,
+            camera,
+        }
+    }
+
+    fn replay_snapshot(speed: i32, is_slow_motion: bool) -> ReplaySpeedSnapshot {
+        ReplaySpeedSnapshot {
+            speed,
+            is_slow_motion,
         }
     }
 
     fn service_with(
-        sender: Arc<FakeSender>,
-        observation: Option<Arc<FakeObservation>>,
+        commands: Arc<FakeCommands>,
+        camera: Option<Arc<FakeCamera>>,
+        replay: Option<Arc<FakeReplay>>,
     ) -> BroadcastService {
-        BroadcastService {
-            sender,
-            observation: observation.map(|observation| observation as Arc<dyn ObservationBackend>),
-            observation_timeout: Duration::from_millis(25),
+        let commands: Arc<dyn BroadcastCommandPort> = commands;
+
+        match (camera, replay) {
+            (Some(camera), Some(replay)) => {
+                let camera: Arc<dyn CameraStatePort> = camera;
+                let replay: Arc<dyn ReplayStatePort> = replay;
+                let disabled = Arc::new(DisabledObservationPort);
+                BroadcastService::from_use_cases(Arc::new(BroadcastUseCases::new(
+                    commands,
+                    camera,
+                    replay,
+                    disabled.clone(),
+                    disabled.clone(),
+                    disabled,
+                    Duration::from_millis(25),
+                )))
+            }
+            (None, None) => {
+                let disabled = Arc::new(DisabledObservationPort);
+                BroadcastService::from_use_cases(Arc::new(BroadcastUseCases::new(
+                    commands,
+                    disabled.clone(),
+                    disabled.clone(),
+                    disabled.clone(),
+                    disabled.clone(),
+                    disabled,
+                    Duration::from_millis(25),
+                )))
+            }
+            _ => panic!("camera and replay fakes must be provided together"),
         }
     }
 
     #[tokio::test]
-    async fn camera_switch_position_observes_and_returns_current_state() {
-        let sender = Arc::new(FakeSender::default());
-        let observation = Arc::new(
-            FakeObservation::default()
-                .with_camera_snapshot(Ok(observed_camera(7, 1, 2, 3)))
-                .with_camera_wait(Ok(observed_camera(7, 42, 4, 5))),
+    async fn get_available_cameras_maps_domain_response() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 42, 4, 5)))
+                .with_groups(Ok(vec![AvailableCameraGroup {
+                    number: 4,
+                    name: "TV".to_string(),
+                    cameras: vec![AvailableCamera {
+                        number: 5,
+                        name: Some("Nose".to_string()),
+                    }],
+                }])),
         );
-        let service = service_with(Arc::clone(&sender), Some(observation));
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(commands, Some(camera), Some(replay));
+
+        let response = service
+            .get_available_cameras(Request::new(()))
+            .await
+            .expect("available cameras should succeed")
+            .into_inner();
+
+        assert_eq!(response.car_index, 42);
+        assert_eq!(response.group, 4);
+        assert_eq!(response.camera, 5);
+        assert_eq!(response.camera_groups.len(), 1);
+        assert_eq!(response.camera_groups[0].number, 4);
+        assert_eq!(response.camera_groups[0].cameras[0].number, Some(5));
+    }
+
+    #[tokio::test]
+    async fn camera_switch_position_observes_and_returns_current_state() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 1, 2, 3)))
+                .with_wait(Ok(camera_snapshot(7, 42, 4, 5))),
+        );
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
 
         let response = service
             .camera_switch_position(Request::new(CameraSwitchPositionRequest {
@@ -1247,21 +993,22 @@ mod tests {
         assert_eq!(response.group, 4);
         assert_eq!(response.camera, 5);
         assert_eq!(
-            sender.sent(),
+            commands.sent(),
             vec![BroadcastCommand::CameraSwitchPosition(42, 4, 5)]
         );
     }
 
     #[tokio::test]
     async fn camera_switch_number_resolves_car_index_and_returns_observed_state() {
-        let sender = Arc::new(FakeSender::default());
-        let observation = Arc::new(
-            FakeObservation::default()
-                .with_camera_snapshot(Ok(observed_camera(11, 1, 2, 3)))
-                .with_camera_wait(Ok(observed_camera(11, 12, 6, 7)))
-                .with_car_resolution("012", Ok(12)),
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(11, 1, 2, 3)))
+                .with_wait(Ok(camera_snapshot(11, 12, 6, 7)))
+                .with_resolution("012", 12),
         );
-        let service = service_with(Arc::clone(&sender), Some(observation));
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
 
         let response = service
             .camera_switch_number(Request::new(CameraSwitchNumberRequest {
@@ -1277,7 +1024,7 @@ mod tests {
         assert_eq!(response.group, 6);
         assert_eq!(response.camera, 7);
         assert_eq!(
-            sender.sent(),
+            commands.sent(),
             vec![BroadcastCommand::CameraSwitchNumber(
                 "012".to_string(),
                 6,
@@ -1288,13 +1035,14 @@ mod tests {
 
     #[tokio::test]
     async fn replay_set_play_speed_observes_and_returns_current_state() {
-        let sender = Arc::new(FakeSender::default());
-        let observation = Arc::new(
-            FakeObservation::default()
-                .with_replay_snapshot(Ok(observed_replay(5, 0, false)))
-                .with_replay_wait(Ok(observed_replay(5, 2, true))),
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(FakeCamera::default());
+        let replay = Arc::new(
+            FakeReplay::default()
+                .with_snapshot(Ok(replay_snapshot(0, false)))
+                .with_wait(Ok(replay_snapshot(2, true))),
         );
-        let service = service_with(Arc::clone(&sender), Some(observation));
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
 
         let response = service
             .replay_set_play_speed(Request::new(ReplaySetPlaySpeedRequest {
@@ -1308,15 +1056,15 @@ mod tests {
         assert_eq!(response.speed, 2);
         assert!(response.is_slow_motion);
         assert_eq!(
-            sender.sent(),
+            commands.sent(),
             vec![BroadcastCommand::ReplaySetPlaySpeed(2, true)]
         );
     }
 
     #[tokio::test]
     async fn observed_rpc_fails_fast_without_observer() {
-        let sender = Arc::new(FakeSender::default());
-        let service = service_with(sender, None);
+        let commands = Arc::new(FakeCommands::default());
+        let service = service_with(commands, None, None);
 
         let error = service
             .camera_switch_position(Request::new(CameraSwitchPositionRequest {
@@ -1332,13 +1080,14 @@ mod tests {
 
     #[tokio::test]
     async fn observed_rpc_propagates_timeout() {
-        let sender = Arc::new(FakeSender::default());
-        let observation = Arc::new(
-            FakeObservation::default()
-                .with_camera_snapshot(Ok(observed_camera(7, 1, 2, 3)))
-                .with_camera_wait(Err(Status::deadline_exceeded("timed out"))),
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 1, 2, 3)))
+                .with_wait(Err(BroadcastError::ObservationTimeout)),
         );
-        let service = service_with(sender, Some(observation));
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(commands, Some(camera), Some(replay));
 
         let error = service
             .camera_switch_position(Request::new(CameraSwitchPositionRequest {
@@ -1354,8 +1103,8 @@ mod tests {
 
     #[tokio::test]
     async fn chat_command_uses_ack_path_without_observation() {
-        let sender = Arc::new(FakeSender::default());
-        let service = service_with(Arc::clone(&sender), None);
+        let commands = Arc::new(FakeCommands::default());
+        let service = service_with(Arc::clone(&commands), None, None);
 
         service
             .chat_command(Request::new(ChatCommandRequest {
@@ -1365,6 +1114,6 @@ mod tests {
             .await
             .expect("chat command should succeed");
 
-        assert_eq!(sender.sent(), vec![BroadcastCommand::ChatCommandMacro(3)]);
+        assert_eq!(commands.sent(), vec![BroadcastCommand::ChatCommandMacro(3)]);
     }
 }

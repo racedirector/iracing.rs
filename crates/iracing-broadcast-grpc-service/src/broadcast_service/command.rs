@@ -4,7 +4,36 @@ use crate::broadcast::*;
 
 use super::request;
 
-use iracing_sdk::{BroadcastCommand, PitCommand};
+use iracing_sdk::{BroadcastCommand, CameraState, PitCommand};
+
+pub(crate) fn camera_state(state: u32) -> CameraState {
+    CameraState::from_bits_retain(state)
+}
+
+pub(crate) fn replay_position_mode(mode: ReplayPositionMode) -> iracing_sdk::ReplayPositionMode {
+    match mode {
+        ReplayPositionMode::Begin => iracing_sdk::ReplayPositionMode::Begin,
+        ReplayPositionMode::Current => iracing_sdk::ReplayPositionMode::Current,
+        ReplayPositionMode::End => iracing_sdk::ReplayPositionMode::End,
+        ReplayPositionMode::Unknown => unreachable!("unknown replay position mode is rejected"),
+    }
+}
+
+pub(crate) fn replay_search_mode(mode: ReplaySearchMode) -> iracing_sdk::ReplaySearchMode {
+    match mode {
+        ReplaySearchMode::ToStart => iracing_sdk::ReplaySearchMode::ToStart,
+        ReplaySearchMode::ToEnd => iracing_sdk::ReplaySearchMode::ToEnd,
+        ReplaySearchMode::PreviousSession => iracing_sdk::ReplaySearchMode::PrevSession,
+        ReplaySearchMode::NextSession => iracing_sdk::ReplaySearchMode::NextSession,
+        ReplaySearchMode::PreviousLap => iracing_sdk::ReplaySearchMode::PrevLap,
+        ReplaySearchMode::NextLap => iracing_sdk::ReplaySearchMode::NextLap,
+        ReplaySearchMode::PreviousFrame => iracing_sdk::ReplaySearchMode::PrevFrame,
+        ReplaySearchMode::NextFrame => iracing_sdk::ReplaySearchMode::NextFrame,
+        ReplaySearchMode::PreviousIncident => iracing_sdk::ReplaySearchMode::PrevIncident,
+        ReplaySearchMode::NextIncident => iracing_sdk::ReplaySearchMode::NextIncident,
+        ReplaySearchMode::Unknown => unreachable!("unknown replay search mode is rejected"),
+    }
+}
 
 pub(crate) fn replay_state_mode(mode: ReplayStateMode) -> iracing_sdk::ReplayStateMode {
     match mode {
@@ -69,6 +98,17 @@ pub(crate) fn pit_command(request: PitCommandRequest) -> Result<PitCommand, Stat
         PitCommandMode::ClearFuel => PitCommand::ClearFuel,
         PitCommandMode::Unknown => unreachable!("unknown pit command mode is rejected"),
     })
+}
+
+pub(crate) fn telemetry_command_mode(
+    mode: TelemetryCommandMode,
+) -> iracing_sdk::TelemetryCommandMode {
+    match mode {
+        TelemetryCommandMode::Stop => iracing_sdk::TelemetryCommandMode::Stop,
+        TelemetryCommandMode::Start => iracing_sdk::TelemetryCommandMode::Start,
+        TelemetryCommandMode::Restart => iracing_sdk::TelemetryCommandMode::Restart,
+        TelemetryCommandMode::Unknown => unreachable!("unknown telemetry command mode is rejected"),
+    }
 }
 
 pub(crate) fn video_capture_mode(mode: VideoCaptureMode) -> iracing_sdk::VideoCaptureMode {

@@ -13,9 +13,11 @@ autobins = false
 workspace = true
 
 [dependencies]
+async-trait = "0.1"
 iracing-sdk = { version = "0.1.0", path = '../iracing-sdk' }
 prost = "0.14"
 socket2 = "0.6"
+thiserror = { workspace = true }
 tokio = { version = "1.0", features = [
   "macros",
   "rt-multi-thread",
@@ -29,9 +31,6 @@ tonic-health = "0.14"
 tonic-reflection = "0.14"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-[dev-dependencies]
-async-trait = "0.1"
 
 [build-dependencies]
 protoc-bin-vendored = "3"

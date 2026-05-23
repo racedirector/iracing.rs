@@ -1,6 +1,6 @@
 use std::{error::Error as StdError, fmt, sync::Arc, time::Duration};
 
-use iracing_sdk::{FrameAdapter, IRacingSDKError, Provider, VariableSchema};
+use iracing_sdk::{FrameAdapter, IRacingSDKError, SendProvider, VariableSchema};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
@@ -29,13 +29,83 @@ pub(crate) struct ReplaySpeedTelemetry {
     pub is_slow_motion: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct CameraStateTelemetry {
+    #[field_name = "CamCameraState"]
+    #[fail_if_missing]
+    pub state: iracing_sdk::CameraState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct ReplayPositionTelemetry {
+    #[field_name = "ReplayFrameNum"]
+    #[fail_if_missing]
+    pub frame: i32,
+
+    #[field_name = "ReplaySessionNum"]
+    #[fail_if_missing]
+    pub session_number: i32,
+
+    #[field_name = "ReplaySessionTime"]
+    #[fail_if_missing]
+    pub session_time: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct PitServiceTelemetry {
+    #[field_name = "PitSvFlags"]
+    #[fail_if_missing]
+    pub service_flags: iracing_sdk::PitServiceFlags,
+
+    #[field_name = "PitSvFuel"]
+    #[fail_if_missing]
+    pub fuel: f32,
+
+    #[field_name = "PitSvLFP"]
+    #[fail_if_missing]
+    pub lf_pressure: f32,
+
+    #[field_name = "PitSvRFP"]
+    #[fail_if_missing]
+    pub rf_pressure: f32,
+
+    #[field_name = "PitSvLRP"]
+    #[fail_if_missing]
+    pub lr_pressure: f32,
+
+    #[field_name = "PitSvRRP"]
+    #[fail_if_missing]
+    pub rr_pressure: f32,
+
+    #[field_name = "PitSvTireCompound"]
+    #[fail_if_missing]
+    pub tire_compound: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct TelemetryLoggingTelemetry {
+    #[field_name = "IsDiskLoggingEnabled"]
+    #[fail_if_missing]
+    pub is_disk_logging_enabled: bool,
+
+    #[field_name = "IsDiskLoggingActive"]
+    #[fail_if_missing]
+    pub is_disk_logging_active: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct ForceFeedbackTelemetry {
+    #[field_name = "SteeringWheelMaxForceNm"]
+    #[fail_if_missing]
+    pub max_force: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ObservedValue<A> {
     pub value: A,
     pub session_version: u32,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum TelemetryObserverError {
     Sdk(IRacingSDKError),
@@ -68,7 +138,6 @@ impl From<IRacingSDKError> for TelemetryObserverError {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) struct TelemetryObserver<P> {
     provider: Arc<Mutex<P>>,
     schema: Arc<VariableSchema>,
@@ -83,10 +152,9 @@ impl<P> Clone for TelemetryObserver<P> {
     }
 }
 
-#[allow(dead_code)]
 impl<P> TelemetryObserver<P>
 where
-    P: Provider,
+    P: SendProvider,
 {
     pub(crate) fn new(provider: Arc<Mutex<P>>, schema: Arc<VariableSchema>) -> Self {
         Self { provider, schema }
@@ -100,23 +168,15 @@ where
         Ok(())
     }
 
-    pub(crate) async fn snapshot<A>(&self) -> Result<A, TelemetryObserverError>
-    where
-        A: FrameAdapter,
-    {
-        Ok(self.snapshot_observed().await?.value)
-    }
-
     pub(crate) async fn snapshot_observed<A>(
         &self,
     ) -> Result<ObservedValue<A>, TelemetryObserverError>
     where
-        A: FrameAdapter,
+        A: FrameAdapter + Send,
     {
         let validation = A::validate_schema(&self.schema)?;
         let mut provider = self.provider.lock().await;
-        let packet = provider
-            .next_frame()
+        let packet = SendProvider::next_frame_send(&mut *provider)
             .await?
             .ok_or(TelemetryObserverError::EndOfSource)?;
 
@@ -126,29 +186,14 @@ where
         })
     }
 
-    pub(crate) async fn wait_for_change_matching<A>(
-        &self,
-        previous: A,
-        timeout: Duration,
-        matches: impl Fn(&A) -> bool,
-    ) -> Result<A, TelemetryObserverError>
-    where
-        A: FrameAdapter + PartialEq,
-    {
-        Ok(self
-            .wait_for_change_matching_observed(previous, timeout, matches)
-            .await?
-            .value)
-    }
-
     pub(crate) async fn wait_for_change_matching_observed<A>(
         &self,
         previous: A,
         timeout: Duration,
-        matches: impl Fn(&A) -> bool,
+        matches: impl Fn(&A) -> bool + Send,
     ) -> Result<ObservedValue<A>, TelemetryObserverError>
     where
-        A: FrameAdapter + PartialEq,
+        A: FrameAdapter + PartialEq + Send,
     {
         let validation = A::validate_schema(&self.schema)?;
         let deadline = tokio::time::Instant::now() + timeout;
@@ -162,7 +207,7 @@ where
             let remaining = deadline.saturating_duration_since(now);
             let next_frame = {
                 let mut provider = self.provider.lock().await;
-                tokio::time::timeout(remaining, provider.next_frame()).await
+                tokio::time::timeout(remaining, SendProvider::next_frame_send(&mut *provider)).await
             };
 
             let packet = match next_frame {
@@ -185,8 +230,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    #![allow(dead_code)]
-
     use std::{
         collections::{HashMap, VecDeque},
         sync::Arc,
@@ -195,12 +238,13 @@ mod tests {
 
     use async_trait::async_trait;
     use iracing_sdk::{
-        FramePacket, IRacingSDKError, Provider, VariableInfo, VariableSchema, VariableType,
+        FramePacket, IRacingSDKError, SendProvider, VariableInfo, VariableSchema, VariableType,
     };
     use tokio::sync::Mutex;
 
     use super::{
-        CameraSelectionTelemetry, ReplaySpeedTelemetry, TelemetryObserver, TelemetryObserverError,
+        CameraSelectionTelemetry, ObservedValue, ReplaySpeedTelemetry, TelemetryObserver,
+        TelemetryObserverError,
     };
 
     struct BroadcastRpcHarness<P> {
@@ -209,18 +253,26 @@ mod tests {
 
     impl<P> BroadcastRpcHarness<P>
     where
-        P: Provider,
+        P: SendProvider,
     {
         async fn camera_snapshot(
             &self,
         ) -> Result<CameraSelectionTelemetry, TelemetryObserverError> {
-            self.telemetry.snapshot().await
+            Ok(self
+                .telemetry
+                .snapshot_observed::<CameraSelectionTelemetry>()
+                .await?
+                .value)
         }
 
         async fn replay_speed_snapshot(
             &self,
         ) -> Result<ReplaySpeedTelemetry, TelemetryObserverError> {
-            self.telemetry.snapshot().await
+            Ok(self
+                .telemetry
+                .snapshot_observed::<ReplaySpeedTelemetry>()
+                .await?
+                .value)
         }
     }
 
@@ -233,25 +285,23 @@ mod tests {
     }
 
     struct FakeProvider {
-        schema: Arc<VariableSchema>,
         frames: VecDeque<PlannedFrame>,
     }
 
     impl FakeProvider {
         fn new(
-            schema: Arc<VariableSchema>,
+            _schema: Arc<VariableSchema>,
             frames: impl IntoIterator<Item = PlannedFrame>,
         ) -> Self {
             Self {
-                schema,
                 frames: frames.into_iter().collect(),
             }
         }
     }
 
-    #[async_trait(?Send)]
-    impl Provider for FakeProvider {
-        async fn next_frame(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
+    #[async_trait]
+    impl SendProvider for FakeProvider {
+        async fn next_frame_send(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
             match self
                 .frames
                 .pop_front()
@@ -265,13 +315,11 @@ mod tests {
             }
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> iracing_sdk::Result<Option<String>> {
+        async fn session_yaml_send(
+            &mut self,
+            _version: u32,
+        ) -> iracing_sdk::Result<Option<String>> {
             Ok(None)
-        }
-
-        fn tick_rate(&self) -> f64 {
-            let _ = &self.schema;
-            60.0
         }
     }
 
@@ -416,9 +464,10 @@ mod tests {
         );
 
         let actual = observer
-            .snapshot::<CameraSelectionTelemetry>()
+            .snapshot_observed::<CameraSelectionTelemetry>()
             .await
-            .expect("snapshot should succeed");
+            .expect("snapshot should succeed")
+            .value;
 
         assert_eq!(actual, expected);
     }
@@ -434,7 +483,10 @@ mod tests {
             schema,
         );
 
-        match observer.snapshot::<CameraSelectionTelemetry>().await {
+        match observer
+            .snapshot_observed::<CameraSelectionTelemetry>()
+            .await
+        {
             Err(TelemetryObserverError::EndOfSource) => {}
             other => panic!("unexpected result: {other:?}"),
         }
@@ -475,11 +527,12 @@ mod tests {
         );
 
         let actual = observer
-            .wait_for_change_matching(previous, Duration::from_millis(100), |current| {
+            .wait_for_change_matching_observed(previous, Duration::from_millis(100), |current| {
                 current.group == matching.group
             })
             .await
-            .expect("wait should find a changed frame");
+            .expect("wait should find a changed frame")
+            .value;
 
         assert_eq!(actual, matching);
     }
@@ -509,7 +562,7 @@ mod tests {
         );
 
         match observer
-            .wait_for_change_matching(previous, Duration::from_millis(10), |_| true)
+            .wait_for_change_matching_observed(previous, Duration::from_millis(10), |_| true)
             .await
         {
             Err(TelemetryObserverError::Timeout) => {}
@@ -534,7 +587,7 @@ mod tests {
         );
 
         match observer
-            .wait_for_change_matching(previous, Duration::from_millis(20), |_| true)
+            .wait_for_change_matching_observed(previous, Duration::from_millis(20), |_| true)
             .await
         {
             Err(TelemetryObserverError::EndOfSource) => {}
@@ -554,7 +607,10 @@ mod tests {
             schema,
         );
 
-        match observer.snapshot::<CameraSelectionTelemetry>().await {
+        match observer
+            .snapshot_observed::<CameraSelectionTelemetry>()
+            .await
+        {
             Err(TelemetryObserverError::Sdk(IRacingSDKError::Connection { reason, .. })) => {
                 assert_eq!(reason, "provider blew up");
             }
@@ -596,15 +652,15 @@ mod tests {
         let cloned = observer.clone();
 
         let (left, right): (
-            Result<CameraSelectionTelemetry, TelemetryObserverError>,
-            Result<CameraSelectionTelemetry, TelemetryObserverError>,
+            Result<ObservedValue<CameraSelectionTelemetry>, TelemetryObserverError>,
+            Result<ObservedValue<CameraSelectionTelemetry>, TelemetryObserverError>,
         ) = tokio::join!(
-            observer.snapshot::<CameraSelectionTelemetry>(),
-            cloned.snapshot::<CameraSelectionTelemetry>()
+            observer.snapshot_observed::<CameraSelectionTelemetry>(),
+            cloned.snapshot_observed::<CameraSelectionTelemetry>()
         );
 
-        let left = left.expect("left snapshot should succeed");
-        let right = right.expect("right snapshot should succeed");
+        let left = left.expect("left snapshot should succeed").value;
+        let right = right.expect("right snapshot should succeed").value;
 
         assert_ne!(left, right);
         assert!(
@@ -632,13 +688,15 @@ mod tests {
         );
 
         let camera = observer
-            .snapshot::<CameraSelectionTelemetry>()
+            .snapshot_observed::<CameraSelectionTelemetry>()
             .await
-            .expect("camera snapshot should succeed");
+            .expect("camera snapshot should succeed")
+            .value;
         let replay = observer
-            .snapshot::<ReplaySpeedTelemetry>()
+            .snapshot_observed::<ReplaySpeedTelemetry>()
             .await
-            .expect("replay snapshot should succeed");
+            .expect("replay snapshot should succeed")
+            .value;
 
         assert_eq!(
             camera,

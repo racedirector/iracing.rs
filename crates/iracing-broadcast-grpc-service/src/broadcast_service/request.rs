@@ -33,6 +33,10 @@ pub(crate) fn required_i16(field_name: &'static str, value: Option<i32>) -> Resu
     }
 }
 
+pub(crate) fn required_u32(field_name: &'static str, value: Option<u32>) -> Result<u32, Status> {
+    value.ok_or_else(|| missing_status(field_name))
+}
+
 pub(crate) fn required_bool(field_name: &'static str, value: Option<bool>) -> Result<bool, Status> {
     value.ok_or_else(|| missing_status(field_name))
 }

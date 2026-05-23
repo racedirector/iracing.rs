@@ -1018,6 +1018,7 @@ dependencies = [
  "prost",
  "protoc-bin-vendored",
  "socket2",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tonic",

@@ -68,6 +68,9 @@ pub mod yaml_utils;
 pub use adapters::*;
 pub use error::*;
 pub use ibt::IbtReader;
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+pub use providers::SendProvider;
 pub use providers::{IbtProvider, Provider};
 pub use schema::{SessionInfo, SessionInfoParser};
 pub use types::*;

@@ -1,8 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::{
-    FramePacket, Provider, Result, VariableSchema, WaitResult, WindowsConnection, yaml_utils,
-};
+use super::{Provider, SendProvider};
+use crate::{FramePacket, Result, VariableSchema, WaitResult, WindowsConnection, yaml_utils};
 
 /// A [`Provider`] that streams telemetry frames from an iRacing mmap file.
 #[derive(Debug)]
@@ -39,11 +38,8 @@ impl LiveProvider {
     pub fn schema(&self) -> Arc<VariableSchema> {
         Arc::clone(&self.schema)
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl Provider for LiveProvider {
-    async fn next_frame(&mut self) -> Result<Option<crate::FramePacket>> {
+    async fn next_frame_impl(&mut self) -> Result<Option<FramePacket>> {
         // Track how long we've been waiting without a connection
         let mut no_connection_count = 0u32;
         const MAX_NO_CONNECTION_ATTEMPTS: u32 = 600; // 5 minutes at 500ms intervals
@@ -127,7 +123,7 @@ impl Provider for LiveProvider {
         }
     }
 
-    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml_impl(&mut self, _version: u32) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
@@ -151,8 +147,30 @@ impl Provider for LiveProvider {
 
         Ok(Some(cleaned_yaml))
     }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Provider for LiveProvider {
+    async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
+        self.next_frame_impl().await
+    }
+
+    async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
+        self.session_yaml_impl(version).await
+    }
 
     fn tick_rate(&self) -> f64 {
         self.connection.header().tick_rate as f64
+    }
+}
+
+#[async_trait::async_trait]
+impl SendProvider for LiveProvider {
+    async fn next_frame_send(&mut self) -> Result<Option<FramePacket>> {
+        self.next_frame_impl().await
+    }
+
+    async fn session_yaml_send(&mut self, version: u32) -> Result<Option<String>> {
+        self.session_yaml_impl(version).await
     }
 }
