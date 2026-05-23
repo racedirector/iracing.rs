@@ -21,6 +21,24 @@ pub trait Provider {
     fn tick_rate(&self) -> f64;
 }
 
+/// A Windows-only provider extension whose async operations are safe to await
+/// from `Send` futures.
+///
+/// The base [`Provider`] trait intentionally uses `?Send` so replay providers
+/// can remain usable in WASM contexts. Live Windows telemetry can satisfy the
+/// stronger bound, so adapters that run under multi-threaded async services can
+/// opt into this trait without changing the cross-platform provider contract.
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(windows)))]
+#[async_trait::async_trait]
+pub trait SendProvider: Send {
+    /// Return the next telemetry frame, or `Ok(None)` when the source is exhausted.
+    async fn next_frame_send(&mut self) -> Result<Option<FramePacket>>;
+
+    /// Return the session info YAML for `version`, or `Ok(None)` if unchanged.
+    async fn session_yaml_send(&mut self, version: u32) -> Result<Option<String>>;
+}
+
 /// IBT replay file provider.
 mod ibt;
 
