@@ -5,6 +5,9 @@ use std::net::SocketAddr;
 use iracing_broadcast_grpc_service::{BroadcastServer, BroadcastService, FILE_DESCRIPTOR_SET};
 
 #[cfg(windows)]
+use iracing_sdk::LiveProvider;
+
+#[cfg(windows)]
 use socket2::{Domain, Protocol, Socket, Type};
 
 #[cfg(windows)]
@@ -49,8 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         default_filter = "info,iracing_broadcast_grpc_service=trace,iracing_sdk=debug,tonic=info,tower=info",
         "starting broadcast gRPC server",
     );
-    tracing::debug!("constructing broadcast service");
-    let broadcast = BroadcastService::new()?;
+    tracing::debug!("opening live telemetry provider");
+    let live_provider = LiveProvider::new()?;
+    tracing::debug!("constructing broadcast service with externally provided live telemetry");
+    let broadcast = BroadcastService::builder()
+        .with_live_provider(live_provider)
+        .build()?;
     tracing::info!("broadcast service initialized");
     tracing::debug!("registering health and reflection services");
     let (health_reporter, health_service) = tonic_health::server::health_reporter();

@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{BroadcastService, DEFAULT_OBSERVATION_TIMEOUT};
-use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError};
+use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError, LiveProvider};
 
 /// Builder for a Windows live [`BroadcastService`].
 ///
@@ -18,6 +18,7 @@ use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError};
 /// telemetry-confirmed state, such as camera switch and replay speed changes.
 pub struct BroadcastServiceBuilder {
     sender: Option<Arc<dyn BroadcastCommandPort>>,
+    live_provider: Option<LiveProvider>,
     observation_enabled: bool,
     observation_timeout: Duration,
 }
@@ -34,6 +35,7 @@ impl Default for BroadcastServiceBuilder {
     fn default() -> Self {
         Self {
             sender: None,
+            live_provider: None,
             observation_enabled: true,
             observation_timeout: DEFAULT_OBSERVATION_TIMEOUT,
         }
@@ -47,6 +49,16 @@ impl BroadcastServiceBuilder {
     /// share startup error handling. Observation wiring is unchanged.
     pub fn with_client(mut self, client: BroadcastClient) -> Self {
         self.sender = Some(Arc::new(IracingBroadcastCommandSender::with_client(client)));
+        self
+    }
+
+    /// Use an already-created live telemetry provider for observation.
+    ///
+    /// This lets the caller control `LiveProvider` construction before handing
+    /// it to the gRPC service. The provider is ignored when observation is
+    /// disabled with [`Self::without_observation`].
+    pub fn with_live_provider(mut self, provider: LiveProvider) -> Self {
+        self.live_provider = Some(provider);
         self
     }
 
@@ -89,7 +101,13 @@ impl BroadcastServiceBuilder {
                 force_feedback: disabled,
             }
         } else {
-            let observation = Arc::new(IracingObservation::live()?);
+            let observation = Arc::new(match self.live_provider {
+                Some(provider) => {
+                    let schema = provider.schema();
+                    IracingObservation::from_provider(provider, schema)
+                }
+                None => IracingObservation::live()?,
+            });
             ObservationPorts {
                 camera: observation.clone(),
                 replay: observation.clone(),

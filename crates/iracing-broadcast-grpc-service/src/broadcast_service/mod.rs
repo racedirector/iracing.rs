@@ -486,9 +486,10 @@ impl Broadcast for BroadcastService {
         while let Some(request) = stream.message().await? {
             commands.push(command_impl::pit_command(request)?);
             if commands.len() > MAX_PIT_COMMANDS {
-                return Err(Status::resource_exhausted(
-                    format!("pit_command_stream exceeds maximum of {} commands", MAX_PIT_COMMANDS),
-                ));
+                return Err(Status::resource_exhausted(format!(
+                    "pit_command_stream exceeds maximum of {} commands",
+                    MAX_PIT_COMMANDS
+                )));
             }
         }
 
