@@ -474,6 +474,8 @@ impl Broadcast for BroadcastService {
         &self,
         request: Request<tonic::Streaming<PitCommandRequest>>,
     ) -> Result<Response<PitCommandResponse>, Status> {
+        const MAX_PIT_COMMANDS: usize = 1000;
+
         tracing::Span::current().record(
             "client.address",
             tracing::field::display(format_args!("{:?}", request.remote_addr())),
@@ -483,6 +485,11 @@ impl Broadcast for BroadcastService {
         let mut commands = Vec::new();
         while let Some(request) = stream.message().await? {
             commands.push(command_impl::pit_command(request)?);
+            if commands.len() > MAX_PIT_COMMANDS {
+                return Err(Status::resource_exhausted(
+                    format!("pit_command_stream exceeds maximum of {} commands", MAX_PIT_COMMANDS),
+                ));
+            }
         }
 
         if commands.is_empty() {

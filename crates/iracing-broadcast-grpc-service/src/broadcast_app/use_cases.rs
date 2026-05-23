@@ -244,6 +244,10 @@ impl BroadcastUseCases {
     ) -> Result<PitServiceSnapshot, BroadcastError> {
         let previous = self.pit.pit_service_snapshot().await?;
 
+        if commands.is_empty() {
+            return Ok(previous);
+        }
+
         for command in commands {
             self.send(BroadcastCommand::PitCommand(command)).await?;
         }
