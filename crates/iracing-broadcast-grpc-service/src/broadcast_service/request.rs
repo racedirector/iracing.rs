@@ -101,3 +101,123 @@ fn missing<T>(field_name: &'static str) -> Result<T, Status> {
 fn missing_status(field_name: &'static str) -> Status {
     Status::invalid_argument(format!("Missing `{field_name}`"))
 }
+
+#[cfg(test)]
+mod tests {
+    use tonic::Code;
+
+    use super::*;
+    use crate::broadcast::ReplaySearchMode;
+
+    fn assert_invalid_argument(error: Status, field: &str) {
+        assert_eq!(error.code(), Code::InvalidArgument);
+        assert!(
+            error.message().contains(field),
+            "error message should mention `{field}`: {}",
+            error.message()
+        );
+    }
+
+    #[test]
+    fn required_u16_accepts_present_values_in_range() {
+        assert_eq!(required_u16("position", Some(0)).unwrap(), 0);
+        assert_eq!(
+            required_u16("position", Some(u32::from(u16::MAX))).unwrap(),
+            u16::MAX
+        );
+    }
+
+    #[test]
+    fn required_u16_rejects_missing_and_overflow_values() {
+        assert_invalid_argument(required_u16("position", None).unwrap_err(), "position");
+        assert_invalid_argument(
+            required_u16("position", Some(u32::from(u16::MAX) + 1)).unwrap_err(),
+            "position",
+        );
+    }
+
+    #[test]
+    fn required_i16_accepts_present_values_in_range() {
+        assert_eq!(
+            required_i16("speed", Some(i32::from(i16::MIN))).unwrap(),
+            i16::MIN
+        );
+        assert_eq!(
+            required_i16("speed", Some(i32::from(i16::MAX))).unwrap(),
+            i16::MAX
+        );
+    }
+
+    #[test]
+    fn required_i16_rejects_missing_and_overflow_values() {
+        assert_invalid_argument(required_i16("speed", None).unwrap_err(), "speed");
+        assert_invalid_argument(
+            required_i16("speed", Some(i32::from(i16::MAX) + 1)).unwrap_err(),
+            "speed",
+        );
+        assert_invalid_argument(
+            required_i16("speed", Some(i32::from(i16::MIN) - 1)).unwrap_err(),
+            "speed",
+        );
+    }
+
+    #[test]
+    fn required_string_rejects_missing_and_empty_values() {
+        assert_eq!(
+            required_string("car_number", Some("012".to_string())).unwrap(),
+            "012"
+        );
+        assert_invalid_argument(
+            required_string("car_number", None).unwrap_err(),
+            "car_number",
+        );
+        assert_invalid_argument(
+            required_string("car_number", Some(String::new())).unwrap_err(),
+            "car_number",
+        );
+    }
+
+    #[test]
+    fn required_enum_rejects_missing_unknown_and_invalid_values() {
+        assert_eq!(
+            required_enum::<ReplaySearchMode>("mode", Some(ReplaySearchMode::NextLap as i32))
+                .unwrap(),
+            ReplaySearchMode::NextLap
+        );
+        assert_invalid_argument(
+            required_enum::<ReplaySearchMode>("mode", None).unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            required_enum::<ReplaySearchMode>("mode", Some(0)).unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            required_enum::<ReplaySearchMode>("mode", Some(999)).unwrap_err(),
+            "mode",
+        );
+    }
+
+    #[test]
+    fn required_f32_accepts_only_finite_values() {
+        assert_eq!(required_f32("value", Some(12.5)).unwrap(), 12.5);
+        assert_invalid_argument(required_f32("value", None).unwrap_err(), "value");
+        assert_invalid_argument(
+            required_f32("value", Some(f32::INFINITY)).unwrap_err(),
+            "value",
+        );
+        assert_invalid_argument(required_f32("value", Some(f32::NAN)).unwrap_err(), "value");
+    }
+
+    #[test]
+    fn f32_to_u16_requires_integer_in_range() {
+        assert_eq!(f32_to_u16("value", 0.0).unwrap(), 0);
+        assert_eq!(f32_to_u16("value", f32::from(u16::MAX)).unwrap(), u16::MAX);
+        assert_invalid_argument(f32_to_u16("value", -1.0).unwrap_err(), "value");
+        assert_invalid_argument(f32_to_u16("value", 1.5).unwrap_err(), "value");
+        assert_invalid_argument(
+            f32_to_u16("value", f32::from(u16::MAX) + 1.0).unwrap_err(),
+            "value",
+        );
+    }
+}

@@ -677,7 +677,7 @@ mod tests {
     };
 
     use async_trait::async_trait;
-    use iracing_sdk::BroadcastCommand;
+    use iracing_sdk::{BroadcastCommand, IRacingSDKError};
 
     use super::*;
     use crate::broadcast_app::{
@@ -690,9 +690,17 @@ mod tests {
     #[derive(Default)]
     struct FakeCommands {
         sent: StdMutex<Vec<BroadcastCommand>>,
+        error: StdMutex<Option<BroadcastError>>,
     }
 
     impl FakeCommands {
+        fn with_error(error: BroadcastError) -> Self {
+            Self {
+                sent: StdMutex::new(Vec::new()),
+                error: StdMutex::new(Some(error)),
+            }
+        }
+
         fn sent(&self) -> Vec<BroadcastCommand> {
             self.sent.lock().expect("sender mutex poisoned").clone()
         }
@@ -705,6 +713,11 @@ mod tests {
                 .lock()
                 .expect("sender mutex poisoned")
                 .push(command);
+
+            if let Some(error) = self.error.lock().expect("sender mutex poisoned").take() {
+                return Err(error);
+            }
+
             Ok(())
         }
     }
@@ -936,6 +949,15 @@ mod tests {
         }
     }
 
+    fn assert_invalid_argument(error: Status, field: &str) {
+        assert_eq!(error.code(), tonic::Code::InvalidArgument);
+        assert!(
+            error.message().contains(field),
+            "error message should mention `{field}`: {}",
+            error.message()
+        );
+    }
+
     #[tokio::test]
     async fn get_available_cameras_maps_domain_response() {
         let commands = Arc::new(FakeCommands::default());
@@ -999,6 +1021,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_position_rejects_invalid_proto_fields_before_dependencies() {
+        let cases = [
+            (
+                "position",
+                CameraSwitchPositionRequest {
+                    position: None,
+                    group: Some(1),
+                    camera: Some(1),
+                },
+            ),
+            (
+                "position",
+                CameraSwitchPositionRequest {
+                    position: Some(u32::from(u16::MAX) + 1),
+                    group: Some(1),
+                    camera: Some(1),
+                },
+            ),
+            (
+                "group",
+                CameraSwitchPositionRequest {
+                    position: Some(1),
+                    group: None,
+                    camera: Some(1),
+                },
+            ),
+            (
+                "camera",
+                CameraSwitchPositionRequest {
+                    position: Some(1),
+                    group: Some(1),
+                    camera: None,
+                },
+            ),
+        ];
+
+        for (field, request) in cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .camera_switch_position(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn camera_switch_number_resolves_car_index_and_returns_observed_state() {
         let commands = Arc::new(FakeCommands::default());
         let camera = Arc::new(
@@ -1034,6 +1110,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_number_rejects_invalid_proto_fields_before_dependencies() {
+        let cases = [
+            (
+                "car_number",
+                CameraSwitchNumberRequest {
+                    car_number: None,
+                    group: Some(1),
+                    camera: Some(1),
+                },
+            ),
+            (
+                "car_number",
+                CameraSwitchNumberRequest {
+                    car_number: Some(String::new()),
+                    group: Some(1),
+                    camera: Some(1),
+                },
+            ),
+            (
+                "group",
+                CameraSwitchNumberRequest {
+                    car_number: Some("012".to_string()),
+                    group: Some(u32::from(u16::MAX) + 1),
+                    camera: Some(1),
+                },
+            ),
+            (
+                "camera",
+                CameraSwitchNumberRequest {
+                    car_number: Some("012".to_string()),
+                    group: Some(1),
+                    camera: Some(u32::from(u16::MAX) + 1),
+                },
+            ),
+        ];
+
+        for (field, request) in cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .camera_switch_number(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn replay_set_play_speed_observes_and_returns_current_state() {
         let commands = Arc::new(FakeCommands::default());
         let camera = Arc::new(FakeCamera::default());
@@ -1059,6 +1189,238 @@ mod tests {
             commands.sent(),
             vec![BroadcastCommand::ReplaySetPlaySpeed(2, true)]
         );
+    }
+
+    #[tokio::test]
+    async fn replay_set_play_speed_rejects_invalid_proto_fields_before_dependencies() {
+        let cases = [
+            (
+                "speed",
+                ReplaySetPlaySpeedRequest {
+                    speed: None,
+                    is_slow_motion: Some(false),
+                },
+            ),
+            (
+                "speed",
+                ReplaySetPlaySpeedRequest {
+                    speed: Some(i32::from(i16::MAX) + 1),
+                    is_slow_motion: Some(false),
+                },
+            ),
+            (
+                "is_slow_motion",
+                ReplaySetPlaySpeedRequest {
+                    speed: Some(1),
+                    is_slow_motion: None,
+                },
+            ),
+        ];
+
+        for (field, request) in cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .replay_set_play_speed(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn replay_enum_requests_reject_invalid_values_before_dependencies() {
+        let search_cases = [
+            ("mode", ReplaySearchRequest { mode: None }),
+            (
+                "mode",
+                ReplaySearchRequest {
+                    mode: Some(ReplaySearchMode::Unknown as i32),
+                },
+            ),
+            ("mode", ReplaySearchRequest { mode: Some(999) }),
+        ];
+
+        for (field, request) in search_cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .replay_search(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+
+        let commands = Arc::new(FakeCommands::default());
+        let service = service_with(Arc::clone(&commands), None, None);
+        let error = service
+            .replay_set_state(Request::new(ReplaySetStateRequest {
+                state: Some(ReplayStateMode::Unknown as i32),
+            }))
+            .await
+            .expect_err("unknown state should fail");
+
+        assert_invalid_argument(error, "state");
+        assert!(commands.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_command_rejects_invalid_proto_values_before_dependencies() {
+        let cases = [
+            (
+                "mode",
+                ChatCommandRequest {
+                    mode: None,
+                    r#macro: None,
+                },
+            ),
+            (
+                "mode",
+                ChatCommandRequest {
+                    mode: Some(ChatCommandMode::Unknown as i32),
+                    r#macro: None,
+                },
+            ),
+            (
+                "macro",
+                ChatCommandRequest {
+                    mode: Some(ChatCommandMode::Macro as i32),
+                    r#macro: None,
+                },
+            ),
+            (
+                "macro",
+                ChatCommandRequest {
+                    mode: Some(ChatCommandMode::Macro as i32),
+                    r#macro: Some(0),
+                },
+            ),
+            (
+                "macro",
+                ChatCommandRequest {
+                    mode: Some(ChatCommandMode::Macro as i32),
+                    r#macro: Some(16),
+                },
+            ),
+        ];
+
+        for (field, request) in cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .chat_command(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn pit_and_force_feedback_reject_invalid_values_before_dependencies() {
+        let pit_cases = [
+            (
+                "mode",
+                PitCommandRequest {
+                    mode: None,
+                    value: None,
+                },
+            ),
+            (
+                "value",
+                PitCommandRequest {
+                    mode: Some(PitCommandMode::Fuel as i32),
+                    value: None,
+                },
+            ),
+            (
+                "value",
+                PitCommandRequest {
+                    mode: Some(PitCommandMode::Fuel as i32),
+                    value: Some(1.5),
+                },
+            ),
+            (
+                "value",
+                PitCommandRequest {
+                    mode: Some(PitCommandMode::Fuel as i32),
+                    value: Some(f32::INFINITY),
+                },
+            ),
+        ];
+
+        for (field, request) in pit_cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .pit_command(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
+
+        let force_feedback_cases = [
+            (
+                "mode",
+                ForceFeedbackCommandRequest {
+                    mode: None,
+                    value: Some(20.0),
+                },
+            ),
+            (
+                "value",
+                ForceFeedbackCommandRequest {
+                    mode: Some(ForceFeedbackCommandMode::MaxForce as i32),
+                    value: None,
+                },
+            ),
+            (
+                "value",
+                ForceFeedbackCommandRequest {
+                    mode: Some(ForceFeedbackCommandMode::MaxForce as i32),
+                    value: Some(f32::NAN),
+                },
+            ),
+        ];
+
+        for (field, request) in force_feedback_cases {
+            let commands = Arc::new(FakeCommands::default());
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .force_feedback_command(Request::new(request))
+                .await
+                .expect_err("invalid request should fail");
+
+            assert_invalid_argument(error, field);
+            assert!(
+                commands.sent().is_empty(),
+                "invalid `{field}` should return before dependency calls"
+            );
+        }
     }
 
     #[tokio::test]
@@ -1099,6 +1461,66 @@ mod tests {
             .expect_err("camera switch should time out");
 
         assert_eq!(error.code(), tonic::Code::DeadlineExceeded);
+    }
+
+    #[tokio::test]
+    async fn observed_rpc_propagates_source_end_as_unavailable() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 1, 2, 3)))
+                .with_wait(Err(BroadcastError::ObservationSourceEnded)),
+        );
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(commands, Some(camera), Some(replay));
+
+        let error = service
+            .camera_switch_position(Request::new(CameraSwitchPositionRequest {
+                position: Some(4),
+                group: Some(5),
+                camera: Some(6),
+            }))
+            .await
+            .expect_err("camera switch should surface source end");
+
+        assert_eq!(error.code(), tonic::Code::Unavailable);
+    }
+
+    #[tokio::test]
+    async fn command_send_errors_map_to_transport_statuses() {
+        let cases = [
+            (
+                BroadcastError::Sdk(IRacingSDKError::connection_failed("sim disconnected")),
+                tonic::Code::Unavailable,
+            ),
+            (
+                BroadcastError::Sdk(IRacingSDKError::unsupported_platform(
+                    "live broadcast",
+                    "Windows",
+                )),
+                tonic::Code::FailedPrecondition,
+            ),
+            (
+                BroadcastError::Sdk(IRacingSDKError::Parse {
+                    context: "broadcast command".to_string(),
+                    details: "unexpected response".to_string(),
+                }),
+                tonic::Code::Internal,
+            ),
+        ];
+
+        for (source, expected_code) in cases {
+            let commands = Arc::new(FakeCommands::with_error(source));
+            let service = service_with(Arc::clone(&commands), None, None);
+
+            let error = service
+                .reload_textures(Request::new(ReloadTexturesRequest { car_idx: None }))
+                .await
+                .expect_err("send failure should map to a transport error");
+
+            assert_eq!(error.code(), expected_code);
+            assert_eq!(commands.sent(), vec![BroadcastCommand::ReloadAllTextures]);
+        }
     }
 
     #[tokio::test]

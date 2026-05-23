@@ -134,3 +134,163 @@ fn required_chat_macro(value: Option<u32>) -> Result<u16, Status> {
 
     Ok(macro_number)
 }
+
+#[cfg(test)]
+mod tests {
+    use tonic::Code;
+
+    use super::*;
+
+    fn assert_invalid_argument(error: Status, field: &str) {
+        assert_eq!(error.code(), Code::InvalidArgument);
+        assert!(
+            error.message().contains(field),
+            "error message should mention `{field}`: {}",
+            error.message()
+        );
+    }
+
+    #[test]
+    fn chat_command_converts_macro_and_standard_modes() {
+        assert_eq!(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Macro as i32),
+                r#macro: Some(3),
+            })
+            .unwrap(),
+            BroadcastCommand::ChatCommandMacro(3)
+        );
+        assert_eq!(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Reply as i32),
+                r#macro: None,
+            })
+            .unwrap(),
+            BroadcastCommand::ChatCommand(iracing_sdk::ChatCommandMode::Reply)
+        );
+    }
+
+    #[test]
+    fn chat_command_rejects_missing_unknown_and_invalid_macro_values() {
+        assert_invalid_argument(
+            chat_command(ChatCommandRequest {
+                mode: None,
+                r#macro: None,
+            })
+            .unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Unknown as i32),
+                r#macro: None,
+            })
+            .unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Macro as i32),
+                r#macro: None,
+            })
+            .unwrap_err(),
+            "macro",
+        );
+        assert_invalid_argument(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Macro as i32),
+                r#macro: Some(0),
+            })
+            .unwrap_err(),
+            "macro",
+        );
+        assert_invalid_argument(
+            chat_command(ChatCommandRequest {
+                mode: Some(ChatCommandMode::Macro as i32),
+                r#macro: Some(16),
+            })
+            .unwrap_err(),
+            "macro",
+        );
+    }
+
+    #[test]
+    fn pit_command_converts_clear_and_value_modes() {
+        assert_eq!(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Clear as i32),
+                value: None,
+            })
+            .unwrap(),
+            PitCommand::Clear
+        );
+        assert_eq!(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Fuel as i32),
+                value: Some(5.0),
+            })
+            .unwrap(),
+            PitCommand::Fuel(5)
+        );
+        assert_eq!(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::RfTire as i32),
+                value: Some(21.0),
+            })
+            .unwrap(),
+            PitCommand::RF(21)
+        );
+    }
+
+    #[test]
+    fn pit_command_rejects_missing_unknown_and_invalid_values() {
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: None,
+                value: None,
+            })
+            .unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Unknown as i32),
+                value: None,
+            })
+            .unwrap_err(),
+            "mode",
+        );
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Fuel as i32),
+                value: None,
+            })
+            .unwrap_err(),
+            "value",
+        );
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Fuel as i32),
+                value: Some(1.5),
+            })
+            .unwrap_err(),
+            "value",
+        );
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Fuel as i32),
+                value: Some(f32::INFINITY),
+            })
+            .unwrap_err(),
+            "value",
+        );
+        assert_invalid_argument(
+            pit_command(PitCommandRequest {
+                mode: Some(PitCommandMode::Fuel as i32),
+                value: Some(f32::from(u16::MAX) + 1.0),
+            })
+            .unwrap_err(),
+            "value",
+        );
+    }
+}

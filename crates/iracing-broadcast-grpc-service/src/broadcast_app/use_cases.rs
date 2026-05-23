@@ -733,16 +733,19 @@ mod tests {
         }
     }
 
-    fn fixture() -> Fixture {
+    fn fixture_with(
+        command_error: Option<BroadcastError>,
+        camera_selection_wait: Result<CameraSelectionSnapshot, BroadcastError>,
+    ) -> Fixture {
         let events = Arc::new(StdMutex::new(Vec::new()));
         let commands = Arc::new(FakeCommands {
             events: Arc::clone(&events),
-            error: StdMutex::new(None),
+            error: StdMutex::new(command_error),
         });
         let camera = Arc::new(FakeCamera {
             events: Arc::clone(&events),
             selection_snapshot: camera_snapshot(1, 2, 3),
-            selection_wait: StdMutex::new(Some(Ok(camera_snapshot(42, 4, 5)))),
+            selection_wait: StdMutex::new(Some(camera_selection_wait)),
             state_snapshot: camera_state(0),
             state_wait: StdMutex::new(Some(Ok(camera_state(CameraState::UI_HIDDEN.bits())))),
             resolutions: StdMutex::new(HashMap::from([("012".to_string(), 12)])),
@@ -784,6 +787,10 @@ mod tests {
         }
     }
 
+    fn fixture() -> Fixture {
+        fixture_with(None, Ok(camera_snapshot(42, 4, 5)))
+    }
+
     #[tokio::test]
     async fn camera_switch_position_snapshots_sends_then_waits() {
         let Fixture { events, use_cases } = fixture();
@@ -794,6 +801,57 @@ mod tests {
             .expect("switch should succeed");
 
         assert_eq!(result, camera_snapshot(42, 4, 5));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraSelectionSnapshot,
+                Event::Send(BroadcastCommand::CameraSwitchPosition(42, 4, 5)),
+                Event::CameraSelectionWait {
+                    previous: camera_snapshot(1, 2, 3),
+                    expected: CameraSelectionExpectation {
+                        car_index: None,
+                        group: 4,
+                        camera: 5,
+                    },
+                    timeout: Duration::from_millis(25),
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn camera_switch_position_send_failure_prevents_wait() {
+        let Fixture { events, use_cases } = fixture_with(
+            Some(BroadcastError::ObservationSourceEnded),
+            Ok(camera_snapshot(42, 4, 5)),
+        );
+
+        let error = use_cases
+            .camera_switch_position(42, 4, 5)
+            .await
+            .expect_err("send failure should fail the use case");
+
+        assert!(matches!(error, BroadcastError::ObservationSourceEnded));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraSelectionSnapshot,
+                Event::Send(BroadcastCommand::CameraSwitchPosition(42, 4, 5)),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn camera_switch_position_wait_error_propagates_after_send() {
+        let Fixture { events, use_cases } =
+            fixture_with(None, Err(BroadcastError::ObservationSourceEnded));
+
+        let error = use_cases
+            .camera_switch_position(42, 4, 5)
+            .await
+            .expect_err("wait failure should fail the use case");
+
+        assert!(matches!(error, BroadcastError::ObservationSourceEnded));
         assert_eq!(
             *events.lock().expect("events mutex poisoned"),
             vec![
@@ -1017,6 +1075,10 @@ mod tests {
             .await
             .expect_err("camera switch should require observation");
         assert!(matches!(error, BroadcastError::ObservationDisabled));
+        assert!(
+            events.lock().expect("events mutex poisoned").is_empty(),
+            "snapshot failure should return before sending a command"
+        );
 
         use_cases
             .reload_textures(None)
