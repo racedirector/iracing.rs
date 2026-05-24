@@ -1,6 +1,15 @@
 [alias]
 broadcast-cli = ["run", "-p", "iracing-sdk", "--bin", "broadcast-cli", "--"]
 
+broadcast-grpc-server = [
+  "run",
+  "-p",
+  "iracing-broadcast-grpc-service",
+  "--bin",
+  "iracing-broadcast-server",
+  "--",
+]
+
 car-setup-observer = [
   "run",
   "-p",

@@ -46,6 +46,12 @@ pub(crate) trait CameraStatePort: Send + Sync {
         session_version: u32,
         car_number: &str,
     ) -> Result<u32, BroadcastError>;
+
+    async fn resolve_car_number_by_index(
+        &self,
+        session_version: u32,
+        car_index: u32,
+    ) -> Result<String, BroadcastError>;
 }
 
 #[async_trait]
@@ -148,6 +154,14 @@ impl CameraStatePort for DisabledObservationPort {
         _session_version: u32,
         _car_number: &str,
     ) -> Result<u32, BroadcastError> {
+        Err(BroadcastError::ObservationDisabled)
+    }
+
+    async fn resolve_car_number_by_index(
+        &self,
+        _session_version: u32,
+        _car_index: u32,
+    ) -> Result<String, BroadcastError> {
         Err(BroadcastError::ObservationDisabled)
     }
 }

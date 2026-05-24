@@ -64,11 +64,24 @@ impl BroadcastUseCases {
 
     pub(crate) async fn camera_switch_position(
         &self,
-        position: u16,
-        group: u16,
-        camera: u16,
+        position: Option<u16>,
+        group: Option<u16>,
+        camera: Option<u16>,
     ) -> Result<CameraSelectionSnapshot, BroadcastError> {
         let previous = self.camera.selection_snapshot().await?;
+        let position_was_provided = position.is_some();
+        let position = match position {
+            Some(position) => position,
+            None => snapshot_u16("car_index", previous.car_index)?,
+        };
+        let group = match group {
+            Some(group) => group,
+            None => snapshot_u16("group", previous.group)?,
+        };
+        let camera = match camera {
+            Some(camera) => camera,
+            None => snapshot_u16("camera", previous.camera)?,
+        };
 
         self.send(BroadcastCommand::CameraSwitchPosition(
             position, group, camera,
@@ -79,7 +92,7 @@ impl BroadcastUseCases {
             .wait_for_selection(
                 previous,
                 CameraSelectionExpectation {
-                    car_index: None,
+                    car_index: (!position_was_provided).then_some(previous.car_index),
                     group: u32::from(group),
                     camera: u32::from(camera),
                 },
@@ -90,15 +103,35 @@ impl BroadcastUseCases {
 
     pub(crate) async fn camera_switch_number(
         &self,
-        car_number: String,
-        group: u16,
-        camera: u16,
+        car_number: Option<String>,
+        group: Option<u16>,
+        camera: Option<u16>,
     ) -> Result<CameraSelectionSnapshot, BroadcastError> {
         let previous = self.camera.selection_snapshot().await?;
-        let car_index = self
-            .camera
-            .resolve_car_index_by_number(previous.session_version, &car_number)
-            .await?;
+        let group = match group {
+            Some(group) => group,
+            None => snapshot_u16("group", previous.group)?,
+        };
+        let camera = match camera {
+            Some(camera) => camera,
+            None => snapshot_u16("camera", previous.camera)?,
+        };
+        let (car_number, car_index) = match car_number {
+            Some(car_number) => {
+                let car_index = self
+                    .camera
+                    .resolve_car_index_by_number(previous.session_version, &car_number)
+                    .await?;
+                (car_number, car_index)
+            }
+            None => {
+                let car_number = self
+                    .camera
+                    .resolve_car_number_by_index(previous.session_version, previous.car_index)
+                    .await?;
+                (car_number, previous.car_index)
+            }
+        };
 
         self.send(BroadcastCommand::CameraSwitchNumber(
             car_number, group, camera,
@@ -120,9 +153,10 @@ impl BroadcastUseCases {
 
     pub(crate) async fn camera_set_state(
         &self,
-        state: CameraState,
+        state: Option<CameraState>,
     ) -> Result<CameraStateSnapshot, BroadcastError> {
         let previous = self.camera.state_snapshot().await?;
+        let state = state.unwrap_or_else(|| CameraState::from_bits_retain(previous.state));
 
         self.send(BroadcastCommand::CameraSetState(state)).await?;
 
@@ -139,10 +173,15 @@ impl BroadcastUseCases {
 
     pub(crate) async fn replay_set_play_speed(
         &self,
-        speed: i16,
-        is_slow_motion: bool,
+        speed: Option<i16>,
+        is_slow_motion: Option<bool>,
     ) -> Result<ReplaySpeedSnapshot, BroadcastError> {
         let previous = self.replay.speed_snapshot().await?;
+        let speed = match speed {
+            Some(speed) => speed,
+            None => snapshot_i16("speed", previous.speed)?,
+        };
+        let is_slow_motion = is_slow_motion.unwrap_or(previous.is_slow_motion);
 
         self.send(BroadcastCommand::ReplaySetPlaySpeed(speed, is_slow_motion))
             .await?;
@@ -314,6 +353,25 @@ impl BroadcastUseCases {
     }
 }
 
+fn snapshot_u16(field_name: &'static str, value: u32) -> Result<u16, BroadcastError> {
+    u16::try_from(value).map_err(|_| {
+        BroadcastError::FailedPrecondition(format!(
+            "current `{field_name}` value {value} is outside broadcast range 0..={}",
+            u16::MAX,
+        ))
+    })
+}
+
+fn snapshot_i16(field_name: &'static str, value: i32) -> Result<i16, BroadcastError> {
+    i16::try_from(value).map_err(|_| {
+        BroadcastError::FailedPrecondition(format!(
+            "current `{field_name}` value {value} is outside broadcast range {}..={}",
+            i16::MIN,
+            i16::MAX,
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -335,6 +393,10 @@ mod tests {
         Resolve {
             session_version: u32,
             car_number: String,
+        },
+        ResolveNumber {
+            session_version: u32,
+            car_index: u32,
         },
         Send(BroadcastCommand),
         CameraSelectionWait {
@@ -494,6 +556,26 @@ mod tests {
                 .expect("resolutions mutex poisoned")
                 .get(car_number)
                 .copied()
+                .ok_or_else(|| BroadcastError::FailedPrecondition("missing car".to_string()))
+        }
+
+        async fn resolve_car_number_by_index(
+            &self,
+            session_version: u32,
+            car_index: u32,
+        ) -> Result<String, BroadcastError> {
+            self.events
+                .lock()
+                .expect("events mutex poisoned")
+                .push(Event::ResolveNumber {
+                    session_version,
+                    car_index,
+                });
+            self.resolutions
+                .lock()
+                .expect("resolutions mutex poisoned")
+                .iter()
+                .find_map(|(number, &index)| (index == car_index).then(|| number.clone()))
                 .ok_or_else(|| BroadcastError::FailedPrecondition("missing car".to_string()))
         }
     }
@@ -752,7 +834,10 @@ mod tests {
             selection_wait: StdMutex::new(Some(camera_selection_wait)),
             state_snapshot: camera_state(0),
             state_wait: StdMutex::new(Some(Ok(camera_state(CameraState::UI_HIDDEN.bits())))),
-            resolutions: StdMutex::new(HashMap::from([("012".to_string(), 12)])),
+            resolutions: StdMutex::new(HashMap::from([
+                ("001".to_string(), 1),
+                ("012".to_string(), 12),
+            ])),
         });
         let replay = Arc::new(FakeReplay {
             events: Arc::clone(&events),
@@ -800,7 +885,7 @@ mod tests {
         let Fixture { events, use_cases } = fixture();
 
         let result = use_cases
-            .camera_switch_position(42, 4, 5)
+            .camera_switch_position(Some(42), Some(4), Some(5))
             .await
             .expect("switch should succeed");
 
@@ -824,6 +909,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_position_uses_current_selection_for_missing_fields() {
+        let Fixture { events, use_cases } = fixture_with(None, Ok(camera_snapshot(1, 2, 8)));
+
+        let result = use_cases
+            .camera_switch_position(None, None, Some(8))
+            .await
+            .expect("partial switch should succeed");
+
+        assert_eq!(result, camera_snapshot(1, 2, 8));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraSelectionSnapshot,
+                Event::Send(BroadcastCommand::CameraSwitchPosition(1, 2, 8)),
+                Event::CameraSelectionWait {
+                    previous: camera_snapshot(1, 2, 3),
+                    expected: CameraSelectionExpectation {
+                        car_index: Some(1),
+                        group: 2,
+                        camera: 8,
+                    },
+                    timeout: Duration::from_millis(25),
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn camera_switch_position_send_failure_prevents_wait() {
         let Fixture { events, use_cases } = fixture_with(
             Some(BroadcastError::ObservationSourceEnded),
@@ -831,7 +944,7 @@ mod tests {
         );
 
         let error = use_cases
-            .camera_switch_position(42, 4, 5)
+            .camera_switch_position(Some(42), Some(4), Some(5))
             .await
             .expect_err("send failure should fail the use case");
 
@@ -851,7 +964,7 @@ mod tests {
             fixture_with(None, Err(BroadcastError::ObservationSourceEnded));
 
         let error = use_cases
-            .camera_switch_position(42, 4, 5)
+            .camera_switch_position(Some(42), Some(4), Some(5))
             .await
             .expect_err("wait failure should fail the use case");
 
@@ -879,7 +992,7 @@ mod tests {
         let Fixture { events, use_cases } = fixture();
 
         let result = use_cases
-            .camera_switch_number("012".to_string(), 6, 7)
+            .camera_switch_number(Some("012".to_string()), Some(6), Some(7))
             .await
             .expect("switch should succeed");
 
@@ -911,11 +1024,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_number_uses_current_selection_for_missing_fields() {
+        let Fixture { events, use_cases } = fixture_with(None, Ok(camera_snapshot(1, 2, 8)));
+
+        let result = use_cases
+            .camera_switch_number(None, None, Some(8))
+            .await
+            .expect("partial switch should succeed");
+
+        assert_eq!(result, camera_snapshot(1, 2, 8));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraSelectionSnapshot,
+                Event::ResolveNumber {
+                    session_version: 7,
+                    car_index: 1,
+                },
+                Event::Send(BroadcastCommand::CameraSwitchNumber(
+                    "001".to_string(),
+                    2,
+                    8,
+                )),
+                Event::CameraSelectionWait {
+                    previous: camera_snapshot(1, 2, 3),
+                    expected: CameraSelectionExpectation {
+                        car_index: Some(1),
+                        group: 2,
+                        camera: 8,
+                    },
+                    timeout: Duration::from_millis(25),
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn camera_set_state_snapshots_sends_then_waits() {
         let Fixture { events, use_cases } = fixture();
 
         let result = use_cases
-            .camera_set_state(CameraState::UI_HIDDEN)
+            .camera_set_state(Some(CameraState::UI_HIDDEN))
             .await
             .expect("camera state should succeed");
 
@@ -937,11 +1086,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_set_state_uses_current_state_when_missing() {
+        let Fixture { events, use_cases } = fixture();
+
+        let result = use_cases
+            .camera_set_state(None)
+            .await
+            .expect("camera state should succeed");
+
+        assert_eq!(result, camera_state(CameraState::UI_HIDDEN.bits()));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraStateSnapshot,
+                Event::Send(BroadcastCommand::CameraSetState(CameraState::empty())),
+                Event::CameraStateWait {
+                    previous: camera_state(0),
+                    expected: CameraStateExpectation { state: 0 },
+                    timeout: Duration::from_millis(25),
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn replay_set_play_speed_snapshots_sends_then_waits() {
         let Fixture { events, use_cases } = fixture();
 
         let result = use_cases
-            .replay_set_play_speed(2, true)
+            .replay_set_play_speed(Some(2), Some(true))
             .await
             .expect("replay speed should succeed");
 
@@ -956,6 +1129,33 @@ mod tests {
                     expected: ReplaySpeedExpectation {
                         speed: 2,
                         is_slow_motion: true,
+                    },
+                    timeout: Duration::from_millis(25),
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_set_play_speed_uses_current_speed_for_missing_fields() {
+        let Fixture { events, use_cases } = fixture();
+
+        let result = use_cases
+            .replay_set_play_speed(Some(2), None)
+            .await
+            .expect("partial replay speed should succeed");
+
+        assert_eq!(result, replay_speed(2, true));
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::ReplaySpeedSnapshot,
+                Event::Send(BroadcastCommand::ReplaySetPlaySpeed(2, false)),
+                Event::ReplaySpeedWait {
+                    previous: replay_speed(0, false),
+                    expected: ReplaySpeedExpectation {
+                        speed: 2,
+                        is_slow_motion: false,
                     },
                     timeout: Duration::from_millis(25),
                 },
@@ -1075,7 +1275,7 @@ mod tests {
         );
 
         let error = use_cases
-            .camera_switch_position(1, 2, 3)
+            .camera_switch_position(Some(1), Some(2), Some(3))
             .await
             .expect_err("camera switch should require observation");
         assert!(matches!(error, BroadcastError::ObservationDisabled));

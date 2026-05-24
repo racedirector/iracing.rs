@@ -5,7 +5,8 @@ use std::{
 
 use async_trait::async_trait;
 use iracing_sdk::{
-    FrameAdapter, LiveProvider, SendProvider, SessionInfo, SessionInfoParser, VariableSchema,
+    CameraState, FrameAdapter, LiveProvider, SendProvider, SessionInfo, SessionInfoParser,
+    VariableSchema,
 };
 use tokio::sync::Mutex;
 
@@ -171,6 +172,27 @@ where
     }
 }
 
+const CONTROLLABLE_CAMERA_STATE: CameraState = CameraState::CAM_TOOL_ACTIVE
+    .union(CameraState::UI_HIDDEN)
+    .union(CameraState::USE_AUTO_SHOT_SELECTION)
+    .union(CameraState::USE_TEMPORARY_EDITS)
+    .union(CameraState::USE_KEY_ACCELERATION)
+    .union(CameraState::USE_KEY_10X_ACCELERATION)
+    .union(CameraState::USE_MOUSE_AIM_MODE);
+
+fn camera_state_matches_expectation(
+    current: CameraState,
+    expected: CameraStateExpectation,
+) -> bool {
+    let expected = CameraState::from_bits_retain(expected.state);
+
+    if expected.bits() == 0 {
+        !current.intersects(CONTROLLABLE_CAMERA_STATE)
+    } else {
+        current.contains(expected)
+    }
+}
+
 #[async_trait]
 impl<P> CameraStatePort for IracingObservation<P>
 where
@@ -233,12 +255,19 @@ where
     ) -> Result<CameraStateSnapshot, BroadcastError> {
         self.require_capability(self.camera_state_available, "camera state")?;
         let previous = CameraStateTelemetry {
-            state: iracing_sdk::CameraState::from_bits_retain(previous.state),
+            state: CameraState::from_bits_retain(previous.state),
         };
+
+        if camera_state_matches_expectation(previous.state, expected) {
+            return Ok(CameraStateSnapshot {
+                state: previous.state.bits(),
+            });
+        }
+
         let observed = self
             .telemetry
             .wait_for_change_matching_observed(previous, timeout, move |current| {
-                current.state.bits() == expected.state
+                camera_state_matches_expectation(current.state, expected)
             })
             .await
             .map_err(Self::map_telemetry_error)?;
@@ -316,6 +345,35 @@ where
             BroadcastError::FailedPrecondition(format!(
                 "car number `{car_number}` resolved to invalid car index {}",
                 driver.car_idx
+            ))
+        })
+    }
+
+    async fn resolve_car_number_by_index(
+        &self,
+        session_version: u32,
+        car_index: u32,
+    ) -> Result<String, BroadcastError> {
+        let session = self.session_info(session_version).await?;
+        let drivers = session
+            .driver_info
+            .and_then(|driver_info| driver_info.drivers)
+            .ok_or_else(|| {
+                BroadcastError::FailedPrecondition("session driver list is unavailable".to_string())
+            })?;
+
+        let driver = drivers
+            .into_iter()
+            .find(|driver| u32::try_from(driver.car_idx).ok() == Some(car_index))
+            .ok_or_else(|| {
+                BroadcastError::FailedPrecondition(format!(
+                    "car index `{car_index}` was not found in session driver info"
+                ))
+            })?;
+
+        driver.car_number.ok_or_else(|| {
+            BroadcastError::FailedPrecondition(format!(
+                "car index `{car_index}` does not have a car number in session driver info"
             ))
         })
     }
@@ -672,7 +730,42 @@ fn finite_f32(field_name: &'static str, value: f32) -> Result<f32, BroadcastErro
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::{HashMap, VecDeque},
+        sync::Arc,
+        time::Duration,
+    };
+
+    use async_trait::async_trait;
+    use iracing_sdk::{CameraState, FramePacket, IRacingSDKError, VariableInfo, VariableType};
+
     use super::*;
+
+    struct FakeProvider {
+        frames: VecDeque<Result<Option<FramePacket>, IRacingSDKError>>,
+    }
+
+    impl FakeProvider {
+        fn new(frames: impl IntoIterator<Item = FramePacket>) -> Self {
+            Self {
+                frames: frames.into_iter().map(|frame| Ok(Some(frame))).collect(),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SendProvider for FakeProvider {
+        async fn next_frame_send(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
+            self.frames.pop_front().unwrap_or(Ok(None))
+        }
+
+        async fn session_yaml_send(
+            &mut self,
+            _version: u32,
+        ) -> iracing_sdk::Result<Option<String>> {
+            Ok(None)
+        }
+    }
 
     fn observed_camera(
         session_version: u32,
@@ -702,6 +795,142 @@ mod tests {
             },
             session_version,
         }
+    }
+
+    fn camera_state_schema() -> Arc<VariableSchema> {
+        let variables = HashMap::from([(
+            "CamCameraState".to_string(),
+            VariableInfo {
+                name: "CamCameraState".to_string(),
+                data_type: VariableType::BitField,
+                offset: 0,
+                count: 1,
+                count_as_time: false,
+                units: String::new(),
+                description: String::new(),
+            },
+        )]);
+
+        Arc::new(VariableSchema::new(variables, 4).expect("schema should be valid"))
+    }
+
+    fn camera_state_packet(
+        schema: Arc<VariableSchema>,
+        tick: u32,
+        state: CameraState,
+    ) -> FramePacket {
+        let mut data = vec![0u8; 4];
+        data.copy_from_slice(&state.bits().to_le_bytes());
+        FramePacket::new(data, tick, 7, schema)
+    }
+
+    fn camera_state_snapshot(state: CameraState) -> CameraStateSnapshot {
+        CameraStateSnapshot {
+            state: state.bits(),
+        }
+    }
+
+    fn camera_state_expectation(state: CameraState) -> CameraStateExpectation {
+        CameraStateExpectation {
+            state: state.bits(),
+        }
+    }
+
+    #[test]
+    fn camera_state_matcher_accepts_superset_flags() {
+        let current = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+
+        assert!(camera_state_matches_expectation(
+            current,
+            camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+        ));
+    }
+
+    #[test]
+    fn camera_state_matcher_requires_all_expected_flags() {
+        let expected = CameraState::CAM_TOOL_ACTIVE.union(CameraState::UI_HIDDEN);
+
+        assert!(!camera_state_matches_expectation(
+            CameraState::CAM_TOOL_ACTIVE,
+            camera_state_expectation(expected),
+        ));
+        assert!(camera_state_matches_expectation(
+            expected.union(CameraState::IS_SESSION_SCREEN),
+            camera_state_expectation(expected),
+        ));
+    }
+
+    #[test]
+    fn camera_state_matcher_treats_zero_as_no_controllable_flags() {
+        assert!(camera_state_matches_expectation(
+            CameraState::IS_SESSION_SCREEN.union(CameraState::IS_SCENIC_ACTIVE),
+            camera_state_expectation(CameraState::empty()),
+        ));
+        assert!(!camera_state_matches_expectation(
+            CameraState::IS_SESSION_SCREEN.union(CameraState::UI_HIDDEN),
+            camera_state_expectation(CameraState::empty()),
+        ));
+    }
+
+    #[tokio::test]
+    async fn camera_state_wait_returns_previous_when_already_satisfied() {
+        let observation =
+            IracingObservation::from_provider(FakeProvider::new([]), camera_state_schema());
+        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+
+        let actual = observation
+            .wait_for_state(
+                camera_state_snapshot(previous),
+                camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+                Duration::from_millis(10),
+            )
+            .await
+            .expect("already-satisfied state should return immediately");
+
+        assert_eq!(actual, camera_state_snapshot(previous));
+    }
+
+    #[tokio::test]
+    async fn camera_state_wait_accepts_changed_superset_state() {
+        let schema = camera_state_schema();
+        let observed = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+        let observation = IracingObservation::from_provider(
+            FakeProvider::new([camera_state_packet(Arc::clone(&schema), 1, observed)]),
+            schema,
+        );
+
+        let actual = observation
+            .wait_for_state(
+                camera_state_snapshot(CameraState::empty()),
+                camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+                Duration::from_millis(100),
+            )
+            .await
+            .expect("changed superset state should satisfy expected flag");
+
+        assert_eq!(actual, camera_state_snapshot(observed));
+    }
+
+    #[tokio::test]
+    async fn camera_state_wait_accepts_zero_when_controllable_flags_clear() {
+        let schema = camera_state_schema();
+        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::UI_HIDDEN);
+        let observed = CameraState::IS_SESSION_SCREEN;
+        let observation = IracingObservation::from_provider(
+            FakeProvider::new([camera_state_packet(Arc::clone(&schema), 1, observed)]),
+            schema,
+        );
+
+        let actual = observation
+            .wait_for_state(
+                camera_state_snapshot(previous),
+                camera_state_expectation(CameraState::empty()),
+                Duration::from_millis(100),
+            )
+            .await
+            .expect("zero state should allow read-only camera status bits");
+
+        assert_eq!(actual, camera_state_snapshot(observed));
     }
 
     #[test]

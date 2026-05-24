@@ -110,13 +110,22 @@ impl Broadcast for BroadcastService {
             camera,
         } = request.into_inner();
 
-        let position = request_impl::required_u16("position", position)?;
-        let group = request_impl::required_u16("group", group)?;
-        let camera = request_impl::required_u16("camera", camera)?;
+        let position = request_impl::optional_u16("position", position)?;
+        let group = request_impl::optional_u16("group", group)?;
+        let camera = request_impl::optional_u16("camera", camera)?;
         let span = tracing::Span::current();
-        span.record("broadcast.position", position);
-        span.record("broadcast.group", group);
-        span.record("broadcast.camera", camera);
+        span.record(
+            "broadcast.position",
+            tracing::field::display(format_args!("{position:?}")),
+        );
+        span.record(
+            "broadcast.group",
+            tracing::field::display(format_args!("{group:?}")),
+        );
+        span.record(
+            "broadcast.camera",
+            tracing::field::display(format_args!("{camera:?}")),
+        );
 
         let snapshot = self
             .use_cases
@@ -157,13 +166,22 @@ impl Broadcast for BroadcastService {
             camera,
         } = request.into_inner();
 
-        let car_number = request_impl::required_string("car_number", car_number)?;
-        let group = request_impl::required_u16("group", group)?;
-        let camera = request_impl::required_u16("camera", camera)?;
+        let car_number = request_impl::optional_string("car_number", car_number)?;
+        let group = request_impl::optional_u16("group", group)?;
+        let camera = request_impl::optional_u16("camera", camera)?;
         let span = tracing::Span::current();
-        span.record("broadcast.car_number", tracing::field::display(&car_number));
-        span.record("broadcast.group", group);
-        span.record("broadcast.camera", camera);
+        span.record(
+            "broadcast.car_number",
+            tracing::field::display(format_args!("{car_number:?}")),
+        );
+        span.record(
+            "broadcast.group",
+            tracing::field::display(format_args!("{group:?}")),
+        );
+        span.record(
+            "broadcast.camera",
+            tracing::field::display(format_args!("{camera:?}")),
+        );
 
         let snapshot = self
             .use_cases
@@ -196,11 +214,11 @@ impl Broadcast for BroadcastService {
         );
         let CameraSetStateRequest { state } = request.into_inner();
         tracing::Span::current().record("broadcast.has_state", state.is_some());
-        let state = request_impl::required_u32("state", state)?;
+        let state = request_impl::optional_u32(state).map(command_impl::camera_state);
 
         let snapshot = self
             .use_cases
-            .camera_set_state(command_impl::camera_state(state))
+            .camera_set_state(state)
             .await
             .map_err(Status::from)?;
 
@@ -233,11 +251,16 @@ impl Broadcast for BroadcastService {
             is_slow_motion,
         } = request.into_inner();
 
-        let speed = request_impl::required_i16("speed", speed)?;
-        let is_slow_motion = request_impl::required_bool("is_slow_motion", is_slow_motion)?;
+        let speed = request_impl::optional_i16("speed", speed)?;
         let span = tracing::Span::current();
-        span.record("replay.speed", speed);
-        span.record("replay.is_slow_motion", is_slow_motion);
+        span.record(
+            "replay.speed",
+            tracing::field::display(format_args!("{speed:?}")),
+        );
+        span.record(
+            "replay.is_slow_motion",
+            tracing::field::display(format_args!("{is_slow_motion:?}")),
+        );
 
         let snapshot = self
             .use_cases
@@ -835,6 +858,23 @@ mod tests {
                     ))
                 })
         }
+
+        async fn resolve_car_number_by_index(
+            &self,
+            _session_version: u32,
+            car_index: u32,
+        ) -> Result<String, BroadcastError> {
+            self.resolutions
+                .lock()
+                .expect("camera mutex poisoned")
+                .iter()
+                .find_map(|(number, &index)| (index == car_index).then(|| number.clone()))
+                .ok_or_else(|| {
+                    BroadcastError::FailedPrecondition(format!(
+                        "no fake car resolution configured for index `{car_index}`"
+                    ))
+                })
+        }
     }
 
     #[derive(Default)]
@@ -1029,41 +1069,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_position_uses_current_telemetry_for_missing_fields() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 42, 4, 5)))
+                .with_wait(Ok(camera_snapshot(7, 42, 4, 8))),
+        );
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
+
+        let response = service
+            .camera_switch_position(Request::new(CameraSwitchPositionRequest {
+                position: None,
+                group: None,
+                camera: Some(8),
+            }))
+            .await
+            .expect("partial camera switch should succeed")
+            .into_inner();
+
+        assert_eq!(response.car_index, 42);
+        assert_eq!(response.group, 4);
+        assert_eq!(response.camera, 8);
+        assert_eq!(
+            commands.sent(),
+            vec![BroadcastCommand::CameraSwitchPosition(42, 4, 8)]
+        );
+    }
+
+    #[tokio::test]
     async fn camera_switch_position_rejects_invalid_proto_fields_before_dependencies() {
-        let cases = [
-            (
-                "position",
-                CameraSwitchPositionRequest {
-                    position: None,
-                    group: Some(1),
-                    camera: Some(1),
-                },
-            ),
-            (
-                "position",
-                CameraSwitchPositionRequest {
-                    position: Some(u32::from(u16::MAX) + 1),
-                    group: Some(1),
-                    camera: Some(1),
-                },
-            ),
-            (
-                "group",
-                CameraSwitchPositionRequest {
-                    position: Some(1),
-                    group: None,
-                    camera: Some(1),
-                },
-            ),
-            (
-                "camera",
-                CameraSwitchPositionRequest {
-                    position: Some(1),
-                    group: Some(1),
-                    camera: None,
-                },
-            ),
-        ];
+        let cases = [(
+            "position",
+            CameraSwitchPositionRequest {
+                position: Some(u32::from(u16::MAX) + 1),
+                group: Some(1),
+                camera: Some(1),
+            },
+        )];
 
         for (field, request) in cases {
             let commands = Arc::new(FakeCommands::default());
@@ -1118,16 +1162,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn camera_switch_number_uses_current_telemetry_for_missing_fields() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(11, 12, 6, 7)))
+                .with_wait(Ok(camera_snapshot(11, 12, 6, 8)))
+                .with_resolution("012", 12),
+        );
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
+
+        let response = service
+            .camera_switch_number(Request::new(CameraSwitchNumberRequest {
+                car_number: None,
+                group: None,
+                camera: Some(8),
+            }))
+            .await
+            .expect("partial camera switch should succeed")
+            .into_inner();
+
+        assert_eq!(response.car_index, 12);
+        assert_eq!(response.group, 6);
+        assert_eq!(response.camera, 8);
+        assert_eq!(
+            commands.sent(),
+            vec![BroadcastCommand::CameraSwitchNumber(
+                "012".to_string(),
+                6,
+                8
+            )]
+        );
+    }
+
+    #[tokio::test]
     async fn camera_switch_number_rejects_invalid_proto_fields_before_dependencies() {
         let cases = [
-            (
-                "car_number",
-                CameraSwitchNumberRequest {
-                    car_number: None,
-                    group: Some(1),
-                    camera: Some(1),
-                },
-            ),
             (
                 "car_number",
                 CameraSwitchNumberRequest {
@@ -1200,30 +1271,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn replay_set_play_speed_uses_current_telemetry_for_missing_fields() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(FakeCamera::default());
+        let replay = Arc::new(
+            FakeReplay::default()
+                .with_snapshot(Ok(replay_snapshot(4, true)))
+                .with_wait(Ok(replay_snapshot(2, true))),
+        );
+        let service = service_with(Arc::clone(&commands), Some(camera), Some(replay));
+
+        let response = service
+            .replay_set_play_speed(Request::new(ReplaySetPlaySpeedRequest {
+                speed: Some(2),
+                is_slow_motion: None,
+            }))
+            .await
+            .expect("partial replay speed should succeed")
+            .into_inner();
+
+        assert_eq!(response.speed, 2);
+        assert!(response.is_slow_motion);
+        assert_eq!(
+            commands.sent(),
+            vec![BroadcastCommand::ReplaySetPlaySpeed(2, true)]
+        );
+    }
+
+    #[tokio::test]
     async fn replay_set_play_speed_rejects_invalid_proto_fields_before_dependencies() {
-        let cases = [
-            (
-                "speed",
-                ReplaySetPlaySpeedRequest {
-                    speed: None,
-                    is_slow_motion: Some(false),
-                },
-            ),
-            (
-                "speed",
-                ReplaySetPlaySpeedRequest {
-                    speed: Some(i32::from(i16::MAX) + 1),
-                    is_slow_motion: Some(false),
-                },
-            ),
-            (
-                "is_slow_motion",
-                ReplaySetPlaySpeedRequest {
-                    speed: Some(1),
-                    is_slow_motion: None,
-                },
-            ),
-        ];
+        let cases = [(
+            "speed",
+            ReplaySetPlaySpeedRequest {
+                speed: Some(i32::from(i16::MAX) + 1),
+                is_slow_motion: Some(false),
+            },
+        )];
 
         for (field, request) in cases {
             let commands = Arc::new(FakeCommands::default());
