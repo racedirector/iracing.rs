@@ -9,7 +9,9 @@ The current implementation is a command gateway plus a live observation layer.
 Command RPCs validate a protobuf request, convert it into typed SDK command
 data, send it through the Windows broadcast channel, and either acknowledge the
 send or return observed simulator state. Query RPCs read current state from live
-telemetry and session data without sending broadcast commands.
+telemetry and session data without sending broadcast commands. Subscription RPCs
+stream those same current-state projections to clients as observed values
+change.
 
 ## Goals
 
@@ -25,7 +27,9 @@ telemetry and session data without sending broadcast commands.
 
 ## Non-goals
 
-- This crate does not stream live telemetry or session YAML to gRPC clients.
+- This crate does not stream raw live telemetry or session YAML to gRPC
+  clients. Server-streaming RPCs expose only curated current-state projections
+  that already have unary query responses.
 - This crate does not currently prove that iRacing applied a command. It proves
   either that the command request was valid and the Win32 broadcast send path
   did not report an error, or that a supported observed state changed before the
@@ -61,8 +65,8 @@ crates/iracing-broadcast-grpc-service/
 - Request and response messages for camera, replay, texture, chat, pit,
   telemetry, force feedback, and video capture commands.
 - Service enums with explicit `UNKNOWN = 0` values.
-- The `Broadcast` service and all unary RPCs plus the client-streaming
-  `PitCommandStream` RPC.
+- The `Broadcast` service, unary command/query RPCs, the client-streaming
+  `PitCommandStream` RPC, and server-streaming current-state subscription RPCs.
 
 The protobuf uses `optional` primitive fields for inputs where absence is
 meaningful. This lets the service distinguish "field omitted" from a primitive
@@ -218,6 +222,16 @@ The protobuf service currently includes these RPC groups:
 | Force feedback | `CurrentForceFeedback`, `ForceFeedbackCommand` | Force-feedback queries read live max-force telemetry. Commands send max-force updates and return observed max-force state when observation is enabled. |
 | Video capture | `CurrentVideoCapture`, `VideoCapture` | Video capture queries read live capture telemetry. Commands send video capture requests and remain ack-only. |
 
+Server-to-client subscription RPCs mirror the unary `Current*` state reads:
+`SubscribeCurrentCameraPosition`, `SubscribeCurrentCameraState`,
+`SubscribeCurrentReplayPlaySpeed`, `SubscribeCurrentReplayPosition`,
+`SubscribeCurrentPitService`, `SubscribeCurrentTelemetryState`,
+`SubscribeCurrentForceFeedback`, and `SubscribeCurrentVideoCapture`. Each stream
+emits the current value first, then emits subsequent values only when the
+response value changes. These streams let UI clients stay synchronized when a
+state changes outside the gRPC command path, such as when an operator controls
+the camera directly in the simulator.
+
 `PitCommandStream` is client-streaming because multiple pit-service selections
 are often applied together. The server validates and sends each streamed command
 in order. If a later command is invalid or the SDK send path fails, the stream
@@ -368,10 +382,16 @@ Responses fall into two groups:
   available, these RPCs return `FAILED_PRECONDITION`.
 - Ack-only command RPCs return an empty response after validation and command
   send succeeds. They do not prove that iRacing applied the command.
+- Subscription RPCs return server streams of the same current-state responses as
+  the unary query RPCs. A stream emits an initial snapshot, suppresses unchanged
+  repeated values, and terminates with the same gRPC status mapping used by
+  unary observed reads if observation is disabled, telemetry is unavailable, or
+  the live source ends.
 
 `VideoCapture` remains ack-only; `CurrentVideoCapture` is the read path for
-observed capture state. `PitCommandStream` can partially apply earlier commands
-before a later stream item fails, and no rollback is attempted.
+observed capture state, and `SubscribeCurrentVideoCapture` is the streaming read
+path. `PitCommandStream` can partially apply earlier commands before a later
+stream item fails, and no rollback is attempted.
 
 ## Concurrency and Ordering
 
@@ -385,6 +405,10 @@ Ordering guarantees:
 - Commands inside one `PitCommandStream` are processed sequentially in stream
   order.
 - Independent unary RPCs may be processed concurrently by tonic.
+- Subscription streams are independent server-to-client streams. They observe
+  the live state source and apply backpressure through the gRPC stream; a slow
+  subscriber may receive fewer intermediate state changes but will receive the
+  latest changed value observed by its stream loop.
 - iRacing's own handling order is outside this crate's direct control.
 
 If future behavior requires strict global ordering, add an explicit command
@@ -402,6 +426,8 @@ When adding a new broadcast command:
    unsupported enum sentinels.
 5. Update this architecture document if request lifecycle, response semantics,
    platform support, or operational behavior changes.
+6. If the command exposes durable current state, add or update the matching
+   unary `Current*` query and server-streaming `SubscribeCurrent*` RPC together.
 
 When changing response semantics from command-acceptance to observed simulator
 state, add characterization tests for the existing response shape first, then
@@ -437,8 +463,6 @@ the crate tests and the relevant workspace quality gates.
 - Implement camera group discovery from session data or a live state source.
 - Resolve camera switch responses to observed car index/group/camera values.
 - Observe replay state after replay commands.
-- Observe pit-service state after pit commands and streams.
-- Observe telemetry logging state after telemetry commands.
 - Observe video capture or acknowledgement state if iRacing exposes one.
 - Add integration tests with a fake broadcast transport so server validation and
   command conversion can be exercised off Windows.
