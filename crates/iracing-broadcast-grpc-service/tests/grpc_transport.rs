@@ -31,6 +31,13 @@ impl Broadcast for TransportProbe {
         }))
     }
 
+    async fn current_camera_position(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentCameraPositionResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
     async fn camera_switch_number(
         &self,
         _request: Request<CameraSwitchNumberRequest>,
@@ -45,6 +52,13 @@ impl Broadcast for TransportProbe {
         Err(Status::unimplemented("not used by transport test"))
     }
 
+    async fn current_camera_state(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentCameraStateResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
     async fn replay_set_play_speed(
         &self,
         _request: Request<ReplaySetPlaySpeedRequest>,
@@ -52,10 +66,24 @@ impl Broadcast for TransportProbe {
         Err(Status::unimplemented("not used by transport test"))
     }
 
+    async fn current_replay_play_speed(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentReplayPlaySpeedResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
     async fn replay_set_play_position(
         &self,
         _request: Request<ReplaySetPlayPositionRequest>,
     ) -> Result<Response<ReplaySetPlayPositionResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
+    async fn current_replay_position(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentReplayPositionResponse>, Status> {
         Err(Status::unimplemented("not used by transport test"))
     }
 
@@ -94,6 +122,13 @@ impl Broadcast for TransportProbe {
         Err(Status::unimplemented("not used by transport test"))
     }
 
+    async fn current_pit_service(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentPitServiceResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
     async fn pit_command_stream(
         &self,
         _request: Request<tonic::Streaming<PitCommandRequest>>,
@@ -108,10 +143,24 @@ impl Broadcast for TransportProbe {
         Err(Status::unimplemented("not used by transport test"))
     }
 
+    async fn current_telemetry_state(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentTelemetryStateResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
     async fn force_feedback_command(
         &self,
         _request: Request<ForceFeedbackCommandRequest>,
     ) -> Result<Response<ForceFeedbackCommandResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
+    async fn current_force_feedback(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentForceFeedbackResponse>, Status> {
         Err(Status::unimplemented("not used by transport test"))
     }
 
@@ -126,6 +175,13 @@ impl Broadcast for TransportProbe {
         &self,
         _request: Request<VideoCaptureRequest>,
     ) -> Result<Response<VideoCaptureResponse>, Status> {
+        Err(Status::unimplemented("not used by transport test"))
+    }
+
+    async fn current_video_capture(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<CurrentVideoCaptureResponse>, Status> {
         Err(Status::unimplemented("not used by transport test"))
     }
 }

@@ -30,6 +30,21 @@ pub(crate) struct ReplaySpeedTelemetry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct ReplayPlayStateTelemetry {
+    #[field_name = "ReplayPlaySpeed"]
+    #[fail_if_missing]
+    pub speed: i32,
+
+    #[field_name = "ReplayPlaySlowMotion"]
+    #[fail_if_missing]
+    pub is_slow_motion: bool,
+
+    #[field_name = "IsReplayPlaying"]
+    #[fail_if_missing]
+    pub is_playing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
 pub(crate) struct CameraStateTelemetry {
     #[field_name = "CamCameraState"]
     #[fail_if_missing]
@@ -98,6 +113,17 @@ pub(crate) struct ForceFeedbackTelemetry {
     #[field_name = "SteeringWheelMaxForceNm"]
     #[fail_if_missing]
     pub max_force: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
+pub(crate) struct VideoCaptureTelemetry {
+    #[field_name = "VidCapEnabled"]
+    #[fail_if_missing]
+    pub is_enabled: bool,
+
+    #[field_name = "VidCapActive"]
+    #[fail_if_missing]
+    pub is_active: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

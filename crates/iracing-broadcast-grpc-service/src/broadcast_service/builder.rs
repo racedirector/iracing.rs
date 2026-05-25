@@ -4,6 +4,7 @@ use crate::{
     broadcast_app::{
         BroadcastCommandPort, BroadcastUseCases, CameraStatePort, DisabledObservationPort,
         ForceFeedbackStatePort, PitStatePort, ReplayStatePort, TelemetryStatePort,
+        VideoCaptureStatePort,
     },
     broadcast_iracing::{IracingBroadcastCommandSender, IracingObservation},
 };
@@ -29,6 +30,7 @@ struct ObservationPorts {
     pit: Arc<dyn PitStatePort>,
     telemetry: Arc<dyn TelemetryStatePort>,
     force_feedback: Arc<dyn ForceFeedbackStatePort>,
+    video_capture: Arc<dyn VideoCaptureStatePort>,
 }
 
 impl Default for BroadcastServiceBuilder {
@@ -98,7 +100,8 @@ impl BroadcastServiceBuilder {
                 replay: disabled.clone(),
                 pit: disabled.clone(),
                 telemetry: disabled.clone(),
-                force_feedback: disabled,
+                force_feedback: disabled.clone(),
+                video_capture: disabled,
             }
         } else {
             let observation = Arc::new(match self.live_provider {
@@ -113,7 +116,8 @@ impl BroadcastServiceBuilder {
                 replay: observation.clone(),
                 pit: observation.clone(),
                 telemetry: observation.clone(),
-                force_feedback: observation,
+                force_feedback: observation.clone(),
+                video_capture: observation,
             }
         };
 
@@ -125,6 +129,7 @@ impl BroadcastServiceBuilder {
                 observation.pit,
                 observation.telemetry,
                 observation.force_feedback,
+                observation.video_capture,
                 self.observation_timeout,
             ),
         )))

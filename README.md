@@ -95,4 +95,5 @@ Defined in `.cargo/config.toml` for convenience:
 - Per-crate guidance lives alongside each package (`crates/*/AGENTS.md`). Start there for deep-dive development tips.
 - Schema tool usage and examples are documented in the binary sources under `crates/iracing-sdk/src/bin/`.
 - Telemetry consumer examples reside under `examples/` in the respective crates; run them with `cargo run -p <crate> --example <name> -- --help` to inspect options.
+- The external [iRacing telemetry variable catalog](https://github-wiki-see.page/m/Diceble/IRacingAPI/wiki/Telemetry-information) is useful when mapping live SDK variable names to higher-level APIs.
 - Release notes and packaging pointers live in `docs/releasing.md`.
