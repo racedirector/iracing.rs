@@ -27,6 +27,7 @@ pub(crate) struct BroadcastUseCases {
 }
 
 impl BroadcastUseCases {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         commands: Arc<dyn BroadcastCommandPort>,
         camera: Arc<dyn CameraStatePort>,

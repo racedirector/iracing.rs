@@ -270,6 +270,13 @@ service Broadcast {
   returns (CurrentCameraPositionResponse) {}
 
   //
+  // A server-to-client RPC
+  //
+  // Streams the current camera position immediately and whenever it changes.
+  rpc SubscribeCurrentCameraPosition(google.protobuf.Empty)
+  returns (stream CurrentCameraPositionResponse) {}
+
+  //
   // A client-to-server RPC
   //
   // Switches the camera to a new number. Returns the new camera position.
@@ -290,6 +297,13 @@ service Broadcast {
   returns (CurrentCameraStateResponse) {}
 
   //
+  // A server-to-client RPC
+  //
+  // Streams the current camera state immediately and whenever it changes.
+  rpc SubscribeCurrentCameraState(google.protobuf.Empty)
+  returns (stream CurrentCameraStateResponse) {}
+
+  //
   // A client-to-server RPC
   //
   // Sets the play speed of the replay
@@ -304,6 +318,13 @@ service Broadcast {
   returns (CurrentReplayPlaySpeedResponse) {}
 
   //
+  // A server-to-client RPC
+  //
+  // Streams the current replay play speed immediately and whenever it changes.
+  rpc SubscribeCurrentReplayPlaySpeed(google.protobuf.Empty)
+  returns (stream CurrentReplayPlaySpeedResponse) {}
+
+  //
   // A client-to-server RPC
   //
   // Sets the play position of the replay
@@ -316,6 +337,13 @@ service Broadcast {
   // Returns the current replay frame/session position.
   rpc CurrentReplayPosition(google.protobuf.Empty)
   returns (CurrentReplayPositionResponse) {}
+
+  //
+  // A server-to-client RPC
+  //
+  // Streams the current replay position immediately and whenever it changes.
+  rpc SubscribeCurrentReplayPosition(google.protobuf.Empty)
+  returns (stream CurrentReplayPositionResponse) {}
 
   //
   // A client-to-server RPC
@@ -355,6 +383,13 @@ service Broadcast {
   returns (CurrentPitServiceResponse) {}
 
   //
+  // A server-to-client RPC
+  //
+  // Streams the current pending pit service state immediately and whenever it changes.
+  rpc SubscribeCurrentPitService(google.protobuf.Empty)
+  returns (stream CurrentPitServiceResponse) {}
+
+  //
   // A client-to-server RPC
   //
   // Sends mutliple pit commands and returns the service flags
@@ -375,6 +410,13 @@ service Broadcast {
   returns (CurrentTelemetryStateResponse) {}
 
   //
+  // A server-to-client RPC
+  //
+  // Streams the current disk telemetry logging state immediately and whenever it changes.
+  rpc SubscribeCurrentTelemetryState(google.protobuf.Empty)
+  returns (stream CurrentTelemetryStateResponse) {}
+
+  //
   // A client-to-server RPC
   //
   // Sends a force feedback command
@@ -387,6 +429,13 @@ service Broadcast {
   // Returns the current force feedback max force.
   rpc CurrentForceFeedback(google.protobuf.Empty)
   returns (CurrentForceFeedbackResponse) {}
+
+  //
+  // A server-to-client RPC
+  //
+  // Streams the current force feedback max force immediately and whenever it changes.
+  rpc SubscribeCurrentForceFeedback(google.protobuf.Empty)
+  returns (stream CurrentForceFeedbackResponse) {}
 
   //
   // A client-to-server RPC
@@ -407,4 +456,11 @@ service Broadcast {
   // Returns the current video capture state.
   rpc CurrentVideoCapture(google.protobuf.Empty)
   returns (CurrentVideoCaptureResponse) {}
+
+  //
+  // A server-to-client RPC
+  //
+  // Streams the current video capture state immediately and whenever it changes.
+  rpc SubscribeCurrentVideoCapture(google.protobuf.Empty)
+  returns (stream CurrentVideoCaptureResponse) {}
 }
