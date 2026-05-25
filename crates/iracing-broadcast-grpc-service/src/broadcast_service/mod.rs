@@ -22,6 +22,7 @@ use response as response_impl;
 
 const DEFAULT_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(2);
 const SUBSCRIPTION_BUFFER_CAPACITY: usize = 16;
+const SUBSCRIPTION_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 type CurrentValueStream<T> = ReceiverStream<Result<T, Status>>;
 
@@ -56,6 +57,7 @@ where
             };
 
             if previous.as_ref() == Some(&response) {
+                tokio::time::sleep(SUBSCRIPTION_POLL_INTERVAL);
                 continue;
             }
 
