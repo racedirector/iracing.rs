@@ -32,6 +32,11 @@ Compact guidance for future OpenCode sessions working in this repo.
 - `crates/test-utils`: shared fixture plumbing and path discovery; lean on it for integration tests instead of reinventing file lookups.
 - `examples/*`: workspace example applications that consume the crates as downstream users would.
 
+## Package-Specific Guidance
+
+- Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`, `iracing-broadcast-grpc-service`, and `test-utils`.
+- For the broadcast gRPC service, read `crates/iracing-broadcast-grpc-service/docs/architecture.md` before changing protocol, server, client, response semantics, platform support, or operational behavior.
+
 ## Patterns & Gotchas
 
 - Frame extraction is little-endian; always rely on `VarData::from_bytes` rather than manual decoding to avoid drift.
