@@ -97,7 +97,11 @@ properties:
                 type: string
               DashDisplayPage:
                 type: string
-              TcSetting:
+              Tc1_Long:
+                type: string
+              Tc2_Lat:
+                type: string
+              ThrottleSetting:
                 type: string
           LeftFront:
             type: object
@@ -130,6 +134,8 @@ properties:
               RideHeight:
                 type: string
               SpringPerchOffset:
+                type: string
+              SpringRate:
                 type: string
               ToeIn:
                 type: string
@@ -175,6 +181,8 @@ properties:
               RideHeight:
                 type: string
               SpringPerchOffset:
+                type: string
+              SpringRate:
                 type: string
               ToeIn:
                 type: string
@@ -385,206 +393,398 @@ properties:
         - array
         - 'null'
         items:
-          type: object
-          properties:
-            AbbrevName:
-              type:
-              - string
-              - 'null'
-            BodyType:
-              type:
-              - integer
-              - 'null'
-            CarCfg:
-              type:
-              - integer
-              - 'null'
-            CarCfgCustomPaintExt: true
-            CarCfgName: true
-            CarClassColor:
-              type:
-              - string
-              - 'null'
-            CarClassDryTireSetLimit:
-              type:
-              - string
-              - 'null'
-            CarClassEstLapTime:
-              type:
-              - number
-              - 'null'
-            CarClassID:
-              type:
-              - integer
-              - 'null'
-            CarClassLicenseLevel:
-              type:
-              - integer
-              - 'null'
-            CarClassMaxFuelPct:
-              type:
-              - string
-              - 'null'
-            CarClassPowerAdjust:
-              type:
-              - string
-              - 'null'
-            CarClassRelSpeed:
-              type:
-              - integer
-              - 'null'
-            CarClassShortName:
-              type:
-              - string
-              - 'null'
-            CarClassWeightPenalty:
-              type:
-              - string
-              - 'null'
-            CarDesignStr:
-              type:
-              - string
-              - 'null'
-            CarID:
-              type:
-              - integer
-              - 'null'
-            CarIdx:
-              type: integer
-            CarIsAI:
-              type:
-              - integer
-              - 'null'
-            CarIsElectric:
-              type:
-              - integer
-              - 'null'
-            CarIsPaceCar:
-              type:
-              - integer
-              - 'null'
-            CarNumber:
-              type:
-              - string
-              - 'null'
-            CarNumberDesignStr:
-              type:
-              - string
-              - 'null'
-            CarNumberRaw:
-              type:
-              - integer
-              - 'null'
-            CarPath:
-              type:
-              - string
-              - 'null'
-            CarScreenName:
-              type:
-              - string
-              - 'null'
-            CarScreenNameShort:
-              type:
-              - string
-              - 'null'
-            CarSponsor_1:
-              type:
-              - integer
-              - 'null'
-            CarSponsor_2:
-              type:
-              - integer
-              - 'null'
-            ClubID:
-              type:
-              - integer
-              - 'null'
-            ClubName:
-              type:
-              - string
-              - 'null'
-            CurDriverIncidentCount:
-              type:
-              - integer
-              - 'null'
-            DivisionID:
-              type:
-              - integer
-              - 'null'
-            DivisionName:
-              type:
-              - string
-              - 'null'
-            FaceType:
-              type:
-              - integer
-              - 'null'
-            FlairID:
-              type:
-              - integer
-              - 'null'
-            FlairName:
-              type:
-              - string
-              - 'null'
-            HelmetDesignStr:
-              type:
-              - string
-              - 'null'
-            HelmetType:
-              type:
-              - integer
-              - 'null'
-            IRating:
-              type:
-              - integer
-              - 'null'
-            Initials:
-              type:
-              - string
-              - 'null'
-            IsSpectator:
-              type:
-              - integer
-              - 'null'
-            LicColor:
-              type:
-              - string
-              - 'null'
-            LicLevel:
-              type:
-              - integer
-              - 'null'
-            LicString:
-              type:
-              - string
-              - 'null'
-            LicSubLevel:
-              type:
-              - integer
-              - 'null'
-            SuitDesignStr:
-              type:
-              - string
-              - 'null'
-            TeamID:
-              type:
-              - integer
-              - 'null'
-            TeamIncidentCount:
-              type:
-              - integer
-              - 'null'
-            TeamName:
-              type:
-              - string
-              - 'null'
-            UserID:
-              type:
-              - integer
-              - 'null'
-            UserName:
-              type: string
+          anyOf:
+          - type: object
+            properties:
+              AbbrevName:
+                type:
+                - string
+                - 'null'
+              BodyType:
+                type:
+                - integer
+                - 'null'
+              CarCfg:
+                type:
+                - integer
+                - 'null'
+              CarCfgCustomPaintExt: true
+              CarCfgName: true
+              CarClassColor:
+                type:
+                - string
+                - 'null'
+              CarClassDryTireSetLimit:
+                type:
+                - string
+                - 'null'
+              CarClassEstLapTime:
+                type:
+                - number
+                - 'null'
+              CarClassID:
+                type:
+                - integer
+                - 'null'
+              CarClassLicenseLevel:
+                type:
+                - integer
+                - 'null'
+              CarClassMaxFuelPct:
+                type:
+                - string
+                - 'null'
+              CarClassPowerAdjust:
+                type:
+                - string
+                - 'null'
+              CarClassRelSpeed:
+                type:
+                - integer
+                - 'null'
+              CarClassShortName:
+                type:
+                - string
+                - 'null'
+              CarClassWeightPenalty:
+                type:
+                - string
+                - 'null'
+              CarDesignStr:
+                type:
+                - string
+                - 'null'
+              CarID:
+                type:
+                - integer
+                - 'null'
+              CarIdx:
+                type: integer
+              CarIsAI:
+                type:
+                - integer
+                - 'null'
+              CarIsElectric:
+                type:
+                - integer
+                - 'null'
+              CarIsPaceCar:
+                type:
+                - integer
+                - 'null'
+              CarNumber:
+                type:
+                - string
+                - 'null'
+              CarNumberDesignStr:
+                type:
+                - string
+                - 'null'
+              CarNumberRaw:
+                type:
+                - integer
+                - 'null'
+              CarPath:
+                type:
+                - string
+                - 'null'
+              CarScreenName:
+                type:
+                - string
+                - 'null'
+              CarScreenNameShort:
+                type:
+                - string
+                - 'null'
+              CarSponsor_1:
+                type:
+                - integer
+                - 'null'
+              CarSponsor_2:
+                type:
+                - integer
+                - 'null'
+              ClubID:
+                type:
+                - integer
+                - 'null'
+              ClubName:
+                type:
+                - string
+                - 'null'
+              CurDriverIncidentCount:
+                type:
+                - integer
+                - 'null'
+              DivisionID:
+                type:
+                - integer
+                - 'null'
+              DivisionName:
+                type:
+                - string
+                - 'null'
+              FaceType:
+                type:
+                - integer
+                - 'null'
+              FlairID:
+                type:
+                - integer
+                - 'null'
+              FlairName:
+                type:
+                - string
+                - 'null'
+              HelmetDesignStr:
+                type:
+                - string
+                - 'null'
+              HelmetType:
+                type:
+                - integer
+                - 'null'
+              IRating:
+                type:
+                - integer
+                - 'null'
+              Initials:
+                type:
+                - string
+                - 'null'
+              IsSpectator:
+                type:
+                - integer
+                - 'null'
+              LicColor:
+                type:
+                - string
+                - 'null'
+              LicLevel:
+                type:
+                - integer
+                - 'null'
+              LicString:
+                type:
+                - string
+                - 'null'
+              LicSubLevel:
+                type:
+                - integer
+                - 'null'
+              SuitDesignStr:
+                type:
+                - string
+                - 'null'
+              TeamID:
+                type:
+                - integer
+                - 'null'
+              TeamIncidentCount:
+                type:
+                - integer
+                - 'null'
+              TeamName:
+                type:
+                - string
+                - 'null'
+              UserID:
+                type:
+                - integer
+                - 'null'
+              UserName:
+                type: string
+          - type: object
+            properties:
+              AbbrevName: true
+              BodyType:
+                type:
+                - integer
+                - 'null'
+              CarCfg:
+                type:
+                - integer
+                - 'null'
+              CarCfgCustomPaintExt: true
+              CarCfgName: true
+              CarClassColor:
+                type:
+                - string
+                - 'null'
+              CarClassDryTireSetLimit:
+                type:
+                - string
+                - 'null'
+              CarClassEstLapTime:
+                type:
+                - number
+                - 'null'
+              CarClassID:
+                type:
+                - integer
+                - 'null'
+              CarClassLicenseLevel:
+                type:
+                - integer
+                - 'null'
+              CarClassMaxFuelPct:
+                type:
+                - string
+                - 'null'
+              CarClassPowerAdjust:
+                type:
+                - string
+                - 'null'
+              CarClassRelSpeed:
+                type:
+                - integer
+                - 'null'
+              CarClassShortName: true
+              CarClassWeightPenalty:
+                type:
+                - string
+                - 'null'
+              CarDesignStr:
+                type:
+                - string
+                - 'null'
+              CarID:
+                type:
+                - integer
+                - 'null'
+              CarIdx:
+                type: integer
+              CarIsAI:
+                type:
+                - integer
+                - 'null'
+              CarIsElectric:
+                type:
+                - integer
+                - 'null'
+              CarIsPaceCar:
+                type:
+                - integer
+                - 'null'
+              CarNumber:
+                type:
+                - string
+                - 'null'
+              CarNumberDesignStr:
+                type:
+                - string
+                - 'null'
+              CarNumberRaw:
+                type:
+                - integer
+                - 'null'
+              CarPath:
+                type:
+                - string
+                - 'null'
+              CarScreenName:
+                type:
+                - string
+                - 'null'
+              CarScreenNameShort:
+                type:
+                - string
+                - 'null'
+              CarSponsor_1:
+                type:
+                - integer
+                - 'null'
+              CarSponsor_2:
+                type:
+                - integer
+                - 'null'
+              ClubID:
+                type:
+                - integer
+                - 'null'
+              ClubName:
+                type:
+                - string
+                - 'null'
+              CurDriverIncidentCount:
+                type:
+                - integer
+                - 'null'
+              DivisionID:
+                type:
+                - integer
+                - 'null'
+              DivisionName:
+                type:
+                - string
+                - 'null'
+              FaceType:
+                type:
+                - integer
+                - 'null'
+              FlairID:
+                type:
+                - integer
+                - 'null'
+              FlairName:
+                type:
+                - string
+                - 'null'
+              HelmetDesignStr:
+                type:
+                - string
+                - 'null'
+              HelmetType:
+                type:
+                - integer
+                - 'null'
+              IRating:
+                type:
+                - integer
+                - 'null'
+              Initials: true
+              IsSpectator:
+                type:
+                - integer
+                - 'null'
+              LicColor:
+                type:
+                - string
+                - 'null'
+              LicLevel:
+                type:
+                - integer
+                - 'null'
+              LicString:
+                type:
+                - string
+                - 'null'
+              LicSubLevel:
+                type:
+                - integer
+                - 'null'
+              SuitDesignStr:
+                type:
+                - string
+                - 'null'
+              TeamID:
+                type:
+                - integer
+                - 'null'
+              TeamIncidentCount:
+                type:
+                - integer
+                - 'null'
+              TeamName:
+                type:
+                - string
+                - 'null'
+              UserID:
+                type:
+                - integer
+                - 'null'
+              UserName:
+                type: string
       PaceCarIdx:
         type:
         - integer
@@ -837,6 +1037,8 @@ properties:
         type:
         - string
         - 'null'
+      Encoding:
+        type: string
       EventType:
         type:
         - string
@@ -938,7 +1140,10 @@ properties:
         type:
         - integer
         - 'null'
-      TrackConfigName: true
+      TrackConfigName:
+        type:
+        - string
+        - 'null'
       TrackCountry:
         type:
         - string
@@ -1013,10 +1218,7 @@ properties:
         type:
         - string
         - 'null'
-      TrackState:
-        type:
-        - string
-        - 'null'
+      TrackState: true
       TrackSurfaceTemp:
         type:
         - string
@@ -1224,42 +1426,34 @@ examples:
       GroupNum: 9
       IsScenic: null
     - Cameras:
-      - CameraName: Scenic_00
-        CameraNum: 1
       - CameraName: Scenic_01
-        CameraNum: 2
+        CameraNum: 1
       - CameraName: Scenic_02
-        CameraNum: 3
+        CameraNum: 2
       - CameraName: Scenic_03
-        CameraNum: 4
+        CameraNum: 3
       - CameraName: Scenic_04
-        CameraNum: 5
+        CameraNum: 4
       - CameraName: Scenic_05
-        CameraNum: 6
+        CameraNum: 5
       - CameraName: Scenic_06
-        CameraNum: 7
+        CameraNum: 6
       - CameraName: Scenic_07
-        CameraNum: 8
+        CameraNum: 7
       - CameraName: Scenic_08
-        CameraNum: 9
-      - CameraName: Scenic_11
-        CameraNum: 10
-      - CameraName: Scenic_12
-        CameraNum: 11
-      - CameraName: Scenic_13
-        CameraNum: 12
+        CameraNum: 8
       - CameraName: Scenic_09
-        CameraNum: 13
+        CameraNum: 9
       - CameraName: Scenic_10
-        CameraNum: 14
+        CameraNum: 10
+      - CameraName: Scenic_11
+        CameraNum: 11
+      - CameraName: Scenic_12
+        CameraNum: 12
+      - CameraName: Scenic_13
+        CameraNum: 13
       - CameraName: Scenic_14
-        CameraNum: 15
-      - CameraName: Scenic_15
-        CameraNum: 16
-      - CameraName: Scenic_16
-        CameraNum: 17
-      - CameraName: Scenic_17
-        CameraNum: 18
+        CameraNum: 14
       GroupName: Scenic
       GroupNum: 10
       IsScenic: true
@@ -1282,27 +1476,19 @@ examples:
         CameraNum: 8
       - CameraName: CamTV1_08
         CameraNum: 9
-      - CameraName: CamTV1_11
+      - CameraName: CamTV1_09
         CameraNum: 10
-      - CameraName: CamTV1_12
+      - CameraName: CamTV1_10
         CameraNum: 11
-      - CameraName: CamTV1_13
-        CameraNum: 12
-      - CameraName: CamTV1_14
-        CameraNum: 13
-      - CameraName: CamTV1_15
-        CameraNum: 14
-      - CameraName: CamTV1_16
-        CameraNum: 15
       GroupName: TV1
       GroupNum: 11
       IsScenic: null
     - Cameras:
-      - CameraName: CamTV2_00
+      - CameraName: CamTV2_12
         CameraNum: 1
-      - CameraName: CamTV2_01
+      - CameraName: CamTV2_10
         CameraNum: 2
-      - CameraName: CamTV2_16
+      - CameraName: CamTV2_11
         CameraNum: 3
       - CameraName: CamTV2_03
         CameraNum: 4
@@ -1318,20 +1504,10 @@ examples:
         CameraNum: 9
       - CameraName: CamTV2_09
         CameraNum: 10
-      - CameraName: CamTV2_10
+      - CameraName: CamTV2_01
         CameraNum: 11
-      - CameraName: CamTV2_11
-        CameraNum: 12
-      - CameraName: CamTV2_12
-        CameraNum: 13
-      - CameraName: CamTV2_13
-        CameraNum: 14
-      - CameraName: CamTV2_14
-        CameraNum: 15
-      - CameraName: CamTV2_15
-        CameraNum: 16
       - CameraName: CamTV2_02
-        CameraNum: 17
+        CameraNum: 12
       GroupName: TV2
       GroupNum: 12
       IsScenic: null
@@ -1362,264 +1538,142 @@ examples:
         CameraNum: 12
       - CameraName: CamTV3_12
         CameraNum: 13
-      - CameraName: CamTV3_13
-        CameraNum: 14
-      - CameraName: CamTV3_14
-        CameraNum: 15
-      - CameraName: CamTV3_15
-        CameraNum: 16
       GroupName: TV3
       GroupNum: 13
       IsScenic: null
     - Cameras:
-      - CameraName: TV_Static_26
+      - CameraName: CamTV4_00
         CameraNum: 1
-      - CameraName: TV_Static_00
+      - CameraName: CamTV4_01
         CameraNum: 2
-      - CameraName: TV_Static_01
+      - CameraName: CamTV4_02
         CameraNum: 3
-      - CameraName: TV_Static_02
+      - CameraName: CamTV4_03
         CameraNum: 4
-      - CameraName: TV_Static_03
+      - CameraName: CamTV4_04
         CameraNum: 5
-      - CameraName: TV_Static_04
+      - CameraName: CamTV4_05
         CameraNum: 6
-      - CameraName: TV_Static_05
+      - CameraName: CamTV4_06
         CameraNum: 7
-      - CameraName: TV_Static_06
+      - CameraName: CamTV4_07
         CameraNum: 8
-      - CameraName: TV_Static_07
+      - CameraName: CamTV4_08
         CameraNum: 9
-      - CameraName: TV_Static_08
+      - CameraName: CamTV4_09
         CameraNum: 10
-      - CameraName: TV_Static_09
+      - CameraName: CamTV4_10
         CameraNum: 11
-      - CameraName: TV_Static_10
+      - CameraName: CamTV4_11
         CameraNum: 12
-      - CameraName: TV_Static_11
+      - CameraName: CamTV4_12
         CameraNum: 13
-      - CameraName: TV_Static_12
+      - CameraName: CamTV4_13
         CameraNum: 14
-      - CameraName: TV_Static_13
-        CameraNum: 15
-      - CameraName: TV_Static_14
-        CameraNum: 16
-      - CameraName: TV_Static_15
-        CameraNum: 17
-      - CameraName: TV_Static_16
-        CameraNum: 18
-      - CameraName: TV_Static_17
-        CameraNum: 19
-      - CameraName: TV_Static_18
-        CameraNum: 20
-      - CameraName: TV_Static_19
-        CameraNum: 21
-      - CameraName: TV_Static_20
-        CameraNum: 22
-      - CameraName: TV_Static_21
-        CameraNum: 23
-      - CameraName: TV_Static_22
-        CameraNum: 24
-      - CameraName: TV_Static_23
-        CameraNum: 25
-      - CameraName: TV_Static_24
-        CameraNum: 26
-      - CameraName: TV_Static_25
-        CameraNum: 27
       GroupName: TV Static
       GroupNum: 14
       IsScenic: null
     - Cameras:
-      - CameraName: TV_Static_01
+      - CameraName: CamTV3_05
         CameraNum: 1
-      - CameraName: CamBlimp0
+      - CameraName: CamTV1_00
         CameraNum: 2
-      - CameraName: CamTV1_57
+      - CameraName: CamTV1_01
         CameraNum: 3
-      - CameraName: CamTV2_39
+      - CameraName: CamTV1_02
         CameraNum: 4
-      - CameraName: TVDynamic_23
+      - CameraName: CamTV1_03
         CameraNum: 5
-      - CameraName: TVDynamic_00
+      - CameraName: CamTV1_04
         CameraNum: 6
-      - CameraName: TVDynamic_22
+      - CameraName: CamTV1_05
         CameraNum: 7
-      - CameraName: TV_Static51
+      - CameraName: CamTV1_06
         CameraNum: 8
-      - CameraName: CamTV1_55
+      - CameraName: CamTV1_07
         CameraNum: 9
-      - CameraName: CamTV2_38
+      - CameraName: CamTV1_08
         CameraNum: 10
-      - CameraName: TVDynamic_21
+      - CameraName: CamTV1_09
         CameraNum: 11
-      - CameraName: CamTV1_51
+      - CameraName: CamTV1_10
         CameraNum: 12
-      - CameraName: CamTV1_53
+      - CameraName: CamTV2_01
         CameraNum: 13
-      - CameraName: CamTV1_52
+      - CameraName: CamTV2_02
         CameraNum: 14
-      - CameraName: CamTV2_36
+      - CameraName: CamTV2_03
         CameraNum: 15
-      - CameraName: TV_Static50
+      - CameraName: CamTV2_04
         CameraNum: 16
-      - CameraName: TVDynamic_20
+      - CameraName: CamTV2_05
         CameraNum: 17
-      - CameraName: TV_Static49
+      - CameraName: CamTV2_06
         CameraNum: 18
-      - CameraName: CamTV1_48
+      - CameraName: CamTV2_07
         CameraNum: 19
-      - CameraName: TV_Static48
+      - CameraName: CamTV2_08
         CameraNum: 20
-      - CameraName: CamTV1_49
+      - CameraName: CamTV2_09
         CameraNum: 21
-      - CameraName: TVDynamic_19
+      - CameraName: CamTV2_10
         CameraNum: 22
-      - CameraName: TVDynamic_39
+      - CameraName: CamTV2_11
         CameraNum: 23
-      - CameraName: TV_Static47
+      - CameraName: CamTV2_12
         CameraNum: 24
-      - CameraName: TVDynamic_40
+      - CameraName: CamTV3_00
         CameraNum: 25
-      - CameraName: TVDynamic_18
+      - CameraName: CamTV3_01
         CameraNum: 26
-      - CameraName: TVDynamic_37
+      - CameraName: CamTV3_02
         CameraNum: 27
-      - CameraName: TVDynamic_38
+      - CameraName: CamTV3_03
         CameraNum: 28
-      - CameraName: CamTV2_33
+      - CameraName: CamTV3_04
         CameraNum: 29
-      - CameraName: TV_Static46
+      - CameraName: CamTV3_06
         CameraNum: 30
-      - CameraName: TV_Static45
+      - CameraName: CamTV3_07
         CameraNum: 31
-      - CameraName: TV_Static43
+      - CameraName: CamTV3_08
         CameraNum: 32
-      - CameraName: TVDynamic_16
+      - CameraName: CamTV3_09
         CameraNum: 33
-      - CameraName: TVDynamic_34
+      - CameraName: CamTV3_10
         CameraNum: 34
-      - CameraName: CamTV2_30
+      - CameraName: CamTV3_11
         CameraNum: 35
-      - CameraName: TVDynamic_36
+      - CameraName: CamTV3_12
         CameraNum: 36
-      - CameraName: TV_Static44
+      - CameraName: CamTV4_00
         CameraNum: 37
-      - CameraName: TVDynamic_17
+      - CameraName: CamTV4_01
         CameraNum: 38
-      - CameraName: TVDynamic_35
+      - CameraName: CamTV4_02
         CameraNum: 39
-      - CameraName: CamTV2_31
+      - CameraName: CamTV4_03
         CameraNum: 40
-      - CameraName: TV_Static42
+      - CameraName: CamTV4_04
         CameraNum: 41
-      - CameraName: TVDynamic_33
+      - CameraName: CamTV4_05
         CameraNum: 42
-      - CameraName: TVDynamic_15
+      - CameraName: CamTV4_06
         CameraNum: 43
-      - CameraName: CamTV2_29
+      - CameraName: CamTV4_08
         CameraNum: 44
-      - CameraName: TV_Static41
+      - CameraName: CamTV4_09
         CameraNum: 45
-      - CameraName: TV_Static38
+      - CameraName: CamTV4_10
         CameraNum: 46
-      - CameraName: CamTV2_27
+      - CameraName: CamTV4_11
         CameraNum: 47
-      - CameraName: TVDynamic_10
+      - CameraName: CamTV4_12
         CameraNum: 48
-      - CameraName: TVDynamic_31
+      - CameraName: CamTV4_13
         CameraNum: 49
-      - CameraName: TVDynamic_11
-        CameraNum: 50
-      - CameraName: TVDynamic_32
-        CameraNum: 51
-      - CameraName: CamTV2_28
-        CameraNum: 52
-      - CameraName: TV_Static40
-        CameraNum: 53
-      - CameraName: TVDynamic_14
-        CameraNum: 54
-      - CameraName: TVDynamic_09
-        CameraNum: 55
-      - CameraName: TVDynamic_08
-        CameraNum: 56
-      - CameraName: TVDynamic_48
-        CameraNum: 57
-      - CameraName: TV_Static36
-        CameraNum: 58
-      - CameraName: TVDynamic_30
-        CameraNum: 59
-      - CameraName: TVDynamic_28
-        CameraNum: 60
-      - CameraName: CamTV2_25
-        CameraNum: 61
-      - CameraName: TVDynamic_06
-        CameraNum: 62
-      - CameraName: TVDynamic_07
-        CameraNum: 63
-      - CameraName: TVDynamic_29
-        CameraNum: 64
-      - CameraName: TVDynamic_05
-        CameraNum: 65
-      - CameraName: TVDynamic_46
-        CameraNum: 66
-      - CameraName: TVDynamic_47
-        CameraNum: 67
-      - CameraName: TVDynamic_13
-        CameraNum: 68
-      - CameraName: TVDynamic_26
-        CameraNum: 69
-      - CameraName: TVDynamic_27
-        CameraNum: 70
-      - CameraName: TVDynamic_45
-        CameraNum: 71
-      - CameraName: CamTV2_23
-        CameraNum: 72
-      - CameraName: TVDynamic_44
-        CameraNum: 73
-      - CameraName: TVDynamic_12
-        CameraNum: 74
-      - CameraName: TV_Static33
-        CameraNum: 75
-      - CameraName: TVDynamic_04
-        CameraNum: 76
-      - CameraName: TVDynamic_03
-        CameraNum: 77
-      - CameraName: TV_Static31
-        CameraNum: 78
-      - CameraName: TVDynamic_43
-        CameraNum: 79
-      - CameraName: CamTV2_21
-        CameraNum: 80
-      - CameraName: TVDynamic_42
-        CameraNum: 81
-      - CameraName: TVDynamic_25
-        CameraNum: 82
-      - CameraName: CamTV2_20
-        CameraNum: 83
-      - CameraName: TV_Static30
-        CameraNum: 84
-      - CameraName: TV_Static29
-        CameraNum: 85
-      - CameraName: TVDynamic_02
-        CameraNum: 86
-      - CameraName: CamTV1_58
-        CameraNum: 87
-      - CameraName: TVDynamic_41
-        CameraNum: 88
-      - CameraName: TV_Static28
-        CameraNum: 89
-      - CameraName: CamTV2_19
-        CameraNum: 90
-      - CameraName: CamTV2_18
-        CameraNum: 91
-      - CameraName: TVDynamic_24
-        CameraNum: 92
-      - CameraName: TVDynamic_01
-        CameraNum: 93
-      - CameraName: TV_Static53
-        CameraNum: 94
       - CameraName: CamRoll Bar
-        CameraNum: 95
+        CameraNum: 50
       GroupName: TV Mixed
       GroupNum: 15
       IsScenic: null
@@ -1668,244 +1722,352 @@ examples:
   CarSetup:
     Chassis:
       FrontBrakes:
-        ArbSetting: 2
-        BrakePads: Endurance
+        ArbSetting: 5
+        BrakePads: Sprint
         CrossWeight: 50.0%
-        NoseWeight: 47.7%
-        ToeIn: -1.6 mm
+        NoseWeight: 50.6%
+        ToeIn: -2.2 mm
       InCarDials:
-        AbsSetting: 7 (ABS)
-        BrakePressureBias: 59.7%
-        DashDisplayPage: Page 1
-        TcSetting: 10 (TC)
+        AbsSetting: 5 (ABS)
+        BrakePressureBias: 56.7%
+        DashDisplayPage: Race 2
+        Tc1_Long: 3 (TC1)
+        Tc2_Lat: 3 (TC2)
+        ThrottleSetting: 6 (THR)
       LeftFront:
-        BumpStiffness: +4 clicks
-        Camber: -3.5 deg
-        CornerWeight: 3745 N
-        ReboundStiffness: +7 clicks
-        RideHeight: 113.0 mm
-        SpringPerchOffset: 3.00 mm
-        SpringRate: 200 N/mm
+        BumpStiffness: +6 clicks
+        Camber: -4.0 deg
+        CornerWeight: 4052 N
+        ReboundStiffness: +6 clicks
+        RideHeight: 95.1 mm
+        SpringPerchOffset: -3.25 mm
+        SpringRate: 140 N/mm
       LeftRear:
-        BumpStiffness: +7 clicks
-        Camber: -2.8 deg
-        CornerWeight: 4099 N
-        ReboundStiffness: +4 clicks
-        RideHeight: 134.8 mm
-        SpringPerchOffset: 3.00 mm
+        BumpStiffness: +4 clicks
+        Camber: -3.2 deg
+        CornerWeight: 3962 N
+        ReboundStiffness: +8 clicks
+        RideHeight: 180.1 mm
+        SpringPerchOffset: 7.25 mm
+        SpringRate: 193 N/mm
         ToeIn: +0.1 mm
       Rear:
-        ArbSetting: 1
-        FuelLevel: 53.0 L
+        ArbSetting: 2
+        FuelLevel: 86.0 L
         FuelLowWarning: 10.0 L
-        WingAngle: 8 deg
+        WingAngle: 10 deg
       RightFront:
-        BumpStiffness: +4 clicks
-        Camber: -3.5 deg
-        CornerWeight: 3745 N
-        ReboundStiffness: +7 clicks
-        RideHeight: 113.0 mm
-        SpringPerchOffset: 3.00 mm
-        SpringRate: 200 N/mm
+        BumpStiffness: +6 clicks
+        Camber: -4.0 deg
+        CornerWeight: 4052 N
+        ReboundStiffness: +6 clicks
+        RideHeight: 95.1 mm
+        SpringPerchOffset: -3.25 mm
+        SpringRate: 140 N/mm
       RightRear:
-        BumpStiffness: +7 clicks
-        Camber: -2.8 deg
-        CornerWeight: 4099 N
-        ReboundStiffness: +4 clicks
-        RideHeight: 134.8 mm
-        SpringPerchOffset: 3.00 mm
+        BumpStiffness: +4 clicks
+        Camber: -3.2 deg
+        CornerWeight: 3962 N
+        ReboundStiffness: +8 clicks
+        RideHeight: 180.1 mm
+        SpringPerchOffset: 7.25 mm
+        SpringRate: 193 N/mm
         ToeIn: +0.1 mm
     Tires:
       LeftFront:
         LastHotPressure: 176 kPa
-        LastTempsOMI: 44C, 44C, 44C
+        LastTempsOMI: 46C, 47C, 48C
         StartingPressure: 176 kPa
         TreadRemaining: 100%, 100%, 100%
       LeftRear:
         LastHotPressure: 176 kPa
-        LastTempsOMI: 44C, 44C, 44C
+        LastTempsOMI: 45C, 47C, 48C
         StartingPressure: 176 kPa
         TreadRemaining: 100%, 100%, 100%
       RightFront:
         LastHotPressure: 176 kPa
-        LastTempsIMO: 44C, 44C, 44C
+        LastTempsIMO: 48C, 48C, 47C
         StartingPressure: 176 kPa
         TreadRemaining: 100%, 100%, 100%
       RightRear:
         LastHotPressure: 176 kPa
-        LastTempsIMO: 44C, 44C, 44C
+        LastTempsIMO: 49C, 48C, 47C
         StartingPressure: 176 kPa
         TreadRemaining: 100%, 100%, 100%
       TireType:
         TireType: Dry
-    UpdateCount: 1
+    UpdateCount: 8
   DriverInfo:
     DriverBrakeCurvingFactor: 0.001
     DriverCarEngCylinderCount: 8
-    DriverCarEstLapTime: 132.0298
+    DriverCarEstLapTime: 83.2375
     DriverCarFuelKgPerLtr: 0.75
-    DriverCarFuelMaxLtr: 75.0
+    DriverCarFuelMaxLtr: 86.0
     DriverCarGearNeutral: 1
     DriverCarGearNumForward: 6
     DriverCarGearReverse: 1
-    DriverCarIdleRPM: 1100.0
+    DriverCarIdleRPM: 1750.0
     DriverCarIdx: 4
     DriverCarIsElectric: 0
     DriverCarMaxFuelPct: 1.0
-    DriverCarRedLine: 6900.0
-    DriverCarSLBlinkRPM: 6850.0
-    DriverCarSLFirstRPM: 5650.0
-    DriverCarSLLastRPM: 6700.0
-    DriverCarSLShiftRPM: 6650.0
-    DriverCarShiftAid: Antistall
-    DriverCarVersion: 2026.01.28.01
+    DriverCarRedLine: 7500.0
+    DriverCarSLBlinkRPM: 7300.0
+    DriverCarSLFirstRPM: 6300.0
+    DriverCarSLLastRPM: 7300.0
+    DriverCarSLShiftRPM: 7300.0
+    DriverCarShiftAid: Antistall_Clutch_Throttle
+    DriverCarVersion: 2026.06.04.01
     DriverGearboxControlType: Sequential
     DriverGearboxType: Sequential
-    DriverHeadPosX: -0.643
-    DriverHeadPosY: 0.393
-    DriverHeadPosZ: 0.622
-    DriverIncidentCount: 0
-    DriverIsAdmin: 0
-    DriverPitTrkPct: 0.043397
+    DriverHeadPosX: -0.356
+    DriverHeadPosY: 0.32
+    DriverHeadPosZ: 0.68
+    DriverIncidentCount: 2
+    DriverIsAdmin: 1
+    DriverPitTrkPct: 0.994954
     DriverSetupIsModified: 0
-    DriverSetupLoadTypeName: fixed
-    DriverSetupName: fixed.sto
+    DriverSetupLoadTypeName: user
+    DriverSetupName: anonymized_setup.sto
     DriverSetupPassedTech: 1
     DriverTires:
     - TireCompoundType: Hard
       TireIndex: 0
     - TireCompoundType: Wet
       TireIndex: 1
-    DriverUserID: 378767
+    DriverUserID: 900005
     Drivers:
-    - AbbrevName: Cabanas, J
+    - AbbrevName: Driver 01
       BodyType: 0
       CarCfg: -1
       CarCfgCustomPaintExt: null
       CarCfgName: null
-      CarClassColor: '0xffffff'
+      CarClassColor: '0xffda59'
       CarClassDryTireSetLimit: 0 %
-      CarClassEstLapTime: 131.2314
-      CarClassID: 2268
+      CarClassEstLapTime: 77.3254
+      CarClassID: 86394
       CarClassLicenseLevel: 0
-      CarClassMaxFuelPct: 1.000 %
+      CarClassMaxFuelPct: 0.800 %
       CarClassPowerAdjust: 0.000 %
-      CarClassRelSpeed: 49
-      CarClassShortName: GT4 Class
+      CarClassRelSpeed: 52
+      CarClassShortName: ARA S8 GT3
       CarClassWeightPenalty: 0.000 kg
-      CarDesignStr: 1,ff0000,00ff00,0000ff
-      CarID: 204
+      CarDesignStr: 2,000000,000000,e8e8e8.000000
+      CarID: 132
       CarIdx: 0
       CarIsAI: 0
       CarIsElectric: 0
       CarIsPaceCar: 0
-      CarNumber: '1'
+      CarNumber: '14'
       CarNumberDesignStr: 0,0,ffffff,777777,000000
-      CarNumberRaw: 1
-      CarPath: fordmustanggt4
-      CarScreenName: Ford Mustang GT4
-      CarScreenNameShort: Ford Mustang GT4
+      CarNumberRaw: 14
+      CarPath: bmwm4gt3
+      CarScreenName: BMW M4 GT3 EVO
+      CarScreenNameShort: BMW M4 GT3 EVO
       CarSponsor_1: 0
       CarSponsor_2: 0
       ClubID: 0
       ClubName: None
-      CurDriverIncidentCount: -1
-      DivisionID: 1
-      DivisionName: Division 2
+      CurDriverIncidentCount: 2
+      DivisionID: 0
+      DivisionName: Division 1
       FaceType: 0
-      FlairID: 31
-      FlairName: Brazil
-      HelmetDesignStr: 57,3300ff,ff0000,0500ff
+      FlairID: 195
+      FlairName: South Africa
+      HelmetDesignStr: 57,0300c2,111111,ffee47
       HelmetType: 0
-      IRating: 5048
-      Initials: JC
+      IRating: 5303
+      Initials: D1
       IsSpectator: 0
-      LicColor: '0x00c702'
-      LicLevel: 14
-      LicString: B 2.74
-      LicSubLevel: 274
-      SuitDesignStr: 15,000000,000000,000000
-      TeamID: 0
-      TeamIncidentCount: -1
-      TeamName: Jose Vitor Cabanas
-      UserID: 607129
-      UserName: Jose Vitor Cabanas
-    - AbbrevName: Li8, D
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.15
+      LicSubLevel: 415
+      SuitDesignStr: 8,000000,ff0000,ffffff
+      TeamID: 910001
+      TeamIncidentCount: 2
+      TeamName: Team 01
+      UserID: 900001
+      UserName: Driver 01
+    - AbbrevName: Driver 02
       BodyType: 0
       CarCfg: -1
       CarCfgCustomPaintExt: null
       CarCfgName: null
-      CarClassColor: '0xffffff'
+      CarClassColor: '0xffda59'
       CarClassDryTireSetLimit: 0 %
-      CarClassEstLapTime: 132.0298
-      CarClassID: 2268
+      CarClassEstLapTime: 76.4665
+      CarClassID: 86394
       CarClassLicenseLevel: 0
-      CarClassMaxFuelPct: 1.000 %
+      CarClassMaxFuelPct: 0.800 %
       CarClassPowerAdjust: 0.000 %
-      CarClassRelSpeed: 49
-      CarClassShortName: GT4 Class
+      CarClassRelSpeed: 52
+      CarClassShortName: ARA S8 GT3
       CarClassWeightPenalty: 0.000 kg
-      CarDesignStr: 3,ff0000,00ff00,0000ff
-      CarID: 157
+      CarDesignStr: 19,000000,000000,000000;ffffff
+      CarID: 206
       CarIdx: 1
       CarIsAI: 0
       CarIsElectric: 0
       CarIsPaceCar: 0
-      CarNumber: '2'
+      CarNumber: '10'
       CarNumberDesignStr: 0,0,ffffff,777777,000000
-      CarNumberRaw: 2
-      CarPath: mercedesamggt4
-      CarScreenName: Mercedes AMG GT4
-      CarScreenNameShort: Mercedes AMG GT4
+      CarNumberRaw: 10
+      CarPath: amvantageevogt3
+      CarScreenName: Aston Martin Vantage GT3 EVO
+      CarScreenNameShort: AMR Vantage GT3 EVO
       CarSponsor_1: 0
       CarSponsor_2: 0
       ClubID: 0
       ClubName: None
-      CurDriverIncidentCount: -1
-      DivisionID: 5
-      DivisionName: Division 6
-      FaceType: 0
-      FlairID: 39
-      FlairName: Canada
-      HelmetDesignStr: 2,2e358f,ec232d,0a0a0a
+      CurDriverIncidentCount: 0
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 4
+      FlairID: 70
+      FlairName: Finland
+      HelmetDesignStr: 60,000000,ffd300,000000
       HelmetType: 0
-      IRating: 2573
-      Initials: DL
+      IRating: 7617
+      Initials: D2
       IsSpectator: 0
-      LicColor: '0xfeec04'
-      LicLevel: 11
-      LicString: C 3.67
-      LicSubLevel: 367
-      SuitDesignStr: 1,2e358f,ec232d,0a0a0a
-      TeamID: 0
-      TeamIncidentCount: -1
-      TeamName: David Li8
-      UserID: 1322925
-      UserName: David Li8
-    - AbbrevName: Loonan, C
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.36
+      LicSubLevel: 236
+      SuitDesignStr: 27,c20008,ffffff,000000
+      TeamID: 910002
+      TeamIncidentCount: 0
+      TeamName: Team 02
+      UserID: 900002
+      UserName: Driver 02
+    - AbbrevName: Driver 03
       BodyType: 0
       CarCfg: -1
       CarCfgCustomPaintExt: null
       CarCfgName: null
-      CarClassColor: '0xffffff'
+      CarClassColor: '0x33ceff'
       CarClassDryTireSetLimit: 0 %
-      CarClassEstLapTime: 131.2314
-      CarClassID: 2268
+      CarClassEstLapTime: 82.8047
+      CarClassID: 86393
       CarClassLicenseLevel: 0
       CarClassMaxFuelPct: 1.000 %
       CarClassPowerAdjust: 0.000 %
       CarClassRelSpeed: 49
-      CarClassShortName: GT4 Class
+      CarClassShortName: ARA S8 GT4
       CarClassWeightPenalty: 0.000 kg
-      CarDesignStr: 8,000000,000000,000000;000000
-      CarID: 204
+      CarDesignStr: 10,ffd600,0e3bf5,0e3bf5
+      CarID: 119
       CarIdx: 2
       CarIsAI: 0
       CarIsElectric: 0
       CarIsPaceCar: 0
-      CarNumber: '3'
-      CarNumberDesignStr: 48,2,cc1e4a,cc1e4a,000000
-      CarNumberRaw: 3
+      CarNumber: '136'
+      CarNumberDesignStr: 0,0,ffffff,ffffff,ffffff
+      CarNumberRaw: 136
+      CarPath: porsche718gt4
+      CarScreenName: Porsche 718 Cayman GT4
+      CarScreenNameShort: Porsche 718 Cayman GT4
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: 0
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 8
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 49,27fd21,000000,000000
+      HelmetType: 0
+      IRating: 2904
+      Initials: D3
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.33
+      LicSubLevel: 233
+      SuitDesignStr: 12,ffd600,0e3bf5,0e3bf5
+      TeamID: 910003
+      TeamIncidentCount: 0
+      TeamName: Team 03
+      UserID: 900003
+      UserName: Driver 03
+    - AbbrevName: Driver 04
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0x33ceff'
+      CarClassDryTireSetLimit: 0 %
+      CarClassEstLapTime: 82.8047
+      CarClassID: 86393
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 49
+      CarClassShortName: ARA S8 GT4
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 0,ffffff,cccccc,666666;01614c
+      CarID: 119
+      CarIdx: 3
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '142'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 142
+      CarPath: porsche718gt4
+      CarScreenName: Porsche 718 Cayman GT4
+      CarScreenNameShort: Porsche 718 Cayman GT4
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: 0
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 0
+      FlairID: 168
+      FlairName: Portugal
+      HelmetDesignStr: 9,ffffff,000000,c9c9c9
+      HelmetType: 0
+      IRating: 2451
+      Initials: D4
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.63
+      LicSubLevel: 463
+      SuitDesignStr: 28,d126ed,d126ed,dcee0e
+      TeamID: 910004
+      TeamIncidentCount: 0
+      TeamName: Team 04
+      UserID: 900004
+      UserName: Driver 04
+    - AbbrevName: Driver 05
+      BodyType: 1
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0x33ceff'
+      CarClassDryTireSetLimit: 0 %
+      CarClassEstLapTime: 83.2375
+      CarClassID: 86393
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 49
+      CarClassShortName: ARA S8 GT4
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 21,347315,72e756,a0ff02
+      CarID: 204
+      CarIdx: 4
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '118'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 118
       CarPath: fordmustanggt4
       CarScreenName: Ford Mustang GT4
       CarScreenNameShort: Ford Mustang GT4
@@ -1913,149 +2075,149 @@ examples:
       CarSponsor_2: 0
       ClubID: 0
       ClubName: None
-      CurDriverIncidentCount: -1
-      DivisionID: 6
-      DivisionName: Division 7
-      FaceType: 0
-      FlairID: 11
-      FlairName: Antarctica
-      HelmetDesignStr: 24,000000,000000,000000
-      HelmetType: 0
-      IRating: 1365
-      Initials: CL
-      IsSpectator: 0
-      LicColor: '0x0153db'
-      LicLevel: 18
-      LicString: A 2.51
-      LicSubLevel: 251
-      SuitDesignStr: 10,000000,000000,000000
-      TeamID: 0
-      TeamIncidentCount: -1
-      TeamName: Chris Loonan
-      UserID: 670022
-      UserName: Chris Loonan
-    - AbbrevName: Petersen3, R
-      BodyType: 0
-      CarCfg: -1
-      CarCfgCustomPaintExt: null
-      CarCfgName: null
-      CarClassColor: '0xffffff'
-      CarClassDryTireSetLimit: 0 %
-      CarClassEstLapTime: 131.4694
-      CarClassID: 2268
-      CarClassLicenseLevel: 0
-      CarClassMaxFuelPct: 1.000 %
-      CarClassPowerAdjust: 0.000 %
-      CarClassRelSpeed: 49
-      CarClassShortName: GT4 Class
-      CarClassWeightPenalty: 0.000 kg
-      CarDesignStr: 0,ed2129,ffffff,ed2129
-      CarID: 150
-      CarIdx: 3
-      CarIsAI: 0
-      CarIsElectric: 0
-      CarIsPaceCar: 0
-      CarNumber: '27'
-      CarNumberDesignStr: 0,0,ffffff,777777,000000
-      CarNumberRaw: 27
-      CarPath: amvantagegt4
-      CarScreenName: Aston Martin Vantage GT4
-      CarScreenNameShort: Aston Martin Vantage GT4
-      CarSponsor_1: 0
-      CarSponsor_2: 0
-      ClubID: 0
-      ClubName: None
-      CurDriverIncidentCount: -1
-      DivisionID: 3
-      DivisionName: Division 4
-      FaceType: 0
-      FlairID: 39
-      FlairName: Canada
-      HelmetDesignStr: 2,ed2129,ffffff,ed2129
-      HelmetType: 0
-      IRating: 2265
-      Initials: RP
-      IsSpectator: 0
-      LicColor: '0x0153db'
-      LicLevel: 18
-      LicString: A 2.43
-      LicSubLevel: 243
-      SuitDesignStr: 3,ed2129,ffffff,d7162d
-      TeamID: 0
-      TeamIncidentCount: -1
-      TeamName: Robert Petersen3
-      UserID: 500616
-      UserName: Robert Petersen3
-    - AbbrevName: Makaila, J
-      BodyType: 1
-      CarCfg: -1
-      CarCfgCustomPaintExt: null
-      CarCfgName: null
-      CarClassColor: '0xffffff'
-      CarClassDryTireSetLimit: 0 %
-      CarClassEstLapTime: 132.0298
-      CarClassID: 2268
-      CarClassLicenseLevel: 0
-      CarClassMaxFuelPct: 1.000 %
-      CarClassPowerAdjust: 0.000 %
-      CarClassRelSpeed: 49
-      CarClassShortName: GT4 Class
-      CarClassWeightPenalty: 0.000 kg
-      CarDesignStr: 10,3e0c55,4e2982,7c57b1
-      CarID: 157
-      CarIdx: 4
-      CarIsAI: 0
-      CarIsElectric: 0
-      CarIsPaceCar: 0
-      CarNumber: '5'
-      CarNumberDesignStr: 0,0,ffffff,777777,000000
-      CarNumberRaw: 5
-      CarPath: mercedesamggt4
-      CarScreenName: Mercedes AMG GT4
-      CarScreenNameShort: Mercedes AMG GT4
-      CarSponsor_1: 0
-      CarSponsor_2: 2
-      ClubID: 0
-      ClubName: None
-      CurDriverIncidentCount: 0
-      DivisionID: 1
-      DivisionName: Division 2
+      CurDriverIncidentCount: 2
+      DivisionID: 0
+      DivisionName: Division 1
       FaceType: 0
       FlairID: 223
       FlairName: United States
       HelmetDesignStr: 52,347315,72e756,a0ff02
       HelmetType: 0
-      IRating: 3413
-      Initials: JM
+      IRating: 3280
+      Initials: D5
       IsSpectator: 0
       LicColor: '0x0153db'
-      LicLevel: 19
-      LicString: A 3.31
-      LicSubLevel: 331
+      LicLevel: 18
+      LicString: A 2.86
+      LicSubLevel: 286
       SuitDesignStr: 1,ffffff,000000,ae0101
+      TeamID: 910005
+      TeamIncidentCount: 2
+      TeamName: Team 05
+      UserID: 900005
+      UserName: Driver 05
+    - AbbrevName: Driver 06
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffda59'
+      CarClassDryTireSetLimit: 0 %
+      CarClassEstLapTime: 76.4665
+      CarClassID: 86394
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 0.800 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 52
+      CarClassShortName: ARA S8 GT3
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 4,ffffff,0ada00,111111.000000
+      CarID: 206
+      CarIdx: 6
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '93'
+      CarNumberDesignStr: 30,0,ff0000,000000,ffffff
+      CarNumberRaw: 93
+      CarPath: amvantageevogt3
+      CarScreenName: Aston Martin Vantage GT3 EVO
+      CarScreenNameShort: AMR Vantage GT3 EVO
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: 0
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 4
+      FlairID: 168
+      FlairName: Portugal
+      HelmetDesignStr: 16,000000,ffffff,ffffff
+      HelmetType: 0
+      IRating: 4472
+      Initials: D6
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.99
+      LicSubLevel: 499
+      SuitDesignStr: 1,ffffff,0ada00,111111
+      TeamID: 910006
+      TeamIncidentCount: 0
+      TeamName: Team 06
+      UserID: 900006
+      UserName: Driver 06
+    - AbbrevName: null
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0x000000'
+      CarClassDryTireSetLimit: 0 %
+      CarClassEstLapTime: 87.0878
+      CarClassID: 11
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 0
+      CarClassShortName: null
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 0,ffffff,ffffff,ffffff
+      CarID: 197
+      CarIdx: 64
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 1
+      CarNumber: '0'
+      CarNumberDesignStr: 0,0,ffffff,ffffff,ffffff
+      CarNumberRaw: 0
+      CarPath: safety pcbmwm2csr
+      CarScreenName: safety pcbmwm2csr
+      CarScreenNameShort: safety pcbmwm2csr
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: 0
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 0
+      FlairID: 0
+      FlairName: -none-
+      HelmetDesignStr: 0,ffffff,ffffff,ffffff
+      HelmetType: 0
+      IRating: 0
+      Initials: null
+      IsSpectator: 0
+      LicColor: '0xffffff'
+      LicLevel: 1
+      LicString: R 0.00
+      LicSubLevel: 0
+      SuitDesignStr: 0,ffffff,ffffff,ffffff
       TeamID: 0
       TeamIncidentCount: 0
-      TeamName: Justin Makaila
-      UserID: 378767
-      UserName: Justin Makaila
-    PaceCarIdx: -1
+      TeamName: Pace Car
+      UserID: -1
+      UserName: Pace Car
+    PaceCarIdx: 64
   QualifyResultsInfo: null
   RadioInfo:
     Radios:
     - Frequencies:
       - CanScan: 1
         CanSquawk: 1
-        CarIdx: -1
+        CarIdx: 4
         ClubID: 0
         EntryIdx: -1
-        FrequencyName: '@ALLTEAMS'
+        FrequencyName: '@TEAM'
         FrequencyNum: 0
         IsDeletable: 0
-        IsMutable: 1
+        IsMutable: 0
         Muted: 0
-        Priority: 12
+        Priority: 60
       - CanScan: 1
-        CanSquawk: 0
+        CanSquawk: 1
         CarIdx: -1
         ClubID: 0
         EntryIdx: -1
@@ -2067,22 +2229,33 @@ examples:
         Priority: 15
       - CanScan: 1
         CanSquawk: 1
-        CarIdx: 4
+        CarIdx: -1
         ClubID: 0
         EntryIdx: -1
-        FrequencyName: '@TEAM'
+        FrequencyName: '@ALLTEAMS'
         FrequencyNum: 2
+        IsDeletable: 0
+        IsMutable: 1
+        Muted: 0
+        Priority: 12
+      - CanScan: 1
+        CanSquawk: 1
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@ADMIN'
+        FrequencyNum: 3
         IsDeletable: 0
         IsMutable: 0
         Muted: 0
-        Priority: 60
+        Priority: 90
       - CanScan: 1
-        CanSquawk: 0
+        CanSquawk: 1
         CarIdx: -1
         ClubID: 0
         EntryIdx: -1
         FrequencyName: '@RACECONTROL'
-        FrequencyNum: 3
+        FrequencyNum: 4
         IsDeletable: 0
         IsMutable: 0
         Muted: 0
@@ -2091,18 +2264,29 @@ examples:
         CanSquawk: 1
         CarIdx: -1
         ClubID: 0
-        EntryIdx: 4
+        EntryIdx: 6
         FrequencyName: '@PRIVATE'
-        FrequencyNum: 4
+        FrequencyNum: 5
         IsDeletable: 0
         IsMutable: 0
         Muted: 0
         Priority: 70
-      HopCount: 2
-      NumFrequencies: 5
+      - CanScan: 1
+        CanSquawk: 1
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@FTR'
+        FrequencyNum: 6
+        IsDeletable: 1
+        IsMutable: 1
+        Muted: 0
+        Priority: 50
+      HopCount: 3
+      NumFrequencies: 7
       RadioNum: 0
       ScanningIsOn: 1
-      TunedToFrequencyNum: 0
+      TunedToFrequencyNum: 6
     SelectedRadioNum: 0
   SessionInfo:
     CurrentSessionNum: 0
@@ -2110,8 +2294,8 @@ examples:
     - ResultsAverageLapTime: -1.0
       ResultsFastestLap:
       - CarIdx: 1
-        FastestLap: 3
-        FastestTime: 134.365
+        FastestLap: 9
+        FastestTime: 77.0297
       ResultsLapsComplete: -1
       ResultsNumCautionFlags: 0
       ResultsNumCautionLaps: 0
@@ -2120,147 +2304,187 @@ examples:
       ResultsPositions:
       - CarIdx: 1
         ClassPosition: 0
-        FastestLap: 3
-        FastestTime: 134.365
+        FastestLap: 9
+        FastestTime: 77.0297
         Incidents: 0
         JokerLapsComplete: 0
-        Lap: 3
-        LapsComplete: 4
+        Lap: 9
+        LapsComplete: 12
         LapsDriven: 0.0
         LapsLed: 0
-        LastTime: 135.5382
+        LastTime: 77.2127
         Position: 1
         ReasonOutId: 0
         ReasonOutStr: Running
-        Time: 134.365
-      - CarIdx: 2
+        Time: 77.0297
+      - CarIdx: 0
         ClassPosition: 1
-        FastestLap: 1
-        FastestTime: 141.6099
+        FastestLap: 8
+        FastestTime: 77.4543
         Incidents: 0
         JokerLapsComplete: 0
-        Lap: 1
-        LapsComplete: 1
+        Lap: 8
+        LapsComplete: 8
         LapsDriven: 0.0
         LapsLed: 0
-        LastTime: 141.6099
+        LastTime: 77.4543
         Position: 2
         ReasonOutId: 0
         ReasonOutStr: Running
-        Time: 141.6099
+        Time: 77.4543
+      - CarIdx: 3
+        ClassPosition: 0
+        FastestLap: 20
+        FastestTime: 84.0949
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 20
+        LapsComplete: 20
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: 84.0949
+        Position: 3
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 84.0949
+      - CarIdx: 2
+        ClassPosition: 1
+        FastestLap: 9
+        FastestTime: 84.1563
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 9
+        LapsComplete: 20
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: 84.3433
+        Position: 4
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 84.1563
+      - CarIdx: 4
+        ClassPosition: 2
+        FastestLap: 8
+        FastestTime: 85.5009
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 8
+        LapsComplete: 12
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 5
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 85.5009
       SessionEnforceTireCompoundChange: 0
       SessionLaps: unlimited
       SessionName: PRACTICE
       SessionNum: 0
       SessionNumLapsToAvg: 0
-      SessionRunGroupsUsed: 1
+      SessionRunGroupsUsed: 0
       SessionSkipped: 0
       SessionSubType: null
       SessionTime: 7200.0000 sec
-      SessionTrackRubberState: moderately low usage
+      SessionTrackRubberState: slight usage
       SessionType: Practice
   SplitTimeInfo:
     Sectors:
     - SectorNum: 0
       SectorStartPct: 0.0
     - SectorNum: 1
-      SectorStartPct: 0.181861
+      SectorStartPct: 0.328407
     - SectorNum: 2
-      SectorStartPct: 0.360013
-    - SectorNum: 3
-      SectorStartPct: 0.52112
-    - SectorNum: 4
-      SectorStartPct: 0.595056
-    - SectorNum: 5
-      SectorStartPct: 0.829202
+      SectorStartPct: 0.634463
   WeekendInfo:
     BuildTarget: Members
     BuildType: Release
-    BuildVersion: 2026.02.02.02
+    BuildVersion: 2026.06.24.02
     Category: SportsCar
     DCRuleSet: None
-    EventType: Practice
+    Encoding: ISO_8859_1
+    EventType: Race
     HeatRacing: 0
-    LeagueID: 0
-    MaxDrivers: 1
-    MinDrivers: 0
-    NumCarClasses: 1
-    NumCarTypes: 6
-    Official: 1
+    LeagueID: 6529
+    MaxDrivers: 5
+    MinDrivers: 1
+    NumCarClasses: 2
+    NumCarTypes: 17
+    Official: 0
     QualifierMustStartRace: 0
-    RaceFarm: US-East-OH
-    RaceWeek: 10
-    SeasonID: 5910
-    SeriesID: 491
-    SessionID: 302010345
+    RaceFarm: DE-Fra
+    RaceWeek: 0
+    SeasonID: 0
+    SeriesID: 0
+    SessionID: 313661886
     SimMode: full
-    SubSessionID: 83823486
-    TeamRacing: 0
+    SubSessionID: 86765732
+    TeamRacing: 1
     TelemetryOptions:
       TelemetryDiskFile: ''
-    TrackAirDensity: 1.06 kg/m^3
-    TrackAirPressure: 26.56 Hg
-    TrackAirTemp: 18.90 C
-    TrackAltitude: 708.99 m
-    TrackCity: Bathurst
+    TrackAirDensity: 1.21 kg/m^3
+    TrackAirPressure: 30.04 Hg
+    TrackAirTemp: 19.29 C
+    TrackAltitude: 60.23 m
+    TrackCity: Adelaide
     TrackCleanup: 0
-    TrackConfigName: null
+    TrackConfigName: Street Circuit
     TrackCountry: Australia
     TrackDirection: neutral
-    TrackDisplayName: Mount Panorama Circuit
-    TrackDisplayShortName: Bathurst
+    TrackDisplayName: Adelaide Street Circuit
+    TrackDisplayShortName: Adelaide
     TrackDynamicTrack: 1
     TrackFogLevel: 0 %
-    TrackID: 219
-    TrackLatitude: -33.439189 m
-    TrackLength: 6.1441 km
-    TrackLengthOfficial: 6.21 km
-    TrackLongitude: 149.557655 m
-    TrackName: bathurst
-    TrackNorthOffset: 1.5543 rad
-    TrackNumPitStalls: 22
-    TrackNumTurns: 23
-    TrackPaceSpeed: 24.58 kph
-    TrackPitSpeedLimit: 50.00 kph
+    TrackID: 580
+    TrackLatitude: -34.930867 m
+    TrackLength: 3.2134 km
+    TrackLengthOfficial: 3.24 km
+    TrackLongitude: 138.620945 m
+    TrackName: adelaide
+    TrackNorthOffset: 1.5966 rad
+    TrackNumPitStalls: 18
+    TrackNumTurns: 14
+    TrackPaceSpeed: 22.35 kph
+    TrackPitSpeedLimit: 40.00 kph
     TrackPrecipitation: 0 %
-    TrackRelativeHumidity: 95 %
+    TrackRelativeHumidity: 49 %
     TrackSkies: Dynamic
-    TrackState: New South Wales
-    TrackSurfaceTemp: 33.90 C
-    TrackSurfaceTempCrew: 18.89 C
+    TrackState: null
+    TrackSurfaceTemp: 34.29 C
+    TrackSurfaceTempCrew: 23.33 C
     TrackType: road course
-    TrackVersion: 2025.12.12.02
-    TrackWeatherType: Realistic
-    TrackWindDir: 1.14 rad
-    TrackWindVel: 4.14 m/s
+    TrackVersion: 2026.05.28.02
+    TrackWeatherType: Timeline
+    TrackWindDir: 1.64 rad
+    TrackWindVel: 0.85 m/s
     WeekendOptions:
       CommercialMode: consumer
-      CourseCautions: off
-      Date: 2026-03-01
+      CourseCautions: local
+      Date: 2026-06-27
       EarthRotationSpeedupFactor: 1
-      FastRepairsLimit: '1'
+      FastRepairsLimit: '0'
       FogLevel: 0 %
       GreenWhiteCheckeredLimit: 0
-      HardcoreLevel: 1
+      HardcoreLevel: 0
       HasOpenRegistration: 1
       IncidentLimit: unlimited
       IncidentWarningInitialLimit: unlimited
       IncidentWarningSubsequentLimit: unlimited
-      IsFixedSetup: 1
+      IsFixedSetup: 0
       NightMode: variable
       NumJokerLaps: 0
-      NumStarters: 30
+      NumStarters: 60
       QualifyScoring: best lap
       RelativeHumidity: 45 %
       Restarts: single file
       ShortParadeLap: 0
       Skies: Dynamic
-      StandingStart: 1
-      StartingGrid: 2x2 inline pole on left
+      StandingStart: 0
+      StartingGrid: single file
       StrictLapsChecking: default
-      TimeOfDay: 6:55 am
-      Unofficial: 0
+      TimeOfDay: 11:30 am
+      Unofficial: 1
       WeatherTemp: 25.56 C
-      WeatherType: Realistic
+      WeatherType: Timeline
       WindDirection: N
       WindSpeed: 3.22 km/h
