@@ -102,10 +102,12 @@ fn run() -> Result<()> {
             row.push(tick.to_string());
             row.push(session_version.to_string());
 
+            // For each variable, read it from the frame and append it to the row
             for variable in &variables {
                 append_variable_values(&mut row, &frame, variable)?;
             }
 
+            // If the row doesn't have the expected number of variables, bail
             if row.len() != expected_column_count {
                 return Err(anyhow!(
                     "Internal CSV row width mismatch: expected {} columns, found {}",
@@ -114,14 +116,18 @@ fn run() -> Result<()> {
                 ));
             }
 
+            // Write the row to the output
             writer.write_record(&row)?;
+            // Update frame counts
             frame_count += 1;
 
+            // Log progress
             if frame_count.is_multiple_of(10_000) {
                 tracing::debug!(frames_exported = frame_count, "CSV export progress");
             }
         }
 
+        // Wait up to 500ms for the next update
         match connection.wait_for_update(Duration::from_millis(500))? {
             WaitResult::Signaled => {
                 tracing::trace!("Telemetry update signaled");
@@ -132,6 +138,7 @@ fn run() -> Result<()> {
         }
     }
 
+    // Clean up
     writer.flush()?;
     tracing::info!(frames_exported = frame_count, "Finished live CSV export");
 
