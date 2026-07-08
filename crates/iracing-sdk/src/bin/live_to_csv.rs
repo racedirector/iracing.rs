@@ -29,6 +29,7 @@ use iracing_sdk::{BitField, FramePacket};
 use iracing_sdk::{LiveProvider, Provider, WindowsConnection};
 #[cfg(any(windows, test))]
 use iracing_sdk::{VarData, VariableInfo, VariableType};
+use std::collections::HashMap;
 use std::fs::File;
 #[cfg(windows)]
 use std::path::PathBuf;
@@ -197,6 +198,7 @@ impl CsvWriter {
 
     pub fn write_packet(&mut self, packet: &FramePacket) -> Result<()> {
         let mut row = Vec::with_capacity(self.columns.len());
+        let mut array_cache = HashMap::new();
 
         for column in &self.columns {
             let value = match &column.source {
@@ -204,7 +206,9 @@ impl CsvWriter {
                     variable_name,
                     array_index,
                 } => match packet.schema.variables.get(variable_name) {
-                    Some(info) => read_variable_column(packet, info, *array_index)?,
+                    Some(info) => {
+                        read_variable_column(packet, info, *array_index, &mut array_cache)?
+                    }
                     None => String::new(),
                 },
             };
@@ -235,6 +239,7 @@ fn read_column_value<T>(
     data: &[u8],
     info: &VariableInfo,
     array_index: Option<usize>,
+    array_cache: &mut HashMap<String, Vec<String>>,
 ) -> Result<String>
 where
     T: VarData + ToString,
@@ -248,31 +253,54 @@ where
         None => return Ok(String::new()),
     };
 
-    let values = Vec::<T>::from_bytes(data, info)?;
+    let values = match array_cache.entry(info.name.clone()) {
+        std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            let values = Vec::<T>::from_bytes(data, info)?
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect();
+            entry.insert(values)
+        }
+    };
 
-    Ok(values
-        .get(index)
-        .map(ToString::to_string)
-        .unwrap_or_default())
+    Ok(values.get(index).cloned().unwrap_or_default())
 }
 
 fn read_variable_column(
     packet: &FramePacket,
     info: &VariableInfo,
     array_index: Option<usize>,
+    array_cache: &mut HashMap<String, Vec<String>>,
 ) -> Result<String> {
     match info.data_type {
         VariableType::Char | VariableType::UInt8 => {
-            read_column_value::<u8>(&packet.data, info, array_index)
+            read_column_value::<u8>(&packet.data, info, array_index, array_cache)
         }
-        VariableType::Int8 => read_column_value::<i8>(&packet.data, info, array_index),
-        VariableType::Int16 => read_column_value::<i16>(&packet.data, info, array_index),
-        VariableType::UInt16 => read_column_value::<u16>(&packet.data, info, array_index),
-        VariableType::Int32 => read_column_value::<i32>(&packet.data, info, array_index),
-        VariableType::UInt32 => read_column_value::<u32>(&packet.data, info, array_index),
-        VariableType::Float32 => read_column_value::<f32>(&packet.data, info, array_index),
-        VariableType::Float64 => read_column_value::<f64>(&packet.data, info, array_index),
-        VariableType::Bool => read_column_value::<bool>(&packet.data, info, array_index),
-        VariableType::BitField => read_column_value::<BitField>(&packet.data, info, array_index),
+        VariableType::Int8 => read_column_value::<i8>(&packet.data, info, array_index, array_cache),
+        VariableType::Int16 => {
+            read_column_value::<i16>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::UInt16 => {
+            read_column_value::<u16>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Int32 => {
+            read_column_value::<i32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::UInt32 => {
+            read_column_value::<u32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Float32 => {
+            read_column_value::<f32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Float64 => {
+            read_column_value::<f64>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Bool => {
+            read_column_value::<bool>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::BitField => {
+            read_column_value::<BitField>(&packet.data, info, array_index, array_cache)
+        }
     }
 }
