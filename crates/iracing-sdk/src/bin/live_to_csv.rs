@@ -17,21 +17,24 @@
 //! live_to_csv --output-path <OUTPUT_FILE.csv>
 //! ```
 
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use anyhow::Context;
 use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use csv::Writer;
+#[cfg(any(windows, test))]
 use iracing_sdk::{BitField, FramePacket};
 #[cfg(windows)]
 use iracing_sdk::{LiveProvider, Provider, WindowsConnection};
 #[cfg(any(windows, test))]
 use iracing_sdk::{VarData, VariableInfo, VariableType};
+#[cfg(any(windows, test))]
 use std::collections::HashMap;
+#[cfg(any(windows, test))]
 use std::fs::File;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -95,22 +98,26 @@ async fn run() -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "live_to_csv is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
     Err(anyhow!("live_to_csv is only supported on Windows"))
 }
 
+#[cfg(any(windows, test))]
 struct CsvWriterBuilder<K> {
     path: Option<PathBuf>,
     variables: Option<Vec<VariableInfo>>,
     _state: std::marker::PhantomData<K>,
 }
 
+#[cfg(any(windows, test))]
 pub struct Unset;
+#[cfg(any(windows, test))]
 pub struct Set;
 
+#[cfg(any(windows, test))]
 impl Default for CsvWriterBuilder<Unset> {
     fn default() -> Self {
         Self {
@@ -121,6 +128,7 @@ impl Default for CsvWriterBuilder<Unset> {
     }
 }
 
+#[cfg(any(windows, test))]
 impl CsvWriterBuilder<Unset> {
     pub fn with_path(self, path: PathBuf) -> CsvWriterBuilder<Set> {
         CsvWriterBuilder {
@@ -131,6 +139,7 @@ impl CsvWriterBuilder<Unset> {
     }
 }
 
+#[cfg(any(windows, test))]
 impl CsvWriterBuilder<Set> {
     pub fn with_variables(mut self, variables: &[VariableInfo]) -> Self {
         self.variables = Some(variables.to_vec());
@@ -174,6 +183,7 @@ impl CsvWriterBuilder<Set> {
     }
 }
 
+#[cfg(any(windows, test))]
 enum CsvColumnSource {
     Variable {
         variable_name: String,
@@ -181,16 +191,19 @@ enum CsvColumnSource {
     },
 }
 
+#[cfg(any(windows, test))]
 struct CsvColumn {
     name: String,
     source: CsvColumnSource,
 }
 
+#[cfg(any(windows, test))]
 struct CsvWriter {
     writer: Writer<File>,
     columns: Vec<CsvColumn>,
 }
 
+#[cfg(any(windows, test))]
 impl CsvWriter {
     pub fn builder() -> CsvWriterBuilder<Unset> {
         CsvWriterBuilder::default()
@@ -222,6 +235,7 @@ impl CsvWriter {
     }
 }
 
+#[cfg(any(windows, test))]
 fn expanded_column_count(variables: &[VariableInfo]) -> usize {
     variables
         .iter()
@@ -235,6 +249,7 @@ fn expanded_column_count(variables: &[VariableInfo]) -> usize {
         .sum()
 }
 
+#[cfg(any(windows, test))]
 fn read_column_value<T>(
     data: &[u8],
     info: &VariableInfo,
@@ -267,6 +282,7 @@ where
     Ok(values.get(index).cloned().unwrap_or_default())
 }
 
+#[cfg(any(windows, test))]
 fn read_variable_column(
     packet: &FramePacket,
     info: &VariableInfo,
