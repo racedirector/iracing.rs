@@ -28,6 +28,12 @@ impl BitField {
     }
 }
 
+impl std::fmt::Display for BitField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Compare tick counters in u32 space with wraparound using half-range rule.
 /// Returns true if `a` is considered newer than `b`.
 pub fn tick_after_u32(a: u32, b: u32) -> bool {
