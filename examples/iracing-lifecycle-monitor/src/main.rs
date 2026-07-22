@@ -190,15 +190,3 @@ fn monitor_connected_session(
         }
     }
 }
-
-#[cfg(windows)]
-fn process_still_ready(simulation: &Simulation) -> bool {
-    match is_iracing_process_running() {
-        Ok(true) => simulation.check_sim_status(),
-        Ok(false) => false,
-        Err(err) => {
-            tracing::warn!(error = %err, "Process detection failed");
-            false
-        }
-    }
-}
