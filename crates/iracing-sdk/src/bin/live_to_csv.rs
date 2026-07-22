@@ -17,19 +17,25 @@
 //! live_to_csv --output-path <OUTPUT_FILE.csv>
 //! ```
 
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use anyhow::Context;
 use anyhow::{Result, anyhow};
 #[cfg(windows)]
 use clap::Parser;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use csv::Writer;
 #[cfg(any(windows, test))]
-use iracing_sdk::{VariableInfo, VariableType};
+use iracing_sdk::{BitField, FramePacket};
 #[cfg(windows)]
-use iracing_sdk::{WaitResult, WindowsConnection};
-#[cfg(windows)]
-use std::{path::PathBuf, time::Duration};
+use iracing_sdk::{LiveProvider, Provider, WindowsConnection};
+#[cfg(any(windows, test))]
+use iracing_sdk::{VarData, VariableInfo, VariableType};
+#[cfg(any(windows, test))]
+use std::collections::HashMap;
+#[cfg(any(windows, test))]
+use std::fs::File;
+#[cfg(any(windows, test))]
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 #[cfg(windows)]
@@ -41,28 +47,26 @@ struct Args {
     output_path: PathBuf,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    run()
+    run().await
 }
 
 #[cfg(windows)]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     let Args { output_path } = Args::parse();
 
     tracing::info!("Opening iRacing connection");
-    let mut connection =
+    let connection =
         WindowsConnection::try_connect().context("Failed to connect to iRacing shared memory")?;
-
     if !connection.is_connected() {
         return Err(anyhow!("iRacing is not connected."));
     }
 
-    tracing::info!(path = %output_path.display(), "Creating CSV output");
-    let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
-
+    // Create an instance of sorted variables available from the connection
     let mut variables = connection.get_variables();
     if variables.is_empty() {
         return Err(anyhow!(
@@ -70,114 +74,165 @@ fn run() -> Result<()> {
         ));
     }
 
+    // Sort the variables by offset
     variables.sort_unstable_by(|left, right| {
         left.offset
             .cmp(&right.offset)
             .then_with(|| left.name.cmp(&right.name))
     });
 
-    let headers = build_headers(&variables);
-    let expected_column_count = headers.len();
-    writer.write_record(&headers)?;
+    let mut writer = CsvWriter::builder()
+        .with_path(output_path)
+        .with_variables(&variables)
+        .build()?;
 
-    tracing::info!(
-        variable_count = variables.len(),
-        column_count = expected_column_count,
-        "Starting live CSV export"
-    );
-
-    let mut frame_count = 0usize;
-    loop {
-        if !connection.is_connected() {
-            tracing::info!("iRacing disconnected; stopping live CSV export");
-            break;
-        }
-
-        if let Some(raw_frame) = connection.get_new_data() {
-            let frame = raw_frame.to_vec();
-            let tick = latest_tick(&connection);
-            let session_version = connection.session_info_update();
-
-            let mut row = Vec::with_capacity(expected_column_count);
-            row.push(tick.to_string());
-            row.push(session_version.to_string());
-
-            // For each variable, read it from the frame and append it to the row
-            for variable in &variables {
-                append_variable_values(&mut row, &frame, variable)?;
-            }
-
-            // If the row doesn't have the expected number of variables, bail
-            if row.len() != expected_column_count {
-                return Err(anyhow!(
-                    "Internal CSV row width mismatch: expected {} columns, found {}",
-                    expected_column_count,
-                    row.len()
-                ));
-            }
-
-            // Write the row to the output
-            writer.write_record(&row)?;
-            // Update frame counts
-            frame_count += 1;
-
-            // Log progress
-            if frame_count.is_multiple_of(10_000) {
-                tracing::debug!(frames_exported = frame_count, "CSV export progress");
-            }
-        }
-
-        // Wait up to 500ms for the next update
-        match connection.wait_for_update(Duration::from_millis(500))? {
-            WaitResult::Signaled => {
-                tracing::trace!("Telemetry update signaled");
-            }
-            WaitResult::Timeout => {
-                tracing::trace!("Wait timeout while polling live telemetry");
-            }
-        }
+    let mut provider = LiveProvider::with_connection(connection)?;
+    while let Some(packet) = provider.next_frame().await? {
+        writer.write_packet(&packet)?;
     }
 
     // Clean up
-    writer.flush()?;
-    tracing::info!(frames_exported = frame_count, "Finished live CSV export");
+    tracing::info!("Finished live CSV export");
 
     Ok(())
 }
 
 #[cfg(not(windows))]
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     tracing::warn!(
         "live_to_csv is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
     );
     Err(anyhow!("live_to_csv is only supported on Windows"))
 }
 
-#[cfg(windows)]
-fn latest_tick(connection: &WindowsConnection) -> i32 {
-    let header = connection.header();
-    let latest_idx = connection.find_latest_buffer(header);
-    header.var_buf[latest_idx].tick_count
+#[cfg(any(windows, test))]
+struct CsvWriterBuilder<K> {
+    path: Option<PathBuf>,
+    variables: Option<Vec<VariableInfo>>,
+    _state: std::marker::PhantomData<K>,
 }
 
 #[cfg(any(windows, test))]
-fn build_headers(variables: &[VariableInfo]) -> Vec<String> {
-    let mut headers = Vec::with_capacity(2 + expanded_column_count(variables));
-    headers.push("tick".to_string());
-    headers.push("session_version".to_string());
+pub struct Unset;
+#[cfg(any(windows, test))]
+pub struct Set;
 
-    for variable in variables {
-        if variable.count <= 1 {
-            headers.push(variable.name.clone());
-            continue;
-        }
-
-        for index in 0..variable.count {
-            headers.push(format!("{}[{}]", variable.name, index));
+#[cfg(any(windows, test))]
+impl Default for CsvWriterBuilder<Unset> {
+    fn default() -> Self {
+        Self {
+            path: None,
+            variables: None,
+            _state: std::marker::PhantomData,
         }
     }
+}
 
-    headers
+#[cfg(any(windows, test))]
+impl CsvWriterBuilder<Unset> {
+    pub fn with_path(self, path: PathBuf) -> CsvWriterBuilder<Set> {
+        CsvWriterBuilder {
+            path: Some(path),
+            variables: self.variables,
+            _state: std::marker::PhantomData,
+        }
+    }
+}
+
+#[cfg(any(windows, test))]
+impl CsvWriterBuilder<Set> {
+    pub fn with_variables(mut self, variables: &[VariableInfo]) -> Self {
+        self.variables = Some(variables.to_vec());
+        self
+    }
+
+    pub fn build(self) -> Result<CsvWriter> {
+        let path = self.path.unwrap();
+        let variables = self.variables.unwrap_or_default();
+
+        let mut columns: Vec<CsvColumn> = Vec::with_capacity(expanded_column_count(&variables));
+
+        for variable in variables {
+            if variable.count <= 1 {
+                columns.push(CsvColumn {
+                    name: variable.name.clone(),
+                    source: CsvColumnSource::Variable {
+                        variable_name: variable.name.clone(),
+                        array_index: None,
+                    },
+                })
+            } else {
+                for index in 0..variable.count {
+                    columns.push(CsvColumn {
+                        name: format!("{}[{}]", variable.name, index),
+                        source: CsvColumnSource::Variable {
+                            variable_name: variable.name.clone(),
+                            array_index: Some(index),
+                        },
+                    })
+                }
+            }
+        }
+
+        let mut writer = Writer::from_path(path)?;
+
+        // Write the header
+        writer.write_record(columns.iter().map(|column| column.name.as_str()))?;
+
+        Ok(CsvWriter { writer, columns })
+    }
+}
+
+#[cfg(any(windows, test))]
+enum CsvColumnSource {
+    Variable {
+        variable_name: String,
+        array_index: Option<usize>,
+    },
+}
+
+#[cfg(any(windows, test))]
+struct CsvColumn {
+    name: String,
+    source: CsvColumnSource,
+}
+
+#[cfg(any(windows, test))]
+struct CsvWriter {
+    writer: Writer<File>,
+    columns: Vec<CsvColumn>,
+}
+
+#[cfg(any(windows, test))]
+impl CsvWriter {
+    pub fn builder() -> CsvWriterBuilder<Unset> {
+        CsvWriterBuilder::default()
+    }
+
+    pub fn write_packet(&mut self, packet: &FramePacket) -> Result<()> {
+        let mut row = Vec::with_capacity(self.columns.len());
+        let mut array_cache = HashMap::new();
+
+        for column in &self.columns {
+            let value = match &column.source {
+                CsvColumnSource::Variable {
+                    variable_name,
+                    array_index,
+                } => match packet.schema.variables.get(variable_name) {
+                    Some(info) => {
+                        read_variable_column(packet, info, *array_index, &mut array_cache)?
+                    }
+                    None => String::new(),
+                },
+            };
+
+            row.push(value);
+        }
+
+        self.writer.write_record(&row)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(any(windows, test))]
@@ -195,173 +250,73 @@ fn expanded_column_count(variables: &[VariableInfo]) -> usize {
 }
 
 #[cfg(any(windows, test))]
-fn append_variable_values(
-    row: &mut Vec<String>,
-    frame: &[u8],
-    variable: &VariableInfo,
-) -> Result<()> {
-    if variable.count <= 1 {
-        row.push(read_scalar_as_string(frame, variable, 0)?);
-        return Ok(());
+fn read_column_value<T>(
+    data: &[u8],
+    info: &VariableInfo,
+    array_index: Option<usize>,
+    array_cache: &mut HashMap<String, Vec<String>>,
+) -> Result<String>
+where
+    T: VarData + ToString,
+{
+    if info.count <= 1 {
+        return Ok(T::from_bytes(data, info)?.to_string());
     }
 
-    for index in 0..variable.count {
-        row.push(read_scalar_as_string(frame, variable, index)?);
-    }
+    let index = match array_index {
+        Some(index) => index,
+        None => return Ok(String::new()),
+    };
 
-    Ok(())
-}
-
-#[cfg(any(windows, test))]
-fn read_scalar_as_string(frame: &[u8], variable: &VariableInfo, index: usize) -> Result<String> {
-    let label = variable_label(variable, index);
-    let offset = variable_offset(variable, index)?;
-
-    let value = match variable.data_type {
-        VariableType::Char => {
-            let byte = read_bytes(frame, offset, 1, &label)?[0];
-            char::from(byte).to_string()
-        }
-        VariableType::Int8 => {
-            let value = i8::from_le_bytes([read_bytes(frame, offset, 1, &label)?[0]]);
-            value.to_string()
-        }
-        VariableType::UInt8 => {
-            let value = read_bytes(frame, offset, 1, &label)?[0];
-            value.to_string()
-        }
-        VariableType::Int16 => {
-            let bytes = read_bytes(frame, offset, 2, &label)?;
-            i16::from_le_bytes([bytes[0], bytes[1]]).to_string()
-        }
-        VariableType::UInt16 => {
-            let bytes = read_bytes(frame, offset, 2, &label)?;
-            u16::from_le_bytes([bytes[0], bytes[1]]).to_string()
-        }
-        VariableType::Int32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::UInt32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::Float32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::Float64 => {
-            let bytes = read_bytes(frame, offset, 8, &label)?;
-            f64::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            ])
-            .to_string()
-        }
-        VariableType::Bool => {
-            let value = read_bytes(frame, offset, 1, &label)?[0] != 0;
-            value.to_string()
-        }
-        VariableType::BitField => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
+    let values = match array_cache.entry(info.name.clone()) {
+        std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+        std::collections::hash_map::Entry::Vacant(entry) => {
+            let values = Vec::<T>::from_bytes(data, info)?
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect();
+            entry.insert(values)
         }
     };
 
-    Ok(value)
+    Ok(values.get(index).cloned().unwrap_or_default())
 }
 
 #[cfg(any(windows, test))]
-fn variable_offset(variable: &VariableInfo, index: usize) -> Result<usize> {
-    let element_size = variable.data_type.size();
-    let offset_delta = index
-        .checked_mul(element_size)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{}`", variable.name))?;
-
-    variable
-        .offset
-        .checked_add(offset_delta)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{}`", variable.name))
-}
-
-#[cfg(any(windows, test))]
-fn read_bytes<'a>(frame: &'a [u8], offset: usize, width: usize, label: &str) -> Result<&'a [u8]> {
-    let end = offset
-        .checked_add(width)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{label}`"))?;
-
-    frame.get(offset..end).with_context(|| {
-        format!(
-            "Frame too small while reading `{label}`: offset={offset}, width={width}, frame_len={}",
-            frame.len()
-        )
-    })
-}
-
-#[cfg(any(windows, test))]
-fn variable_label(variable: &VariableInfo, index: usize) -> String {
-    if variable.count <= 1 {
-        return variable.name.clone();
-    }
-
-    format!("{}[{}]", variable.name, index)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn variable(name: &str, data_type: VariableType, offset: usize, count: usize) -> VariableInfo {
-        VariableInfo {
-            name: name.to_string(),
-            data_type,
-            offset,
-            count,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
+fn read_variable_column(
+    packet: &FramePacket,
+    info: &VariableInfo,
+    array_index: Option<usize>,
+    array_cache: &mut HashMap<String, Vec<String>>,
+) -> Result<String> {
+    match info.data_type {
+        VariableType::Char | VariableType::UInt8 => {
+            read_column_value::<u8>(&packet.data, info, array_index, array_cache)
         }
-    }
-
-    #[test]
-    fn build_headers_expands_array_variables() {
-        let variables = vec![
-            variable("Speed", VariableType::Float32, 0, 1),
-            variable("CarIdxLapDistPct", VariableType::Float32, 4, 3),
-        ];
-
-        let headers = build_headers(&variables);
-        assert_eq!(
-            headers,
-            vec![
-                "tick",
-                "session_version",
-                "Speed",
-                "CarIdxLapDistPct[0]",
-                "CarIdxLapDistPct[1]",
-                "CarIdxLapDistPct[2]",
-            ]
-        );
-    }
-
-    #[test]
-    fn append_variable_values_reads_scalars_and_arrays() -> Result<()> {
-        let frame = vec![
-            0x00, 0x00, 0x20, 0x41, // Speed = 10.0f32
-            0x01, // OnPitRoad = true
-            0x02, 0x00, 0x00, 0x00, // Flags[0] = 2
-            0x03, 0x00, 0x00, 0x00, // Flags[1] = 3
-        ];
-
-        let speed = variable("Speed", VariableType::Float32, 0, 1);
-        let on_pit_road = variable("OnPitRoad", VariableType::Bool, 4, 1);
-        let flags = variable("Flags", VariableType::UInt32, 5, 2);
-
-        let mut row = Vec::new();
-        append_variable_values(&mut row, &frame, &speed)?;
-        append_variable_values(&mut row, &frame, &on_pit_road)?;
-        append_variable_values(&mut row, &frame, &flags)?;
-
-        assert_eq!(row, vec!["10", "true", "2", "3"]);
-        Ok(())
+        VariableType::Int8 => read_column_value::<i8>(&packet.data, info, array_index, array_cache),
+        VariableType::Int16 => {
+            read_column_value::<i16>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::UInt16 => {
+            read_column_value::<u16>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Int32 => {
+            read_column_value::<i32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::UInt32 => {
+            read_column_value::<u32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Float32 => {
+            read_column_value::<f32>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Float64 => {
+            read_column_value::<f64>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::Bool => {
+            read_column_value::<bool>(&packet.data, info, array_index, array_cache)
+        }
+        VariableType::BitField => {
+            read_column_value::<BitField>(&packet.data, info, array_index, array_cache)
+        }
     }
 }
