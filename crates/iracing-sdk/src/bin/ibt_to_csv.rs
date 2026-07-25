@@ -7,8 +7,9 @@
 //!
 //! # Behavior
 //! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
-//! - Extracts "frames" from `reader.read_next_frame()`
-//! - Reads all variables from the frame and writes them to a CSV.
+//! - Streams [`iracing_sdk::DynamicFrame`] values through an
+//!   [`iracing_sdk::IbtConnection`]
+//! - Reads all variables through the dynamic value API and writes them to a CSV
 //!
 //! # Logging
 //! Uses `tracing` + `tracing_subscriber`.
@@ -48,7 +49,11 @@
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{VariableInfo, VariableType, ibt::IbtReader};
+use futures::StreamExt;
+use iracing_sdk::{
+    DynamicFrame, IbtConnection, TelemetryValue, VariableInfo, ibt::IbtReader,
+    providers::ibt::IbtProvider,
+};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -67,7 +72,8 @@ struct Args {
     output_path: PathBuf,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -87,10 +93,7 @@ fn main() -> Result<()> {
     // Open telemetry reader.
     // ------------------------------------------------------------
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
-    let mut reader = IbtReader::open(&ibt_path).context("Failed to open IBT file")?;
-
-    tracing::info!(path = %output_path.display(), "Creating CSV output");
-    let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
+    let reader = IbtReader::open(&ibt_path).context("Failed to open IBT file")?;
 
     // Clone and sort variables for deterministic column ordering.
     let mut variables: Vec<VariableInfo> = reader.variables().variables.values().cloned().collect();
@@ -99,6 +102,15 @@ fn main() -> Result<()> {
             .cmp(&right.offset)
             .then_with(|| left.name.cmp(&right.name))
     });
+
+    let provider = IbtProvider::from_reader(reader);
+    let connection = IbtConnection::builder()
+        .with_provider(provider)
+        .build()
+        .await?;
+
+    tracing::info!(path = %output_path.display(), "Creating CSV output");
+    let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
 
     let headers = build_headers(&variables);
     let expected_column_count = headers.len();
@@ -111,24 +123,20 @@ fn main() -> Result<()> {
     );
 
     // ------------------------------------------------------------
-    // Frame iteration
+    // Frame streaming
     // ------------------------------------------------------------
-    //
-    // `read_next_frame()` returns:
-    //   Result<Option<(data, tick, session_version)>>
-    //
-    // - Err(_)       => read failure
-    // - Ok(None)     => end-of-stream
-    // - Ok(Some(...))=> next frame
-    //
     let mut frame_count = 0usize;
-    while let Some((frame, tick, session_version)) = reader.read_next_frame()? {
+    let mut stream = connection.subscribe::<DynamicFrame>(iracing_sdk::UpdateRate::Native);
+    while let Some(frame) = stream.next().await {
         let mut row = Vec::with_capacity(expected_column_count);
-        row.push(tick.to_string());
-        row.push(session_version.to_string());
+        row.push(frame.tick_count().to_string());
 
         for variable in &variables {
-            append_variable_values(&mut row, &frame, variable)?;
+            let value = frame
+                .value_from_info(variable)
+                .with_context(|| format!("Failed to decode `{}`", variable.name))?;
+
+            append_value(&mut row, value);
         }
 
         if row.len() != expected_column_count {
@@ -185,116 +193,31 @@ fn expanded_column_count(variables: &[VariableInfo]) -> usize {
         .sum()
 }
 
-fn append_variable_values(
-    row: &mut Vec<String>,
-    frame: &[u8],
-    variable: &VariableInfo,
-) -> Result<()> {
-    if variable.count <= 1 {
-        row.push(read_scalar_as_string(frame, variable, 0)?);
-        return Ok(());
+fn append_value(row: &mut Vec<String>, value: TelemetryValue) {
+    match value {
+        TelemetryValue::Char(value) => row.push(char::from(value).to_string()),
+        TelemetryValue::Int8(value) => row.push(value.to_string()),
+        TelemetryValue::UInt8(value) => row.push(value.to_string()),
+        TelemetryValue::Int16(value) => row.push(value.to_string()),
+        TelemetryValue::UInt16(value) => row.push(value.to_string()),
+        TelemetryValue::Int32(value) => row.push(value.to_string()),
+        TelemetryValue::UInt32(value) => row.push(value.to_string()),
+        TelemetryValue::Float32(value) => row.push(value.to_string()),
+        TelemetryValue::Float64(value) => row.push(value.to_string()),
+        TelemetryValue::Bool(value) => row.push(value.to_string()),
+        TelemetryValue::BitField(value) => row.push(value.value().to_string()),
+        TelemetryValue::Array(values) => {
+            for value in values {
+                append_value(row, value);
+            }
+        }
     }
-
-    for index in 0..variable.count {
-        row.push(read_scalar_as_string(frame, variable, index)?);
-    }
-
-    Ok(())
-}
-
-fn read_scalar_as_string(frame: &[u8], variable: &VariableInfo, index: usize) -> Result<String> {
-    let label = variable_label(variable, index);
-    let offset = variable_offset(variable, index)?;
-
-    let value = match variable.data_type {
-        VariableType::Char => {
-            let byte = read_bytes(frame, offset, 1, &label)?[0];
-            char::from(byte).to_string()
-        }
-        VariableType::Int8 => {
-            let value = i8::from_le_bytes([read_bytes(frame, offset, 1, &label)?[0]]);
-            value.to_string()
-        }
-        VariableType::UInt8 => {
-            let value = read_bytes(frame, offset, 1, &label)?[0];
-            value.to_string()
-        }
-        VariableType::Int16 => {
-            let bytes = read_bytes(frame, offset, 2, &label)?;
-            i16::from_le_bytes([bytes[0], bytes[1]]).to_string()
-        }
-        VariableType::UInt16 => {
-            let bytes = read_bytes(frame, offset, 2, &label)?;
-            u16::from_le_bytes([bytes[0], bytes[1]]).to_string()
-        }
-        VariableType::Int32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::UInt32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::Float32 => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-        VariableType::Float64 => {
-            let bytes = read_bytes(frame, offset, 8, &label)?;
-            f64::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            ])
-            .to_string()
-        }
-        VariableType::Bool => {
-            let value = read_bytes(frame, offset, 1, &label)?[0] != 0;
-            value.to_string()
-        }
-        VariableType::BitField => {
-            let bytes = read_bytes(frame, offset, 4, &label)?;
-            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).to_string()
-        }
-    };
-
-    Ok(value)
-}
-
-fn variable_offset(variable: &VariableInfo, index: usize) -> Result<usize> {
-    let element_size = variable.data_type.size();
-    let offset_delta = index
-        .checked_mul(element_size)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{}`", variable.name))?;
-
-    variable
-        .offset
-        .checked_add(offset_delta)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{}`", variable.name))
-}
-
-fn read_bytes<'a>(frame: &'a [u8], offset: usize, width: usize, label: &str) -> Result<&'a [u8]> {
-    let end = offset
-        .checked_add(width)
-        .ok_or_else(|| anyhow!("Offset overflow while reading `{label}`"))?;
-
-    frame.get(offset..end).with_context(|| {
-        format!(
-            "Frame too small while reading `{label}`: offset={offset}, width={width}, frame_len={}",
-            frame.len()
-        )
-    })
-}
-
-fn variable_label(variable: &VariableInfo, index: usize) -> String {
-    if variable.count <= 1 {
-        return variable.name.clone();
-    }
-
-    format!("{}[{}]", variable.name, index)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use iracing_sdk::VariableType;
 
     fn variable(name: &str, data_type: VariableType, offset: usize, count: usize) -> VariableInfo {
         VariableInfo {
@@ -330,24 +253,15 @@ mod tests {
     }
 
     #[test]
-    fn append_variable_values_reads_scalars_and_arrays() -> Result<()> {
-        let frame = vec![
-            0x00, 0x00, 0x20, 0x41, // Speed = 10.0f32
-            0x01, // OnPitRoad = true
-            0x02, 0x00, 0x00, 0x00, // Flags[0] = 2
-            0x03, 0x00, 0x00, 0x00, // Flags[1] = 3
-        ];
-
-        let speed = variable("Speed", VariableType::Float32, 0, 1);
-        let on_pit_road = variable("OnPitRoad", VariableType::Bool, 4, 1);
-        let flags = variable("Flags", VariableType::UInt32, 5, 2);
-
+    fn append_value_formats_scalars_and_flattens_arrays() {
         let mut row = Vec::new();
-        append_variable_values(&mut row, &frame, &speed)?;
-        append_variable_values(&mut row, &frame, &on_pit_road)?;
-        append_variable_values(&mut row, &frame, &flags)?;
+        append_value(&mut row, TelemetryValue::Float32(10.0));
+        append_value(&mut row, TelemetryValue::Bool(true));
+        append_value(
+            &mut row,
+            TelemetryValue::Array(vec![TelemetryValue::UInt32(2), TelemetryValue::UInt32(3)]),
+        );
 
         assert_eq!(row, vec!["10", "true", "2", "3"]);
-        Ok(())
     }
 }

@@ -83,7 +83,7 @@ pub use irsdk_enums::{
 pub use schema::{VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_type::{Value, VariableType};
+pub use variable_type::{TelemetryValue, VariableType};
 
 #[cfg(test)]
 mod tests {

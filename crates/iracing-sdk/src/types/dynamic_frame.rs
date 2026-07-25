@@ -63,6 +63,28 @@ impl DynamicFrame {
     }
 }
 
+impl DynamicFrame {
+    /// Retrieves the variable from the frame by name.
+    pub fn value(
+        &self,
+        name: &str,
+    ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
+        let Some(info) = self.variable_info(name) else {
+            return Ok(None);
+        };
+
+        self.value_from_info(info).map(Some)
+    }
+
+    /// Retrieves the requested variable from the frame.
+    pub fn value_from_info(
+        &self,
+        info: &VariableInfo,
+    ) -> crate::Result<crate::types::variable_type::TelemetryValue> {
+        crate::types::variable_type::TelemetryValue::decode(self.data.as_ref(), info)
+    }
+}
+
 impl FrameAdapter for DynamicFrame {
     fn validate_schema(_schema: &VariableSchema) -> Result<AdapterValidation> {
         // No pre-validation or extraction plan needed for dynamic lookups
