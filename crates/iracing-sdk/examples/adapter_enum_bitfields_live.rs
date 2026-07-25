@@ -2,7 +2,9 @@ use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{
+    AdapterValidation, FieldExtraction, FrameAdapter, providers::live::LiveProvider,
+};
 #[cfg(windows)]
 use iracing_sdk::{BitField, IRacingSDKError, VarData};
 
@@ -89,7 +91,7 @@ async fn main() -> Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::Provider;
+        use iracing_sdk::provider::Provider;
 
         let args = Args::parse();
         let mut provider = LiveProvider::new()?;

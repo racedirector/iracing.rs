@@ -3,7 +3,7 @@ mod driver_input;
 use clap::Parser;
 use csv::Writer;
 use driver_input::DriverInput;
-use iracing_sdk::{FrameAdapter, IbtProvider, Provider, SessionFlags};
+use iracing_sdk::{FrameAdapter, SessionFlags, provider::Provider, providers::ibt::IbtProvider};
 use std::{fs::File, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -105,8 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     flag_csv_output_path.push("flags.csv");
     let mut flag_observer = FlagObserver::new(flag_csv_output_path);
 
-    let mut ibt_provider =
-        IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
+    let mut ibt_provider = IbtProvider::open(&ibt_path).expect("Failed to initialize IBT provider");
     let schema = ibt_provider.schema();
 
     tracing::info!(

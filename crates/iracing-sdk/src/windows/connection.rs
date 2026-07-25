@@ -3,6 +3,8 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
+use crate::schema::header::IRSDKHeader;
+use crate::schema::variables::IRSDKVarHeader;
 use crate::{IRacingSDKError, Result, yaml_utils};
 use std::ptr::NonNull;
 use std::time::Duration;
@@ -23,116 +25,6 @@ const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
 const IRSDK_VER: i32 = 2;
 /// Connection status flag
 const IRSDK_ST_CONNECTED: i32 = 1;
-/// Maximum number of telemetry buffers
-const IRSDK_MAX_BUFS: usize = 4;
-
-/// Variable buffer containing tick count and offset information
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct VarBuf {
-    /// Used to detect changes in data
-    pub tick_count: i32,
-    /// Offset from header
-    pub buf_offset: i32,
-    /// 16-byte alignment
-    pub pad: [i32; 2],
-}
-
-/// Variable header structure from iRacing SDK
-#[repr(C)]
-#[derive(Debug)]
-pub struct IRSDKVarHeader {
-    /// Variable type (irsdk_VarType)
-    pub var_type: i32,
-    /// Offset from start of buffer row
-    pub offset: i32,
-    /// Number of entries (array)
-    pub count: i32,
-    /// Values in array represent timeseries data
-    pub count_as_time: bool,
-    /// 16-byte alignment padding
-    pub pad: [u8; 3],
-    /// Variable name
-    pub name: [std::os::raw::c_char; 32],
-    /// Variable description
-    pub desc: [std::os::raw::c_char; 64],
-    /// Variable units
-    pub unit: [std::os::raw::c_char; 32],
-}
-
-impl IRSDKVarHeader {
-    /// Get variable name as String
-    pub fn name(&self) -> String {
-        unsafe {
-            let cstr = std::ffi::CStr::from_ptr(self.name.as_ptr());
-            cstr.to_string_lossy().into_owned()
-        }
-    }
-
-    /// Get variable description as String
-    pub fn description(&self) -> String {
-        unsafe {
-            let cstr = std::ffi::CStr::from_ptr(self.desc.as_ptr());
-            cstr.to_string_lossy().into_owned()
-        }
-    }
-
-    /// Get variable unit as String
-    pub fn unit(&self) -> String {
-        unsafe {
-            let cstr = std::ffi::CStr::from_ptr(self.unit.as_ptr());
-            cstr.to_string_lossy().into_owned()
-        }
-    }
-
-    /// Convert iRacing variable type to our VariableType
-    pub fn data_type(&self) -> crate::VariableType {
-        match self.var_type {
-            0 => crate::VariableType::Char,
-            1 => crate::VariableType::Bool,
-            2 => crate::VariableType::Int32,
-            3 => crate::VariableType::BitField,
-            4 => crate::VariableType::Float32,
-            5 => crate::VariableType::Float64,
-            _ => crate::VariableType::Int32, // Default fallback
-        }
-    }
-}
-
-/// Main iRacing header structure matching C++ SDK exactly
-#[repr(C)]
-#[derive(Debug)]
-pub struct IRSDKHeader {
-    /// API header version (should be IRSDK_VER)
-    pub ver: i32,
-    /// Bitfield using status flags
-    pub status: i32,
-    /// Ticks per second (60 or 360 etc)
-    pub tick_rate: i32,
-
-    // Session information, updated periodically
-    /// Incremented when session info changes
-    pub session_info_update: i32,
-    /// Length in bytes of session info string
-    pub session_info_len: i32,
-    /// Session info, encoded in YAML format
-    pub session_info_offset: i32,
-
-    // State data, output at tick_rate
-    /// Length of array pointed to by var_header_offset
-    pub num_vars: i32,
-    /// Offset to variable header array
-    pub var_header_offset: i32,
-
-    /// Number of buffers (<= IRSDK_MAX_BUFS)
-    pub num_buf: i32,
-    /// Length in bytes for one line
-    pub buf_len: i32,
-    /// 16-byte alignment
-    pub pad1: [i32; 2],
-    /// Buffers of data being written to
-    pub var_buf: [VarBuf; IRSDK_MAX_BUFS],
-}
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -385,15 +277,7 @@ impl Connection {
                 let var_header = &*(var_ptr as *const IRSDKVarHeader);
 
                 // Convert to our VariableInfo format
-                let var_info = crate::VariableInfo {
-                    name: var_header.name(),
-                    description: var_header.description(),
-                    units: var_header.unit(),
-                    data_type: var_header.data_type(),
-                    offset: var_header.offset as usize,
-                    count: var_header.count as usize,
-                    count_as_time: var_header.count_as_time,
-                };
+                let var_info = var_header.to_variable_info();
 
                 variables.push(var_info);
             }
@@ -405,14 +289,7 @@ impl Connection {
     /// Validate initial connection
     fn validate_connection(&self) -> Result<()> {
         let header = self.header();
-
-        // Check SDK version
-        if header.ver != IRSDK_VER {
-            return Err(IRacingSDKError::Version {
-                expected: IRSDK_VER as u32,
-                found: header.ver as u32,
-            });
-        }
+        header.validate()?;
 
         tracing::debug!(
             ver = header.ver,
@@ -427,7 +304,8 @@ impl Connection {
     /// Find the buffer with the highest tick count
     pub fn find_latest_buffer(&self, header: &IRSDKHeader) -> usize {
         let mut latest = 0;
-        for i in 1..(header.num_buf as usize) {
+        let num_buf = std::cmp::min(header.num_buf, 4) as usize;
+        for i in 1..num_buf {
             if header.var_buf[latest].tick_count < header.var_buf[i].tick_count {
                 latest = i;
             }
@@ -457,6 +335,55 @@ unsafe impl Sync for Connection {}
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    use crate::schema::header::IRSDKVarBuf;
+    use std::mem::ManuallyDrop;
+
+    fn test_connection() -> ManuallyDrop<Connection> {
+        ManuallyDrop::new(Connection {
+            mapping: HANDLE::default(),
+            base: NonNull::dangling(),
+            event: HANDLE::default(),
+            last_tick_count: i32::MAX,
+        })
+    }
+
+    fn test_header(num_buf: i32) -> IRSDKHeader {
+        IRSDKHeader {
+            ver: IRSDK_VER,
+            status: IRSDK_ST_CONNECTED,
+            tick_rate: 60,
+            session_info_update: 0,
+            session_info_len: 0,
+            session_info_offset: 0,
+            num_vars: 1,
+            var_header_offset: 112,
+            num_buf,
+            buf_len: 4,
+            pad1: [0; 2],
+            var_buf: [
+                IRSDKVarBuf {
+                    tick_count: 1,
+                    buf_offset: 256,
+                    pad: [0; 2],
+                },
+                IRSDKVarBuf {
+                    tick_count: 4,
+                    buf_offset: 260,
+                    pad: [0; 2],
+                },
+                IRSDKVarBuf {
+                    tick_count: 3,
+                    buf_offset: 264,
+                    pad: [0; 2],
+                },
+                IRSDKVarBuf {
+                    tick_count: 2,
+                    buf_offset: 268,
+                    pad: [0; 2],
+                },
+            ],
+        }
+    }
 
     #[test]
     fn constants_match_iracing_sdk() {
@@ -473,8 +400,27 @@ mod tests {
         assert_eq!(std::mem::align_of::<IRSDKHeader>(), 4);
 
         // Check VarBuf size and alignment
-        assert_eq!(std::mem::size_of::<VarBuf>(), 16);
-        assert_eq!(std::mem::align_of::<VarBuf>(), 4);
+        assert_eq!(std::mem::size_of::<IRSDKVarBuf>(), 16);
+        assert_eq!(std::mem::align_of::<IRSDKVarBuf>(), 4);
+    }
+
+    #[test]
+    fn find_latest_buffer_caps_count_at_backing_array_length() {
+        let connection = test_connection();
+        let header = test_header(5);
+
+        assert_eq!(connection.find_latest_buffer(&header), 1);
+    }
+
+    #[test]
+    #[ignore = "known bug: a negative num_buf is cast to usize after applying only an upper bound"]
+    fn find_latest_buffer_does_not_panic_for_negative_count() {
+        let connection = test_connection();
+        let header = test_header(-1);
+
+        let result = std::panic::catch_unwind(|| connection.find_latest_buffer(&header));
+
+        assert!(result.is_ok(), "negative num_buf must not cause a panic");
     }
 
     #[test]

@@ -3,7 +3,9 @@ use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::IRacingSDKError;
 #[cfg(windows)]
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, LiveProvider};
+use iracing_sdk::{
+    AdapterValidation, FieldExtraction, FrameAdapter, providers::live::LiveProvider,
+};
 #[cfg(windows)]
 use std::path::PathBuf;
 
@@ -170,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::Provider;
+        use iracing_sdk::provider::Provider;
 
         let Args { csv_output_path } = Args::parse();
 

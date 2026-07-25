@@ -57,12 +57,10 @@ fn main() -> Result<()> {
 
     #[cfg(windows)]
     {
-        tracing::info!("Opening iRacing connection...");
         let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
 
         tracing::info!("Reading live header bytes");
-        let header_ptr =
-            connection.header() as *const iracing_sdk::windows::IRSDKHeader as *const u8;
+        let header_ptr = connection.header() as *const IRSDKHeader as *const u8;
         let header_bytes =
             unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
 

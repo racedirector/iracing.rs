@@ -38,7 +38,7 @@ iracing-sdk = { git = "https://github.com/racedirector/iracing.rs", package = "i
 Basic import:
 
 ```rust
-use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, IbtReader};
+use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader};
 ```
 
 ## Quick Start
@@ -46,7 +46,7 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, IbtReader};
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{IbtReader, VarData};
+use iracing_sdk::{VarData, ibt::IbtReader};
 
 fn main() -> iracing_sdk::Result<()> {
     let mut reader = IbtReader::open("telemetry.ibt")?;
@@ -71,7 +71,7 @@ fn main() -> iracing_sdk::Result<()> {
 ### Session YAML Parsing
 
 ```rust,no_run
-use iracing_sdk::{IbtReader, SessionInfo};
+use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
 fn main() -> iracing_sdk::Result<()> {
     let reader = IbtReader::open("telemetry.ibt")?;

@@ -2,7 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, IRacingSDKError, IbtProvider, Provider,
+    AdapterValidation, FieldExtraction, FrameAdapter, IRacingSDKError, provider::Provider,
+    providers::ibt::IbtProvider,
 };
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
@@ -172,8 +173,7 @@ async fn main() -> Result<()> {
 
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
-    let mut ibt_provider =
-        IbtProvider::from_path(&ibt_path).expect("Failed to initialize IBT provider");
+    let mut ibt_provider = IbtProvider::open(&ibt_path)?;
     let schema = ibt_provider.schema();
 
     // ------------------------------------------------------------

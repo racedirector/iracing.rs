@@ -107,7 +107,7 @@ fn run() -> Result<()> {
                 append_variable_values(&mut row, &frame, variable)?;
             }
 
-            // If the row doesn't have the expected number of variables, bail
+            // Ensure scalar and expanded array values match the CSV header width
             if row.len() != expected_column_count {
                 return Err(anyhow!(
                     "Internal CSV row width mismatch: expected {} columns, found {}",

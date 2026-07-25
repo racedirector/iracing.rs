@@ -6,7 +6,7 @@
 //! - Converting an `.ibt` file into a standalone CSV file for sharing.
 //!
 //! # Behavior
-//! - Opens the `.ibt` file using [`iracing_sdk::IbtReader`]
+//! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
 //! - Extracts "frames" from `reader.read_next_frame()`
 //! - Reads all variables from the frame and writes them to a CSV.
 //!
@@ -48,7 +48,7 @@
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{IbtReader, VariableInfo, VariableType};
+use iracing_sdk::{VariableInfo, VariableType, ibt::IbtReader};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 

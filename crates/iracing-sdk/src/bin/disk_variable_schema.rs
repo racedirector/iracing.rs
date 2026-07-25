@@ -15,7 +15,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use iracing_sdk::IbtReader;
+use iracing_sdk::ibt::IbtReader;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
 /// CLI arguments for the disk telemetry schema generator.

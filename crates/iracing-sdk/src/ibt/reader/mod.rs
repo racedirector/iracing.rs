@@ -6,7 +6,7 @@
 //! ## Usage Example
 //!
 //! ```rust,no_run
-//! use iracing_sdk::IbtReader;
+//! use iracing_sdk::ibt::IbtReader;
 //!
 //! fn read_frames() -> iracing_sdk::Result<()> {
 //!     // Open IBT file
@@ -32,15 +32,17 @@
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
 use crate::{IRacingSDKError, Result, VariableSchema, yaml_utils};
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 /// IBT file reader for cross-platform replay.
 pub struct IbtReader {
     data: Vec<u8>,
     current_position: usize,
-    path: PathBuf,
+    path: Option<PathBuf>,
     header: IbtHeader,
     disk_header: IbtDiskSubHeader,
     variable_schema: VariableSchema,
@@ -50,31 +52,32 @@ pub struct IbtReader {
 }
 
 impl IbtReader {
-    /// Open an IBT file for reading
+    /// Open and parse an `.ibt` file.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut file = File::open(&path).map_err(|e| IRacingSDKError::File {
-            path: path.as_ref().to_path_buf(),
-            source: e,
+        let path = path.as_ref().to_path_buf();
+        let mut file = File::open(&path).map_err(|source| IRacingSDKError::File {
+            path: path.clone(),
+            source,
         })?;
 
         let mut data = Vec::new();
         file.read_to_end(&mut data)
-            .map_err(|e| IRacingSDKError::File {
-                path: path.as_ref().to_path_buf(),
-                source: e,
+            .map_err(|source| IRacingSDKError::File {
+                path: path.clone(),
+                source,
             })?;
 
-        Self::from_bytes_with_path(&data, path.as_ref().to_path_buf())
+        Self::from_bytes_with_path(data, Some(path))
     }
 
-    /// Create IbtReader from bytes (for testing)
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_path(data, PathBuf::from("<memory>"))
+    /// Parse owned in-memory `.ibt` data.
+    pub fn from_bytes<B: Into<Vec<u8>>>(data: B) -> Result<Self> {
+        Self::from_bytes_with_path(data.into(), None)
     }
 
     /// Create IbtReader from bytes with path context
-    fn from_bytes_with_path(data: &[u8], path: PathBuf) -> Result<Self> {
-        let mut cursor = std::io::Cursor::new(data);
+    fn from_bytes_with_path(data: Vec<u8>, path: Option<PathBuf>) -> Result<Self> {
+        let mut cursor = std::io::Cursor::new(data.as_slice());
 
         // Parse IBT header
         let header = IbtHeader::parse_from_reader(&mut cursor)?;
@@ -149,7 +152,7 @@ impl IbtReader {
         }
 
         let reader = IbtReader {
-            data: data.to_vec(),
+            data,
             current_position: frame_data_start,
             path,
             header,
@@ -219,9 +222,11 @@ impl IbtReader {
         }
     }
 
-    /// Get the file path this reader was opened from
-    pub fn file_path(&self) -> &Path {
-        &self.path
+    /// Get the file path this reader was opened from, if it has one.
+    ///
+    /// Readers constructed with [`Self::from_bytes`] have no filesystem path.
+    pub fn file_path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 
     /// Get disk metadata from the disk sub-header
@@ -325,6 +330,20 @@ mod tests {
     }
 
     #[test]
+    fn from_bytes_builds_an_owned_memory_reader() -> Result<()> {
+        let test_file = fixture_path()?;
+        let data = std::fs::read(test_file)?;
+
+        let reader = IbtReader::from_bytes(data)?;
+
+        assert_eq!(reader.file_path(), None);
+        assert_eq!(reader.current_frame(), 0);
+        assert!(reader.total_frames() > 0);
+        assert!(reader.variables().variable_count() > 0);
+        Ok(())
+    }
+
+    #[test]
     fn test_real_ibt_reader_construction() -> Result<()> {
         let test_file = fixture_path()?;
         println!("Testing reader construction with: {}", test_file.display());
@@ -337,6 +356,7 @@ mod tests {
         println!("  Current frame: {}", reader.current_frame());
 
         assert_eq!(reader.current_frame(), 0, "Should start at frame 0");
+        assert_eq!(reader.file_path(), Some(test_file.as_path()));
 
         if reader.total_frames() == 0 {
             println!("  This IBT file contains only session info (no telemetry data)");
@@ -611,7 +631,7 @@ mod tests {
         }
 
         // Verify the YAML can be parsed into SessionInfo
-        let session = crate::SessionInfo::parse(&yaml)
+        let session = crate::schema::SessionInfo::parse(&yaml)
             .with_context(|| "Parsing extracted YAML into SessionInfo")?;
 
         println!("  Track: {}", session.weekend_info.track_name);

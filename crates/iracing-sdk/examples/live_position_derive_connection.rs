@@ -76,7 +76,8 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
     {
         use csv::Writer;
-        use iracing_sdk::{FrameAdapter, provider::Provider, providers::live::LiveProvider};
+        use futures::StreamExt;
+        use iracing_sdk::{LiveConnection, UpdateRate};
 
         // ------------------------------------------------------------
         // Parse CLI arguments
@@ -86,15 +87,13 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Opening Live iRacing connection");
 
         // ------------------------------------------------------------
-        // Open telemetry reader and CSV writer
+        // Open telemetry connection and CSV writer
         // ------------------------------------------------------------
-        let mut provider = LiveProvider::new()?;
-        let schema = provider.schema();
+        let connection = LiveConnection::builder().build()?;
+        let mut stream = connection.subscribe::<Row>(UpdateRate::Native);
         let mut writer = Writer::from_path(&csv_output_path)?;
 
-        let shared_validation = Row::validate_schema(&schema)?;
-        while let Some(packet) = provider.next_frame().await? {
-            let frame = Row::adapt(&packet, &shared_validation);
+        while let Some(frame) = stream.next().await {
             writer.serialize(frame)?;
         }
 

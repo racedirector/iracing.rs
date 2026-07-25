@@ -9,7 +9,7 @@
 //! - Converting `.ibt` session info into a standalone YAML file for sharing
 //!
 //! # Behavior
-//! - Opens the `.ibt` file using [`iracing_sdk::IbtReader`]
+//! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
 //! - Extracts session YAML via `reader.session_yaml()?`
 //! - If session YAML is present, writes it to `--output-path`
 //! - If session YAML is **absent**, the tool exits successfully without writing a file
@@ -60,7 +60,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use iracing_sdk::IbtReader;
+use iracing_sdk::ibt::IbtReader;
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 

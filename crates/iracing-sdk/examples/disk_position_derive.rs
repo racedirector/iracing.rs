@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{FrameAdapter, IRacingTelemetryFrame, IbtProvider, Provider};
+use iracing_sdk::{
+    FrameAdapter, IRacingTelemetryFrame, provider::Provider, providers::ibt::IbtProvider,
+};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -80,7 +82,7 @@ async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut provider = IbtProvider::from_path(&ibt_path)?;
+    let mut provider = IbtProvider::open(&ibt_path)?;
     let schema = provider.schema();
     let mut writer = Writer::from_path(&csv_output_path)?;
 

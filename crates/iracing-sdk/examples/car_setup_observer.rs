@@ -1,4 +1,5 @@
-fn main() -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -19,51 +20,26 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::SessionInfo;
-        use iracing_sdk::WaitResult;
-        use iracing_sdk::WindowsConnection;
-        use serde_yaml_ng::to_string;
-        use std::time::Duration;
+        use futures::StreamExt;
+        use iracing_sdk::LiveConnection;
 
-        tracing::info!("Opening iRacing connection...");
-
-        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-        if !connection.is_connected() {
-            return Err(anyhow::anyhow!("iRacing telemetry is not connected"));
-        }
-
-        let mut previous_session_info_update: i32 = -1;
+        let connection = LiveConnection::builder().build()?;
+        let mut stream = Box::pin(connection.session_updates());
         let mut previous_setup_update: i32 = -1;
-        loop {
-            if !connection.is_connected() {
-                return Err(anyhow::anyhow!("iRacing disconnected"));
-            }
 
-            match connection.wait_for_update(Duration::from_millis(500)) {
-                Ok(WaitResult::Signaled) => {
-                    let current_update = connection.session_info_update();
+        // Observe the stream until it closes
+        while let Some(session) = stream.next().await {
+            if let Some(setup) = &session.car_setup
+                && previous_setup_update != setup.update_count
+            {
+                let serialized_setup = serde_yaml_ng::to_string(&setup)?;
 
-                    if current_update != previous_session_info_update
-                        && let Some(session_info_yaml) = connection.session_info()
-                        && let Some(session_info) = SessionInfo::parse(&session_info_yaml).ok()
-                    {
-                        if let Some(setup) = session_info.car_setup
-                            && previous_setup_update != setup.update_count
-                        {
-                            let serialized_setup = to_string(&setup)?;
+                tracing::info!("\n{}", serialized_setup);
 
-                            tracing::info!("\n{}", serialized_setup);
-
-                            previous_setup_update = setup.update_count;
-                        }
-
-                        previous_session_info_update = current_update;
-                    }
-                    continue;
-                }
-                Ok(WaitResult::Timeout) => continue,
-                Err(err) => return Err(anyhow::anyhow!("{}", err)),
+                previous_setup_update = setup.update_count;
             }
         }
+
+        Ok(())
     }
 }

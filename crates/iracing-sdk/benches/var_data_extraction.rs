@@ -9,7 +9,7 @@
 //! Platform: Cross-platform (uses real IBT test files, CI-safe)
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use iracing_sdk::IbtReader;
+use iracing_sdk::ibt::IbtReader;
 use iracing_sdk::types::{BitField, VarData};
 use std::hint::black_box;
 use test_utils::get_smallest_ibt_test_file;

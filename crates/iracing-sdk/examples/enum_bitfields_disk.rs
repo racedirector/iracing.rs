@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::{
-    IbtReader, VarData,
+    VarData,
+    ibt::IbtReader,
     types::{
         CarLeftRight, EngineWarnings, PaceMode, PitServiceFlags, SessionFlags, SessionState,
         TrackLocation, TrackSurface, TrackWetness,

@@ -1054,6 +1054,7 @@ dependencies = [
  "encoding_rs",
  "futures",
  "iracing-sdk-derive",
+ "pin-project-lite",
  "proptest",
  "schemars",
  "serde",

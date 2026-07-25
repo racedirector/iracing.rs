@@ -118,6 +118,15 @@ pub enum IRacingSDKError {
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
+
+    /// A caller-provided SDK configuration value was invalid.
+    #[error("Invalid configuration for '{field}': {reason}")]
+    InvalidConfiguration {
+        /// Name of the invalid configuration field.
+        field: &'static str,
+        /// Human-readable explanation of the configuration requirement.
+        reason: String,
+    },
 }
 
 impl IRacingSDKError {
@@ -136,6 +145,7 @@ impl IRacingSDKError {
             #[cfg(windows)]
             IRacingSDKError::WindowsApi { .. } => true,
             IRacingSDKError::SchemaValidation { .. } => false,
+            IRacingSDKError::InvalidConfiguration { .. } => false,
         }
     }
 
@@ -200,6 +210,10 @@ impl IRacingSDKError {
                 "Verify buffer access patterns",
                 "Restart buffer management",
             ],
+            IRacingSDKError::InvalidConfiguration { .. } => vec![
+                "Review the documented requirements for the configuration field",
+                "Provide a supported nonzero configuration value",
+            ],
         }
     }
 
@@ -263,6 +277,14 @@ impl IRacingSDKError {
         IRacingSDKError::UnsupportedPlatform {
             feature: feature.into(),
             required_platform: required_platform.into(),
+        }
+    }
+
+    /// Helper constructor for invalid SDK configuration values.
+    pub fn invalid_configuration(field: &'static str, reason: impl Into<String>) -> Self {
+        IRacingSDKError::InvalidConfiguration {
+            field,
+            reason: reason.into(),
         }
     }
 }
@@ -445,6 +467,16 @@ mod tests {
             platform_error,
             IRacingSDKError::UnsupportedPlatform { .. }
         ));
+
+        let configuration_error =
+            IRacingSDKError::invalid_configuration("poll_interval", "must be nonzero");
+        assert!(matches!(
+            configuration_error,
+            IRacingSDKError::InvalidConfiguration {
+                field: "poll_interval",
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -472,6 +504,10 @@ mod tests {
         assert!(connection_error.is_retryable());
         assert!(!memory_error.is_retryable());
         assert!(!version_error.is_retryable());
+
+        let configuration_error =
+            IRacingSDKError::invalid_configuration("poll_interval", "must be nonzero");
+        assert!(!configuration_error.is_retryable());
 
         // Test recovery suggestions are provided
         let conn_suggestions = connection_error.recovery_suggestions();

@@ -17,7 +17,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use iracing_sdk::{IbtReader, SessionInfo};
+use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the car setup schema generator.
@@ -56,7 +56,7 @@ fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
 /// Connects to live iRacing shared memory and parses the current session info.
 #[cfg(windows)]
 fn parse_live_session() -> Result<SessionInfo> {
-    use iracing_sdk::{SessionInfoParser, WindowsConnection};
+    use iracing_sdk::{WindowsConnection, schema::SessionInfoParser};
 
     tracing::info!("Opening iRacing connection");
 

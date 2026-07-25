@@ -13,8 +13,8 @@
 //!
 //! # Feature-Specific Implementation
 //!
-//! Schema discovery is conditionally compiled based on the live feature flag
-//! for Windows-specific iRacing integration.
+//! Live header and variable discovery are compiled only for Windows targets;
+//! session schema parsing remains available on every supported platform.
 
 #[cfg(windows)]
 pub mod header;

@@ -9,7 +9,7 @@
 //! ```
 
 use clap::Parser;
-use iracing_sdk::{IbtProvider, Provider, SessionInfo};
+use iracing_sdk::{provider::Provider, providers::ibt::IbtProvider, schema::SessionInfo};
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     } = Args::parse();
 
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
-    let mut provider = IbtProvider::from_path(&ibt_path)?;
+    let mut provider = IbtProvider::open(&ibt_path)?;
 
     let session_yaml = provider
         .session_yaml(0)

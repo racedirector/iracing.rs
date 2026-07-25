@@ -1,13 +1,16 @@
-#[cfg(windows)]
+use anyhow::Result;
 use clap::Parser;
-#[cfg(windows)]
-use iracing_sdk::IRacingTelemetryFrame;
-#[cfg(windows)]
+use csv::Writer;
+use futures::StreamExt;
+use iracing_sdk::{IRacingTelemetryFrame, IbtConnection};
 use std::path::PathBuf;
 
-#[cfg(windows)]
 #[derive(Parser, Debug)]
 struct Args {
+    /// Path to the input `.ibt` telemetry file.
+    #[arg(short, long)]
+    ibt_path: PathBuf,
+
     /// Path where the output CSV should be written.
     #[arg(short, long)]
     csv_output_path: PathBuf,
@@ -16,7 +19,6 @@ struct Args {
 /// CSV row representation of positional telemetry.
 ///
 /// This struct defines the output schema written per frame.
-#[cfg(windows)]
 #[derive(IRacingTelemetryFrame, Debug, Clone, Copy, serde::Serialize)]
 struct Row {
     /// Distance traveled around the lap (meters).
@@ -32,14 +34,17 @@ struct Row {
     /// !!!: iRacing uses EPSG:3857 for coordinates.
     /// Latitude in decimal degrees. Unit: deg.
     #[field_name = "Lat"]
+    #[fail_if_missing]
     latitude: f64,
 
     /// Longitude in decimal degrees. Unit: deg.
     #[field_name = "Lon"]
+    #[fail_if_missing]
     longitude: f64,
 
     /// Altitude. Unit: m.
     #[field_name = "Alt"]
+    #[fail_if_missing]
     altitude: f32,
 
     /// Whether the car is currently on pit road.
@@ -54,7 +59,7 @@ struct Row {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -63,43 +68,28 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    #[cfg(not(windows))]
-    {
-        tracing::warn!(
-            "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
-        );
-        Err(anyhow::anyhow!(
-            "live-position example is only supported on Windows"
-        ))
+    // ------------------------------------------------------------
+    // Parse CLI arguments
+    // ------------------------------------------------------------
+    let Args {
+        ibt_path,
+        csv_output_path,
+    } = Args::parse();
+
+    tracing::info!(path = %ibt_path.display(), "Opening IBT file");
+
+    // ------------------------------------------------------------
+    // Open telemetry reader and CSV writer
+    // ------------------------------------------------------------
+    let connection = IbtConnection::builder().with_path(ibt_path).build().await?;
+    let mut stream = connection.subscribe::<Row>(iracing_sdk::UpdateRate::Native);
+    let mut writer = Writer::from_path(&csv_output_path)?;
+
+    while let Some(frame) = stream.next().await {
+        writer.serialize(frame)?;
     }
 
-    #[cfg(windows)]
-    {
-        use csv::Writer;
-        use iracing_sdk::{FrameAdapter, provider::Provider, providers::live::LiveProvider};
+    writer.flush()?;
 
-        // ------------------------------------------------------------
-        // Parse CLI arguments
-        // ------------------------------------------------------------
-        let Args { csv_output_path } = Args::parse();
-
-        tracing::info!("Opening Live iRacing connection");
-
-        // ------------------------------------------------------------
-        // Open telemetry reader and CSV writer
-        // ------------------------------------------------------------
-        let mut provider = LiveProvider::new()?;
-        let schema = provider.schema();
-        let mut writer = Writer::from_path(&csv_output_path)?;
-
-        let shared_validation = Row::validate_schema(&schema)?;
-        while let Some(packet) = provider.next_frame().await? {
-            let frame = Row::adapt(&packet, &shared_validation);
-            writer.serialize(frame)?;
-        }
-
-        writer.flush()?;
-
-        Ok(())
-    }
+    Ok(())
 }

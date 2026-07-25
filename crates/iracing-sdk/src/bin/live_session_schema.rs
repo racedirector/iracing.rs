@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::{SessionInfoParser, WindowsConnection};
+        use iracing_sdk::{WindowsConnection, schema::SessionInfoParser};
         use std::{fs::File, io::BufWriter};
 
         let Args {

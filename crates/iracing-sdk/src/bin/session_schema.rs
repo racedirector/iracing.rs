@@ -46,7 +46,7 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     let Args { output_path } = Args::parse();
 
-    let schema = schemars::schema_for!(iracing_sdk::SessionInfo);
+    let schema = schemars::schema_for!(iracing_sdk::schema::SessionInfo);
 
     let output_file = File::create(&output_path)?;
     let writer = BufWriter::new(output_file);

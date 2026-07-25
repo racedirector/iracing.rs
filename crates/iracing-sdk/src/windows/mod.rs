@@ -42,5 +42,5 @@ mod utils;
 
 pub use crate::PitCommand;
 pub use broadcast::{Broadcast, BroadcastCommand};
-pub use connection::{Connection, IRSDKHeader, VarBuf, WaitResult};
+pub use connection::{Connection, WaitResult};
 pub use utils::wide_string;

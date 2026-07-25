@@ -84,6 +84,18 @@ pub const IRSDK_VER: i32 = 2;
 /// Status flag indicating that the simulator is actively publishing telemetry
 pub const IRSDK_STATUS_CONNECTED: i32 = 0x1;
 
+/// iRacing variable buffer information
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct IRSDKVarBuf {
+    /// Tick count when buffer was written
+    pub tick_count: i32,
+    /// Offset from header to buffer start
+    pub buf_offset: i32,
+    /// Padding to maintain alignment
+    pub pad: [i32; 2],
+}
+
 /// iRacing header structure that matches the C SDK layout
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -112,18 +124,6 @@ pub struct IRSDKHeader {
     pub pad1: [i32; 2],
     /// Buffer information (4-buffer rotation system)
     pub var_buf: [IRSDKVarBuf; 4],
-}
-
-/// iRacing variable buffer information
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct IRSDKVarBuf {
-    /// Tick count when buffer was written
-    pub tick_count: i32,
-    /// Offset from header to buffer start
-    pub buf_offset: i32,
-    /// Padding to maintain alignment
-    pub pad: [i32; 2],
 }
 
 impl IRSDKHeader {
@@ -673,6 +673,36 @@ mod tests {
         };
 
         assert!(header.validate().is_ok());
+    }
+
+    #[test]
+    fn header_validation_rejects_invalid_buffer_counts() {
+        let mut header = IRSDKHeader {
+            ver: IRSDK_VER,
+            status: 0,
+            tick_rate: 60,
+            session_info_update: 123,
+            session_info_len: 5000,
+            session_info_offset: 1000,
+            num_vars: 150,
+            var_header_offset: 500,
+            num_buf: 4,
+            buf_len: 2000,
+            pad1: [0, 0],
+            var_buf: [IRSDKVarBuf {
+                tick_count: 100,
+                buf_offset: 3000,
+                pad: [0, 0],
+            }; 4],
+        };
+
+        for num_buf in [-1, 0, 5] {
+            header.num_buf = num_buf;
+            assert!(
+                header.validate().is_err(),
+                "num_buf {num_buf} should be rejected"
+            );
+        }
     }
 
     #[test]

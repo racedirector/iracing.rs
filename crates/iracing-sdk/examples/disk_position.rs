@@ -43,7 +43,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{IbtReader, types::VarData};
+use iracing_sdk::{ibt::IbtReader, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 

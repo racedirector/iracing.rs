@@ -62,10 +62,24 @@ const IRSDK_MAX_STRING: usize = 32; // For name and unit fields
 const IRSDK_MAX_DESC: usize = 64; // For description field
 const VAR_HEADER_SIZE: usize = std::mem::size_of::<IRSDKVarHeader>();
 
+/// iRacing SDK variable type constants (for reference)
+///
+/// These constants map to the irsdk_VarType enum values used in IBT files
+/// and live telemetry. They document the numeric values found in the type
+/// field of IRSDKVarHeader structs.
+mod irsdk_var_type {
+    pub const IRSDK_CHAR: i32 = 0;
+    pub const IRSDK_BOOL: i32 = 1;
+    pub const IRSDK_INT: i32 = 2;
+    pub const IRSDK_BITFIELD: i32 = 3;
+    pub const IRSDK_FLOAT: i32 = 4;
+    pub const IRSDK_DOUBLE: i32 = 5;
+}
+
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
 #[derive(Debug, Clone)]
-struct IRSDKVarHeader {
+pub struct IRSDKVarHeader {
     /// Variable type (irsdk_VarType enum)
     var_type: i32,
     /// Offset in bytes from buffer start
@@ -84,20 +98,7 @@ struct IRSDKVarHeader {
     unit: [u8; IRSDK_MAX_STRING],
 }
 
-/// iRacing SDK variable type constants (for reference)
-///
-/// These constants map to the irsdk_VarType enum values used in IBT files
-/// and live telemetry. They document the numeric values found in the type
-/// field of IRSDKVarHeader structs.
-mod irsdk_var_type {
-    pub const IRSDK_CHAR: i32 = 0;
-    pub const IRSDK_BOOL: i32 = 1;
-    pub const IRSDK_INT: i32 = 2;
-    pub const IRSDK_BITFIELD: i32 = 3;
-    pub const IRSDK_FLOAT: i32 = 4;
-    pub const IRSDK_DOUBLE: i32 = 5;
-}
-
+/// Static IRSDK VarHeader parsing utils
 impl IRSDKVarHeader {
     /// Parse variable header from raw memory bytes with validation
     pub fn parse_from_memory(memory: &[u8], offset: usize) -> Result<Self> {
@@ -121,26 +122,6 @@ impl IRSDKVarHeader {
         header.validate()?;
 
         Ok(header)
-    }
-
-    /// Validate header fields for reasonable values
-    fn validate(&self) -> Result<()> {
-        // iRacing reserves count >= 0 and count_as_time <= 1
-        if self.count < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Variable header validation".to_string(),
-                details: format!("Negative element count: {}", self.count),
-            });
-        }
-
-        if self.count_as_time > 1 {
-            return Err(IRacingSDKError::Parse {
-                context: "Variable header validation".to_string(),
-                details: format!("Invalid count_as_time flag: {}", self.count_as_time),
-            });
-        }
-
-        Ok(())
     }
 
     /// Convert C string bytes to Rust String
@@ -170,17 +151,59 @@ impl IRSDKVarHeader {
             }
         }
     }
+}
+
+impl IRSDKVarHeader {
+    /// Get iRacing variable name as a String
+    pub fn name(&self) -> String {
+        Self::c_string_to_string(&self.name)
+    }
+
+    /// Get iRacing variable description as a String
+    pub fn description(&self) -> String {
+        Self::c_string_to_string(&self.desc)
+    }
+
+    /// Get iRacing variable unit as a String
+    pub fn unit(&self) -> String {
+        Self::c_string_to_string(&self.unit)
+    }
+
+    /// Convert iRacing variable type to our VariableType
+    pub fn data_type(&self) -> VariableType {
+        Self::map_variable_type(self.var_type)
+    }
+
+    /// Validate header fields for reasonable values
+    fn validate(&self) -> Result<()> {
+        // iRacing reserves count >= 0 and count_as_time <= 1
+        if self.count < 0 {
+            return Err(IRacingSDKError::Parse {
+                context: "Variable header validation".to_string(),
+                details: format!("Negative element count: {}", self.count),
+            });
+        }
+
+        if self.count_as_time > 1 {
+            return Err(IRacingSDKError::Parse {
+                context: "Variable header validation".to_string(),
+                details: format!("Invalid count_as_time flag: {}", self.count_as_time),
+            });
+        }
+
+        Ok(())
+    }
 
     /// Convert to VariableInfo for schema building
     pub fn to_variable_info(&self) -> VariableInfo {
         VariableInfo {
-            name: Self::c_string_to_string(&self.name),
-            data_type: Self::map_variable_type(self.var_type),
+            name: self.name(),
+            data_type: self.data_type(),
             offset: self.offset as usize,
             count: self.count as usize,
             count_as_time: self.count_as_time(),
-            units: Self::c_string_to_string(&self.unit),
-            description: Self::c_string_to_string(&self.desc),
+            units: self.unit(),
+            description: self.description(),
         }
     }
 
