@@ -6,8 +6,9 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    FramePacket, Result, VarData, VariableInfo, VariableSchema,
+    FramePacket, Result, TelemetryValue, VarData, VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
+    types::variable_type::TelemetryValueProvider,
 };
 use std::sync::Arc;
 
@@ -61,27 +62,20 @@ impl DynamicFrame {
     pub fn tick_count(&self) -> u32 {
         self.tick_count
     }
-}
 
-impl DynamicFrame {
     /// Retrieves the variable from the frame by name.
-    pub fn value(
-        &self,
-        name: &str,
-    ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
+    pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
         let Some(info) = self.variable_info(name) else {
             return Ok(None);
         };
 
-        self.value_from_info(info).map(Some)
+        self.telemetry_value_from_info(info).map(Some)
     }
+}
 
-    /// Retrieves the requested variable from the frame.
-    pub fn value_from_info(
-        &self,
-        info: &VariableInfo,
-    ) -> crate::Result<crate::types::variable_type::TelemetryValue> {
-        crate::types::variable_type::TelemetryValue::decode(self.data.as_ref(), info)
+impl TelemetryValueProvider for DynamicFrame {
+    fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
+        TelemetryValue::decode(self.data.as_ref(), info)
     }
 }
 

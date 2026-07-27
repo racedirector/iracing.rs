@@ -22,6 +22,7 @@ const IRSDK_MEMMAPFILENAME: &str = "Local\\IRSDKMemMapFileName";
 /// iRacing data valid event name
 const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
 /// Expected SDK version
+#[cfg(test)]
 const IRSDK_VER: i32 = 2;
 /// Connection status flag
 const IRSDK_ST_CONNECTED: i32 = 1;

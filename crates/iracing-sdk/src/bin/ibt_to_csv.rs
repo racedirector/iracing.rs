@@ -7,14 +7,13 @@
 //!
 //! # Behavior
 //! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
-//! - Streams [`iracing_sdk::DynamicFrame`] values through an
-//!   [`iracing_sdk::IbtConnection`]
-//! - Reads all variables through the dynamic value API and writes them to a CSV
+//! - Streams frame packets through an [`iracing_sdk::providers::ibt::IbtProvider`]
+//! - Reads the selected variables from each packet and writes them to a CSV
 //!
 //! # Logging
 //! Uses `tracing` + `tracing_subscriber`.
 //!
-//! - Defaults to `trace` level
+//! - Defaults to `info` level
 //! - Override with `RUST_LOG`, e.g. `RUST_LOG=info`
 //!
 //! # Usage
@@ -46,16 +45,15 @@
 //! - Returns an error if the output file cannot be written
 //!
 
-use anyhow::{Context, Result, anyhow};
+mod csv_telemetry_writer;
+
+use anyhow::{Context, Result};
 use clap::Parser;
-use csv::Writer;
-use futures::StreamExt;
-use iracing_sdk::{
-    DynamicFrame, IbtConnection, TelemetryValue, VariableInfo, ibt::IbtReader,
-    providers::ibt::IbtProvider,
-};
+use iracing_sdk::{VariableInfo, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
+
+use csv_telemetry_writer::CsvTelemetryWriter;
 
 /// CLI arguments for the disk session parser.
 ///
@@ -76,9 +74,9 @@ struct Args {
 async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
-    // Default to TRACE unless RUST_LOG is set.
+    // Default to INFO unless RUST_LOG is set.
     // ------------------------------------------------------------
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
     // ------------------------------------------------------------
@@ -103,22 +101,17 @@ async fn main() -> Result<()> {
             .then_with(|| left.name.cmp(&right.name))
     });
 
-    let provider = IbtProvider::from_reader(reader);
-    let connection = IbtConnection::builder()
-        .with_provider(provider)
-        .build()
-        .await?;
+    let mut provider = IbtProvider::from_reader(reader);
 
     tracing::info!(path = %output_path.display(), "Creating CSV output");
-    let mut writer = Writer::from_path(&output_path).context("Could not create CSV output")?;
-
-    let headers = build_headers(&variables);
-    let expected_column_count = headers.len();
-    writer.write_record(&headers)?;
+    let mut writer = CsvTelemetryWriter::builder()
+        .with_output_path(&output_path)
+        .with_variables(variables)
+        .build()?;
 
     tracing::info!(
-        variable_count = variables.len(),
-        column_count = expected_column_count,
+        variable_count = writer.variable_count(),
+        column_count = writer.column_count(),
         "Starting CSV export"
     );
 
@@ -126,28 +119,9 @@ async fn main() -> Result<()> {
     // Frame streaming
     // ------------------------------------------------------------
     let mut frame_count = 0usize;
-    let mut stream = connection.subscribe::<DynamicFrame>(iracing_sdk::UpdateRate::Native);
-    while let Some(frame) = stream.next().await {
-        let mut row = Vec::with_capacity(expected_column_count);
-        row.push(frame.tick_count().to_string());
 
-        for variable in &variables {
-            let value = frame
-                .value_from_info(variable)
-                .with_context(|| format!("Failed to decode `{}`", variable.name))?;
-
-            append_value(&mut row, value);
-        }
-
-        if row.len() != expected_column_count {
-            return Err(anyhow!(
-                "Internal CSV row width mismatch: expected {} columns, found {}",
-                expected_column_count,
-                row.len()
-            ));
-        }
-
-        writer.write_record(&row)?;
+    while let Some(packet) = provider.next_frame().await? {
+        writer.write_telemetry(&packet)?;
         frame_count += 1;
 
         if frame_count.is_multiple_of(10_000) {
@@ -159,109 +133,4 @@ async fn main() -> Result<()> {
     tracing::info!(frames_exported = frame_count, "Finished CSV export");
 
     Ok(())
-}
-
-fn build_headers(variables: &[VariableInfo]) -> Vec<String> {
-    let mut headers = Vec::with_capacity(2 + expanded_column_count(variables));
-    headers.push("tick".to_string());
-    headers.push("session_version".to_string());
-
-    for variable in variables {
-        if variable.count <= 1 {
-            headers.push(variable.name.clone());
-            continue;
-        }
-
-        for index in 0..variable.count {
-            headers.push(format!("{}[{}]", variable.name, index));
-        }
-    }
-
-    headers
-}
-
-fn expanded_column_count(variables: &[VariableInfo]) -> usize {
-    variables
-        .iter()
-        .map(|variable| {
-            if variable.count == 0 {
-                1
-            } else {
-                variable.count
-            }
-        })
-        .sum()
-}
-
-fn append_value(row: &mut Vec<String>, value: TelemetryValue) {
-    match value {
-        TelemetryValue::Char(value) => row.push(char::from(value).to_string()),
-        TelemetryValue::Int8(value) => row.push(value.to_string()),
-        TelemetryValue::UInt8(value) => row.push(value.to_string()),
-        TelemetryValue::Int16(value) => row.push(value.to_string()),
-        TelemetryValue::UInt16(value) => row.push(value.to_string()),
-        TelemetryValue::Int32(value) => row.push(value.to_string()),
-        TelemetryValue::UInt32(value) => row.push(value.to_string()),
-        TelemetryValue::Float32(value) => row.push(value.to_string()),
-        TelemetryValue::Float64(value) => row.push(value.to_string()),
-        TelemetryValue::Bool(value) => row.push(value.to_string()),
-        TelemetryValue::BitField(value) => row.push(value.value().to_string()),
-        TelemetryValue::Array(values) => {
-            for value in values {
-                append_value(row, value);
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use iracing_sdk::VariableType;
-
-    fn variable(name: &str, data_type: VariableType, offset: usize, count: usize) -> VariableInfo {
-        VariableInfo {
-            name: name.to_string(),
-            data_type,
-            offset,
-            count,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
-    }
-
-    #[test]
-    fn build_headers_expands_array_variables() {
-        let variables = vec![
-            variable("Speed", VariableType::Float32, 0, 1),
-            variable("CarIdxLapDistPct", VariableType::Float32, 4, 3),
-        ];
-
-        let headers = build_headers(&variables);
-        assert_eq!(
-            headers,
-            vec![
-                "tick",
-                "session_version",
-                "Speed",
-                "CarIdxLapDistPct[0]",
-                "CarIdxLapDistPct[1]",
-                "CarIdxLapDistPct[2]",
-            ]
-        );
-    }
-
-    #[test]
-    fn append_value_formats_scalars_and_flattens_arrays() {
-        let mut row = Vec::new();
-        append_value(&mut row, TelemetryValue::Float32(10.0));
-        append_value(&mut row, TelemetryValue::Bool(true));
-        append_value(
-            &mut row,
-            TelemetryValue::Array(vec![TelemetryValue::UInt32(2), TelemetryValue::UInt32(3)]),
-        );
-
-        assert_eq!(row, vec!["10", "true", "2", "3"]);
-    }
 }

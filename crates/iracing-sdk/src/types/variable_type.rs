@@ -151,6 +151,15 @@ impl TelemetryValue {
     }
 }
 
+/// Decodes telemetry values using their variable metadata.
+///
+/// Implementors provide access to the raw data for a telemetry frame while
+/// callers supply the corresponding [`VariableInfo`].
+pub trait TelemetryValueProvider {
+    /// Decodes the telemetry value described by `info`.
+    fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue>;
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "codegen")]
