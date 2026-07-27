@@ -56,7 +56,7 @@ impl IbtConnection {
         P: Provider,
     {
         // Spawn telemetry channels task
-        let channels = Telemetry::spawn_preserving_last_frame(provider);
+        let channels = Telemetry::spawn(provider);
 
         // Wait for first frame.
         let mut frame_rx = channels.frames.clone();
