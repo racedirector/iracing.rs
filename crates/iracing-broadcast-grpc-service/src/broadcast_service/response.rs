@@ -1,13 +1,17 @@
 use crate::{
     broadcast::{
         CameraDetail, CameraGroup, CameraSetStateResponse, CameraSwitchNumberResponse,
-        CameraSwitchPositionResponse, ForceFeedbackCommandResponse, GetAvailableCamerasResponse,
-        PitCommandResponse, ReplaySearchResponse, ReplaySetPlayPositionResponse,
-        ReplaySetPlaySpeedResponse, TelemetryCommandResponse,
+        CameraSwitchPositionResponse, CurrentCameraPositionResponse, CurrentCameraStateResponse,
+        CurrentForceFeedbackResponse, CurrentPitServiceResponse, CurrentReplayPlaySpeedResponse,
+        CurrentReplayPositionResponse, CurrentTelemetryStateResponse, CurrentVideoCaptureResponse,
+        ForceFeedbackCommandResponse, GetAvailableCamerasResponse, PitCommandResponse,
+        ReplaySearchResponse, ReplaySetPlayPositionResponse, ReplaySetPlaySpeedResponse,
+        TelemetryCommandResponse,
     },
     broadcast_app::{
         AvailableCameras, CameraSelectionSnapshot, CameraStateSnapshot, ForceFeedbackSnapshot,
-        PitServiceSnapshot, ReplayPositionSnapshot, ReplaySpeedSnapshot, TelemetryLoggingSnapshot,
+        PitServiceSnapshot, ReplayPlayStateSnapshot, ReplayPositionSnapshot, ReplaySpeedSnapshot,
+        TelemetryLoggingSnapshot, VideoCaptureSnapshot,
     },
 };
 
@@ -55,10 +59,30 @@ pub(crate) fn camera_switch_number(
     }
 }
 
+pub(crate) fn current_camera_position(
+    snapshot: CameraSelectionSnapshot,
+) -> CurrentCameraPositionResponse {
+    CurrentCameraPositionResponse {
+        car_index: snapshot.car_index,
+        group: snapshot.group,
+        camera: snapshot.camera,
+    }
+}
+
 pub(crate) fn replay_set_play_speed(snapshot: ReplaySpeedSnapshot) -> ReplaySetPlaySpeedResponse {
     ReplaySetPlaySpeedResponse {
         speed: snapshot.speed,
         is_slow_motion: snapshot.is_slow_motion,
+    }
+}
+
+pub(crate) fn current_replay_play_speed(
+    snapshot: ReplayPlayStateSnapshot,
+) -> CurrentReplayPlaySpeedResponse {
+    CurrentReplayPlaySpeedResponse {
+        speed: snapshot.speed,
+        is_slow_motion: snapshot.is_slow_motion,
+        is_playing: snapshot.is_playing,
     }
 }
 
@@ -68,11 +92,27 @@ pub(crate) fn camera_set_state(snapshot: CameraStateSnapshot) -> CameraSetStateR
     }
 }
 
+pub(crate) fn current_camera_state(snapshot: CameraStateSnapshot) -> CurrentCameraStateResponse {
+    CurrentCameraStateResponse {
+        state: snapshot.state,
+    }
+}
+
 pub(crate) fn replay_set_play_position(
     snapshot: ReplayPositionSnapshot,
 ) -> ReplaySetPlayPositionResponse {
     ReplaySetPlayPositionResponse {
         frame: snapshot.frame,
+    }
+}
+
+pub(crate) fn current_replay_position(
+    snapshot: ReplayPositionSnapshot,
+) -> CurrentReplayPositionResponse {
+    CurrentReplayPositionResponse {
+        frame: snapshot.frame,
+        session_number: snapshot.session_number,
+        session_time: snapshot.session_time,
     }
 }
 
@@ -96,8 +136,29 @@ pub(crate) fn pit_command(snapshot: PitServiceSnapshot) -> PitCommandResponse {
     }
 }
 
+pub(crate) fn current_pit_service(snapshot: PitServiceSnapshot) -> CurrentPitServiceResponse {
+    CurrentPitServiceResponse {
+        service_flags: snapshot.service_flags,
+        fuel: snapshot.fuel,
+        lf_pressure: snapshot.lf_pressure,
+        rf_pressure: snapshot.rf_pressure,
+        lr_pressure: snapshot.lr_pressure,
+        rr_pressure: snapshot.rr_pressure,
+        tire_compound: snapshot.tire_compound,
+    }
+}
+
 pub(crate) fn telemetry_command(snapshot: TelemetryLoggingSnapshot) -> TelemetryCommandResponse {
     TelemetryCommandResponse {
+        is_disk_logging_enabled: snapshot.is_disk_logging_enabled,
+        is_disk_logging_active: snapshot.is_disk_logging_active,
+    }
+}
+
+pub(crate) fn current_telemetry_state(
+    snapshot: TelemetryLoggingSnapshot,
+) -> CurrentTelemetryStateResponse {
+    CurrentTelemetryStateResponse {
         is_disk_logging_enabled: snapshot.is_disk_logging_enabled,
         is_disk_logging_active: snapshot.is_disk_logging_active,
     }
@@ -106,5 +167,20 @@ pub(crate) fn telemetry_command(snapshot: TelemetryLoggingSnapshot) -> Telemetry
 pub(crate) fn force_feedback(snapshot: ForceFeedbackSnapshot) -> ForceFeedbackCommandResponse {
     ForceFeedbackCommandResponse {
         max_force: snapshot.max_force,
+    }
+}
+
+pub(crate) fn current_force_feedback(
+    snapshot: ForceFeedbackSnapshot,
+) -> CurrentForceFeedbackResponse {
+    CurrentForceFeedbackResponse {
+        max_force: snapshot.max_force,
+    }
+}
+
+pub(crate) fn current_video_capture(snapshot: VideoCaptureSnapshot) -> CurrentVideoCaptureResponse {
+    CurrentVideoCaptureResponse {
+        is_enabled: snapshot.is_enabled,
+        is_active: snapshot.is_active,
     }
 }

@@ -15,14 +15,16 @@ use crate::{
         AvailableCamera, AvailableCameraGroup, BroadcastError, CameraSelectionExpectation,
         CameraSelectionSnapshot, CameraStateExpectation, CameraStatePort, CameraStateSnapshot,
         ForceFeedbackExpectation, ForceFeedbackSnapshot, ForceFeedbackStatePort,
-        PitServiceExpectation, PitServiceSnapshot, PitStatePort, ReplayPositionExpectation,
-        ReplayPositionSnapshot, ReplaySpeedExpectation, ReplaySpeedSnapshot, ReplayStatePort,
-        TelemetryLoggingExpectation, TelemetryLoggingSnapshot, TelemetryStatePort,
+        PitServiceExpectation, PitServiceSnapshot, PitStatePort, ReplayPlayStateSnapshot,
+        ReplayPositionExpectation, ReplayPositionSnapshot, ReplaySpeedExpectation,
+        ReplaySpeedSnapshot, ReplayStatePort, TelemetryLoggingExpectation,
+        TelemetryLoggingSnapshot, TelemetryStatePort, VideoCaptureSnapshot, VideoCaptureStatePort,
     },
     telemetry_observer::{
         CameraSelectionTelemetry, CameraStateTelemetry, ForceFeedbackTelemetry, ObservedValue,
-        PitServiceTelemetry, ReplayPositionTelemetry, ReplaySpeedTelemetry,
-        TelemetryLoggingTelemetry, TelemetryObserver, TelemetryObserverError,
+        PitServiceTelemetry, ReplayPlayStateTelemetry, ReplayPositionTelemetry,
+        ReplaySpeedTelemetry, TelemetryLoggingTelemetry, TelemetryObserver, TelemetryObserverError,
+        VideoCaptureTelemetry,
     },
 };
 
@@ -44,6 +46,8 @@ pub(crate) struct IracingObservation<P> {
     pit_service_available: bool,
     telemetry_logging_available: bool,
     force_feedback_available: bool,
+    replay_play_state_available: bool,
+    video_capture_available: bool,
 }
 
 impl IracingObservation<LiveProvider> {
@@ -76,6 +80,10 @@ where
                 &telemetry,
                 "replay speed",
             ),
+            replay_play_state_available: Self::validate_capability::<ReplayPlayStateTelemetry>(
+                &telemetry,
+                "replay play state",
+            ),
             replay_position_available: Self::validate_capability::<ReplayPositionTelemetry>(
                 &telemetry,
                 "replay position",
@@ -91,6 +99,10 @@ where
             force_feedback_available: Self::validate_capability::<ForceFeedbackTelemetry>(
                 &telemetry,
                 "force feedback",
+            ),
+            video_capture_available: Self::validate_capability::<VideoCaptureTelemetry>(
+                &telemetry,
+                "video capture",
             ),
             telemetry,
             session_parser: Arc::new(StdMutex::new(SessionInfoParser::new())),
@@ -395,6 +407,17 @@ where
         Ok(observed.into())
     }
 
+    async fn play_state_snapshot(&self) -> Result<ReplayPlayStateSnapshot, BroadcastError> {
+        self.require_capability(self.replay_play_state_available, "replay play state")?;
+        let observed = self
+            .telemetry
+            .snapshot_observed::<ReplayPlayStateTelemetry>()
+            .await
+            .map_err(Self::map_telemetry_error)?;
+
+        Ok(observed.into())
+    }
+
     async fn wait_for_speed(
         &self,
         previous: ReplaySpeedSnapshot,
@@ -561,6 +584,23 @@ where
     }
 }
 
+#[async_trait]
+impl<P> VideoCaptureStatePort for IracingObservation<P>
+where
+    P: SendProvider + Send + Sync + 'static,
+{
+    async fn video_capture_snapshot(&self) -> Result<VideoCaptureSnapshot, BroadcastError> {
+        self.require_capability(self.video_capture_available, "video capture")?;
+        let observed = self
+            .telemetry
+            .snapshot_observed::<VideoCaptureTelemetry>()
+            .await
+            .map_err(Self::map_telemetry_error)?;
+
+        Ok(observed.into())
+    }
+}
+
 impl TryFrom<ObservedValue<CameraSelectionTelemetry>> for CameraSelectionSnapshot {
     type Error = BroadcastError;
 
@@ -579,6 +619,16 @@ impl From<ObservedValue<ReplaySpeedTelemetry>> for ReplaySpeedSnapshot {
         Self {
             speed: observed.value.speed,
             is_slow_motion: observed.value.is_slow_motion,
+        }
+    }
+}
+
+impl From<ObservedValue<ReplayPlayStateTelemetry>> for ReplayPlayStateSnapshot {
+    fn from(observed: ObservedValue<ReplayPlayStateTelemetry>) -> Self {
+        Self {
+            speed: observed.value.speed,
+            is_slow_motion: observed.value.is_slow_motion,
+            is_playing: observed.value.is_playing,
         }
     }
 }
@@ -632,6 +682,15 @@ impl From<ObservedValue<ForceFeedbackTelemetry>> for ForceFeedbackSnapshot {
     fn from(observed: ObservedValue<ForceFeedbackTelemetry>) -> Self {
         Self {
             max_force: observed.value.max_force,
+        }
+    }
+}
+
+impl From<ObservedValue<VideoCaptureTelemetry>> for VideoCaptureSnapshot {
+    fn from(observed: ObservedValue<VideoCaptureTelemetry>) -> Self {
+        Self {
+            is_enabled: observed.value.is_enabled,
+            is_active: observed.value.is_active,
         }
     }
 }

@@ -9,9 +9,10 @@ use super::{
     AvailableCameras, BroadcastCommandPort, BroadcastError, CameraSelectionExpectation,
     CameraSelectionSnapshot, CameraStateExpectation, CameraStatePort, CameraStateSnapshot,
     ForceFeedbackExpectation, ForceFeedbackSnapshot, ForceFeedbackStatePort, PitServiceExpectation,
-    PitServiceSnapshot, PitStatePort, ReplayPositionExpectation, ReplayPositionSnapshot,
-    ReplaySpeedExpectation, ReplaySpeedSnapshot, ReplayStatePort, TelemetryLoggingExpectation,
-    TelemetryLoggingSnapshot, TelemetryStatePort,
+    PitServiceSnapshot, PitStatePort, ReplayPlayStateSnapshot, ReplayPositionExpectation,
+    ReplayPositionSnapshot, ReplaySpeedExpectation, ReplaySpeedSnapshot, ReplayStatePort,
+    TelemetryLoggingExpectation, TelemetryLoggingSnapshot, TelemetryStatePort,
+    VideoCaptureSnapshot, VideoCaptureStatePort,
 };
 
 pub(crate) struct BroadcastUseCases {
@@ -21,10 +22,12 @@ pub(crate) struct BroadcastUseCases {
     pit: Arc<dyn PitStatePort>,
     telemetry: Arc<dyn TelemetryStatePort>,
     force_feedback: Arc<dyn ForceFeedbackStatePort>,
+    video_capture: Arc<dyn VideoCaptureStatePort>,
     observation_timeout: Duration,
 }
 
 impl BroadcastUseCases {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         commands: Arc<dyn BroadcastCommandPort>,
         camera: Arc<dyn CameraStatePort>,
@@ -32,6 +35,7 @@ impl BroadcastUseCases {
         pit: Arc<dyn PitStatePort>,
         telemetry: Arc<dyn TelemetryStatePort>,
         force_feedback: Arc<dyn ForceFeedbackStatePort>,
+        video_capture: Arc<dyn VideoCaptureStatePort>,
         observation_timeout: Duration,
     ) -> Self {
         Self {
@@ -41,6 +45,7 @@ impl BroadcastUseCases {
             pit,
             telemetry,
             force_feedback,
+            video_capture,
             observation_timeout,
         }
     }
@@ -60,6 +65,12 @@ impl BroadcastUseCases {
             camera_groups,
             current,
         })
+    }
+
+    pub(crate) async fn current_camera_position(
+        &self,
+    ) -> Result<CameraSelectionSnapshot, BroadcastError> {
+        self.camera.selection_snapshot().await
     }
 
     pub(crate) async fn camera_switch_position(
@@ -151,6 +162,10 @@ impl BroadcastUseCases {
             .await
     }
 
+    pub(crate) async fn current_camera_state(&self) -> Result<CameraStateSnapshot, BroadcastError> {
+        self.camera.state_snapshot().await
+    }
+
     pub(crate) async fn camera_set_state(
         &self,
         state: Option<CameraState>,
@@ -169,6 +184,12 @@ impl BroadcastUseCases {
                 self.observation_timeout,
             )
             .await
+    }
+
+    pub(crate) async fn current_replay_play_speed(
+        &self,
+    ) -> Result<ReplayPlayStateSnapshot, BroadcastError> {
+        self.replay.play_state_snapshot().await
     }
 
     pub(crate) async fn replay_set_play_speed(
@@ -196,6 +217,12 @@ impl BroadcastUseCases {
                 self.observation_timeout,
             )
             .await
+    }
+
+    pub(crate) async fn current_replay_position(
+        &self,
+    ) -> Result<ReplayPositionSnapshot, BroadcastError> {
+        self.replay.position_snapshot().await
     }
 
     pub(crate) async fn replay_set_play_position(
@@ -260,6 +287,10 @@ impl BroadcastUseCases {
         self.send(command).await
     }
 
+    pub(crate) async fn current_pit_service(&self) -> Result<PitServiceSnapshot, BroadcastError> {
+        self.pit.pit_service_snapshot().await
+    }
+
     pub(crate) async fn pit_command(
         &self,
         command: PitCommand,
@@ -300,6 +331,12 @@ impl BroadcastUseCases {
             .await
     }
 
+    pub(crate) async fn current_telemetry_state(
+        &self,
+    ) -> Result<TelemetryLoggingSnapshot, BroadcastError> {
+        self.telemetry.logging_snapshot().await
+    }
+
     pub(crate) async fn telemetry_command(
         &self,
         mode: TelemetryCommandMode,
@@ -319,6 +356,12 @@ impl BroadcastUseCases {
             .await
     }
 
+    pub(crate) async fn current_force_feedback(
+        &self,
+    ) -> Result<ForceFeedbackSnapshot, BroadcastError> {
+        self.force_feedback.force_feedback_snapshot().await
+    }
+
     pub(crate) async fn force_feedback_command(
         &self,
         max_force: f32,
@@ -334,6 +377,12 @@ impl BroadcastUseCases {
                 self.observation_timeout,
             )
             .await
+    }
+
+    pub(crate) async fn current_video_capture(
+        &self,
+    ) -> Result<VideoCaptureSnapshot, BroadcastError> {
+        self.video_capture.video_capture_snapshot().await
     }
 
     pub(crate) async fn replay_search_session_time(
@@ -410,6 +459,7 @@ mod tests {
             timeout: Duration,
         },
         ReplaySpeedSnapshot,
+        ReplayPlayStateSnapshot,
         ReplayPositionSnapshot,
         ReplaySpeedWait {
             previous: ReplaySpeedSnapshot,
@@ -439,6 +489,7 @@ mod tests {
             expected: ForceFeedbackExpectation,
             timeout: Duration,
         },
+        VideoCaptureSnapshot,
     }
 
     #[derive(Default)]
@@ -583,6 +634,7 @@ mod tests {
     struct FakeReplay {
         events: Arc<StdMutex<Vec<Event>>>,
         speed_snapshot: ReplaySpeedSnapshot,
+        play_state_snapshot: ReplayPlayStateSnapshot,
         speed_wait: StdMutex<Option<Result<ReplaySpeedSnapshot, BroadcastError>>>,
         position_snapshot: ReplayPositionSnapshot,
         position_wait: StdMutex<Option<Result<ReplayPositionSnapshot, BroadcastError>>>,
@@ -596,6 +648,14 @@ mod tests {
                 .expect("events mutex poisoned")
                 .push(Event::ReplaySpeedSnapshot);
             Ok(self.speed_snapshot)
+        }
+
+        async fn play_state_snapshot(&self) -> Result<ReplayPlayStateSnapshot, BroadcastError> {
+            self.events
+                .lock()
+                .expect("events mutex poisoned")
+                .push(Event::ReplayPlayStateSnapshot);
+            Ok(self.play_state_snapshot)
         }
 
         async fn wait_for_speed(
@@ -763,6 +823,22 @@ mod tests {
         }
     }
 
+    struct FakeVideoCapture {
+        events: Arc<StdMutex<Vec<Event>>>,
+        snapshot: VideoCaptureSnapshot,
+    }
+
+    #[async_trait]
+    impl VideoCaptureStatePort for FakeVideoCapture {
+        async fn video_capture_snapshot(&self) -> Result<VideoCaptureSnapshot, BroadcastError> {
+            self.events
+                .lock()
+                .expect("events mutex poisoned")
+                .push(Event::VideoCaptureSnapshot);
+            Ok(self.snapshot)
+        }
+    }
+
     struct Fixture {
         events: Arc<StdMutex<Vec<Event>>>,
         use_cases: BroadcastUseCases,
@@ -785,6 +861,18 @@ mod tests {
         ReplaySpeedSnapshot {
             speed,
             is_slow_motion,
+        }
+    }
+
+    fn replay_play_state(
+        speed: i32,
+        is_slow_motion: bool,
+        is_playing: bool,
+    ) -> ReplayPlayStateSnapshot {
+        ReplayPlayStateSnapshot {
+            speed,
+            is_slow_motion,
+            is_playing,
         }
     }
 
@@ -842,6 +930,7 @@ mod tests {
         let replay = Arc::new(FakeReplay {
             events: Arc::clone(&events),
             speed_snapshot: replay_speed(0, false),
+            play_state_snapshot: replay_play_state(0, false, true),
             speed_wait: StdMutex::new(Some(Ok(replay_speed(2, true)))),
             position_snapshot: replay_position(10, 1, 2.0),
             position_wait: StdMutex::new(Some(Ok(replay_position(20, 1, 3.0)))),
@@ -861,6 +950,13 @@ mod tests {
             snapshot: ForceFeedbackSnapshot { max_force: 10.0 },
             wait: StdMutex::new(Some(Ok(ForceFeedbackSnapshot { max_force: 20.0 }))),
         });
+        let video_capture = Arc::new(FakeVideoCapture {
+            events: Arc::clone(&events),
+            snapshot: VideoCaptureSnapshot {
+                is_enabled: true,
+                is_active: false,
+            },
+        });
 
         Fixture {
             events,
@@ -871,6 +967,7 @@ mod tests {
                 pit,
                 telemetry,
                 force_feedback,
+                video_capture,
                 Duration::from_millis(25),
             ),
         }
@@ -878,6 +975,85 @@ mod tests {
 
     fn fixture() -> Fixture {
         fixture_with(None, Ok(camera_snapshot(42, 4, 5)))
+    }
+
+    #[tokio::test]
+    async fn current_snapshot_use_cases_read_without_sending_commands() {
+        let Fixture { events, use_cases } = fixture();
+
+        assert_eq!(
+            use_cases
+                .current_camera_position()
+                .await
+                .expect("camera position should be readable"),
+            camera_snapshot(1, 2, 3)
+        );
+        assert_eq!(
+            use_cases
+                .current_camera_state()
+                .await
+                .expect("camera state should be readable"),
+            camera_state(0)
+        );
+        assert_eq!(
+            use_cases
+                .current_replay_play_speed()
+                .await
+                .expect("replay play state should be readable"),
+            replay_play_state(0, false, true)
+        );
+        assert_eq!(
+            use_cases
+                .current_replay_position()
+                .await
+                .expect("replay position should be readable"),
+            replay_position(10, 1, 2.0)
+        );
+        assert_eq!(
+            use_cases
+                .current_pit_service()
+                .await
+                .expect("pit service should be readable"),
+            pit_snapshot(0)
+        );
+        assert_eq!(
+            use_cases
+                .current_telemetry_state()
+                .await
+                .expect("telemetry state should be readable"),
+            telemetry_snapshot(true, true)
+        );
+        assert_eq!(
+            use_cases
+                .current_force_feedback()
+                .await
+                .expect("force feedback should be readable"),
+            ForceFeedbackSnapshot { max_force: 10.0 }
+        );
+        assert_eq!(
+            use_cases
+                .current_video_capture()
+                .await
+                .expect("video capture should be readable"),
+            VideoCaptureSnapshot {
+                is_enabled: true,
+                is_active: false,
+            }
+        );
+
+        assert_eq!(
+            *events.lock().expect("events mutex poisoned"),
+            vec![
+                Event::CameraSelectionSnapshot,
+                Event::CameraStateSnapshot,
+                Event::ReplayPlayStateSnapshot,
+                Event::ReplayPositionSnapshot,
+                Event::PitSnapshot,
+                Event::TelemetrySnapshot,
+                Event::ForceFeedbackSnapshot,
+                Event::VideoCaptureSnapshot,
+            ]
+        );
     }
 
     #[tokio::test]
@@ -1266,6 +1442,7 @@ mod tests {
         let disabled = Arc::new(crate::broadcast_app::DisabledObservationPort);
         let use_cases = BroadcastUseCases::new(
             commands,
+            disabled.clone(),
             disabled.clone(),
             disabled.clone(),
             disabled.clone(),

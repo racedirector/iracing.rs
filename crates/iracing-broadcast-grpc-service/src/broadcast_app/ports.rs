@@ -6,9 +6,9 @@ use iracing_sdk::BroadcastCommand;
 use super::{
     AvailableCameraGroup, BroadcastError, CameraSelectionExpectation, CameraSelectionSnapshot,
     CameraStateExpectation, CameraStateSnapshot, ForceFeedbackExpectation, ForceFeedbackSnapshot,
-    PitServiceExpectation, PitServiceSnapshot, ReplayPositionExpectation, ReplayPositionSnapshot,
-    ReplaySpeedExpectation, ReplaySpeedSnapshot, TelemetryLoggingExpectation,
-    TelemetryLoggingSnapshot,
+    PitServiceExpectation, PitServiceSnapshot, ReplayPlayStateSnapshot, ReplayPositionExpectation,
+    ReplayPositionSnapshot, ReplaySpeedExpectation, ReplaySpeedSnapshot,
+    TelemetryLoggingExpectation, TelemetryLoggingSnapshot, VideoCaptureSnapshot,
 };
 
 #[async_trait]
@@ -57,6 +57,8 @@ pub(crate) trait CameraStatePort: Send + Sync {
 #[async_trait]
 pub(crate) trait ReplayStatePort: Send + Sync {
     async fn speed_snapshot(&self) -> Result<ReplaySpeedSnapshot, BroadcastError>;
+
+    async fn play_state_snapshot(&self) -> Result<ReplayPlayStateSnapshot, BroadcastError>;
 
     async fn wait_for_speed(
         &self,
@@ -109,6 +111,11 @@ pub(crate) trait ForceFeedbackStatePort: Send + Sync {
         expected: ForceFeedbackExpectation,
         timeout: Duration,
     ) -> Result<ForceFeedbackSnapshot, BroadcastError>;
+}
+
+#[async_trait]
+pub(crate) trait VideoCaptureStatePort: Send + Sync {
+    async fn video_capture_snapshot(&self) -> Result<VideoCaptureSnapshot, BroadcastError>;
 }
 
 #[derive(Debug, Default)]
@@ -169,6 +176,10 @@ impl CameraStatePort for DisabledObservationPort {
 #[async_trait]
 impl ReplayStatePort for DisabledObservationPort {
     async fn speed_snapshot(&self) -> Result<ReplaySpeedSnapshot, BroadcastError> {
+        Err(BroadcastError::ObservationDisabled)
+    }
+
+    async fn play_state_snapshot(&self) -> Result<ReplayPlayStateSnapshot, BroadcastError> {
         Err(BroadcastError::ObservationDisabled)
     }
 
@@ -239,6 +250,13 @@ impl ForceFeedbackStatePort for DisabledObservationPort {
         _expected: ForceFeedbackExpectation,
         _timeout: Duration,
     ) -> Result<ForceFeedbackSnapshot, BroadcastError> {
+        Err(BroadcastError::ObservationDisabled)
+    }
+}
+
+#[async_trait]
+impl VideoCaptureStatePort for DisabledObservationPort {
+    async fn video_capture_snapshot(&self) -> Result<VideoCaptureSnapshot, BroadcastError> {
         Err(BroadcastError::ObservationDisabled)
     }
 }

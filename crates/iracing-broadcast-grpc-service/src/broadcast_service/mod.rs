@@ -4,13 +4,15 @@ mod error;
 mod request;
 mod response;
 
-use std::{sync::Arc, time::Duration};
+use std::{future::Future, sync::Arc, time::Duration};
 
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use crate::broadcast::broadcast_server::Broadcast;
 use crate::broadcast::*;
-use crate::broadcast_app::BroadcastUseCases;
+use crate::broadcast_app::{BroadcastError, BroadcastUseCases};
 
 pub use builder::BroadcastServiceBuilder;
 use command as command_impl;
@@ -19,6 +21,55 @@ use request as request_impl;
 use response as response_impl;
 
 const DEFAULT_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(2);
+const SUBSCRIPTION_BUFFER_CAPACITY: usize = 16;
+const SUBSCRIPTION_POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+type CurrentValueStream<T> = ReceiverStream<Result<T, Status>>;
+
+fn current_value_stream<S, R, Fut, Snapshot, Map>(
+    use_cases: Arc<BroadcastUseCases>,
+    mut snapshot: Snapshot,
+    map: Map,
+) -> CurrentValueStream<R>
+where
+    Fut: Future<Output = Result<S, BroadcastError>> + Send + 'static,
+    Snapshot: FnMut(Arc<BroadcastUseCases>) -> Fut + Send + 'static,
+    Map: Fn(S) -> R + Send + 'static,
+    S: Send + 'static,
+    R: Clone + PartialEq + Send + 'static,
+{
+    let (tx, rx) = mpsc::channel(SUBSCRIPTION_BUFFER_CAPACITY);
+
+    tokio::spawn(async move {
+        let mut previous = None;
+
+        loop {
+            if tx.is_closed() {
+                break;
+            }
+
+            let response = match snapshot(Arc::clone(&use_cases)).await {
+                Ok(snapshot) => map(snapshot),
+                Err(error) => {
+                    let _ = tx.send(Err(Status::from(error))).await;
+                    break;
+                }
+            };
+
+            if previous.as_ref() == Some(&response) {
+                tokio::time::sleep(SUBSCRIPTION_POLL_INTERVAL);
+                continue;
+            }
+
+            previous = Some(response.clone());
+            if tx.send(Ok(response)).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    ReceiverStream::new(rx)
+}
 
 /// Tonic adapter that serves the iRacing broadcast gRPC API on Windows.
 ///
@@ -53,6 +104,15 @@ impl BroadcastService {
 
 #[tonic::async_trait]
 impl Broadcast for BroadcastService {
+    type SubscribeCurrentCameraPositionStream = CurrentValueStream<CurrentCameraPositionResponse>;
+    type SubscribeCurrentCameraStateStream = CurrentValueStream<CurrentCameraStateResponse>;
+    type SubscribeCurrentReplayPlaySpeedStream = CurrentValueStream<CurrentReplayPlaySpeedResponse>;
+    type SubscribeCurrentReplayPositionStream = CurrentValueStream<CurrentReplayPositionResponse>;
+    type SubscribeCurrentPitServiceStream = CurrentValueStream<CurrentPitServiceResponse>;
+    type SubscribeCurrentTelemetryStateStream = CurrentValueStream<CurrentTelemetryStateResponse>;
+    type SubscribeCurrentForceFeedbackStream = CurrentValueStream<CurrentForceFeedbackResponse>;
+    type SubscribeCurrentVideoCaptureStream = CurrentValueStream<CurrentVideoCaptureResponse>;
+
     #[tracing::instrument(
         name = "grpc.get_available_cameras",
         skip_all,
@@ -135,6 +195,64 @@ impl Broadcast for BroadcastService {
 
         Ok(Response::new(response_impl::camera_switch_position(
             snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.current_camera_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentCameraPosition",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_camera_position(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentCameraPositionResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_camera_position()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_camera_position(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_camera_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentCameraPosition",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_camera_position(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentCameraPositionStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_camera_position().await },
+            response_impl::current_camera_position,
         )))
     }
 
@@ -226,6 +344,62 @@ impl Broadcast for BroadcastService {
     }
 
     #[tracing::instrument(
+        name = "grpc.current_camera_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentCameraState",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_camera_state(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentCameraStateResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_camera_state()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_camera_state(snapshot)))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_camera_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentCameraState",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_camera_state(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentCameraStateStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_camera_state().await },
+            response_impl::current_camera_state,
+        )))
+    }
+
+    #[tracing::instrument(
         name = "grpc.replay_set_play_speed",
         skip_all,
         fields(
@@ -274,6 +448,64 @@ impl Broadcast for BroadcastService {
     }
 
     #[tracing::instrument(
+        name = "grpc.current_replay_play_speed",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentReplayPlaySpeed",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_replay_play_speed(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentReplayPlaySpeedResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_replay_play_speed()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_replay_play_speed(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_replay_play_speed",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentReplayPlaySpeed",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_replay_play_speed(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentReplayPlaySpeedStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_replay_play_speed().await },
+            response_impl::current_replay_play_speed,
+        )))
+    }
+
+    #[tracing::instrument(
         name = "grpc.replay_set_play_position",
         skip_all,
         fields(
@@ -313,6 +545,64 @@ impl Broadcast for BroadcastService {
 
         Ok(Response::new(response_impl::replay_set_play_position(
             snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.current_replay_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentReplayPosition",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_replay_position(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentReplayPositionResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_replay_position()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_replay_position(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_replay_position",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentReplayPosition",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_replay_position(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentReplayPositionStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_replay_position().await },
+            response_impl::current_replay_position,
         )))
     }
 
@@ -483,6 +773,62 @@ impl Broadcast for BroadcastService {
     }
 
     #[tracing::instrument(
+        name = "grpc.current_pit_service",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentPitService",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_pit_service(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentPitServiceResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_pit_service()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_pit_service(snapshot)))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_pit_service",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentPitService",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_pit_service(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentPitServiceStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_pit_service().await },
+            response_impl::current_pit_service,
+        )))
+    }
+
+    #[tracing::instrument(
         name = "grpc.pit_command_stream",
         skip_all,
         fields(
@@ -568,6 +914,64 @@ impl Broadcast for BroadcastService {
     }
 
     #[tracing::instrument(
+        name = "grpc.current_telemetry_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentTelemetryState",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_telemetry_state(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentTelemetryStateResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_telemetry_state()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_telemetry_state(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_telemetry_state",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentTelemetryState",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_telemetry_state(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentTelemetryStateStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_telemetry_state().await },
+            response_impl::current_telemetry_state,
+        )))
+    }
+
+    #[tracing::instrument(
         name = "grpc.force_feedback_command",
         skip_all,
         fields(
@@ -616,6 +1020,64 @@ impl Broadcast for BroadcastService {
                 unreachable!("unknown force feedback command mode is rejected")
             }
         }
+    }
+
+    #[tracing::instrument(
+        name = "grpc.current_force_feedback",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentForceFeedback",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_force_feedback(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentForceFeedbackResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_force_feedback()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_force_feedback(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_force_feedback",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentForceFeedback",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_force_feedback(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentForceFeedbackStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_force_feedback().await },
+            response_impl::current_force_feedback,
+        )))
     }
 
     #[tracing::instrument(
@@ -697,6 +1159,64 @@ impl Broadcast for BroadcastService {
 
         Ok(Response::new(VideoCaptureResponse {}))
     }
+
+    #[tracing::instrument(
+        name = "grpc.current_video_capture",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "CurrentVideoCapture",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn current_video_capture(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<CurrentVideoCaptureResponse>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        let snapshot = self
+            .use_cases
+            .current_video_capture()
+            .await
+            .map_err(Status::from)?;
+
+        Ok(Response::new(response_impl::current_video_capture(
+            snapshot,
+        )))
+    }
+
+    #[tracing::instrument(
+        name = "grpc.subscribe_current_video_capture",
+        skip_all,
+        fields(
+            rpc.system = "grpc",
+            rpc.service = "iracing.broadcast.Broadcast",
+            rpc.method = "SubscribeCurrentVideoCapture",
+            client.address = tracing::field::Empty
+        ),
+        err(level = tracing::Level::WARN)
+    )]
+    async fn subscribe_current_video_capture(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Self::SubscribeCurrentVideoCaptureStream>, Status> {
+        tracing::Span::current().record(
+            "client.address",
+            tracing::field::display(format_args!("{:?}", request.remote_addr())),
+        );
+
+        Ok(Response::new(current_value_stream(
+            Arc::clone(&self.use_cases),
+            |use_cases| async move { use_cases.current_video_capture().await },
+            response_impl::current_video_capture,
+        )))
+    }
 }
 
 #[cfg(test)]
@@ -709,13 +1229,15 @@ mod tests {
 
     use async_trait::async_trait;
     use iracing_sdk::{BroadcastCommand, IRacingSDKError};
+    use tokio_stream::StreamExt;
 
     use super::*;
     use crate::broadcast_app::{
         AvailableCamera, AvailableCameraGroup, BroadcastCommandPort, BroadcastError,
         CameraSelectionExpectation, CameraSelectionSnapshot, CameraStateExpectation,
-        CameraStatePort, CameraStateSnapshot, DisabledObservationPort, ReplayPositionExpectation,
-        ReplayPositionSnapshot, ReplaySpeedExpectation, ReplaySpeedSnapshot, ReplayStatePort,
+        CameraStatePort, CameraStateSnapshot, DisabledObservationPort, ReplayPlayStateSnapshot,
+        ReplayPositionExpectation, ReplayPositionSnapshot, ReplaySpeedExpectation,
+        ReplaySpeedSnapshot, ReplayStatePort,
     };
 
     #[derive(Default)]
@@ -911,6 +1433,21 @@ mod tests {
                 .expect("replay snapshot should be configured")
         }
 
+        async fn play_state_snapshot(&self) -> Result<ReplayPlayStateSnapshot, BroadcastError> {
+            let snapshot = self
+                .snapshots
+                .lock()
+                .expect("replay mutex poisoned")
+                .pop_front()
+                .expect("replay snapshot should be configured")?;
+
+            Ok(ReplayPlayStateSnapshot {
+                speed: snapshot.speed,
+                is_slow_motion: snapshot.is_slow_motion,
+                is_playing: true,
+            })
+        }
+
         async fn wait_for_speed(
             &self,
             _previous: ReplaySpeedSnapshot,
@@ -977,6 +1514,7 @@ mod tests {
                     replay,
                     disabled.clone(),
                     disabled.clone(),
+                    disabled.clone(),
                     disabled,
                     Duration::from_millis(25),
                 )))
@@ -985,6 +1523,7 @@ mod tests {
                 let disabled = Arc::new(DisabledObservationPort);
                 BroadcastService::from_use_cases(Arc::new(BroadcastUseCases::new(
                     commands,
+                    disabled.clone(),
                     disabled.clone(),
                     disabled.clone(),
                     disabled.clone(),
@@ -1036,6 +1575,51 @@ mod tests {
         assert_eq!(response.camera_groups.len(), 1);
         assert_eq!(response.camera_groups[0].number, 4);
         assert_eq!(response.camera_groups[0].cameras[0].number, Some(5));
+    }
+
+    #[tokio::test]
+    async fn subscribe_current_camera_position_emits_initial_value_then_changes() {
+        let commands = Arc::new(FakeCommands::default());
+        let camera = Arc::new(
+            FakeCamera::default()
+                .with_snapshot(Ok(camera_snapshot(7, 42, 4, 5)))
+                .with_snapshot(Ok(camera_snapshot(7, 42, 4, 5)))
+                .with_snapshot(Ok(camera_snapshot(7, 43, 4, 5)))
+                .with_snapshot(Err(BroadcastError::ObservationSourceEnded)),
+        );
+        let replay = Arc::new(FakeReplay::default());
+        let service = service_with(commands, Some(camera), Some(replay));
+
+        let mut stream = service
+            .subscribe_current_camera_position(Request::new(()))
+            .await
+            .expect("subscription should start")
+            .into_inner();
+
+        let first = stream
+            .next()
+            .await
+            .expect("first stream item should exist")
+            .expect("first stream item should be ok");
+        assert_eq!(first.car_index, 42);
+        assert_eq!(first.group, 4);
+        assert_eq!(first.camera, 5);
+
+        let second = stream
+            .next()
+            .await
+            .expect("second stream item should exist")
+            .expect("second stream item should be ok");
+        assert_eq!(second.car_index, 43);
+        assert_eq!(second.group, 4);
+        assert_eq!(second.camera, 5);
+
+        let error = stream
+            .next()
+            .await
+            .expect("terminal stream item should exist")
+            .expect_err("source end should terminate stream with a status");
+        assert_eq!(error.code(), tonic::Code::Unavailable);
     }
 
     #[tokio::test]

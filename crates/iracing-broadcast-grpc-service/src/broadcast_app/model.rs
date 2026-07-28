@@ -49,6 +49,13 @@ pub(crate) struct ReplaySpeedSnapshot {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ReplayPlayStateSnapshot {
+    pub(crate) speed: i32,
+    pub(crate) is_slow_motion: bool,
+    pub(crate) is_playing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ReplaySpeedExpectation {
     pub(crate) speed: i32,
     pub(crate) is_slow_motion: bool,
@@ -101,4 +108,10 @@ pub(crate) struct ForceFeedbackSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct ForceFeedbackExpectation {
     pub(crate) max_force: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct VideoCaptureSnapshot {
+    pub(crate) is_enabled: bool,
+    pub(crate) is_active: bool,
 }
