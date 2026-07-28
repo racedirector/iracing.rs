@@ -1,458 +1,366 @@
 # iRacing Broadcast gRPC Service Architecture
 
-This document describes the architecture of the `iracing-broadcast-grpc-service`
-crate. The service exposes iRacing broadcast controls over gRPC while keeping
-the Win32-specific broadcast transport isolated behind the lower-level
-`iracing-sdk` crate.
+This crate exposes iRacing broadcast controls over gRPC. It separates the
+protobuf boundary, command orchestration, and SDK/live adapters so request
+validation and simulator-specific I/O do not become one monolithic tonic
+service.
 
-The current implementation is primarily a command gateway. Most RPCs validate a
-protobuf request, convert it into an `iracing_sdk::BroadcastCommand`, send that
-command through the Windows broadcast channel, and return an acknowledgement or
-an echo of the accepted request. Several response fields are intentionally
-placeholders until the service is connected to live telemetry/session state that
-can observe the simulator after a command is sent.
+The service has two kinds of operation:
+
+- state-bearing RPCs snapshot simulator data, send a command, and wait for a
+  matching telemetry change;
+- acknowledgement RPCs validate and synchronously send a command without
+  claiming that simulator state was observed.
 
 ## Goals
 
-- Provide a network-accessible gRPC surface for iRacing broadcast commands.
-- Preserve the typed command model from `iracing-sdk` instead of duplicating raw
-  iRacing message packing in the service crate.
-- Keep the server implementation Windows-only because iRacing broadcast
-  messages use Win32 APIs.
-- Keep generated protobuf types and tonic client/server types available to
-  downstream consumers.
-- Offer an ergonomic Rust client wrapper for common broadcast operations while
-  still exposing the generated raw tonic client.
-- Validate all external gRPC input at the service boundary before it reaches the
-  SDK broadcast layer.
+- Keep `proto/broadcast.proto` as the public network contract.
+- Keep raw Win32 broadcast packing in `iracing-sdk`.
+- Validate untrusted protobuf input at the gRPC boundary.
+- Express command sequencing against internal ports that can be faked in tests.
+- Return observed simulator state where the SDK exposes enough telemetry/session
+  data.
+- Keep generated protobuf and tonic client/server types cross-platform.
+- Keep real live composition Windows-only.
 
 ## Non-goals
 
-- This crate does not currently stream live telemetry or session YAML.
-- This crate does not currently prove that iRacing applied a command. It proves
-  that the command request was valid and that the Win32 broadcast send path did
-  not report an error.
-- This crate does not currently discover camera groups, current camera state,
-  pit-service state, replay state, telemetry logging state, or video capture
-  state from the simulator.
-- This crate does not implement authentication, authorization, TLS, rate
-  limiting, or multi-tenant isolation. Those concerns belong in the deployment
-  wrapper until the crate grows first-class support.
+- The server does not provide TLS, authentication, authorization, rate limiting,
+  or tenant isolation.
+- A successful acknowledgement does not prove that iRacing applied a command.
+- State observation is not transactional with command sending.
+- The crate does not replace the SDK's general telemetry streaming APIs.
+- There is no separate ergonomic client wrapper; consumers use
+  `RawBroadcastClient` or generated tonic types directly.
 
-## Crate Layout
+## Source layout
 
 ```text
 crates/iracing-broadcast-grpc-service/
-  Cargo.toml
   build.rs
   proto/
     broadcast.proto
   src/
     lib.rs
-    broadcast_service.rs
-    client.rs
+    broadcast_app/
+      error.rs
+      model.rs
+      ports.rs
+      use_cases.rs
+    broadcast_iracing/
+      command_sender.rs
+      observation.rs
+    broadcast_service/
+      builder.rs
+      command.rs
+      error.rs
+      request.rs
+      response.rs
+      mod.rs
+    telemetry_observer.rs
     bin/
       server.rs
-  docs/
-    architecture.md
+  tests/
+    grpc_transport.rs
 ```
 
-### `proto/broadcast.proto`
+`build.rs` uses `tonic-prost-build` and `protoc-bin-vendored`. Generated code
+lives in `OUT_DIR`; never edit it directly. The embedded descriptor set is
+exported as `FILE_DESCRIPTOR_SET` for reflection.
 
-`broadcast.proto` is the public protocol contract. It defines:
+## Platform split
 
-- Request and response messages for camera, replay, texture, chat, pit,
-  telemetry, force feedback, and video capture commands.
-- Service enums with explicit `UNKNOWN = 0` values.
-- The `Broadcast` service and all unary RPCs plus the client-streaming
-  `PitCommandStream` RPC.
+`lib.rs` always exposes:
 
-The protobuf uses `optional` primitive fields for inputs where absence is
-meaningful. This lets the service distinguish "field omitted" from a primitive
-default such as `0` or `false`, which is important for actionable
-`INVALID_ARGUMENT` errors.
+- generated protobuf messages and enums;
+- `RawBroadcastClient`;
+- the generated `Broadcast` trait and `BroadcastServer`;
+- `FILE_DESCRIPTOR_SET`.
 
-### `build.rs`
+The application, observation, service, and concrete builder modules are
+currently compiled only on Windows. `BroadcastService` and
+`BroadcastServiceBuilder` therefore exist only on Windows.
 
-`build.rs` compiles `proto/broadcast.proto` at build time with
-`tonic-prost-build` and a vendored `protoc` binary from `protoc-bin-vendored`.
-This avoids requiring developers or CI runners to install `protoc` separately.
+The server binary has a non-Windows entry point that returns a clear
+unsupported-platform error.
 
-The generated code is included from `src/lib.rs` with:
-
-```rust
-tonic::include_proto!("iracing.broadcast");
-```
-
-### `src/lib.rs`
-
-`lib.rs` is the crate facade. It:
-
-- Includes the generated protobuf module as `broadcast`.
-- Re-exports generated message, enum, client, service trait, and server types.
-- Re-exports `BroadcastGrpcClient` and `BroadcastGrpcResult` from `client.rs`.
-- Re-exports `BroadcastService` only on Windows.
-
-The server implementation is behind `#[cfg(windows)]` because it depends on
-`iracing_sdk::Broadcast`, which sends Win32 broadcast window messages.
-
-### `src/broadcast_service.rs`
-
-`broadcast_service.rs` contains the server-side implementation and is compiled
-only on Windows. The central type is `BroadcastService`.
-
-Responsibilities:
-
-- Own an `iracing_sdk::Broadcast` client.
-- Implement the generated tonic `Broadcast` trait.
-- Validate protobuf requests and return gRPC `Status` errors for bad input.
-- Convert protobuf enums and messages into SDK command types.
-- Map SDK errors into gRPC status codes.
-- Send accepted commands through `Broadcast::send_message`.
-
-The service is built through `BroadcastService::builder()`. Tests and future
-composition layers can inject an existing SDK broadcast client with
-`BroadcastServiceBuilder::with_client`.
-
-### `src/client.rs`
-
-`client.rs` contains `BroadcastGrpcClient`, an ergonomic Rust wrapper around the
-generated `broadcast_client::BroadcastClient<Channel>`.
-
-Responsibilities:
-
-- Connect to a tonic endpoint.
-- Provide higher-level Rust methods using `iracing_sdk` enum types where useful.
-- Build protobuf request messages with required optional fields populated.
-- Catch unsupported SDK enum sentinels before sending them over gRPC.
-- Expose access to the raw tonic client when callers need lower-level control.
-
-This client is not Windows-only. A Linux or macOS process can use it to call a
-Windows-hosted broadcast server.
-
-### `src/bin/server.rs`
-
-`server.rs` is the executable entry point for the server binary
-`iracing-broadcast-server`.
-
-On Windows it:
-
-1. Initializes `tracing_subscriber`.
-2. Reads `BROADCAST_ADDR`, defaulting to `[::1]:50051`.
-3. Creates a `BroadcastService`.
-4. Starts a tonic transport server and registers `BroadcastServer`.
-
-On non-Windows platforms the binary exits with an unsupported-platform error.
-
-## Runtime Topology
+## Layering
 
 ```text
-Remote client process
-  |
-  | gRPC over HTTP/2
-  v
-iracing-broadcast-server on Windows
-  |
-  | tonic generated server dispatch
-  v
-BroadcastService RPC method
-  |
-  | validate protobuf request
-  | convert protobuf types to iracing-sdk types
-  v
-iracing_sdk::Broadcast::send_message
-  |
-  | RegisterWindowMessageW("IRSDK_BROADCASTMSG")
-  | SendNotifyMessageW(HWND_BROADCAST, ...)
-  v
-iRacing simulator process
+gRPC/HTTP2
+  -> broadcast_service
+       boundary validation
+       protobuf <-> application/SDK conversion
+       tonic Status mapping
+  -> broadcast_app
+       models and expectations
+       command/state ports
+       use-case sequencing
+  -> broadcast_iracing
+       SDK command sender
+       telemetry/session-backed port implementation
+  -> iracing-sdk
+       Win32 broadcast channel
+       live telemetry frames and session YAML
+  -> iRacing
 ```
 
-The gRPC service does not talk to iRacing directly. It delegates the final
-transport hop to `iracing-sdk`, which owns the Win32 message contract and packs
-the iRacing broadcast message id plus three command variables into
-`WPARAM`/`LPARAM`.
+### gRPC adapter: `broadcast_service`
 
-## Request Lifecycle
+`BroadcastService` is intentionally thin. Each RPC:
 
-Every server RPC follows the same high-level lifecycle:
+1. records the remote address and selected request fields in a tracing span;
+2. destructures the protobuf request;
+3. validates and narrows external values;
+4. maps enums/messages to SDK command data;
+5. calls one `BroadcastUseCases` method;
+6. maps the application result to protobuf or tonic `Status`.
 
-1. Tonic receives the protobuf request and dispatches it to `BroadcastService`.
-2. The RPC method destructures the generated request message.
-3. Helper functions validate required fields, numeric ranges, finite floats,
-   and enum values.
-4. The method maps protobuf values into `iracing_sdk` command types.
-5. `send_message` delegates to `iracing_sdk::Broadcast::send_message`.
-6. SDK errors are mapped to gRPC status codes.
-7. The method returns an acknowledgement response.
+Keep protobuf-specific concerns here. Do not put session lookup or frame polling
+inside tonic handlers.
 
-Example path for `ReplaySetPlayPosition`:
+`request.rs` owns boundary primitives such as:
 
-```text
-ReplaySetPlayPositionRequest
-  -> require non-UNKNOWN mode
-  -> require frame
-  -> map ReplayPositionMode to iracing_sdk::ReplayPositionMode
-  -> BroadcastCommand::ReplaySetPlayPosition(mode, frame)
-  -> Broadcast::send_message(command)
-  -> ReplaySetPlayPositionResponse { frame }
-```
+- optional/required `u16`, `i16`, `u32`, string, enum, and float conversion;
+- narrowing range checks;
+- finite-float checks;
+- whole-number float-to-`u16` conversion used by pit commands.
 
-## Protocol Surface
+`command.rs` maps protobuf command enums and messages to SDK types.
+`response.rs` maps observed application snapshots back to protobuf.
 
-The protobuf service currently includes these RPC groups:
+### Application layer: `broadcast_app`
 
-| Group | RPCs | Current behavior |
+`model.rs` defines transport-independent snapshots and expectations for camera,
+replay, pit, telemetry logging, and force feedback.
+
+`ports.rs` defines:
+
+- `BroadcastCommandPort`;
+- `CameraStatePort`;
+- `ReplayStatePort`;
+- `PitStatePort`;
+- `TelemetryStatePort`;
+- `ForceFeedbackStatePort`.
+
+`BroadcastUseCases` depends only on these ports. It owns snapshot/send/wait
+sequencing, optional-field fallback, observation timeout use, and ordered
+multi-command behavior.
+
+`DisabledObservationPort` implements all state ports with
+`ObservationDisabled`. This supports an ack-only service configuration without
+pretending that state-bearing RPCs can work.
+
+### iRacing adapters: `broadcast_iracing`
+
+`IracingBroadcastCommandSender` wraps `iracing_sdk::Broadcast` and implements
+`BroadcastCommandPort`. It delegates message packing and the Win32 send call to
+the SDK.
+
+`IracingObservation` implements all state ports over one shared live provider.
+It:
+
+- validates telemetry adapter capabilities against the provider schema;
+- serializes provider reads behind a Tokio mutex;
+- uses typed telemetry adapters for snapshots and change detection;
+- parses and caches session YAML by version;
+- derives camera groups and car-number/index mappings from session data;
+- converts invalid observed values to `FailedPrecondition`.
+
+### Telemetry observer
+
+`TelemetryObserver` is generic over the provider contract expected by the
+service. It holds a shared provider and schema. `snapshot_observed` reads one
+frame and adapts it. `wait_for_change_matching_observed` reads until:
+
+- the adapted value changes and matches the supplied predicate;
+- the timeout expires;
+- the source ends;
+- the provider returns an SDK error.
+
+The provider mutex prevents concurrent RPCs from reading the same live provider
+simultaneously. It does not globally serialize command sends.
+
+## Service construction
+
+`BroadcastServiceBuilder` defaults to:
+
+- opening a new SDK broadcast client;
+- opening live observation;
+- a two-second observation timeout.
+
+Configuration methods:
+
+- `with_client` injects an existing SDK broadcast client;
+- `with_live_provider` injects an already-created live provider;
+- `with_observation_timeout` changes only state-wait duration;
+- `without_observation` avoids live provider creation and installs disabled
+  state ports.
+
+With observation disabled, acknowledgement RPCs can still send. State-bearing
+RPCs fail with `FAILED_PRECONDITION`.
+
+## Request and response semantics
+
+### State-bearing RPCs
+
+These operations use observation:
+
+| Group | Operations | Returned state |
 | --- | --- | --- |
-| Camera | `GetAvailableCameras`, `CameraSwitchPosition`, `CameraSwitchNumber`, `CameraSetState` | Switch/set commands are sent. Camera discovery and current camera observation are placeholders. |
-| Replay | `ReplaySetPlaySpeed`, `ReplaySetPlayPosition`, `ReplaySearch`, `ReplaySetState`, `ReplaySearchSessionTime` | Replay commands are sent. Observed replay frame/session/time state is not yet read back. |
-| Textures | `ReloadTextures` | Sends either reload-all or reload-by-car-index. |
-| Chat | `ChatCommand` | Sends chat mode commands or validated chat macros. |
-| Pit service | `PitCommand`, `PitCommandStream` | Sends one or more pit commands. Returned pit-service values are placeholders. |
-| Telemetry logging | `TelemetryCommand` | Sends disk telemetry logging command. Returned logging booleans are placeholders. |
-| Force feedback | `ForceFeedbackCommand` | Sends max-force command and echoes the accepted value. |
-| Video capture | `VideoCapture` | Sends video capture command. No capture state is observed yet. |
+| Camera | list cameras, switch by position/number, set state | Camera/session-derived catalog or observed camera selection/state |
+| Replay | set speed, set play position, search | Observed replay speed or position |
+| Pit | unary and streamed pit commands | Observed pit-service snapshot |
+| Telemetry | start/restart/stop logging | Observed logging flags |
+| Force feedback | set max force | Observed max-force value |
 
-`PitCommandStream` is client-streaming because multiple pit-service selections
-are often applied together. The server validates and sends each streamed command
-in order. If a later command is invalid or the SDK send path fails, the stream
-returns an error after any earlier commands have already been sent. There is no
-transactional rollback in the iRacing broadcast channel.
+Optional fields on camera switch/state and replay speed mean "use the current
+observed value." They are not protobuf defaults. This makes a partial request an
+explicit read-modify-command operation.
 
-## Type Mapping
-
-The service intentionally keeps protobuf types separate from SDK types.
-
-Inbound mapping happens in `broadcast_service.rs`:
-
-- Protobuf enums reject `UNKNOWN` before conversion.
-- Protobuf integer fields are range-checked before narrowing to `u16` or `i16`.
-- Protobuf floats must be finite.
-- Pit command float values must represent whole-number values that fit into
-  `u16`, because the underlying SDK pit commands are integer gallon/PSI values.
-- Chat macros must be in the supported `1..=15` range.
-
-Outbound mapping in the current implementation is limited. Most responses are
-empty, echo accepted request data, or use placeholders until simulator state
-observation is implemented.
-
-The ergonomic client performs a complementary mapping in `client.rs`:
-
-- `iracing_sdk` enums are translated into protobuf enums.
-- SDK sentinel variants such as `Last` and `Unknown` are rejected locally.
-- `chat_macro` is separate from `chat_command` so macro commands cannot be sent
-  without a macro number.
-- `pit_command_stream` builds an ordered tonic stream from SDK pit commands.
-
-## Validation and Boundary Rules
-
-The service boundary is the authoritative place for external input validation.
-Generated protobuf types are not trusted just because they were decoded by
-tonic.
-
-Important validation helpers:
-
-- `required_proto_u16`: required `uint32` field narrowed to `u16`.
-- `required_proto_i16`: required `int32` field narrowed to `i16`.
-- `required_proto_bool`: required optional boolean.
-- `required_proto_string`: required non-empty string.
-- `required_proto_enum`: required enum, rejects `UNKNOWN`, rejects invalid
-  numeric enum values.
-- `required_proto_f32`: required finite float.
-- `proto_f32_to_u16`: finite whole-number float narrowed to `u16`.
-- `required_chat_macro`: required chat macro in `1..=15`.
-
-These checks protect the lower SDK layer from invalid gRPC inputs and produce
-client-actionable `INVALID_ARGUMENT` responses.
-
-## Error Handling
-
-Input validation errors are returned as `INVALID_ARGUMENT`.
-
-SDK errors from `iracing_sdk::Broadcast` are mapped by
-`broadcast_error_to_status`:
-
-| SDK error category | gRPC status | Rationale |
-| --- | --- | --- |
-| Connection failure | `UNAVAILABLE` | The broadcast channel cannot currently be used. |
-| Unsupported platform | `FAILED_PRECONDITION` | The server cannot perform Windows-only work on this platform. |
-| Windows API failure | `UNAVAILABLE` | The Win32 broadcast send path failed at runtime. |
-| Retryable buffer or SDK error | `UNAVAILABLE` | Caller may retry after the simulator or environment recovers. |
-| Other SDK error | `INTERNAL` | The request passed service validation but failed unexpectedly below the boundary. |
-
-Each SDK error is logged with `tracing::warn!` and includes whether the SDK
-classified it as retryable. Error messages should remain useful to operators but
-must not include secrets or unrelated process details.
-
-## Platform Boundaries
-
-The service has two distinct platform surfaces:
-
-- Generated protobuf types and the ergonomic gRPC client are cross-platform.
-- `BroadcastService` and the real server implementation are Windows-only.
-
-The platform split is enforced with `#[cfg(windows)]` in `lib.rs`,
-`broadcast_service.rs`, and `server.rs`.
-
-This mirrors the lower-level SDK design:
-
-- `iracing_sdk::BroadcastCommand` is typed command data.
-- `iracing_sdk::Broadcast` is the Windows transport that registers
-  `IRSDK_BROADCASTMSG` and sends `SendNotifyMessageW(HWND_BROADCAST, ...)`.
-
-Any future server feature that touches live iRacing shared memory or broadcast
-messages must stay behind Windows gates. Cross-platform client helpers and
-protobuf definitions should remain portable.
-
-## Build and Code Generation
-
-The crate depends on:
-
-- `tonic` for gRPC transport.
-- `prost` and `tonic-prost` for protobuf message support.
-- `tonic-prost-build` for build-time code generation.
-- `protoc-bin-vendored` so local and CI builds do not depend on a system
-  `protoc`.
-- `tokio` for the async server runtime.
-- `tracing` and `tracing-subscriber` for operational logging.
-
-Build flow:
+Typical lifecycle:
 
 ```text
-cargo build
-  -> build.rs runs
-  -> vendored protoc path is configured
-  -> proto/broadcast.proto is compiled
-  -> generated Rust is placed in OUT_DIR
-  -> tonic::include_proto! includes generated module
+snapshot previous value
+  -> resolve omitted fields
+  -> send BroadcastCommand
+  -> wait for changed matching telemetry
+  -> return observed snapshot
 ```
 
-Because the generated code is derived from `broadcast.proto`, protocol changes
-should be made in the proto first, followed by service implementation, client
-wrapper updates, tests, and documentation updates.
+Replay position/search and pit commands currently wait for any relevant
+snapshot change rather than proving every command parameter directly.
 
-## Operational Model
+### Acknowledgement RPCs
 
-The default server bind address is local-only:
+Replay state, texture reload, chat, replay search-by-session-time, and video
+capture return empty acknowledgement responses after validation and synchronous
+SDK send success. They are not simulator-state confirmation.
+
+### Pit command stream
+
+The tonic adapter reads and validates the complete client stream before invoking
+the use case. It rejects:
+
+- an empty stream with `INVALID_ARGUMENT`;
+- more than 1000 commands with `RESOURCE_EXHAUSTED`.
+
+The use case snapshots pit state, sends buffered commands sequentially, then
+waits for a change. A later send or the final observation can fail after earlier
+commands were sent. There is no rollback.
+
+## Validation rules
+
+- Reject absent required values.
+- Reject protobuf `UNKNOWN` enum values and invalid numeric discriminants.
+- Check every `u32 -> u16` and `i32 -> i16` conversion.
+- Require finite floats.
+- Require pit values represented as floats to be whole numbers that fit `u16`
+  where the SDK command is integer-valued.
+- Keep chat macros in the supported range.
+- Reject empty strings where the operation requires content.
+- Validate the whole pit stream before sending any item.
+
+Bad external input maps to `INVALID_ARGUMENT` except for the explicit stream
+size limit, which maps to `RESOURCE_EXHAUSTED`.
+
+## Error mapping
+
+Application errors map as follows:
+
+| Error | gRPC status |
+| --- | --- |
+| Observation timeout | `DEADLINE_EXCEEDED` |
+| Observation source ended | `UNAVAILABLE` |
+| Observation disabled | `FAILED_PRECONDITION` |
+| Telemetry capability unavailable | `FAILED_PRECONDITION` |
+| Invalid observed/current state | `FAILED_PRECONDITION` |
+
+SDK connection, Windows API, retryable buffer, and other retryable errors map to
+`UNAVAILABLE`. Unsupported platform maps to `FAILED_PRECONDITION`. Unexpected
+non-retryable SDK errors map to `INTERNAL`.
+
+SDK failures are logged with retryability. Error text must remain useful to an
+operator without exposing unrelated process details or secrets.
+
+## Ordering, concurrency, and retries
+
+- Tonic may execute independent RPCs concurrently.
+- Provider reads used for observation are serialized by the observation mutex.
+- SDK command sends are not globally queued.
+- Commands inside one pit stream are sent in stream order.
+- The simulator's handling order is outside this crate's control.
+- Retrying a command RPC may send the command more than once.
+- A timeout happens after the command was sent; it does not undo the command.
+
+If strict global command ordering becomes necessary, add an explicit application
+port/queue and document its backpressure and latency semantics.
+
+## Server runtime
+
+On Windows, `src/bin/server.rs`:
+
+1. initializes tracing from `RUST_LOG` or its built-in filter;
+2. reads `BROADCAST_ADDR`, defaulting to `[::]:50051`;
+3. creates `LiveProvider` and injects it into the service;
+4. builds health and reflection v1/v1alpha services;
+5. creates an IPv4 or dual-stack IPv6 socket;
+6. serves reflection, health, and broadcast services.
+
+The default is an all-interfaces dual-stack bind, not loopback-only. This can
+expose simulator controls to the network. The crate has no built-in security;
+use firewall/network policy, TLS termination, and authentication before exposing
+it outside a trusted host/network.
+
+## Extending the service
+
+For a new command:
+
+1. Change `proto/broadcast.proto`.
+2. Rebuild and use generated types; never edit `OUT_DIR`.
+3. Add boundary validation and protobuf conversion.
+4. Add or extend application models/ports if state is observed.
+5. Implement orchestration in `BroadcastUseCases`.
+6. Implement SDK/live behavior in `broadcast_iracing`.
+7. Map the response and error semantics.
+8. Cover invalid input, omitted-field behavior, send failure, observation
+   timeout/source end, and response mapping.
+9. Update this document and the crate `AGENTS.md`.
+
+For a new observed telemetry shape, implement a small `FrameAdapter`, validate
+it once at observation construction, and keep numeric/semantic conversion at the
+iRacing adapter boundary.
+
+## Testing strategy
+
+- Test use cases with fake command and state ports.
+- Test request/command/response converters at the gRPC boundary.
+- Test telemetry observation with fake providers and minimal schemas.
+- Test transport behavior over a real tonic listener when the platform permits.
+- Keep protocol-generation and raw-client types compiling cross-platform.
+- Run the crate check on Windows because most implementation modules are
+  Windows-gated.
+
+Relevant commands:
 
 ```text
-[::1]:50051
-```
-
-Override it with:
-
-```bash
-BROADCAST_ADDR="0.0.0.0:50051" cargo run -p iracing-broadcast-grpc-service --bin iracing-broadcast-server
-```
-
-Operational considerations:
-
-- Binding to a non-loopback address exposes simulator controls to the network.
-  Put the service behind network controls, TLS termination, or an authenticated
-  proxy before exposing it beyond the local machine.
-- The service currently logs SDK broadcast failures but does not emit metrics.
-  Production wrappers should add request counts, error counts, latency, and
-  command audit logging where appropriate.
-- gRPC calls are not idempotent in the general case. Retrying a command may send
-  the command multiple times.
-- `PitCommandStream` can partially apply commands before failing.
-- The Win32 broadcast channel is asynchronous from the perspective of simulator
-  state. A successful send does not guarantee that the simulator consumed or
-  applied the command.
-
-## Response Semantics
-
-Current responses should be interpreted as command-acceptance responses, not
-authoritative simulator state responses.
-
-Examples:
-
-- `CameraSwitchPositionResponse` echoes the requested group and camera, and uses
-  the requested position as the returned car index.
-- `CameraSwitchNumberResponse` echoes group and camera but does not resolve the
-  car number back to a car index yet.
-- `GetAvailableCamerasResponse` returns no camera groups.
-- `ReplaySearchResponse` returns placeholder frame/session/time values.
-- `PitCommandResponse` returns zeroed placeholder pit-service values.
-- `TelemetryCommandResponse` returns placeholder logging booleans.
-- Empty responses mean the command was validated and sent without a synchronous
-  SDK error.
-
-The TODO comments in `broadcast_service.rs` mark the intended future direction:
-read previous state, send the command, wait for the relevant state change, then
-return observed simulator values.
-
-## Concurrency and Ordering
-
-`BroadcastService` stores a single `iracing_sdk::Broadcast` client and tonic may
-serve multiple RPCs concurrently. The SDK broadcast transport sends each command
-through `SendNotifyMessageW` to `HWND_BROADCAST`; the crate does not currently
-serialize commands across independent RPCs.
-
-Ordering guarantees:
-
-- Commands inside one `PitCommandStream` are processed sequentially in stream
-  order.
-- Independent unary RPCs may be processed concurrently by tonic.
-- iRacing's own handling order is outside this crate's direct control.
-
-If future behavior requires strict global ordering, add an explicit command
-queue in the service layer and document the latency and backpressure policy.
-
-## Extending the Service
-
-When adding a new broadcast command:
-
-1. Add or update the protobuf enum, request, response, and RPC in
-   `proto/broadcast.proto`.
-2. Rebuild to generate updated tonic/prost types.
-3. Add server-side validation and conversion in `broadcast_service.rs`.
-4. Add an ergonomic client method in `client.rs` if the RPC is expected to be
-   commonly used by Rust callers.
-5. Add unit tests for conversion and validation, especially range checks and
-   unsupported enum sentinels.
-6. Update this architecture document if request lifecycle, response semantics,
-   platform support, or operational behavior changes.
-
-When changing response semantics from command-acceptance to observed simulator
-state, add characterization tests for the existing response shape first, then
-introduce the state observation path behind a clearly documented behavior
-change.
-
-## Testing Strategy
-
-Recommended checks for this crate:
-
-```bash
-cargo fmt --all -- --check
 cargo test -p iracing-broadcast-grpc-service
+cargo check -p iracing-broadcast-grpc-service --all-targets
+cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings
 ```
 
-Additional workspace gates before commit or push should match the repository
-quality workflow:
+## Current integration inconsistencies
 
-```bash
-python3 scripts/check_test_fixtures.py
-cargo build --workspace
-cargo test --workspace --all-targets
-cargo check -p iracing-sdk --lib --target wasm32-unknown-unknown --all-features
-```
+The Windows implementation currently does not compile against the SDK facade:
 
-For documentation-only changes, at minimum run formatting or a markdown sanity
-check if one exists. For protocol, client, server, or public API changes, run
-the crate tests and the relevant workspace quality gates.
+- observation code imports and implements an SDK trait named `SendProvider`,
+  while the SDK defines `provider::Provider` and has no `SendProvider`;
+- builder and observation code import `LiveProvider` from the SDK root, while
+  its current path is `iracing_sdk::providers::live::LiveProvider`;
+- observation code imports `SessionInfo` and `SessionInfoParser` from the SDK
+  root, while their current path is `iracing_sdk::schema`.
 
-## Known Gaps and Future Work
-
-- Implement camera group discovery from session data or a live state source.
-- Resolve camera switch responses to observed car index/group/camera values.
-- Observe replay state after replay commands.
-- Observe pit-service state after pit commands and streams.
-- Observe telemetry logging state after telemetry commands.
-- Observe video capture or acknowledgement state if iRacing exposes one.
-- Add integration tests with a fake broadcast transport so server validation and
-  command conversion can be exercised off Windows.
-- Add optional TLS/authentication guidance or first-class server configuration
-  before recommending non-loopback deployments.
-- Add metrics and structured command audit logs for operational support.
+Do not work around these mismatches in protobuf or tonic code. Align the SDK
+provider contract and adapter imports, restore the Windows build, then update
+this section.
