@@ -82,24 +82,24 @@ Dropping a high-level connection cancels its task through a
 The internal `TelemetryBuilder` makes delivery and session policies independent.
 Its defaults are `LatestDelivery` and `LiveSessionPolicy`.
 
-## Delivery policies and current status
+## Delivery policies
 
 `LatestDelivery` stores `Option<Arc<FramePacket>>` in a Tokio watch channel.
 Each frame replaces the previous snapshot. This is correct for live state:
 consumers care about the newest value and may intentionally miss intermediate
 ticks.
 
-`OnDemandDelivery` is implemented around an mpsc request queue and one-shot
-responses. One demand authorizes exactly one provider read, so it is the intended
-lossless/backpressured model for recorded replay.
+`OnDemandDelivery` uses an mpsc request queue and one-shot responses. One demand
+authorizes exactly one provider read. `Telemetry::spawn_ibt` selects this policy
+and returns its request handle to `IbtConnection`.
 
-The recorded migration is currently incomplete. `Telemetry::spawn_ibt`
-customizes `IbtSessionPolicy` but does not select `OnDemandDelivery`, and
-`IbtConnection` still consumes a watch receiver. Because `IbtProvider` can run
-without source pacing, a subscriber can observe only the latest retained frame.
-Do not claim `IbtConnection` is lossless until the spawn path and connection API
-are wired to demand and exact-frame tests pass. The direct `IbtReader` path
-remains the reliable sequential iterator.
+`IbtConnection` places a coordinated watch bridge above that request handle.
+The connection starts explicitly, maintains one shared IBT cursor, and publishes
+one retained frame to every active subscription. A subscription acknowledges its
+current frame when it is polled for the next item. The bridge sends another
+demand only after every active subscription has acknowledged the retained frame.
+Dropping the final subscription parks the cursor without closing the connection;
+a later subscriber receives the retained frame and can resume replay.
 
 ## Session policies
 
@@ -127,8 +127,11 @@ recording metadata have different lifecycle requirements.
 - spawn the telemetry task;
 - expose typed frame subscriptions and session update streams;
 - retain current frame/session snapshots;
-- normalize `UpdateRate` against source frequency;
 - cancel background work on drop.
+
+`LiveConnection` normalizes `UpdateRate` against source frequency and applies
+latest-wins throttling. `IbtConnection` does not accept an update rate: recorded
+delivery is paced by its coordinated subscriber acknowledgement barrier.
 
 `LiveConnection` has a portable non-Windows stub whose builder returns an
 unsupported-platform error. The actual fields and subscription methods exist
@@ -159,7 +162,8 @@ Invariants:
 
 ## Rate limiting
 
-`UpdateRate::Native` forwards source cadence. `UpdateRate::Max(hz)` applies the
-custom `ThrottleExt` stream after frame delivery. Throttling and delivery loss
-are separate concerns: a source can already have dropped frames before a
-subscriber-level throttle runs.
+For live telemetry, `UpdateRate::Native` forwards source cadence and
+`UpdateRate::Max(hz)` applies the custom `ThrottleExt` stream after frame
+delivery. Throttling and delivery loss are separate concerns: a live source can
+already have dropped frames before a subscriber-level throttle runs.
+Coordinated IBT subscriptions do not use this throttle.

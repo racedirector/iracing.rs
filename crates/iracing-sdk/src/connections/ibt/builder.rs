@@ -1,10 +1,8 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use crate::{Result, providers::ibt::IbtProvider};
 
 use super::IbtConnection;
-
-const DEFAULT_FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Type state indicating that an [`IbtConnectionBuilder`] has no source yet.
 #[derive(Debug, Default)]
@@ -36,26 +34,11 @@ pub struct ProviderSource {
 /// ```
 pub struct IbtConnectionBuilder<Source = NoSource> {
     source: Source,
-    first_frame_timeout: Duration,
 }
 
 impl Default for IbtConnectionBuilder<NoSource> {
     fn default() -> Self {
-        Self {
-            source: NoSource,
-            first_frame_timeout: DEFAULT_FIRST_FRAME_TIMEOUT,
-        }
-    }
-}
-
-impl<Source> IbtConnectionBuilder<Source> {
-    /// Set how long the connection waits for its first telemetry frame.
-    ///
-    /// The connection is still returned if this duration elapses. A zero
-    /// duration skips the wait and returns as soon as telemetry is spawned.
-    pub fn with_first_frame_timeout(mut self, timeout: Duration) -> Self {
-        self.first_frame_timeout = timeout;
-        self
+        Self { source: NoSource }
     }
 }
 
@@ -64,7 +47,6 @@ impl IbtConnectionBuilder<NoSource> {
     pub fn with_path<P: Into<PathBuf>>(self, path: P) -> IbtConnectionBuilder<PathSource> {
         IbtConnectionBuilder {
             source: PathSource { path: path.into() },
-            first_frame_timeout: self.first_frame_timeout,
         }
     }
 
@@ -72,7 +54,6 @@ impl IbtConnectionBuilder<NoSource> {
     pub fn with_provider(self, provider: IbtProvider) -> IbtConnectionBuilder<ProviderSource> {
         IbtConnectionBuilder {
             source: ProviderSource { provider },
-            first_frame_timeout: self.first_frame_timeout,
         }
     }
 }
@@ -82,14 +63,14 @@ impl IbtConnectionBuilder<PathSource> {
     pub async fn build(self) -> Result<IbtConnection> {
         tracing::info!("Opening IBT file: {}", self.source.path.display());
         let provider = IbtProvider::open(self.source.path)?;
-        IbtConnection::from_provider(provider, self.first_frame_timeout).await
+        IbtConnection::from_provider(provider).await
     }
 }
 
 impl IbtConnectionBuilder<ProviderSource> {
     /// Build an [`IbtConnection`] from the configured provider.
     pub async fn build(self) -> Result<IbtConnection> {
-        IbtConnection::from_provider(self.source.provider, self.first_frame_timeout).await
+        IbtConnection::from_provider(self.source.provider).await
     }
 }
 
@@ -97,21 +78,6 @@ impl IbtConnectionBuilder<ProviderSource> {
 mod tests {
     use super::*;
     use test_utils::require_smallest_ibt_fixture;
-
-    #[test]
-    fn defaults_to_five_second_first_frame_timeout() {
-        let builder = IbtConnectionBuilder::default();
-        assert_eq!(builder.first_frame_timeout, Duration::from_secs(5));
-    }
-
-    #[test]
-    fn timeout_override_survives_source_transition() {
-        let builder = IbtConnectionBuilder::default()
-            .with_first_frame_timeout(Duration::from_millis(25))
-            .with_path("telemetry.ibt");
-
-        assert_eq!(builder.first_frame_timeout, Duration::from_millis(25));
-    }
 
     #[tokio::test]
     async fn path_source_builds_connection() -> Result<()> {

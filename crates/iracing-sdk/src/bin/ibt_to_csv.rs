@@ -6,8 +6,8 @@
 //! - Converting an `.ibt` file into a standalone CSV file for sharing.
 //!
 //! # Behavior
-//! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
-//! - Streams frame packets through an [`iracing_sdk::providers::ibt::IbtProvider`]
+//! - Opens and streams every frame through a coordinated
+//!   [`iracing_sdk::IbtConnection`]
 //! - Reads the selected variables from each packet and writes them to a CSV
 //!
 //! # Logging
@@ -49,7 +49,8 @@ mod csv_telemetry_writer;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use iracing_sdk::{VariableInfo, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider};
+use futures::StreamExt;
+use iracing_sdk::{DynamicFrame, IbtConnection, VariableInfo};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -91,17 +92,20 @@ async fn main() -> Result<()> {
     // Open telemetry reader.
     // ------------------------------------------------------------
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
-    let reader = IbtReader::open(&ibt_path).context("Failed to open IBT file")?;
+    let connection = IbtConnection::builder()
+        .with_path(&ibt_path)
+        .build()
+        .await
+        .context("Failed to open IBT file")?;
 
     // Clone and sort variables for deterministic column ordering.
-    let mut variables: Vec<VariableInfo> = reader.variables().variables.values().cloned().collect();
+    let mut variables: Vec<VariableInfo> =
+        connection.schema().variables.values().cloned().collect();
     variables.sort_unstable_by(|left, right| {
         left.offset
             .cmp(&right.offset)
             .then_with(|| left.name.cmp(&right.name))
     });
-
-    let mut provider = IbtProvider::from_reader(reader);
 
     tracing::info!(path = %output_path.display(), "Creating CSV output");
     let mut writer = CsvTelemetryWriter::builder()
@@ -120,8 +124,11 @@ async fn main() -> Result<()> {
     // ------------------------------------------------------------
     let mut frame_count = 0usize;
 
-    while let Some(packet) = provider.next_frame().await? {
-        writer.write_telemetry(&packet)?;
+    let mut frames = Box::pin(connection.subscribe::<DynamicFrame>());
+    connection.start()?;
+
+    while let Some(frame) = frames.next().await {
+        writer.write_telemetry(&frame)?;
         frame_count += 1;
 
         if frame_count.is_multiple_of(10_000) {

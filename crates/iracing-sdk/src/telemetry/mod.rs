@@ -164,6 +164,11 @@ impl Telemetry {
                         break;
                     }
 
+                    if !delivery.error(permit, e).await {
+                        sessions.end().await;
+                        break;
+                    }
+
                     // Exponential backoff before next loop.
                     let backoff = std::time::Duration::from_millis(50 * (1 << error_count.min(5)));
                     tokio::time::sleep(backoff).await;
@@ -201,7 +206,7 @@ mod tests {
 
     use crate::{FramePacket, Result, VariableSchema, provider::Provider};
 
-    use super::{ReplayDemand, Telemetry};
+    use super::{ReplayDemand, Telemetry, TelemetryChannels};
 
     /// Construct the smallest valid packet needed by the telemetry task.
     ///
@@ -226,14 +231,26 @@ mod tests {
     struct FiniteProvider {
         next_tick: u32,
         frame_count: u32,
+        session_yaml: Option<&'static str>,
+        reads: mpsc::UnboundedSender<Option<u32>>,
     }
 
     impl FiniteProvider {
-        fn new(frame_count: u32) -> Self {
-            Self {
-                next_tick: 0,
-                frame_count,
-            }
+        fn new(
+            frame_count: u32,
+            session_yaml: Option<&'static str>,
+        ) -> (Self, mpsc::UnboundedReceiver<Option<u32>>) {
+            let (reads, observed_reads) = mpsc::unbounded_channel();
+
+            (
+                Self {
+                    next_tick: 0,
+                    frame_count,
+                    session_yaml,
+                    reads,
+                },
+                observed_reads,
+            )
         }
     }
 
@@ -241,17 +258,19 @@ mod tests {
     impl Provider for FiniteProvider {
         async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
             if self.next_tick >= self.frame_count {
+                let _ = self.reads.send(None);
                 return Ok(None);
             }
 
             let tick = self.next_tick;
             self.next_tick += 1;
+            let _ = self.reads.send(Some(tick));
 
             Ok(Some(live_frame(tick, 0)))
         }
 
         async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-            Ok(None)
+            Ok(self.session_yaml.map(str::to_owned))
         }
 
         fn tick_rate(&self) -> f64 {
@@ -259,47 +278,134 @@ mod tests {
         }
     }
 
-    /// Assert that the first replay demand receives frame zero.
+    /// Ask the IBT frame channel to perform one provider read.
     ///
-    /// The timeout prevents a broken telemetry task from hanging the test
-    /// suite. Channel closure is reported separately from a timeout so a
-    /// developer can tell whether the producer stopped or merely stalled.
-    async fn assert_subscriber_receives_first_frame(frame_count: u32) {
-        let channels = Telemetry::spawn_ibt(FiniteProvider::new(frame_count));
+    /// Unlike the live watch channel, the IBT frame handle is a request sender.
+    /// The one-shot response pairs this demand with exactly one frame, EOF, or
+    /// provider error.
+    async fn request_ibt_frame(frames: &mpsc::Sender<ReplayDemand>) -> Result<Option<FramePacket>> {
         let (response_tx, response_rx) = oneshot::channel();
 
-        channels
-            .frames
+        frames
             .send(ReplayDemand {
                 response: response_tx,
             })
             .await
             .expect("telemetry should accept one replay demand");
 
-        let first = tokio::time::timeout(Duration::from_secs(1), response_rx)
+        tokio::time::timeout(Duration::from_secs(1), response_rx)
             .await
-            .expect("subscriber should not time out waiting for the first frame")
+            .expect("subscriber should not time out waiting for the replay response")
             .expect("telemetry should answer the replay demand")
-            .expect("the first provider read should succeed")
-            .expect("telemetry should publish a frame before ending");
-
-        assert_eq!(first.tick, 0, "subscriber should receive the first frame");
-        channels.cancel.cancel();
     }
 
     #[tokio::test]
-    async fn subscriber_receives_first_frame_from_one_frame_provider() {
-        assert_subscriber_receives_first_frame(1).await;
+    async fn ibt_frame_channel_reads_one_ordered_frame_per_demand() {
+        // Arrange: an IBT provider is finite and eager, but the telemetry task
+        // must not touch it until the consumer requests a frame.
+        let (provider, mut reads) = FiniteProvider::new(3, None);
+        let channels = Telemetry::spawn_ibt(provider);
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), reads.recv())
+                .await
+                .is_err(),
+            "the IBT cursor should remain parked while there is no demand"
+        );
+
+        // Act and assert: every request receives the next recorded frame. The
+        // task parks again after each response instead of reading ahead.
+        for expected_tick in 0..3 {
+            let frame = request_ibt_frame(&channels.frames)
+                .await
+                .expect("the IBT provider read should succeed")
+                .expect("a frame should remain in the recording");
+
+            assert_eq!(frame.tick, expected_tick);
+            assert_eq!(reads.recv().await, Some(Some(expected_tick)));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), reads.recv())
+                    .await
+                    .is_err(),
+                "one demand should authorize only one provider read"
+            );
+        }
+
+        // EOF is also delivered in response to a demand; it never replaces a
+        // frame that was already returned to the consumer.
+        assert!(
+            request_ibt_frame(&channels.frames)
+                .await
+                .expect("the EOF read should succeed")
+                .is_none()
+        );
+        assert_eq!(reads.recv().await, Some(None));
     }
 
     #[tokio::test]
-    async fn subscriber_receives_first_frame_from_two_frame_provider() {
-        assert_subscriber_receives_first_frame(2).await;
+    async fn ibt_session_channel_is_ready_before_frames_and_retained_after_eof() {
+        // IBT session YAML describes the whole recording. It is published once
+        // during startup, without requiring a frame demand.
+        let (provider, _reads) = FiniteProvider::new(
+            1,
+            Some(include_str!(
+                "../../../../test-data/session-yaml/profile_small.yaml"
+            )),
+        );
+        let channels = Telemetry::spawn_ibt(provider);
+        let mut sessions = channels.sessions.clone();
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while sessions.borrow_and_update().is_none() {
+                sessions
+                    .changed()
+                    .await
+                    .expect("IBT session channel should remain connected");
+            }
+        })
+        .await
+        .expect("IBT session metadata should be published during startup");
+
+        let session = sessions
+            .borrow()
+            .clone()
+            .expect("the parsed IBT session should be available");
+
+        assert!(
+            request_ibt_frame(&channels.frames)
+                .await
+                .expect("the frame read should succeed")
+                .is_some()
+        );
+        assert!(
+            request_ibt_frame(&channels.frames)
+                .await
+                .expect("the EOF read should succeed")
+                .is_none()
+        );
+        assert!(
+            Arc::ptr_eq(
+                &session,
+                sessions
+                    .borrow()
+                    .as_ref()
+                    .expect("EOF should retain the immutable IBT session")
+            ),
+            "IBT session metadata should remain the same snapshot after EOF"
+        );
     }
 
     #[tokio::test]
-    async fn subscriber_receives_first_frame_from_many_frame_provider() {
-        assert_subscriber_receives_first_frame(48).await;
+    async fn ibt_cancellation_closes_the_pending_frame_channel() {
+        // With no demand outstanding, cancellation wakes the parked telemetry
+        // task and drops the receiving side of the request channel.
+        let (provider, _reads) = FiniteProvider::new(1, None);
+        let TelemetryChannels { frames, cancel, .. } = Telemetry::spawn_ibt(provider);
+
+        cancel.cancel();
+        tokio::time::timeout(Duration::from_secs(1), frames.closed())
+            .await
+            .expect("cancellation should close the IBT frame request channel");
     }
 
     /// A controllable approximation of `LiveProvider`.

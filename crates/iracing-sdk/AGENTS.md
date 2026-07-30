@@ -5,7 +5,6 @@
 - `cargo test -p iracing-sdk --all-targets` runs the crate test suite; add `-- types::tests::bitfield_constructor_works` to laser in on a single test.
 - `cargo test -p iracing-sdk --doc` followed by `RUSTDOCFLAGS="-D warnings" cargo doc -p iracing-sdk --no-deps` mirrors this crate's docs CI job.
 - `cargo check -p iracing-sdk --examples --bins` catches example/bin drift early.
-- `cargo check -p iracing-sdk --lib --target wasm32-unknown-unknown --all-features` mirrors the workspace wasm compatibility gate.
 - Enable schema tools with `cargo build -p iracing-sdk --features codegen,schema-discovery` when generating schema outputs.
 
 ## Key APIs & Layout
@@ -15,8 +14,8 @@
 - `schema/session/`: `SessionInfoParser` caches YAML; only re-parse when `session_version` changes.
 - `schema/header.rs` and `schema/variables.rs`: Windows-only live schema discovery for shared-memory headers and variable definitions.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
-- `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. Both currently expose watch-backed latest snapshots; do not describe `IbtConnection` as lossless without completing the on-demand wiring.
-- `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the active default. `OnDemandDelivery` exists for replay but is not currently selected by `Telemetry::spawn_ibt`.
+- `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. `IbtConnection` coordinates one shared cursor across acknowledged subscribers; `LiveConnection` exposes watch-backed latest snapshots.
+- `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.
 - `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `DefaultValue`, and `SchemaProvider` support typed per-frame extraction.
 - `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code, and broadcast helpers. Keep everything behind `#[cfg(windows)]`.
 - `src/bin/`: CLI and schema-generation binaries; codegen binaries require the `codegen` feature, and discovery overlays require `schema-discovery`.
@@ -28,7 +27,7 @@
 ## Platform & Feature Guardrails
 
 - Gate actual shared-memory, live-provider, and Win32 broadcast transports with `#[cfg(windows)]`. Keep portable typed commands and the non-Windows `LiveConnection` builder stub available where the public API already promises them.
-- Recorded and live sources need different delivery semantics, but the transition is incomplete: `OnDemandDelivery` is implemented while `spawn_ibt` and `IbtConnection` remain watch-backed. Treat the red characterization tests and `docs/review-2026-07-22.md` as evidence of the gap.
+- Recorded and live sources have different delivery semantics. IBT replay is explicitly started and advances one shared cursor only after every active subscription asks for its next item; live delivery remains latest-wins.
 - Tokio is a target-specific internal dependency: native targets use full Tokio, while `wasm32` builds are limited to Tokio's WASM-safe subset.
 - Only gate APIs that require incompatible Tokio runtime behavior; `tokio::sync` usage can stay in shared code.
 
