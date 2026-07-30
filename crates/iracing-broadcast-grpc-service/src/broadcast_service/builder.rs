@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{BroadcastService, DEFAULT_OBSERVATION_TIMEOUT};
-use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError, LiveProvider};
+use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError, providers::live::LiveProvider};
 
 /// Builder for a Windows live [`BroadcastService`].
 ///

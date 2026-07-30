@@ -7,8 +7,16 @@ use super::LiveConnection;
 
 /// Builder for a [`LiveConnection`].
 ///
-/// On Windows, the default builder creates a [`LiveProvider`] with its default
-/// connection policy. Use `with_provider` to supply a customized provider.
+#[cfg_attr(
+    windows,
+    doc = "On Windows, the default builder creates a [`LiveProvider`] with its default \
+           connection policy. Use `with_provider` to supply a customized provider."
+)]
+#[cfg_attr(
+    not(windows),
+    doc = "On Windows, the default builder creates a `LiveProvider` with its default \
+           connection policy. Use `with_provider` to supply a customized provider."
+)]
 ///
 /// ```no_run
 /// # #[cfg(windows)]

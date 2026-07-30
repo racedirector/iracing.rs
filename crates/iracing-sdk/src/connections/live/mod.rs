@@ -125,6 +125,11 @@ impl LiveConnection {
         self.sessions.borrow().clone()
     }
 
+    /// Get the latest frame (if available)
+    pub fn current_frame(&self) -> Option<Arc<FramePacket>> {
+        self.frames.borrow().clone()
+    }
+
     /// Get the source telemetry frequency
     pub fn source_hz(&self) -> f64 {
         self.source_hz

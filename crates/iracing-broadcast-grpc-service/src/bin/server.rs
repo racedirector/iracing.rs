@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use iracing_broadcast_grpc_service::{BroadcastServer, BroadcastService, FILE_DESCRIPTOR_SET};
 
 #[cfg(windows)]
-use iracing_sdk::LiveProvider;
+use iracing_sdk::providers::live::LiveProvider;
 
 #[cfg(windows)]
 use socket2::{Domain, Protocol, Socket, Type};

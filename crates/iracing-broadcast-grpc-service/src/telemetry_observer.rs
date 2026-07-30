@@ -1,6 +1,6 @@
 use std::{error::Error as StdError, fmt, sync::Arc, time::Duration};
 
-use iracing_sdk::{FrameAdapter, IRacingSDKError, SendProvider, VariableSchema};
+use iracing_sdk::{FrameAdapter, IRacingSDKError, VariableSchema, provider::Provider};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, iracing_sdk::IRacingTelemetryFrame)]
@@ -154,7 +154,7 @@ impl<P> Clone for TelemetryObserver<P> {
 
 impl<P> TelemetryObserver<P>
 where
-    P: SendProvider,
+    P: Provider,
 {
     pub(crate) fn new(provider: Arc<Mutex<P>>, schema: Arc<VariableSchema>) -> Self {
         Self { provider, schema }
@@ -176,7 +176,7 @@ where
     {
         let validation = A::validate_schema(&self.schema)?;
         let mut provider = self.provider.lock().await;
-        let packet = SendProvider::next_frame_send(&mut *provider)
+        let packet = Provider::next_frame(&mut *provider)
             .await?
             .ok_or(TelemetryObserverError::EndOfSource)?;
 
@@ -207,7 +207,7 @@ where
             let remaining = deadline.saturating_duration_since(now);
             let next_frame = {
                 let mut provider = self.provider.lock().await;
-                tokio::time::timeout(remaining, SendProvider::next_frame_send(&mut *provider)).await
+                tokio::time::timeout(remaining, Provider::next_frame(&mut *provider)).await
             };
 
             let packet = match next_frame {
@@ -238,7 +238,8 @@ mod tests {
 
     use async_trait::async_trait;
     use iracing_sdk::{
-        FramePacket, IRacingSDKError, SendProvider, VariableInfo, VariableSchema, VariableType,
+        FramePacket, IRacingSDKError, VariableInfo, VariableSchema, VariableType,
+        provider::Provider,
     };
     use tokio::sync::Mutex;
 
@@ -253,7 +254,7 @@ mod tests {
 
     impl<P> BroadcastRpcHarness<P>
     where
-        P: SendProvider,
+        P: Provider,
     {
         async fn camera_snapshot(
             &self,
@@ -300,8 +301,8 @@ mod tests {
     }
 
     #[async_trait]
-    impl SendProvider for FakeProvider {
-        async fn next_frame_send(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
+    impl Provider for FakeProvider {
+        async fn next_frame(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
             match self
                 .frames
                 .pop_front()
@@ -315,11 +316,12 @@ mod tests {
             }
         }
 
-        async fn session_yaml_send(
-            &mut self,
-            _version: u32,
-        ) -> iracing_sdk::Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> iracing_sdk::Result<Option<String>> {
             Ok(None)
+        }
+
+        fn tick_rate(&self) -> f64 {
+            60.0
         }
     }
 

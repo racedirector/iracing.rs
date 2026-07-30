@@ -75,8 +75,6 @@ For detailed RPC semantics, validation/status mapping, partial-application
 behavior, and extension steps, read the crate-local
 [architecture document](../../crates/iracing-broadcast-grpc-service/docs/architecture.md).
 
-The current Windows implementation has a known SDK facade mismatch:
-`SendProvider` does not exist, and live/session types are imported from stale
-root paths. The crate-local document records the exact current failures. Treat
-the layering above as implemented structure, but do not treat the Windows build
-as green until those imports and the provider contract are reconciled.
+The Windows observation implementation uses the SDK's `Provider` contract,
+imports `LiveProvider` from its live-provider module, and imports session types
+from the schema module.

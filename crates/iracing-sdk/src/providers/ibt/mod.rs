@@ -8,6 +8,7 @@ use crate::{FramePacket, Result, VariableSchema, ibt::IbtReader, provider::Provi
 pub struct IbtProvider {
     reader: IbtReader,
     schema: Arc<VariableSchema>,
+    tick_rate: f64,
 }
 
 impl IbtProvider {
@@ -18,13 +19,23 @@ impl IbtProvider {
 
     /// Create a replay provider from an already-opened reader.
     pub fn from_reader(reader: IbtReader) -> Self {
+        let tick_rate = reader.tick_rate();
         let schema = Arc::new(reader.variables().clone());
-        Self { reader, schema }
+        Self {
+            reader,
+            schema,
+            tick_rate,
+        }
     }
 
     /// Returns a shared reference to the telemetry variable schema.
     pub fn schema(&self) -> Arc<VariableSchema> {
         Arc::clone(&self.schema)
+    }
+
+    /// Seek to a specific frame
+    pub fn seek_to_frame(&mut self, frame: usize) -> Result<()> {
+        self.reader.seek_to_frame(frame)
     }
 
     /// Returns the index of the next frame that will be read (0-based).
@@ -35,6 +46,16 @@ impl IbtProvider {
     /// Returns the total number of telemetry frames in the file.
     pub fn total_frames(&self) -> usize {
         self.reader.total_frames()
+    }
+
+    /// Get current playback time in seconds.
+    pub fn current_time(&self) -> f64 {
+        self.current_frame() as f64 / self.tick_rate
+    }
+
+    /// Get total duration in seconds.
+    pub fn duration(&self) -> f64 {
+        self.total_frames() as f64 / self.tick_rate
     }
 }
 
@@ -73,7 +94,7 @@ impl Provider for IbtProvider {
     }
 
     fn tick_rate(&self) -> f64 {
-        self.reader.tick_rate()
+        self.tick_rate
     }
 }
 

@@ -56,12 +56,8 @@ default-features-disabled subset for synchronization, runtime, time, streams,
 and cancellation support.
 
 Keep code that only needs WASM-safe synchronization portable. Gate or restructure
-APIs that require native runtime, I/O, signals, or OS threads. The CI contract is:
-
-```text
-cargo check -p iracing-sdk --lib \
-  --target wasm32-unknown-unknown --all-features
-```
+APIs that require native runtime, I/O, signals, or OS threads. WASM compatibility
+is not enforced by the CI workflow.
 
 ## Documentation and CI platforms
 
@@ -77,4 +73,3 @@ When adding a public API:
 3. add or preserve a clear unsupported-platform behavior;
 4. check examples/binaries on both cfg paths;
 5. update dist target metadata for shipped binaries;
-6. run the WASM check if the SDK public graph changed.

@@ -14,7 +14,7 @@ Cheat sheet for agents editing `crates/iracing-broadcast-grpc-service`.
 - `cargo check -p iracing-broadcast-grpc-service --all-targets` catches library, bin, and test drift.
 - `cargo run -p iracing-broadcast-grpc-service --bin iracing-broadcast-server` starts the server on Windows; non-Windows exits with an unsupported-platform error.
 - `BROADCAST_ADDR="[::1]:50051" cargo run -p iracing-broadcast-grpc-service --bin iracing-broadcast-server` overrides the bind address.
-- Before committing broader changes, run the root quality gates from `/AGENTS.md`, especially formatting, clippy, workspace tests, and the wasm compatibility check.
+- Before committing broader changes, run the root quality gates from `/AGENTS.md`, especially formatting, clippy, and workspace tests.
 
 ## Crate Layout
 
@@ -63,4 +63,3 @@ Cheat sheet for agents editing `crates/iracing-broadcast-grpc-service`.
 - Server behavior that depends on `iracing_sdk::Broadcast` is Windows-only; preserve cross-platform compilation with cfg gates.
 - For new broadcast commands, cover enum sentinel rejection, optional/current-state semantics, required-field errors, numeric range checks, finite-float checks, observation timeout/error mapping, and response mapping.
 - Protocol, public API, response-semantics, or operational changes should update `docs/architecture.md` in the same change.
-- Current Windows compilation is broken at the SDK integration boundary: `SendProvider` is not exported or defined by `iracing-sdk`, and `LiveProvider`, `SessionInfo`, and `SessionInfoParser` are imported from stale root paths instead of their current modules. Fix that contract before interpreting service tests as representative.

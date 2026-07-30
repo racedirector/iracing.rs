@@ -84,6 +84,7 @@ async fn run() -> Result<()> {
         .build()?;
 
     let connection = LiveConnection::builder().with_provider(provider).build()?;
+    let mut stream = connection.subscribe::<DynamicFrame>(iracing_sdk::UpdateRate::Native);
 
     tracing::info!(path = %output_path.display(), "Creating CSV output");
     let mut writer = CsvTelemetryWriter::builder()
@@ -98,7 +99,6 @@ async fn run() -> Result<()> {
     );
 
     let mut frame_count = 0usize;
-    let mut stream = connection.subscribe::<DynamicFrame>(iracing_sdk::UpdateRate::Native);
     while let Some(frame) = stream.next().await {
         writer.write_telemetry(&frame)?;
         frame_count += 1;

@@ -80,9 +80,6 @@ cargo clippy --workspace --all-targets --all-features --keep-going -- -D warning
 cargo test --workspace --all-targets
 ```
 
-A separate Ubuntu job checks the SDK library for
-`wasm32-unknown-unknown --all-features`.
-
 The docs workflow conditionally runs doctests, rustdoc with warnings denied, and
 examples/binaries checks for `iracing-sdk`, `iracing-sdk-derive`, and
 `iracing-simulation` on Ubuntu and Windows.

@@ -350,17 +350,10 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings
 ```
 
-## Current integration inconsistencies
+## SDK provider integration
 
-The Windows implementation currently does not compile against the SDK facade:
-
-- observation code imports and implements an SDK trait named `SendProvider`,
-  while the SDK defines `provider::Provider` and has no `SendProvider`;
-- builder and observation code import `LiveProvider` from the SDK root, while
-  its current path is `iracing_sdk::providers::live::LiveProvider`;
-- observation code imports `SessionInfo` and `SessionInfoParser` from the SDK
-  root, while their current path is `iracing_sdk::schema`.
-
-Do not work around these mismatches in protobuf or tonic code. Align the SDK
-provider contract and adapter imports, restore the Windows build, then update
-this section.
+The Windows observation implementation uses `iracing_sdk::provider::Provider`
+directly. Live composition imports `LiveProvider` from
+`iracing_sdk::providers::live`, while session parsing uses the types in
+`iracing_sdk::schema`. Keep these adapter imports aligned with the SDK modules
+rather than introducing a second provider contract in the gRPC crate.

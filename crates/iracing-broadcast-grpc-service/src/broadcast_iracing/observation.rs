@@ -5,8 +5,10 @@ use std::{
 
 use async_trait::async_trait;
 use iracing_sdk::{
-    CameraState, FrameAdapter, LiveProvider, SendProvider, SessionInfo, SessionInfoParser,
-    VariableSchema,
+    CameraState, FrameAdapter, VariableSchema,
+    provider::Provider,
+    providers::live::LiveProvider,
+    schema::{SessionInfo, SessionInfoParser},
 };
 use tokio::sync::Mutex;
 
@@ -56,7 +58,7 @@ impl IracingObservation<LiveProvider> {
 
 impl<P> IracingObservation<P>
 where
-    P: SendProvider + Send + 'static,
+    P: Provider,
 {
     pub(crate) fn from_provider(provider: P, schema: Arc<VariableSchema>) -> Self {
         let provider = Arc::new(Mutex::new(provider));
@@ -144,7 +146,7 @@ where
 
         let yaml = {
             let mut provider = self.provider.lock().await;
-            SendProvider::session_yaml_send(&mut *provider, version).await?
+            Provider::session_yaml(&mut *provider, version).await?
         };
 
         let yaml = yaml.ok_or_else(|| {
@@ -196,7 +198,7 @@ fn camera_state_matches_expectation(
 #[async_trait]
 impl<P> CameraStatePort for IracingObservation<P>
 where
-    P: SendProvider + Send + Sync + 'static,
+    P: Provider + Sync,
 {
     async fn selection_snapshot(&self) -> Result<CameraSelectionSnapshot, BroadcastError> {
         self.require_capability(self.camera_selection_available, "camera selection")?;
@@ -382,7 +384,7 @@ where
 #[async_trait]
 impl<P> ReplayStatePort for IracingObservation<P>
 where
-    P: SendProvider + Send + Sync + 'static,
+    P: Provider + Sync,
 {
     async fn speed_snapshot(&self) -> Result<ReplaySpeedSnapshot, BroadcastError> {
         self.require_capability(self.replay_speed_available, "replay speed")?;
@@ -451,7 +453,7 @@ where
 #[async_trait]
 impl<P> PitStatePort for IracingObservation<P>
 where
-    P: SendProvider + Send + Sync + 'static,
+    P: Provider + Sync,
 {
     async fn pit_service_snapshot(&self) -> Result<PitServiceSnapshot, BroadcastError> {
         self.require_capability(self.pit_service_available, "pit service")?;
@@ -487,7 +489,7 @@ where
 #[async_trait]
 impl<P> TelemetryStatePort for IracingObservation<P>
 where
-    P: SendProvider + Send + Sync + 'static,
+    P: Provider + Sync,
 {
     async fn logging_snapshot(&self) -> Result<TelemetryLoggingSnapshot, BroadcastError> {
         self.require_capability(self.telemetry_logging_available, "telemetry logging")?;
@@ -526,7 +528,7 @@ where
 #[async_trait]
 impl<P> ForceFeedbackStatePort for IracingObservation<P>
 where
-    P: SendProvider + Send + Sync + 'static,
+    P: Provider + Sync,
 {
     async fn force_feedback_snapshot(&self) -> Result<ForceFeedbackSnapshot, BroadcastError> {
         self.require_capability(self.force_feedback_available, "force feedback")?;
@@ -754,16 +756,17 @@ mod tests {
     }
 
     #[async_trait]
-    impl SendProvider for FakeProvider {
-        async fn next_frame_send(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
+    impl Provider for FakeProvider {
+        async fn next_frame(&mut self) -> iracing_sdk::Result<Option<FramePacket>> {
             self.frames.pop_front().unwrap_or(Ok(None))
         }
 
-        async fn session_yaml_send(
-            &mut self,
-            _version: u32,
-        ) -> iracing_sdk::Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> iracing_sdk::Result<Option<String>> {
             Ok(None)
+        }
+
+        fn tick_rate(&self) -> f64 {
+            60.0
         }
     }
 

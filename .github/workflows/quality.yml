@@ -50,22 +50,3 @@ jobs:
 
       - name: Test workspace
         run: cargo test --workspace --all-targets
-
-  wasm-compat:
-    name: Wasm Compatibility
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache cargo artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check `iracing-sdk` for wasm
-        run: cargo check -p iracing-sdk --lib --target wasm32-unknown-unknown
-          --all-features

@@ -224,17 +224,17 @@ mod tests {
 
         // Act: authorize and publish two live frames without reading watch
         // between them.
-        let first_permit = delivery
+        delivery
             .acquire(&cancel)
             .await
             .expect("active live delivery should issue a permit");
-        assert!(delivery.deliver(first_permit, frame(0)).await);
+        assert!(delivery.deliver((), frame(0)).await);
 
-        let second_permit = delivery
+        delivery
             .acquire(&cancel)
             .await
             .expect("active live delivery should issue another permit");
-        assert!(delivery.deliver(second_permit, frame(1)).await);
+        assert!(delivery.deliver((), frame(1)).await);
 
         // Assert: watch retains the newest snapshot rather than frame zero.
         assert_eq!(

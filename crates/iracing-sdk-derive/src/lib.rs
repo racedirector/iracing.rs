@@ -193,8 +193,7 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
             } => {
                 telemetry_map.insert(field_name.clone(), (index, inner_type.clone()));
             }
-            FieldStrategy::BitfieldHas { field_name: _, .. }
-            | FieldStrategy::BitfieldMap { field_name: _, .. } => {
+            FieldStrategy::BitfieldHas { .. } | FieldStrategy::BitfieldMap { .. } => {
                 // Bitfield variables have u32 underlying type (BitField). Calculated expressions rarely reference them directly; skip mapping.
             }
             FieldStrategy::Calculated { .. } | FieldStrategy::Skipped { .. } => {}
