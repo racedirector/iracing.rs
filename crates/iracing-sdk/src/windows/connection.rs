@@ -53,7 +53,7 @@ impl Connection {
 
         match result {
             WAIT_OBJECT_0 => {
-                tracing::debug!("Telemetry update signaled");
+                tracing::trace!("Telemetry update signaled");
                 Ok(WaitResult::Signaled)
             }
             WAIT_TIMEOUT => {
