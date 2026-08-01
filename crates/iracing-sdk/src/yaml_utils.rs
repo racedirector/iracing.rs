@@ -99,6 +99,7 @@ pub fn extract_yaml_from_memory(data: &[u8], offset: i32, length: i32) -> Result
 /// Separate the decoding of the buffer; iRacing may change this to UTF-8 only soon, so keep it separate and testable.
 fn decode_yaml_from_buffer(buffer: &[u8]) -> Result<String> {
     if let Ok(s) = std::str::from_utf8(buffer) {
+        tracing::trace!("Parsed YAML as UTF-8");
         return Ok(s.to_string());
     }
 
@@ -111,6 +112,7 @@ fn decode_yaml_from_buffer(buffer: &[u8]) -> Result<String> {
         });
     }
 
+    tracing::trace!("Parsed YAML as WINDOWS_1252");
     Ok(decoded.into_owned())
 }
 
