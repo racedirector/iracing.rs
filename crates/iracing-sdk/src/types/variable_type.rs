@@ -106,11 +106,11 @@ pub enum TelemetryValue {
 impl TelemetryValue {
     /// Decodes requested VariableInfo from the provided data.
     pub fn decode(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        if info.count > 1 {
-            return Self::decode_array(data, info);
+        match info.count {
+            0 => Ok(Self::Array(Vec::new())),
+            1 => Self::decode_scalar(data, info),
+            _ => Self::decode_array(data, info),
         }
-
-        Self::decode_scalar(data, info)
     }
 
     fn decode_scalar(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
@@ -132,17 +132,25 @@ impl TelemetryValue {
     fn decode_array(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         let element_size = info.data_type.size();
         let mut values = Vec::with_capacity(info.count);
+        let mut element_info = info.clone();
+        element_info.count = 1;
 
         for index in 0..info.count {
-            let mut element_info = info.clone();
-            element_info.offset =
-                info.offset
-                    .checked_add(index * element_size)
+            let offset_delta =
+                index
+                    .checked_mul(element_size)
                     .ok_or_else(|| IRacingSDKError::Memory {
                         offset: info.offset,
                         source: None,
                     })?;
-            element_info.count = 1;
+
+            element_info.offset =
+                info.offset
+                    .checked_add(offset_delta)
+                    .ok_or_else(|| IRacingSDKError::Memory {
+                        offset: info.offset,
+                        source: None,
+                    })?;
 
             values.push(Self::decode_scalar(data, &element_info)?);
         }
