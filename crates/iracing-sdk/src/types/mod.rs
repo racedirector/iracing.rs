@@ -80,7 +80,7 @@ pub use irsdk_enums::{
     ReplayStateMode, SessionState, StatusField, TelemetryCommandMode, TrackLocation, TrackSurface,
     TrackWetness, VideoCaptureMode,
 };
-pub use schema::{VariableInfo, VariableSchema};
+pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
 pub use variable_type::{TelemetryValue, TelemetryValueProvider, VariableType};

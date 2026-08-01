@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use crate::{
-    TelemetryValue, VariableInfo, VariableSchema, types::variable_type::TelemetryValueProvider,
+    SchemaProvider, TelemetryValue, VariableInfo, VariableSchema,
+    types::variable_type::TelemetryValueProvider,
 };
 
 /// Raw telemetry frame packet for the stream-based architecture
@@ -43,11 +44,6 @@ impl FramePacket {
 }
 
 impl FramePacket {
-    /// Returns variable metadata if present.
-    pub fn variable_info(&self, name: &str) -> Option<&VariableInfo> {
-        self.schema.variables.get(name)
-    }
-
     /// Retrieves the variable from the frame by name.
     pub fn value(
         &self,
@@ -61,8 +57,54 @@ impl FramePacket {
     }
 }
 
+impl SchemaProvider for FramePacket {
+    fn schema(&self) -> &VariableSchema {
+        &self.schema
+    }
+}
+
 impl TelemetryValueProvider for FramePacket {
     fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
         TelemetryValue::decode(self.data.as_ref(), info)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::VariableType;
+    use std::collections::HashMap;
+
+    #[test]
+    fn frame_packet_provides_schema_and_telemetry_values() {
+        let rpm_info = VariableInfo {
+            name: "RPM".into(),
+            data_type: VariableType::Int32,
+            offset: 0,
+            count: 1,
+            count_as_time: false,
+            units: "rev/min".into(),
+            description: "Engine RPM".into(),
+        };
+        let schema = Arc::new(VariableSchema {
+            variables: HashMap::from([("RPM".to_string(), rpm_info)]),
+            frame_size: 4,
+        });
+        let packet = FramePacket::new(1234i32.to_le_bytes().to_vec(), 10, 2, Arc::clone(&schema));
+
+        assert!(std::ptr::eq(packet.schema(), schema.as_ref()));
+        assert!(packet.has_variable("RPM"));
+        assert!(!packet.has_variable("Missing"));
+
+        let info = packet.variable_info("RPM").unwrap();
+        assert_eq!(
+            packet.telemetry_value_from_info(info).unwrap(),
+            TelemetryValue::Int32(1234)
+        );
+        assert_eq!(
+            packet.value("RPM").unwrap(),
+            Some(TelemetryValue::Int32(1234))
+        );
+        assert_eq!(packet.value("Missing").unwrap(), None);
     }
 }

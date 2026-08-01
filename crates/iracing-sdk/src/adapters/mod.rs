@@ -60,12 +60,10 @@
 //! ```
 
 mod frame_adapter;
-mod schema_provider;
 mod validation;
 
 // Re-export all public types
 pub use frame_adapter::FrameAdapter;
-pub use schema_provider::SchemaProvider;
 pub use validation::{
     AdapterValidation, DefaultValue, FieldExtraction, telemetry_type_mismatch_details,
 };
@@ -73,40 +71,7 @@ pub use validation::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VariableInfo, VariableSchema, VariableType};
-    use std::collections::HashMap;
-
-    fn create_test_schema() -> VariableSchema {
-        let mut variables = HashMap::new();
-
-        variables.insert(
-            "Speed".to_string(),
-            VariableInfo {
-                name: "Speed".to_string(),
-                data_type: VariableType::Float32,
-                offset: 0,
-                count: 1,
-                count_as_time: false,
-                units: "mph".to_string(),
-                description: "Car speed".to_string(),
-            },
-        );
-
-        variables.insert(
-            "RPM".to_string(),
-            VariableInfo {
-                name: "RPM".to_string(),
-                data_type: VariableType::Int32,
-                offset: 4,
-                count: 1,
-                count_as_time: false,
-                units: "rpm".to_string(),
-                description: "Engine RPM".to_string(),
-            },
-        );
-
-        VariableSchema::new(variables, 8).unwrap()
-    }
+    use crate::{VariableInfo, VariableType};
 
     #[test]
     fn adapter_validation_creation() {
@@ -153,30 +118,5 @@ mod tests {
         assert_eq!(skipped_field.field_name(), None);
         assert!(!skipped_field.is_required());
         assert!(skipped_field.var_info().is_none());
-    }
-
-    #[test]
-    fn schema_provider_basic_usage() {
-        struct TestProvider {
-            schema: VariableSchema,
-        }
-
-        impl SchemaProvider for TestProvider {
-            fn get_schema(&self) -> &VariableSchema {
-                &self.schema
-            }
-        }
-
-        let provider = TestProvider {
-            schema: create_test_schema(),
-        };
-
-        assert!(provider.has_field("Speed"));
-        assert!(!provider.has_field("InvalidField"));
-        assert!(provider.get_field_info("Speed").is_some());
-
-        let field_names = provider.get_field_names();
-        assert!(field_names.contains(&"Speed".to_string()));
-        assert!(field_names.contains(&"RPM".to_string()));
     }
 }

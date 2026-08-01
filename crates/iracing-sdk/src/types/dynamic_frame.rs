@@ -6,7 +6,7 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    FramePacket, Result, TelemetryValue, VarData, VariableInfo, VariableSchema,
+    FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
     types::variable_type::TelemetryValueProvider,
 };
@@ -21,11 +21,6 @@ pub struct DynamicFrame {
 }
 
 impl DynamicFrame {
-    /// Returns variable metadata if present.
-    pub fn variable_info(&self, name: &str) -> Option<&VariableInfo> {
-        self.schema.variables.get(name)
-    }
-
     /// Generic typed lookup by variable name.
     /// Returns None if the variable is missing or type conversion fails.
     pub fn get<T: VarData>(&self, name: &str) -> Option<T> {
@@ -70,6 +65,12 @@ impl DynamicFrame {
         };
 
         self.telemetry_value_from_info(info).map(Some)
+    }
+}
+
+impl SchemaProvider for DynamicFrame {
+    fn schema(&self) -> &VariableSchema {
+        &self.schema
     }
 }
 
@@ -157,6 +158,18 @@ mod tests {
 
         let packet = FramePacket::new(data, 10, 0, Arc::new(schema));
         let df = DynamicFrame::adapt(&packet, &AdapterValidation::new(vec![]));
+
+        assert!(std::ptr::eq(df.schema(), packet.schema.as_ref()));
+        assert!(df.has_variable("RPM"));
+        assert!(!df.has_variable("Missing"));
+
+        let rpm_info = df.variable_info("RPM").unwrap();
+        assert_eq!(
+            df.telemetry_value_from_info(rpm_info).unwrap(),
+            TelemetryValue::Int32(1234)
+        );
+        assert_eq!(df.value("RPM").unwrap(), Some(TelemetryValue::Int32(1234)));
+        assert_eq!(df.value("Missing").unwrap(), None);
 
         assert_eq!(df.i32("RPM"), Some(1234));
         assert!(df.f32("Speed").unwrap() - 42.5 < 1e-5);
