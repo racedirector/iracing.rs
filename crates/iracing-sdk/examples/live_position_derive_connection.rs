@@ -90,7 +90,9 @@ async fn main() -> anyhow::Result<()> {
         // Open telemetry connection and CSV writer
         // ------------------------------------------------------------
         let connection = LiveConnection::builder().build()?;
-        let mut stream = connection.subscribe::<Row>(UpdateRate::Native);
+        let mut stream = connection
+            .subscribe::<Row>(UpdateRate::Native)
+            .expect("Could not create subscription");
         let mut writer = Writer::from_path(&csv_output_path)?;
 
         while let Some(frame) = stream.next().await {

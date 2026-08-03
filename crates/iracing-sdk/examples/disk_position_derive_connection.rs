@@ -82,7 +82,9 @@ async fn main() -> Result<()> {
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
     let connection = IbtConnection::builder().with_path(ibt_path).build().await?;
-    let mut stream = connection.subscribe::<Row>();
+    let mut stream = connection
+        .subscribe::<Row>()
+        .expect("Could not create subscription");
     connection.start()?;
     let mut writer = Writer::from_path(&csv_output_path)?;
 

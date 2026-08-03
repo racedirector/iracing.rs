@@ -94,21 +94,21 @@ impl IbtConnection {
     /// poll multiple subscriptions concurrently. Dropping a subscription
     /// removes it from the current acknowledgement barrier. If all
     /// subscriptions are dropped, replay pauses until another subscriber joins.
-    pub fn subscribe<T>(&self) -> impl Stream<Item = T> + 'static
+    pub fn subscribe<T>(&self) -> Result<impl Stream<Item = T> + 'static>
     where
         T: FrameAdapter + Send + 'static,
     {
-        let validation = T::validate_schema(&self.schema).expect("Schema validation failed");
+        let validation = T::validate_schema(&self.schema)?;
         let subscriber_id = self.next_subscriber_id.fetch_add(1, Ordering::Relaxed);
 
         let _ = self.controls.send(ReplayControl::Join { subscriber_id });
 
-        IbtSubscription::new(
+        Ok(IbtSubscription::new(
             subscriber_id,
             self.frames.clone(),
             self.controls.clone(),
             validation,
-        )
+        ))
     }
 
     /// Start coordinated frame delivery.
@@ -301,7 +301,7 @@ mod tests {
         let provider = IbtProvider::from_reader(reader);
         let connection = IbtConnection::from_provider(provider).await?;
 
-        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
         let frame = tokio::time::timeout(Duration::from_millis(100), frames.next())
             .await
@@ -320,7 +320,7 @@ mod tests {
         let connection = IbtConnection::from_provider(provider).await?;
 
         assert!(started_at.elapsed() < Duration::from_millis(250));
-        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
         assert!(
             tokio::time::timeout(Duration::from_secs(1), frames.next())
@@ -334,7 +334,7 @@ mod tests {
     #[tokio::test]
     async fn connection_does_not_read_before_start() -> Result<()> {
         let (connection, mut reads) = tracking_connection(1).await?;
-        let _frames = connection.subscribe::<DynamicFrame>();
+        let _frames = connection.subscribe::<DynamicFrame>()?;
 
         assert!(
             tokio::time::timeout(Duration::from_millis(20), reads.recv())
@@ -362,8 +362,8 @@ mod tests {
     #[tokio::test]
     async fn every_subscriber_acknowledges_before_the_cursor_advances() -> Result<()> {
         let (connection, mut reads) = tracking_connection(2).await?;
-        let mut first = Box::pin(connection.subscribe::<DynamicFrame>());
-        let mut second = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut first = Box::pin(connection.subscribe::<DynamicFrame>()?);
+        let mut second = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
 
         let (first_frame, second_frame) = tokio::time::timeout(Duration::from_secs(1), async {
@@ -423,7 +423,7 @@ mod tests {
     #[tokio::test]
     async fn subscriber_joining_midstream_joins_the_current_frame_barrier() -> Result<()> {
         let (connection, mut reads) = tracking_connection(2).await?;
-        let mut first = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut first = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
 
         assert_eq!(
@@ -436,7 +436,7 @@ mod tests {
         );
         assert_eq!(reads.recv().await, Some(Some(0)));
 
-        let mut late = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut late = Box::pin(connection.subscribe::<DynamicFrame>()?);
         assert_eq!(
             late.next()
                 .await
@@ -483,7 +483,7 @@ mod tests {
     #[tokio::test]
     async fn dropping_all_subscribers_pauses_and_resubscription_resumes() -> Result<()> {
         let (connection, mut reads) = tracking_connection(2).await?;
-        let mut first = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut first = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
 
         let frame = tokio::time::timeout(Duration::from_secs(1), first.next())
@@ -501,7 +501,7 @@ mod tests {
             "dropping the last subscriber should park the cursor"
         );
 
-        let mut resumed = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut resumed = Box::pin(connection.subscribe::<DynamicFrame>()?);
         let retained = tokio::time::timeout(Duration::from_secs(1), resumed.next())
             .await
             .expect("resubscribing should yield the retained frame")
@@ -520,7 +520,7 @@ mod tests {
     #[tokio::test]
     async fn replay_delivers_every_frame_and_retains_the_last_at_eof() -> Result<()> {
         let (connection, _reads) = tracking_connection(3).await?;
-        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
 
         let mut ticks = Vec::new();
@@ -588,7 +588,7 @@ mod tests {
             "retaining the response should not authorize another read"
         );
 
-        let mut resumed = Box::pin(connection.subscribe::<DynamicFrame>());
+        let mut resumed = Box::pin(connection.subscribe::<DynamicFrame>()?);
         assert_eq!(
             resumed
                 .next()

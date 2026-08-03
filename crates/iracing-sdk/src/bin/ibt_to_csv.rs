@@ -123,7 +123,7 @@ async fn main() -> Result<()> {
     // ------------------------------------------------------------
     let mut frame_count = 0usize;
 
-    let mut frames = Box::pin(connection.subscribe::<DynamicFrame>());
+    let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
     connection.start()?;
 
     while let Some(frame) = frames.next().await {

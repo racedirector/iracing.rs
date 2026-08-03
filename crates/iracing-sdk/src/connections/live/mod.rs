@@ -10,7 +10,7 @@ use crate::SchemaProvider;
 #[cfg(windows)]
 use {
     crate::{
-        FrameAdapter, VariableSchema,
+        FrameAdapter, Result, VariableSchema,
         provider::Provider,
         providers::live::LiveProvider,
         schema::SessionInfo,
@@ -74,12 +74,12 @@ impl LiveConnection {
     }
 
     /// Subscribe to telemetry frames
-    pub fn subscribe<T>(&self, rate: UpdateRate) -> impl Stream<Item = T> + 'static
+    pub fn subscribe<T>(&self, rate: UpdateRate) -> Result<impl Stream<Item = T> + 'static>
     where
         T: FrameAdapter + Send + 'static,
     {
         // Validate schema at subscription time.
-        let validation = T::validate_schema(&self.schema).expect("Schema validation failed");
+        let validation = T::validate_schema(&self.schema)?;
 
         // Create base frame stream from watch channel.
         //
@@ -104,7 +104,7 @@ impl LiveConnection {
 
         let effective_rate = rate.normalize(self.source_hz);
 
-        match effective_rate {
+        let stream = match effective_rate {
             UpdateRate::Native => frames
                 .map(move |packet| T::adapt(&packet, &validation))
                 .boxed(),
@@ -115,7 +115,9 @@ impl LiveConnection {
                     .map(move |packet| T::adapt(&packet, &validation))
                     .boxed()
             }
-        }
+        };
+
+        Ok(stream)
     }
 
     /// Get session updates as a stream.
