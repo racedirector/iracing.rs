@@ -71,13 +71,10 @@
 //! `connection.session_info()` (e.g., return an error or write a placeholder file).
 
 use anyhow::Result;
-use anyhow::anyhow;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
-use iracing_sdk::WindowsConnection;
-#[cfg(windows)]
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the live session parser.
@@ -102,6 +99,8 @@ fn main() -> Result<()> {
 
     #[cfg(not(windows))]
     {
+        use anyhow::anyhow;
+
         tracing::warn!(
             "live-session-parser is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
         );
@@ -110,6 +109,7 @@ fn main() -> Result<()> {
 
     #[cfg(windows)]
     {
+        use iracing_sdk::WindowsConnection;
         use std::{fs, thread, time::Duration};
 
         let Args { output_path } = Args::parse();
