@@ -53,7 +53,7 @@ impl IbtConnection {
     }
 
     async fn from_provider(provider: IbtProvider) -> Result<Self> {
-        let schema = Arc::new(provider.schema().clone());
+        let schema = provider.shared_schema();
         let source_hz = provider.tick_rate();
 
         Self::from_provider_parts(provider, schema, source_hz).await

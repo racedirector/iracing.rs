@@ -54,6 +54,11 @@ impl IbtProvider {
     pub fn duration(&self) -> f64 {
         self.reader.duration()
     }
+
+    /// Returns an ownable schema.
+    pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
+        Arc::clone(&self.schema)
+    }
 }
 
 impl SchemaProvider for IbtProvider {
@@ -79,7 +84,7 @@ impl Provider for IbtProvider {
             }
         };
 
-        let packet = FramePacket::new(frame_data, tick, session_version, Arc::clone(&self.schema));
+        let packet = FramePacket::new(frame_data, tick, session_version, self.shared_schema());
 
         tracing::trace!(
             "Frame {}/{}: tick={}, session_version={}",

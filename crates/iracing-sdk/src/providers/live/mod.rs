@@ -77,6 +77,11 @@ impl LiveProvider {
         })
     }
 
+    /// Returns an ownable schema.
+    pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
+        Arc::clone(&self.schema)
+    }
+
     async fn next_frame_impl(&mut self) -> Result<Option<FramePacket>> {
         let mut no_connection = NoConnectionState::default();
 
@@ -140,7 +145,7 @@ impl LiveProvider {
                     frame_data,
                     tick,
                     session_version,
-                    Arc::clone(&self.schema),
+                    self.shared_schema(),
                 )));
             }
 

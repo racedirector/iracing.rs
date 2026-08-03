@@ -151,7 +151,7 @@ impl IbtReader {
             }
         }
 
-        let reader = IbtReader {
+        Ok(IbtReader {
             data,
             current_position: frame_data_start,
             path,
@@ -161,9 +161,7 @@ impl IbtReader {
             current_frame: 0,
             total_frames,
             frame_data_start,
-        };
-
-        Ok(reader)
+        })
     }
 
     /// Get cleaned session YAML from the IBT file

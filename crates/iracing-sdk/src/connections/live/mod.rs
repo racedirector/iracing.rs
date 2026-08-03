@@ -53,7 +53,7 @@ impl LiveConnection {
 
     fn from_provider(provider: LiveProvider) -> Self {
         // Extract metadata
-        let schema = Arc::new(provider.schema().clone());
+        let schema = provider.shared_schema();
         let source_hz = provider.tick_rate();
 
         // Spawn telemetry tasks
@@ -139,6 +139,7 @@ impl LiveConnection {
     }
 }
 
+#[cfg(windows)]
 impl SchemaProvider for LiveConnection {
     /// Get the variable schema
     fn schema(&self) -> &VariableSchema {
