@@ -24,7 +24,7 @@ impl DynamicFrame {
     /// Generic typed lookup by variable name.
     /// Returns None if the variable is missing or type conversion fails.
     pub fn get<T: VarData>(&self, name: &str) -> Option<T> {
-        let info = self.variable_info(name)?;
+        let info = self.variable(name)?;
         T::from_bytes(self.data.as_ref(), info).ok()
     }
 
@@ -60,11 +60,11 @@ impl DynamicFrame {
 
     /// Retrieves the variable from the frame by name.
     pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
-        let Some(info) = self.variable_info(name) else {
+        let Some(info) = self.variable(name) else {
             return Ok(None);
         };
 
-        self.telemetry_value_from_info(info).map(Some)
+        self.telemetry_value(info).map(Some)
     }
 }
 
@@ -75,7 +75,7 @@ impl SchemaProvider for DynamicFrame {
 }
 
 impl TelemetryValueProvider for DynamicFrame {
-    fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
+    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
         TelemetryValue::decode(self.data.as_ref(), info)
     }
 }
@@ -163,9 +163,9 @@ mod tests {
         assert!(df.has_variable("RPM"));
         assert!(!df.has_variable("Missing"));
 
-        let rpm_info = df.variable_info("RPM").unwrap();
+        let rpm_info = df.variable("RPM").unwrap();
         assert_eq!(
-            df.telemetry_value_from_info(rpm_info).unwrap(),
+            df.telemetry_value(rpm_info).unwrap(),
             TelemetryValue::Int32(1234)
         );
         assert_eq!(df.value("RPM").unwrap(), Some(TelemetryValue::Int32(1234)));

@@ -90,12 +90,6 @@ struct Args {
     /// Path where the session YAML should be written.
     #[arg(short, long)]
     output_path: Option<PathBuf>,
-
-    #[arg(long, default_value_t = true)]
-    live_only: bool,
-
-    #[arg(long, overrides_with = "live_only")]
-    no_live_only: bool,
 }
 
 fn main() -> Result<()> {
@@ -116,24 +110,30 @@ fn main() -> Result<()> {
 
     #[cfg(windows)]
     {
-        let Args {
-            output_path,
-            live_only,
-            no_live_only,
-        } = Args::parse();
+        use std::{fs, thread, time::Duration};
 
-        let effective_live_only = if no_live_only { false } else { live_only };
+        let Args { output_path } = Args::parse();
+
         tracing::info!("Opening iRacing connection...");
-        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-        if effective_live_only && !connection.is_connected() {
-            return Err(anyhow!("Live only is enabled."));
-        }
+        let windows_connection = loop {
+            match WindowsConnection::try_connect() {
+                Ok(connection) if connection.is_connected() => break connection,
+                Ok(_) => {
+                    tracing::debug!("Shared memory opened but telemetry is not connected yet");
+                }
+                Err(error) => {
+                    tracing::debug!(%error, "Waiting for iRacing shared memory");
+                }
+            }
+
+            thread::sleep(Duration::from_secs(1));
+        };
 
         // ------------------------------------------------------------
         // Write session string to output path.
         // ------------------------------------------------------------
         tracing::info!("Parsing session information");
-        if let Some(session) = connection.session_info() {
+        if let Some(session) = windows_connection.session_info() {
             if let Some(output_path) = output_path {
                 fs::write(output_path, session)?;
             } else {

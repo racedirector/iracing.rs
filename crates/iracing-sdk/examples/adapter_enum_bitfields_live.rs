@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, providers::live::LiveProvider,
+    AdapterValidation, FieldExtraction, FrameAdapter, SchemaProvider, providers::live::LiveProvider,
 };
 #[cfg(windows)]
 use iracing_sdk::{BitField, IRacingSDKError, VarData};

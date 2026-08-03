@@ -5,7 +5,7 @@ use std::{
 
 use async_trait::async_trait;
 use iracing_sdk::{
-    CameraState, FrameAdapter, VariableSchema,
+    CameraState, FrameAdapter, SchemaProvider, VariableSchema,
     provider::Provider,
     providers::live::LiveProvider,
     schema::{SessionInfo, SessionInfoParser},
@@ -51,7 +51,7 @@ pub(crate) struct IracingObservation<P> {
 impl IracingObservation<LiveProvider> {
     pub(crate) fn live() -> iracing_sdk::Result<Self> {
         let provider = LiveProvider::new()?;
-        let schema = provider.schema();
+        let schema = Arc::new(provider.schema().clone());
         Ok(Self::from_provider(provider, schema))
     }
 }

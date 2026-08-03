@@ -2,7 +2,9 @@
 
 use std::{path::Path, sync::Arc};
 
-use crate::{FramePacket, Result, VariableSchema, ibt::IbtReader, provider::Provider};
+use crate::{
+    FramePacket, Result, SchemaProvider, VariableSchema, ibt::IbtReader, provider::Provider,
+};
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 pub struct IbtProvider {
@@ -20,17 +22,12 @@ impl IbtProvider {
     /// Create a replay provider from an already-opened reader.
     pub fn from_reader(reader: IbtReader) -> Self {
         let tick_rate = reader.tick_rate();
-        let schema = Arc::new(reader.variables().clone());
+        let schema = Arc::new(reader.schema().clone());
         Self {
             reader,
             schema,
             tick_rate,
         }
-    }
-
-    /// Returns a shared reference to the telemetry variable schema.
-    pub fn schema(&self) -> Arc<VariableSchema> {
-        Arc::clone(&self.schema)
     }
 
     /// Seek to a specific frame
@@ -50,20 +47,26 @@ impl IbtProvider {
 
     /// Get current playback time in seconds.
     pub fn current_time(&self) -> f64 {
-        self.current_frame() as f64 / self.tick_rate
+        self.reader.current_time()
     }
 
     /// Get total duration in seconds.
     pub fn duration(&self) -> f64 {
-        self.total_frames() as f64 / self.tick_rate
+        self.reader.duration()
+    }
+}
+
+impl SchemaProvider for IbtProvider {
+    fn schema(&self) -> &VariableSchema {
+        self.schema.as_ref()
     }
 }
 
 #[async_trait::async_trait]
 impl Provider for IbtProvider {
     async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
-        let total_frames = self.reader.total_frames();
-        if self.reader.current_frame() >= total_frames {
+        let total_frames = self.total_frames();
+        if self.current_frame() >= total_frames {
             tracing::debug!("End of IBT frames");
             return Ok(None);
         }

@@ -76,7 +76,9 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
     {
         use csv::Writer;
-        use iracing_sdk::{FrameAdapter, provider::Provider, providers::live::LiveProvider};
+        use iracing_sdk::{
+            FrameAdapter, SchemaProvider, provider::Provider, providers::live::LiveProvider,
+        };
 
         // ------------------------------------------------------------
         // Parse CLI arguments

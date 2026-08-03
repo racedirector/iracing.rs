@@ -165,7 +165,7 @@ impl TelemetryValue {
 /// callers supply the corresponding [`VariableInfo`].
 pub trait TelemetryValueProvider {
     /// Decodes the telemetry value described by `info`.
-    fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue>;
+    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue>;
 }
 
 #[cfg(test)]

@@ -49,11 +49,11 @@ impl FramePacket {
         &self,
         name: &str,
     ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
-        let Some(info) = self.variable_info(name) else {
+        let Some(info) = self.variable(name) else {
             return Ok(None);
         };
 
-        self.telemetry_value_from_info(info).map(Some)
+        self.telemetry_value(info).map(Some)
     }
 }
 
@@ -64,7 +64,7 @@ impl SchemaProvider for FramePacket {
 }
 
 impl TelemetryValueProvider for FramePacket {
-    fn telemetry_value_from_info(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
+    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
         TelemetryValue::decode(self.data.as_ref(), info)
     }
 }
@@ -96,9 +96,9 @@ mod tests {
         assert!(packet.has_variable("RPM"));
         assert!(!packet.has_variable("Missing"));
 
-        let info = packet.variable_info("RPM").unwrap();
+        let info = packet.variable("RPM").unwrap();
         assert_eq!(
-            packet.telemetry_value_from_info(info).unwrap(),
+            packet.telemetry_value(info).unwrap(),
             TelemetryValue::Int32(1234)
         );
         assert_eq!(

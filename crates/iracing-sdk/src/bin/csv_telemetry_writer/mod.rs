@@ -33,7 +33,7 @@ impl CsvTelemetryWriter {
 
         for variable in &self.variables {
             let value = provider
-                .telemetry_value_from_info(variable)
+                .telemetry_value(variable)
                 .with_context(|| format!("Failed to decode `{}`", variable.name))?;
 
             Self::append_value(&mut row, value);
@@ -137,10 +137,7 @@ mod tests {
     }
 
     impl TelemetryValueProvider for TestTelemetryValueProvider {
-        fn telemetry_value_from_info(
-            &self,
-            info: &VariableInfo,
-        ) -> iracing_sdk::Result<TelemetryValue> {
+        fn telemetry_value(&self, info: &VariableInfo) -> iracing_sdk::Result<TelemetryValue> {
             Ok(self.values[&info.name].clone())
         }
     }

@@ -2,8 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, IRacingSDKError, provider::Provider,
-    providers::ibt::IbtProvider,
+    AdapterValidation, FieldExtraction, FrameAdapter, IRacingSDKError, SchemaProvider,
+    provider::Provider, providers::ibt::IbtProvider,
 };
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
@@ -174,7 +174,6 @@ async fn main() -> Result<()> {
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
     let mut ibt_provider = IbtProvider::open(&ibt_path)?;
-    let schema = ibt_provider.schema();
 
     // ------------------------------------------------------------
     // Write session string to output path.
@@ -194,6 +193,7 @@ async fn main() -> Result<()> {
         "Parsing frames from IBT provider"
     );
 
+    let schema = ibt_provider.schema();
     let shared_validation = Row::validate_schema(&schema)?;
     while let Some(packet) = ibt_provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);

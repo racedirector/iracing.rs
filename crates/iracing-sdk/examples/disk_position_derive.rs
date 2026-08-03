@@ -2,7 +2,8 @@ use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
 use iracing_sdk::{
-    FrameAdapter, IRacingTelemetryFrame, provider::Provider, providers::ibt::IbtProvider,
+    FrameAdapter, IRacingTelemetryFrame, SchemaProvider, provider::Provider,
+    providers::ibt::IbtProvider,
 };
 use std::path::PathBuf;
 

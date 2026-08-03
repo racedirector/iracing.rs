@@ -43,7 +43,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{ibt::IbtReader, types::VarData};
+use iracing_sdk::{SchemaProvider, ibt::IbtReader, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -126,7 +126,7 @@ fn main() -> Result<()> {
     tracing::info!("Resolving telemetry schema");
 
     // Clone the schema once to avoid repeated lookups.
-    let schema = reader.variables().clone();
+    let schema = reader.schema().clone();
 
     // ------------------------------------------------------------
     // Resolve required variable metadata

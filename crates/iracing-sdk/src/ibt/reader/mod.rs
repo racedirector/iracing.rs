@@ -31,7 +31,7 @@
 //! - Seeking operations are O(1) as they only update internal position counters
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{IRacingSDKError, Result, VariableSchema, yaml_utils};
+use crate::{IRacingSDKError, Result, SchemaProvider, VariableSchema, yaml_utils};
 use std::{
     fs::File,
     io::Read,
@@ -195,11 +195,6 @@ impl IbtReader {
         Ok(Some(cleaned_yaml))
     }
 
-    /// Get the variable schema for this IBT file
-    pub fn variables(&self) -> &VariableSchema {
-        &self.variable_schema
-    }
-
     /// Get total number of frames in the file
     pub fn total_frames(&self) -> usize {
         self.total_frames
@@ -220,6 +215,16 @@ impl IbtReader {
             // Fallback to 60Hz if tick_rate is invalid
             60.0
         }
+    }
+
+    /// Get the current file location in seconds
+    pub fn current_time(&self) -> f64 {
+        self.current_frame() as f64 / self.tick_rate()
+    }
+
+    /// Get the total duration in seconds
+    pub fn duration(&self) -> f64 {
+        self.total_frames() as f64 / self.tick_rate()
     }
 
     /// Get the file path this reader was opened from, if it has one.
@@ -316,6 +321,12 @@ impl IbtReader {
     }
 }
 
+impl SchemaProvider for IbtReader {
+    fn schema(&self) -> &VariableSchema {
+        &self.variable_schema
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,7 +350,7 @@ mod tests {
         assert_eq!(reader.file_path(), None);
         assert_eq!(reader.current_frame(), 0);
         assert!(reader.total_frames() > 0);
-        assert!(reader.variables().variable_count() > 0);
+        assert!(reader.variable_count() > 0);
         Ok(())
     }
 
@@ -399,13 +410,13 @@ mod tests {
             test_file.display()
         );
         ensure!(
-            data.len() == reader.variables().frame_size,
+            data.len() == reader.schema().frame_size,
             "Frame data length {} must match schema frame size {}",
             data.len(),
-            reader.variables().frame_size
+            reader.schema().frame_size
         );
         ensure!(
-            reader.variables().variable_count() > 0,
+            reader.variable_count() > 0,
             "Schema should expose telemetry variables"
         );
         ensure!(
@@ -558,7 +569,7 @@ mod tests {
             .with_context(|| format!("Reading frame for validation from {}", test_file.display()))?
             .expect("Expected frame for validation");
         let (data, _, _) = frame;
-        let schema = reader.variables();
+        let schema = reader.schema();
 
         ensure!(
             schema.variable_count() > 0,

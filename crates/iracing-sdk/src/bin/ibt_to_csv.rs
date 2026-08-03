@@ -50,7 +50,7 @@ mod csv_telemetry_writer;
 use anyhow::{Context, Result};
 use clap::Parser;
 use futures::StreamExt;
-use iracing_sdk::{DynamicFrame, IbtConnection, VariableInfo};
+use iracing_sdk::{DynamicFrame, IbtConnection, SchemaProvider, VariableInfo};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -99,8 +99,7 @@ async fn main() -> Result<()> {
         .context("Failed to open IBT file")?;
 
     // Clone and sort variables for deterministic column ordering.
-    let mut variables: Vec<VariableInfo> =
-        connection.schema().variables.values().cloned().collect();
+    let mut variables: Vec<VariableInfo> = connection.variables();
     variables.sort_unstable_by(|left, right| {
         left.offset
             .cmp(&right.offset)

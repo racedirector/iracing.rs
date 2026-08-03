@@ -9,7 +9,9 @@ use crate::{
 };
 
 use super::{BroadcastService, DEFAULT_OBSERVATION_TIMEOUT};
-use iracing_sdk::{Broadcast as BroadcastClient, IRacingSDKError, providers::live::LiveProvider};
+use iracing_sdk::{
+    Broadcast as BroadcastClient, IRacingSDKError, SchemaProvider, providers::live::LiveProvider,
+};
 
 /// Builder for a Windows live [`BroadcastService`].
 ///
@@ -103,7 +105,7 @@ impl BroadcastServiceBuilder {
         } else {
             let observation = Arc::new(match self.live_provider {
                 Some(provider) => {
-                    let schema = provider.schema();
+                    let schema = Arc::new(provider.schema().clone());
                     IracingObservation::from_provider(provider, schema)
                 }
                 None => IracingObservation::live()?,

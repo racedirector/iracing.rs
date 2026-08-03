@@ -113,6 +113,11 @@ impl VariableSchema {
     pub fn variable_names(&self) -> Vec<String> {
         self.variables.keys().cloned().collect()
     }
+
+    /// Get all available variables in the schema.
+    pub fn variables(&self) -> Vec<VariableInfo> {
+        self.variables.values().cloned().collect()
+    }
 }
 
 /// Provider abstraction for schema discovery across telemetry sources.
@@ -124,7 +129,7 @@ pub trait SchemaProvider {
     fn schema(&self) -> &VariableSchema;
 
     /// Get variable information for a field name.
-    fn variable_info(&self, name: &str) -> Option<&VariableInfo> {
+    fn variable(&self, name: &str) -> Option<&VariableInfo> {
         self.schema().get_variable(name)
     }
 
@@ -134,8 +139,18 @@ pub trait SchemaProvider {
     }
 
     /// Get all available field names in this schema.
-    fn get_field_names(&self) -> Vec<String> {
-        self.schema().variables.keys().cloned().collect()
+    fn variable_names(&self) -> Vec<String> {
+        self.schema().variable_names()
+    }
+
+    /// Get all available variable values.
+    fn variables(&self) -> Vec<VariableInfo> {
+        self.schema().variables()
+    }
+
+    /// The number of variables in the schema.
+    fn variable_count(&self) -> usize {
+        self.schema().variable_count()
     }
 }
 
@@ -170,7 +185,7 @@ mod tests {
 
         assert!(provider.has_variable("Speed"));
         assert!(!provider.has_variable("InvalidField"));
-        assert!(provider.variable_info("Speed").is_some());
-        assert_eq!(provider.get_field_names(), vec!["Speed".to_string()]);
+        assert!(provider.variable("Speed").is_some());
+        assert_eq!(provider.variable_names(), vec!["Speed".to_string()]);
     }
 }

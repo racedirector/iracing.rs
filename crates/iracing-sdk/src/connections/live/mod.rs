@@ -5,6 +5,9 @@ mod builder;
 pub use builder::LiveConnectionBuilder;
 
 #[cfg(windows)]
+use crate::SchemaProvider;
+
+#[cfg(windows)]
 use {
     crate::{
         FrameAdapter, VariableSchema,
@@ -50,7 +53,7 @@ impl LiveConnection {
 
     fn from_provider(provider: LiveProvider) -> Self {
         // Extract metadata
-        let schema = provider.schema();
+        let schema = Arc::new(provider.schema().clone());
         let source_hz = provider.tick_rate();
 
         // Spawn telemetry tasks
@@ -134,10 +137,12 @@ impl LiveConnection {
     pub fn source_hz(&self) -> f64 {
         self.source_hz
     }
+}
 
+impl SchemaProvider for LiveConnection {
     /// Get the variable schema
-    pub fn schema(&self) -> &VariableSchema {
-        &self.schema
+    fn schema(&self) -> &VariableSchema {
+        self.schema.as_ref()
     }
 }
 

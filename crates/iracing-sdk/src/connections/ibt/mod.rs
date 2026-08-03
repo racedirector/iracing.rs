@@ -16,8 +16,8 @@ use tokio_stream::wrappers::WatchStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    FrameAdapter, FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider,
-    providers::ibt::IbtProvider, schema::SessionInfo, telemetry::Telemetry,
+    FrameAdapter, FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    provider::Provider, providers::ibt::IbtProvider, schema::SessionInfo, telemetry::Telemetry,
 };
 use coordinator::ReplayControl;
 use subscription::IbtSubscription;
@@ -53,7 +53,7 @@ impl IbtConnection {
     }
 
     async fn from_provider(provider: IbtProvider) -> Result<Self> {
-        let schema = provider.schema();
+        let schema = Arc::new(provider.schema().clone());
         let source_hz = provider.tick_rate();
 
         Self::from_provider_parts(provider, schema, source_hz).await
@@ -140,10 +140,11 @@ impl IbtConnection {
     pub fn source_hz(&self) -> f64 {
         self.source_hz
     }
+}
 
-    /// Get the variable schema
-    pub fn schema(&self) -> &VariableSchema {
-        &self.schema
+impl SchemaProvider for IbtConnection {
+    fn schema(&self) -> &VariableSchema {
+        self.schema.as_ref()
     }
 }
 
@@ -176,7 +177,7 @@ mod tests {
         assert!(frame_count <= reader.total_frames());
 
         let frames_to_remove = reader.total_frames() - frame_count;
-        data.truncate(data.len() - frames_to_remove * reader.variables().frame_size);
+        data.truncate(data.len() - frames_to_remove * reader.schema().frame_size);
         Ok(data)
     }
 

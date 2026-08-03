@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::{
-    FramePacket, Result, VariableSchema, WaitResult, WindowsConnection, provider::Provider,
-    yaml_utils,
+    FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
+    provider::Provider, yaml_utils,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -75,11 +75,6 @@ impl LiveProvider {
             poll_interval,
             max_no_connection_attempts,
         })
-    }
-
-    /// Get the variable schema
-    pub fn schema(&self) -> Arc<VariableSchema> {
-        Arc::clone(&self.schema)
     }
 
     async fn next_frame_impl(&mut self) -> Result<Option<FramePacket>> {
@@ -195,6 +190,12 @@ impl LiveProvider {
         tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
 
         Ok(Some(cleaned_yaml))
+    }
+}
+
+impl SchemaProvider for LiveProvider {
+    fn schema(&self) -> &VariableSchema {
+        self.schema.as_ref()
     }
 }
 

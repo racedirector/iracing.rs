@@ -4,7 +4,7 @@ use clap::Parser;
 use iracing_sdk::IRacingSDKError;
 #[cfg(windows)]
 use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, providers::live::LiveProvider,
+    AdapterValidation, FieldExtraction, FrameAdapter, SchemaProvider, providers::live::LiveProvider,
 };
 #[cfg(windows)]
 use std::path::PathBuf;

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::{
-    VarData,
+    SchemaProvider, VarData,
     ibt::IbtReader,
     types::{
         CarLeftRight, EngineWarnings, PaceMode, PitServiceFlags, SessionFlags, SessionState,
@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     let mut reader = IbtReader::open(&args.ibt_path)?;
-    let schema = reader.variables().clone();
+    let schema = reader.schema().clone();
 
     let session_state = schema.get_variable("SessionState").cloned();
     let session_flags = schema.get_variable("SessionFlags").cloned();
