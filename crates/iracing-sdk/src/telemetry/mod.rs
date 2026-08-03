@@ -102,6 +102,7 @@ impl Telemetry {
 
         if !sessions.initialize(&mut provider, &cancel).await {
             tracing::info!("Session initialization cancelled");
+            sessions.end().await;
             return;
         }
 
@@ -148,7 +149,6 @@ impl Telemetry {
                     tracing::info!("Provider stream ended after {} frames", frame_count);
                     // Update consumers that stream ended.
                     delivery.end(permit).await;
-                    sessions.end().await;
                     break;
                 }
                 Err(e) => {
@@ -160,12 +160,10 @@ impl Telemetry {
                         tracing::error!("Too many provider errors, shutting down!");
                         // Update consumers that stream ended.
                         delivery.end(permit).await;
-                        sessions.end().await;
                         break;
                     }
 
                     if !delivery.error(permit, e).await {
-                        sessions.end().await;
                         break;
                     }
 
@@ -175,6 +173,10 @@ impl Telemetry {
                 }
             }
         }
+
+        // Finalize session state exactly once for every loop exit, including
+        // cancellation and dropped delivery receivers.
+        sessions.end().await;
 
         // When the loop breaks, log the number of processed frames.
         tracing::info!("Frame reader task ended (processed {} frames)", frame_count);
@@ -200,13 +202,45 @@ mod tests {
     //! scheduling and delivery behavior of `Telemetry::read_task`, which is the
     //! behavior under test here.
 
-    use std::{collections::HashMap, sync::Arc, time::Duration};
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
     use tokio::sync::{mpsc, oneshot, watch};
+    use tokio_util::sync::CancellationToken;
 
     use crate::{FramePacket, Result, VariableSchema, provider::Provider};
 
-    use super::{ReplayDemand, Telemetry, TelemetryChannels};
+    use super::{
+        ReplayDemand, Telemetry, TelemetryChannels, delivery_policy::LatestDelivery,
+        session_policy::SessionPolicy,
+    };
+
+    /// A session policy that records how many times the telemetry task finalizes it.
+    struct CountingSessionPolicy {
+        end_count: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl<P: Provider> SessionPolicy<P> for CountingSessionPolicy {
+        async fn observe(
+            &mut self,
+            _provider: &mut P,
+            _frame: &FramePacket,
+            _cancel: &CancellationToken,
+        ) -> bool {
+            true
+        }
+
+        async fn end(&mut self) {
+            self.end_count.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     /// Construct the smallest valid packet needed by the telemetry task.
     ///
@@ -340,6 +374,29 @@ mod tests {
                 .is_none()
         );
         assert_eq!(reads.recv().await, Some(None));
+    }
+
+    #[tokio::test]
+    async fn telemetry_finalizes_its_session_policy_once_at_eof() {
+        let (provider, _reads) = FiniteProvider::new(0, None);
+        let (frames, _frame_receiver) = watch::channel(None);
+        let end_count = Arc::new(AtomicUsize::new(0));
+
+        Telemetry::read_task(
+            provider,
+            LatestDelivery::new(frames),
+            CountingSessionPolicy {
+                end_count: Arc::clone(&end_count),
+            },
+            CancellationToken::new(),
+        )
+        .await;
+
+        assert_eq!(
+            end_count.load(Ordering::SeqCst),
+            1,
+            "the telemetry task should finalize a session policy exactly once"
+        );
     }
 
     #[tokio::test]

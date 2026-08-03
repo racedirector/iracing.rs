@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::watch;
+use tokio::{
+    sync::{mpsc, watch},
+    task::JoinHandle,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::{FramePacket, provider::Provider, schema::SessionInfo};
@@ -18,10 +21,8 @@ use crate::{FramePacket, provider::Provider, schema::SessionInfo};
 ///
 /// 1. [`SessionPolicy::initialize`] once, before requesting or reading frames.
 /// 2. [`SessionPolicy::observe`] for every successfully read frame.
-/// 3. [`SessionPolicy::end`] when the provider reaches EOF or exceeds its error
-///    limit.
-///
-/// Cancellation can stop the telemetry task without calling [`SessionPolicy::end`].
+/// 3. [`SessionPolicy::end`] exactly once whenever the telemetry task stops,
+///    including provider EOF, terminal errors, and cancellation.
 #[async_trait]
 pub(crate) trait SessionPolicy<P: Provider>: Send {
     /// Perform source-specific session initialization before frame processing.
@@ -70,30 +71,120 @@ pub(crate) trait SessionPolicy<P: Provider>: Send {
     async fn end(&mut self);
 }
 
+enum LiveSessionEvent {
+    Advance {
+        generation: u64,
+    },
+    Parse {
+        generation: u64,
+        yaml: String,
+    },
+    Parsed {
+        generation: u64,
+        result: crate::Result<Box<SessionInfo>>,
+    },
+    Shutdown,
+
+    #[cfg(test)]
+    Barrier(tokio::sync::oneshot::Sender<()>),
+}
+
 /// Tracks changing session information for a live telemetry source.
 ///
 /// Live session YAML is associated with the session version reported by each
 /// frame. The policy fetches YAML when it observes a version for the first time
 /// and spawns parsing so the frame reader is not blocked by YAML parsing.
 ///
-/// The version is considered observed after the fetch attempt, including when
-/// the provider returns no YAML or an error. Parsing also happens in a detached
-/// task, so parse completion is not ordered with later versions or shutdown.
-/// These details intentionally preserve the existing live-session behavior.
+/// A changed source version advances an internal generation before YAML is
+/// fetched. Parsing runs outside the telemetry frame task and returns its result
+/// to a coordinator, which is the sole owner of the session publisher. The
+/// coordinator publishes only results from the newest observed generation, so
+/// older parses cannot overwrite newer state.
+///
+/// [`SessionPolicy::end`] is the shutdown barrier: the coordinator publishes
+/// `None` and exits before the method returns. Parse work that finishes later
+/// owns no session publisher and therefore cannot restore live session state.
+/// A version remains considered observed when fetching returns no YAML or an
+/// error, preserving the existing no-retry behavior for repeated frames.
 pub(crate) struct LiveSessionPolicy {
-    /// Latest-value channel used by live session observers.
-    sessions: watch::Sender<Option<Arc<SessionInfo>>>,
-
     /// Most recently observed frame session version.
     last_version: Option<u32>,
+
+    /// The generation for parsing
+    next_generation: u64,
+
+    // Internal sender for event coordination
+    events: mpsc::UnboundedSender<LiveSessionEvent>,
+
+    // Coordinator task. Owns the session sender.
+    coordinator: Option<JoinHandle<()>>,
 }
 
 impl LiveSessionPolicy {
     /// Create a live policy with no previously observed session version.
     pub(crate) fn new(sessions: watch::Sender<Option<Arc<SessionInfo>>>) -> Self {
+        let (events, events_rx) = mpsc::unbounded_channel();
+
+        let coordinator_handle =
+            tokio::spawn(Self::coordinator_task(events_rx, events.clone(), sessions));
+
         Self {
-            sessions,
             last_version: None,
+            next_generation: 0,
+            events,
+            coordinator: Some(coordinator_handle),
+        }
+    }
+
+    async fn coordinator_task(
+        mut receiver: mpsc::UnboundedReceiver<LiveSessionEvent>,
+        sender: mpsc::UnboundedSender<LiveSessionEvent>,
+        sessions: watch::Sender<Option<Arc<SessionInfo>>>,
+    ) {
+        let mut latest_generation = 0;
+
+        while let Some(event) = receiver.recv().await {
+            match event {
+                // Track the latest generation
+                LiveSessionEvent::Advance { generation } => latest_generation = generation,
+                // YAML was pulled from the provider, parse it synchronously into `SessionInfo` and send the result
+                LiveSessionEvent::Parse { generation, yaml } => {
+                    if generation != latest_generation {
+                        continue;
+                    }
+
+                    let results = sender.clone();
+
+                    tokio::spawn(async move {
+                        let result = SessionInfo::parse(&yaml).map(Box::new);
+                        let _ = results.send(LiveSessionEvent::Parsed { generation, result });
+                    });
+                }
+                // SessionInfo was parsed, check the result and send if successful.
+                LiveSessionEvent::Parsed { generation, result } => {
+                    if generation != latest_generation {
+                        continue;
+                    }
+
+                    match result {
+                        Ok(session) => {
+                            let _ = sessions.send(Some(Arc::from(session)));
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to parse session YAML: {}", e);
+                        }
+                    }
+                }
+                // Send the terminal `None` and break the loop.
+                LiveSessionEvent::Shutdown => {
+                    let _ = sessions.send(None);
+                    break;
+                }
+                #[cfg(test)]
+                LiveSessionEvent::Barrier(reached) => {
+                    let _ = reached.send(());
+                }
+            }
         }
     }
 }
@@ -104,62 +195,86 @@ impl<P: Provider> SessionPolicy<P> for LiveSessionPolicy {
         &mut self,
         provider: &mut P,
         frame: &FramePacket,
-        _cancel: &CancellationToken, // TODO: Implement cancellation handling later.
+        cancel: &CancellationToken,
     ) -> bool {
         // A repeated version uses the already-published session snapshot and
         // does not ask the live provider for identical YAML again.
         let version = frame.session_version;
-        if self.last_version != Some(version) {
-            tracing::debug!(
-                "Session version changed: {} -> {}",
-                self.last_version.unwrap_or(0),
-                version
-            );
+        if self.last_version == Some(version) {
+            return true;
+        }
 
-            match provider.session_yaml(version).await {
-                Ok(Some(yaml)) => {
-                    tracing::debug!(
-                        "Fetched session YAML ({} bytes) for v{}",
-                        yaml.len(),
-                        version
-                    );
+        tracing::debug!(
+            "Session version changed: {:#?} -> {}",
+            self.last_version,
+            version
+        );
 
-                    // The detached parser owns a sender clone so frame reading
-                    // can continue while the YAML is parsed.
-                    let session_clone = self.sessions.clone();
+        // A version is marked observed after any fetch outcome. The policy
+        // therefore makes at most one fetch attempt per observed version.
+        self.last_version = Some(version);
 
-                    // This preserves the existing latest-wins live behavior:
-                    // independently spawned versions can complete out of order.
-                    tokio::spawn(async move {
-                        match SessionInfo::parse(&yaml) {
-                            Ok(session) => {
-                                tracing::debug!("Parsed session info");
-                                let _ = session_clone.send(Some(Arc::new(session)));
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to parse session YAML: {}", e);
-                            }
-                        }
-                    });
-                }
-                Ok(None) => {
-                    tracing::debug!("No session YAML for version {}", version);
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to get session YAML: {}", e);
-                }
+        // Increase the tracked generation
+        self.next_generation = self.next_generation.wrapping_add(1);
+        let generation = self.next_generation;
+
+        // Notify the processing task that we've advanced.
+        let _ = self.events.send(LiveSessionEvent::Advance { generation });
+
+        // Use select to allow cancellation during provider.session_yaml()
+        let result = tokio::select! {
+            _ = cancel.cancelled() => {
+                tracing::info!("Frame reader cancelled during session parsing");
+                // Return false to represent parsing failure
+                return false;
             }
+            result = provider.session_yaml(version) => result,
+        };
 
-            // A version is marked observed after any fetch outcome. The policy
-            // therefore makes at most one fetch attempt per observed version.
-            self.last_version = Some(version);
+        match result {
+            Ok(Some(yaml)) => {
+                tracing::debug!(
+                    "Fetched session YAML ({} bytes) for v{}",
+                    yaml.len(),
+                    version
+                );
+
+                let _ = self
+                    .events
+                    .send(LiveSessionEvent::Parse { generation, yaml });
+            }
+            Ok(None) => {
+                tracing::debug!("No session YAML for version {}", version);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to get session YAML: {}", e);
+            }
         }
 
         true
     }
 
     async fn end(&mut self) {
-        let _ = self.sessions.send(None);
+        // Get the handle if it exists or bail because it's already closed.
+        let Some(handle) = self.coordinator.take() else {
+            return;
+        };
+
+        // Send shutdown so the coordinator sends terminal None
+        let _ = self.events.send(LiveSessionEvent::Shutdown);
+
+        // Handle errors, if any.
+        if let Err(error) = handle.await {
+            tracing::warn!(%error, "Live session coordinator failed during shutdown");
+        }
+    }
+}
+
+impl Drop for LiveSessionPolicy {
+    fn drop(&mut self) {
+        if let Some(coordinator) = self.coordinator.take() {
+            coordinator.abort();
+        }
     }
 }
 
@@ -294,7 +409,8 @@ impl<P: Provider> SessionPolicy<P> for IbtSessionPolicy {
 
 #[cfg(test)]
 mod tests {
-    //! Characterization tests for immutable IBT session handling.
+    //! Characterization tests for live generation ordering and immutable IBT
+    //! session handling.
     //!
     //! The tests use [`SessionProvider`] instead of an `IbtReader` so they can
     //! independently control the three provider outcomes relevant to the
@@ -306,14 +422,187 @@ mod tests {
     //! The only frame passed to `observe` is a minimal packet used to prove that
     //! normal replay traversal does not trigger another session fetch.
 
-    use std::{collections::HashMap, sync::Arc};
+    use std::{collections::HashMap, sync::Arc, time::Duration};
 
-    use tokio::sync::watch;
+    use tokio::sync::{mpsc, oneshot, watch};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider};
+    use crate::{
+        FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider,
+        schema::SessionInfo,
+    };
 
-    use super::{IbtSessionPolicy, IbtSessionState, SessionPolicy};
+    use super::{
+        IbtSessionPolicy, IbtSessionState, LiveSessionEvent, LiveSessionPolicy, SessionPolicy,
+    };
+
+    /// Create a valid session with a distinctive value for publication-order assertions.
+    fn named_session(track_name: &str) -> SessionInfo {
+        let mut session = SessionInfo::parse(include_str!(
+            "../../../../test-data/session-yaml/profile_small.yaml"
+        ))
+        .expect("the small session fixture should parse");
+        session.weekend_info.track_name = track_name.to_owned();
+        session
+    }
+
+    /// Wait until the coordinator has processed every event sent before this call.
+    async fn coordinator_barrier(events: &mpsc::UnboundedSender<LiveSessionEvent>) {
+        let (reached, wait) = oneshot::channel();
+        events
+            .send(LiveSessionEvent::Barrier(reached))
+            .expect("the live session coordinator should still be running");
+        wait.await
+            .expect("the live session coordinator should reach the barrier");
+    }
+
+    #[tokio::test]
+    async fn live_coordinator_rejects_an_older_result_after_a_newer_publication() {
+        let (events, receiver) = mpsc::unbounded_channel();
+        let (sessions, session_receiver) = watch::channel(None);
+        let coordinator = tokio::spawn(LiveSessionPolicy::coordinator_task(
+            receiver,
+            events.clone(),
+            sessions,
+        ));
+
+        events
+            .send(LiveSessionEvent::Advance { generation: 1 })
+            .expect("the coordinator should accept the first generation");
+        events
+            .send(LiveSessionEvent::Parsed {
+                generation: 1,
+                result: Ok(Box::new(named_session("older"))),
+            })
+            .expect("the coordinator should accept the first result");
+        coordinator_barrier(&events).await;
+        assert_eq!(
+            session_receiver
+                .borrow()
+                .as_ref()
+                .expect("the first generation should publish")
+                .weekend_info
+                .track_name,
+            "older"
+        );
+
+        events
+            .send(LiveSessionEvent::Advance { generation: 2 })
+            .expect("the coordinator should accept the newer generation");
+        events
+            .send(LiveSessionEvent::Parsed {
+                generation: 2,
+                result: Ok(Box::new(named_session("newer"))),
+            })
+            .expect("the coordinator should accept the newer result");
+        coordinator_barrier(&events).await;
+
+        // Complete the older generation after the newer value has published.
+        events
+            .send(LiveSessionEvent::Parsed {
+                generation: 1,
+                result: Ok(Box::new(named_session("stale"))),
+            })
+            .expect("the coordinator should receive the stale result");
+        coordinator_barrier(&events).await;
+
+        assert_eq!(
+            session_receiver
+                .borrow()
+                .as_ref()
+                .expect("the newer generation should remain published")
+                .weekend_info
+                .track_name,
+            "newer"
+        );
+
+        events
+            .send(LiveSessionEvent::Shutdown)
+            .expect("the coordinator should accept shutdown");
+        coordinator
+            .await
+            .expect("the live session coordinator should stop cleanly");
+    }
+
+    #[tokio::test]
+    async fn live_coordinator_parses_submitted_yaml_and_publishes_the_result() {
+        let (events, receiver) = mpsc::unbounded_channel();
+        let (sessions, mut session_receiver) = watch::channel(None);
+        let coordinator = tokio::spawn(LiveSessionPolicy::coordinator_task(
+            receiver,
+            events.clone(),
+            sessions,
+        ));
+
+        events
+            .send(LiveSessionEvent::Advance { generation: 1 })
+            .expect("the coordinator should accept a generation");
+        events
+            .send(LiveSessionEvent::Parse {
+                generation: 1,
+                yaml: include_str!("../../../../test-data/session-yaml/profile_small.yaml")
+                    .to_owned(),
+            })
+            .expect("the coordinator should accept YAML for parsing");
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while session_receiver.borrow_and_update().is_none() {
+                session_receiver
+                    .changed()
+                    .await
+                    .expect("the live session channel should remain connected");
+            }
+        })
+        .await
+        .expect("background parsing should publish the session promptly");
+
+        assert!(session_receiver.borrow().is_some());
+
+        events
+            .send(LiveSessionEvent::Shutdown)
+            .expect("the coordinator should accept shutdown");
+        coordinator
+            .await
+            .expect("the live session coordinator should stop cleanly");
+    }
+
+    #[tokio::test]
+    async fn live_end_is_idempotent_and_prevents_late_publication() {
+        let (sessions, receiver) = watch::channel(None);
+        let mut policy = LiveSessionPolicy::new(sessions);
+
+        policy
+            .events
+            .send(LiveSessionEvent::Advance { generation: 1 })
+            .expect("the coordinator should accept a generation");
+        policy
+            .events
+            .send(LiveSessionEvent::Parsed {
+                generation: 1,
+                result: Ok(Box::new(named_session("published"))),
+            })
+            .expect("the coordinator should accept a parsed session");
+        coordinator_barrier(&policy.events).await;
+        assert!(receiver.borrow().is_some());
+
+        <LiveSessionPolicy as SessionPolicy<SessionProvider>>::end(&mut policy).await;
+        <LiveSessionPolicy as SessionPolicy<SessionProvider>>::end(&mut policy).await;
+
+        assert!(
+            receiver.borrow().is_none(),
+            "end should leave the live session channel in its terminal state"
+        );
+        assert!(
+            policy
+                .events
+                .send(LiveSessionEvent::Parsed {
+                    generation: 1,
+                    result: Ok(Box::new(named_session("late"))),
+                })
+                .is_err(),
+            "the stopped coordinator must reject late parse results"
+        );
+    }
 
     /// Configures the result returned by the mock provider's session endpoint.
     enum SessionOutcome {

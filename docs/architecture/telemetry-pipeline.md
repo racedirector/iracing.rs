@@ -77,7 +77,9 @@ repeats:
 
 Provider errors use exponential backoff and stop after ten consecutive errors.
 Dropping a high-level connection cancels its task through a
-`CancellationToken`.
+`CancellationToken`. The task finalizes its session policy exactly once on every
+exit, including cancellation, provider EOF, terminal errors, and dropped frame
+receivers.
 
 The internal `TelemetryBuilder` makes delivery and session policies independent.
 Its defaults are `LatestDelivery` and `LiveSessionPolicy`.
@@ -103,13 +105,18 @@ a later subscriber receives the retained frame and can resume replay.
 
 ## Session policies
 
-`LiveSessionPolicy` watches packet session versions. On a new version it fetches
-YAML once and parses it in a detached task so the frame loop is not blocked. The
-current semantics are important:
+`LiveSessionPolicy` watches packet session versions. On a changed version it
+advances an internal generation, fetches YAML once, and submits parsing to a
+background task so typed YAML deserialization does not block the frame loop. A
+private coordinator is the sole owner of the live session publisher. The
+current semantics are:
 
 - a version is marked observed even if fetch or parse fails;
-- independently spawned parses can publish out of order;
-- normal end publishes `None`.
+- repeated adjacent frames with the same version do not refetch YAML;
+- only a parse result matching the newest observed generation may publish;
+- older parses cannot overwrite a newer session snapshot;
+- `end` publishes `None` and waits for the coordinator to exit, after which
+  outstanding parse work cannot republish live session state.
 
 `IbtSessionPolicy` fetches the file's single immutable YAML document once during
 initialization, parses inline, and publishes before frames. It does not retry a
