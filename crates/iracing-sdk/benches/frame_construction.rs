@@ -1,40 +1,33 @@
 //! Benchmarks for core frame packet construction
 //!
 //! Tests the <100μs frame construction latency goal for:
-//! - FramePacket creation with real telemetry data from IBT files
+//! - FramePacket creation with a representative full live frame
 //! - Arc<[u8]> cloning overhead for zero-copy data sharing
 //! - Tick count operations and wraparound handling
 //!
-//! Platform: Cross-platform (uses real IBT test files, CI-safe)
+//! Platform: Cross-platform (uses the checked-in live variable schema, CI-safe)
 
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use iracing_sdk::{FramePacket, VariableSchema, ibt::IbtReader};
+mod support;
+
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use iracing_sdk::{FramePacket, VariableSchema};
+use std::collections::HashMap;
 use std::hint::black_box;
 use std::sync::Arc;
-use test_utils::get_smallest_ibt_test_file;
 
-/// Load real telemetry data from IBT test file
-fn load_real_frame_data() -> (Vec<u8>, u32, u32, Arc<VariableSchema>) {
-    let ibt_file = get_smallest_ibt_test_file().expect("No IBT test files found");
-    let mut reader = IbtReader::open(&ibt_file).expect("Failed to open IBT file");
-
-    let schema = Arc::new(reader.variables().clone());
-
-    let (data, tick, session_version) = reader
-        .read_next_frame()
-        .expect("Failed to read frame")
-        .expect("No frames in IBT");
-
-    (data, tick, session_version, schema)
+/// Load deterministic data with the captured full live-frame layout.
+fn load_full_frame_data() -> (Vec<u8>, u32, u32, Arc<VariableSchema>) {
+    let fixture = support::full_frame_fixture();
+    (fixture.data, 1, 1, fixture.schema)
 }
 
 fn bench_frame_packet_creation(c: &mut Criterion) {
-    let (data, tick, session_version, schema) = load_real_frame_data();
+    let (data, tick, session_version, schema) = load_full_frame_data();
 
     let mut group = c.benchmark_group("frame_packet_creation");
     group.throughput(Throughput::Bytes(data.len() as u64));
 
-    group.bench_function("new_from_ibt_data", |b| {
+    group.bench_function("allocate_copy_and_construct", |b| {
         b.iter(|| {
             let packet = FramePacket::new(
                 black_box(data.clone()),
@@ -46,11 +39,56 @@ fn bench_frame_packet_creation(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("construct_from_owned_buffer", |b| {
+        b.iter_batched(
+            || data.clone(),
+            |owned_data| {
+                let packet = FramePacket::new(
+                    black_box(owned_data),
+                    black_box(tick),
+                    black_box(session_version),
+                    black_box(Arc::clone(&schema)),
+                );
+                black_box(packet)
+            },
+            BatchSize::SmallInput,
+        )
+    });
+
+    group.finish();
+}
+
+fn bench_frame_size_scaling(c: &mut Criterion) {
+    let (full_data, tick, session_version, _) = load_full_frame_data();
+    let mut group = c.benchmark_group("frame_size_scaling");
+
+    for size in [48, 64, 96, full_data.len()] {
+        let data = &full_data[..size];
+        let schema = Arc::new(VariableSchema::new(HashMap::new(), size).unwrap());
+        group.throughput(Throughput::Bytes(size as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("allocate_copy_and_construct", size),
+            &size,
+            |b, _| {
+                b.iter(|| {
+                    let packet = FramePacket::new(
+                        black_box(data.to_vec()),
+                        black_box(tick),
+                        black_box(session_version),
+                        black_box(Arc::clone(&schema)),
+                    );
+                    black_box(packet)
+                })
+            },
+        );
+    }
+
     group.finish();
 }
 
 fn bench_arc_cloning(c: &mut Criterion) {
-    let (data, tick, session_version, schema) = load_real_frame_data();
+    let (data, tick, session_version, schema) = load_full_frame_data();
     let packet = FramePacket::new(data, tick, session_version, Arc::clone(&schema));
 
     c.bench_function("arc_clone_frame_data", |b| {
@@ -71,7 +109,7 @@ fn bench_arc_cloning(c: &mut Criterion) {
 }
 
 fn bench_tick_operations(c: &mut Criterion) {
-    let (data, tick, session_version, schema) = load_real_frame_data();
+    let (data, tick, session_version, schema) = load_full_frame_data();
 
     let mut group = c.benchmark_group("tick_operations");
 
@@ -98,7 +136,7 @@ fn bench_tick_operations(c: &mut Criterion) {
 }
 
 fn bench_frame_construction_latency(c: &mut Criterion) {
-    let (data, tick, session_version, schema) = load_real_frame_data();
+    let (data, tick, session_version, schema) = load_full_frame_data();
 
     let mut group = c.benchmark_group("frame_construction_latency");
 
@@ -123,6 +161,7 @@ fn bench_frame_construction_latency(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_frame_packet_creation,
+    bench_frame_size_scaling,
     bench_arc_cloning,
     bench_tick_operations,
     bench_frame_construction_latency

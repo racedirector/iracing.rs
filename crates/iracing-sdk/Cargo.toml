@@ -97,12 +97,22 @@ derive = ["dep:iracing-sdk-derive"]
 schema-discovery = []
 
 [[bench]]
-name = "var_data_extraction"
+name = "adapter_performance"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
 name = "frame_construction"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "live_frame_latency"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
