@@ -27,6 +27,12 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.live_to_csv]
 targets = ["x86_64-pc-windows-msvc"]
 
+[package.metadata.dist.bin.live-json-snapshot]
+targets = ["x86_64-pc-windows-msvc"]
+
+[package.metadata.dist.bin.live-to-jsonl]
+targets = ["x86_64-pc-windows-msvc"]
+
 [package.metadata.dist.bin.live-session-schema]
 targets = ["x86_64-pc-windows-msvc"]
 
@@ -205,6 +211,14 @@ name = "ibt-to-csv"
 path = "src/bin/ibt_to_csv.rs"
 
 [[bin]]
+name = "ibt-json-snapshot"
+path = "src/bin/ibt_json_snapshot.rs"
+
+[[bin]]
+name = "ibt-to-json"
+path = "src/bin/ibt_to_json.rs"
+
+[[bin]]
 name = "live-headers"
 path = "src/bin/live_headers.rs"
 
@@ -215,6 +229,14 @@ path = "src/bin/live_session_parser.rs"
 [[bin]]
 name = "live-to-csv"
 path = "src/bin/live_to_csv.rs"
+
+[[bin]]
+name = "live-json-snapshot"
+path = "src/bin/live_json_snapshot.rs"
+
+[[bin]]
+name = "live-to-jsonl"
+path = "src/bin/live_to_jsonl.rs"
 
 [[bin]]
 name = "session-schema"

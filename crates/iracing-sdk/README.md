@@ -156,7 +156,7 @@ impl FrameAdapter for Row {
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
 | Session parsing (`SessionInfoParser`) | Yes | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-session-parser` and `live-to-csv` bins | No | Yes |
+| `live-position` example / `live-session-parser`, `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
 ## Examples and Binaries
 
@@ -177,10 +177,18 @@ impl FrameAdapter for Row {
 
 - `ibt-session-parser`:
   - `cargo run -p iracing-sdk --bin ibt-session-parser -- --ibt-path ./session.ibt --output-path ./session.yaml`
+- `ibt-json-snapshot`:
+  - `cargo run -p iracing-sdk --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
+- `ibt-to-json`:
+  - `cargo run -p iracing-sdk --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
 - `live-session-parser` (Windows only):
   - `cargo run -p iracing-sdk --bin live-session-parser -- --output-path .\\live-session.yaml`
 - `live-to-csv` (Windows only):
   - `cargo run -p iracing-sdk --bin live-to-csv -- --output-path .\\live.csv`
+- `live-json-snapshot` (Windows only):
+  - `cargo run -p iracing-sdk --bin live-json-snapshot -- --output-path .\\live-snapshot.jsonl`
+- `live-to-jsonl` (Windows only):
+  - `cargo run -p iracing-sdk --bin live-to-jsonl -- --output-path .\\live.jsonl`
 
 ## Troubleshooting
 

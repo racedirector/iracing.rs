@@ -65,6 +65,17 @@ ibt-session-parser = [
 
 ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
 
+ibt-json-snapshot = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--bin",
+  "ibt-json-snapshot",
+  "--",
+]
+
+ibt-to-json = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-json", "--"]
+
 primitives-schema = [
   "run",
   "-p",
@@ -99,6 +110,17 @@ live-session-schema = [
 ]
 
 live-to-csv = ["run", "-p", "iracing-sdk", "--bin", "live-to-csv", "--"]
+
+live-json-snapshot = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--bin",
+  "live-json-snapshot",
+  "--",
+]
+
+live-to-jsonl = ["run", "-p", "iracing-sdk", "--bin", "live-to-jsonl", "--"]
 
 live-variable-schema = [
   "run",
