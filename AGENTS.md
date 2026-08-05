@@ -22,7 +22,8 @@ on commands, boundaries, and easy-to-miss constraints.
 ## Test Data
 
 - Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
-- Use helpers from `crates/test-utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
+- Use helpers from `iracing_sdk::test_utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
+- Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` and the generated schemas it indexes. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use the session and primitive schemas for object shapes and legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
 
 ## Workspace Map
 
@@ -30,12 +31,11 @@ on commands, boundaries, and easy-to-miss constraints.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
 - `crates/iracing-broadcast-grpc-service`: generated cross-platform protobuf/tonic surface plus a Windows-only, layered command-and-observation service.
-- `crates/test-utils`: shared fixture plumbing and path discovery; lean on it for integration tests instead of reinventing file lookups.
 - `examples/*`: publish-disabled workspace applications that exercise the crates as downstream users would.
 
 ## Package-Specific Guidance
 
-- Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`, `iracing-broadcast-grpc-service`, and `test-utils`.
+- Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`, and `iracing-broadcast-grpc-service`.
 - For the broadcast gRPC service, read `crates/iracing-broadcast-grpc-service/docs/architecture.md` before changing protocol, server, client, response semantics, platform support, or operational behavior.
 
 ## Patterns & Gotchas

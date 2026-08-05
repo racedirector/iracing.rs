@@ -78,7 +78,7 @@ impl IbtConnectionBuilder<ProviderSource> {
 mod tests {
     use super::*;
     use crate::SchemaProvider;
-    use test_utils::require_smallest_ibt_fixture;
+    use crate::test_utils::require_smallest_ibt_fixture;
 
     #[tokio::test]
     async fn path_source_builds_connection() -> Result<()> {

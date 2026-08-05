@@ -159,6 +159,7 @@ impl Drop for IbtConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::require_smallest_ibt_fixture;
     use crate::{DynamicFrame, IRacingSDKError};
     use futures::StreamExt;
     use std::{
@@ -166,7 +167,6 @@ mod tests {
         future::pending,
         time::{Duration, Instant},
     };
-    use test_utils::require_smallest_ibt_fixture;
     use tokio::sync::mpsc;
 
     fn fixture_with_frame_count(frame_count: usize) -> Result<Vec<u8>> {

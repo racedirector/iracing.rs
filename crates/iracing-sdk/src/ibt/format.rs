@@ -486,12 +486,12 @@ fn extract_null_terminated_string(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    use crate::test_utils::{
+        IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
+    };
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
     use std::path::Path;
-    use test_utils::{
-        IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
-    };
 
     fn open_buf_reader(path: &Path) -> Result<std::io::BufReader<File>> {
         let file = File::open(path).with_context(|| format!("Opening {}", path.display()))?;

@@ -5,7 +5,6 @@ members = [
   "crates/iracing-sdk",
   "crates/iracing-sdk-derive",
   "crates/iracing-simulation",
-  "crates/test-utils",
   "examples/driver-inputs",
   "examples/iracing-lifecycle-monitor",
 ]

@@ -33,7 +33,7 @@ Use `--no-drift-check` only while intentionally changing generated output.
 ## Manifest contract
 
 When `test-data/ibt/manifest.json` exists, its listed profiles are authoritative
-for `test-utils` discovery. Unlisted real-world captures in the same directory
+for `iracing_sdk::test_utils` discovery. Unlisted real-world captures in the same directory
 are not automatically part of deterministic manifest-backed tests.
 
 The manifest records layout constants, profile seeds, frame counts and sizes,
@@ -42,7 +42,7 @@ generator and verifier together when this contract changes.
 
 ## Shared helpers
 
-`test-utils` finds the repository root by walking upward for a `.git` entry and
+`iracing_sdk::test_utils` finds the repository root by walking upward for a `.git` entry and
 resolves `test-data` from there.
 
 Use:
@@ -59,10 +59,15 @@ skip a required integration test because data is absent. The best-effort
 
 ## Test layering
 
+- Before designing synthetic telemetry or session inputs, use the generated
+  schema catalog in [`docs/reference/README.md`](../reference/README.md) to find
+  real variable names and metadata, session shapes, and primitive value
+  domains. A disk/live snapshot's offsets and `frame_size` form one captured
+  layout and must not be combined with offsets from another snapshot.
 - Unit tests should construct minimal frames/schemas and use fake providers or
   ports.
 - SDK parser/reader integration tests should use deterministic fixtures through
-  `test-utils`.
+  `iracing_sdk::test_utils`.
 - Broadcast application tests should fake internal ports; transport tests should
   exercise tonic over a real listener where platform gates permit.
 - Simulation tests should inject `SimStatusClient`; only an explicit smoke test

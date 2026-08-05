@@ -109,7 +109,7 @@ impl Provider for IbtProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_utils::require_smallest_ibt_fixture;
+    use crate::test_utils::require_smallest_ibt_fixture;
 
     #[test]
     fn open_constructs_provider() -> Result<()> {

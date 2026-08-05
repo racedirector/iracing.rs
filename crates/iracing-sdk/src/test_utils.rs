@@ -1,3 +1,6 @@
+#![cfg(any(test, feature = "benchmark"))]
+#![allow(missing_docs)]
+
 //! Test utilities for consistent path resolution and test data access
 //!
 //! This module provides utilities for finding test data files and other testing helpers

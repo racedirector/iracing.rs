@@ -59,6 +59,7 @@
 //!
 pub mod adapters;
 mod error;
+pub mod test_utils;
 pub mod types;
 pub mod yaml_utils;
 

@@ -328,8 +328,8 @@ impl SchemaProvider for IbtReader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::require_smallest_ibt_fixture;
     use anyhow::{Context, Result, ensure};
-    use test_utils::require_smallest_ibt_fixture;
 
     use std::path::PathBuf;
     use std::time::{Duration, Instant};

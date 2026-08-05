@@ -88,7 +88,6 @@ tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 criterion = "0.8.2"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive" }
 proptest = "1.11.0"
-test-utils = { path = "../test-utils" }
 
 [features]
 default = ["derive"]

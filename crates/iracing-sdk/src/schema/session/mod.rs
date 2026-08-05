@@ -302,9 +302,9 @@ impl SessionInfo {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    use crate::test_utils::{find_git_repository_root, require_test_data_file};
     use anyhow::{Context, Result};
     use proptest::prelude::*;
-    use test_utils::{find_git_repository_root, require_test_data_file};
 
     #[test]
     fn find_git_repository_root_works() {

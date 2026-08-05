@@ -1060,7 +1060,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "test-utils",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -2315,14 +2314,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "test-utils"
-version = "0.0.0"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

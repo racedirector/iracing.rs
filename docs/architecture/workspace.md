@@ -14,7 +14,6 @@ workspace applications
 
 iracing-broadcast-grpc-service ───► iracing-sdk
 iracing-sdk ── optional derive ───► iracing-sdk-derive
-iracing-sdk tests ────────────────► test-utils
 ```
 
 `iracing-sdk-derive` has a dev-dependency back on `iracing-sdk` for integration
@@ -72,12 +71,6 @@ Owns the network boundary for broadcast controls:
 
 Raw Win32 message identifiers and packing remain in `iracing-sdk`. Generated
 protobuf types remain portable; the real service composition is Windows-only.
-
-### `test-utils`
-
-Owns repository-root discovery and deterministic fixture contracts. It keeps
-missing-fixture behavior uniform and prevents integration tests from embedding
-fragile relative paths.
 
 ### Workspace applications
 
@@ -141,7 +134,7 @@ Simulation
   `broadcast_service`, SDK/live conversion in `broadcast_iracing`.
 - Put optional HTTP clients in simulation examples/dev-dependencies; preserve
   the raw standard-library default path.
-- Put fixture discovery in `test-utils` and fixture generation/verification in
-  `scripts`.
+- Put test-only fixture discovery in `iracing-sdk::test_utils` and fixture
+  generation/verification in `scripts`.
 - Gate the smallest OS-dependent implementation unit. Do not hide portable data
   models just because one transport is Windows-only.
