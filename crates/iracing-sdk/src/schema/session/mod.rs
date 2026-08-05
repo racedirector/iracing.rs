@@ -327,7 +327,7 @@ mod tests {
 
         let repo_path_name = repo_root.file_name().unwrap();
 
-        // The path should end with 'pitwall' (our project name)
+        // The path should end with 'iracing.rs' (our project name)
         assert!(
             repo_path_name == "iracing.rs",
             "Repository root should be named 'iracing.rs'. Received: {:?}",

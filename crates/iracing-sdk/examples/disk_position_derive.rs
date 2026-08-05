@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
         "Parsing frames from IBT provider"
     );
 
-    let shared_validation = Row::validate_schema(&schema)?;
+    let shared_validation = Row::validate_schema(schema)?;
     while let Some(packet) = provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         writer.serialize(frame)?;

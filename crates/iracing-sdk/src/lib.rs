@@ -26,12 +26,12 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{VarData, ibt::IbtReader};
+//! use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
 //!
 //! fn main() -> iracing_sdk::Result<()> {
 //!     let mut reader = IbtReader::open("telemetry.ibt")?;
 //!     let speed_info = reader
-//!         .variables()
+//!         .schema()
 //!         .get_variable("Speed")
 //!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
 //!             context: "schema lookup".to_string(),

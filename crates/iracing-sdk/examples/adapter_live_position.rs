@@ -183,7 +183,7 @@ async fn main() -> anyhow::Result<()> {
 
         tracing::info!("Parsing frames from live connection");
 
-        let shared_validation = Row::validate_schema(&schema)?;
+        let shared_validation = Row::validate_schema(schema)?;
         while let Some(packet) = live_provider.next_frame().await? {
             let frame = Row::adapt(&packet, &shared_validation);
             writer.serialize(frame)?;

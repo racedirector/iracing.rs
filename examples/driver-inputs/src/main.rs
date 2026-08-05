@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Parsing frames from IBT provider"
     );
 
-    let shared_validation = DriverInput::validate_schema(&schema)?;
+    let shared_validation = DriverInput::validate_schema(schema)?;
     while let Some(packet) = ibt_provider.next_frame().await? {
         let frame = DriverInput::adapt(&packet, &shared_validation);
         flag_observer.observe(frame.flags)?;

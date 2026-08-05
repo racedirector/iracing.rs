@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
         let schema = provider.schema();
         let mut writer = Writer::from_path(&csv_output_path)?;
 
-        let shared_validation = Row::validate_schema(&schema)?;
+        let shared_validation = Row::validate_schema(schema)?;
         while let Some(packet) = provider.next_frame().await? {
             let frame = Row::adapt(&packet, &shared_validation);
             writer.serialize(frame)?;

@@ -194,7 +194,7 @@ async fn main() -> Result<()> {
     );
 
     let schema = ibt_provider.schema();
-    let shared_validation = Row::validate_schema(&schema)?;
+    let shared_validation = Row::validate_schema(schema)?;
     while let Some(packet) = ibt_provider.next_frame().await? {
         let frame = Row::adapt(&packet, &shared_validation);
         // Serialize row to CSV.

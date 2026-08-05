@@ -1,7 +1,7 @@
 //! Test utilities for consistent path resolution and test data access
 //!
 //! This module provides utilities for finding test data files and other testing helpers
-//! that are used across the pitwall workspace.
+//! that are used across the iracing_sdk workspace.
 
 use std::path::{Path, PathBuf};
 

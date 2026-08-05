@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
 
         let args = Args::parse();
         let mut provider = LiveProvider::new()?;
-        let validation = TelemetryRow::validate_schema(&provider.schema())?;
+        let validation = TelemetryRow::validate_schema(provider.schema())?;
 
         let mut seen = 0usize;
         while let Some(packet) = provider.next_frame().await? {
