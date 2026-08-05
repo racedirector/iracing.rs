@@ -95,7 +95,7 @@ async fn run() -> Result<()> {
     let mut frame_count = 0usize;
     while let Some(frame) = frames.next().await {
         let snapshot = DynamicFrameSnapshot::from_frame(&frame, &variables)?;
-        writer.write_record(&snapshot)?;
+        writer.write_snapshot(&snapshot)?;
         frame_count += 1;
 
         if frame_count.is_multiple_of(10_000) {

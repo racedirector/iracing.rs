@@ -1,21 +1,24 @@
 use anyhow::{Context, Result};
 use iracing_sdk::{DynamicFrame, TelemetryValue, TelemetryValueProvider, VariableInfo};
-use serde::Serialize;
-use serde_json::{Map, Number, Value};
+use serde::{
+    Serialize, Serializer,
+    ser::{SerializeMap, SerializeSeq},
+};
 use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
 };
 
+const OUTPUT_BUFFER_CAPACITY: usize = 64 * 1024;
+
 pub(super) struct JsonTelemetryWriter {
     writer: BufWriter<File>,
 }
 
-#[derive(Debug, Serialize)]
-pub(super) struct DynamicFrameSnapshot {
-    tick_count: u32,
-    telemetry: Map<String, Value>,
+#[derive(Debug)]
+pub(super) struct DynamicFrameSnapshot<'a> {
+    telemetry: Vec<(&'a str, TelemetryValue)>,
 }
 
 impl JsonTelemetryWriter {
@@ -26,10 +29,20 @@ impl JsonTelemetryWriter {
         })?;
 
         Ok(Self {
-            writer: BufWriter::new(file),
+            writer: BufWriter::with_capacity(OUTPUT_BUFFER_CAPACITY, file),
         })
     }
 
+    pub(super) fn write_snapshot(&mut self, snapshot: &DynamicFrameSnapshot<'_>) -> Result<()> {
+        serde_json::to_writer(&mut self.writer, snapshot)
+            .context("Could not serialize JSONL snapshot")?;
+        self.writer
+            .write_all(b"\n")
+            .context("Could not write JSONL snapshot")?;
+        Ok(())
+    }
+
+    #[cfg(test)]
     pub(super) fn write_record<T>(&mut self, record: &T) -> Result<()>
     where
         T: Serialize + ?Sized,
@@ -47,51 +60,78 @@ impl JsonTelemetryWriter {
     }
 }
 
-impl DynamicFrameSnapshot {
-    pub(super) fn from_frame(frame: &DynamicFrame, variables: &[VariableInfo]) -> Result<Self> {
-        Self::from_provider(frame.tick_count(), frame, variables)
+impl<'a> DynamicFrameSnapshot<'a> {
+    pub(super) fn from_frame(frame: &DynamicFrame, variables: &'a [VariableInfo]) -> Result<Self> {
+        Self::from_provider(frame, variables)
     }
 
     fn from_provider(
-        tick_count: u32,
         provider: &dyn TelemetryValueProvider,
-        variables: &[VariableInfo],
+        variables: &'a [VariableInfo],
     ) -> Result<Self> {
-        let mut telemetry = Map::with_capacity(variables.len());
+        let mut telemetry = Vec::with_capacity(variables.len());
 
         for variable in variables {
             let value = provider
                 .telemetry_value(variable)
                 .with_context(|| format!("Failed to decode `{}`", variable.name))?;
-            telemetry.insert(variable.name.clone(), telemetry_value_to_json(value));
+            telemetry.push((variable.name.as_str(), value));
         }
 
-        Ok(Self {
-            tick_count,
-            telemetry,
-        })
+        Ok(Self { telemetry })
     }
 }
 
-fn telemetry_value_to_json(value: TelemetryValue) -> Value {
-    match value {
-        TelemetryValue::Char(value) => Value::String(char::from(value).to_string()),
-        TelemetryValue::Int8(value) => Value::from(value),
-        TelemetryValue::UInt8(value) => Value::from(value),
-        TelemetryValue::Int16(value) => Value::from(value),
-        TelemetryValue::UInt16(value) => Value::from(value),
-        TelemetryValue::Int32(value) => Value::from(value),
-        TelemetryValue::UInt32(value) => Value::from(value),
-        TelemetryValue::Float32(value) => Number::from_f64(f64::from(value))
-            .map(Value::Number)
-            .unwrap_or(Value::Null),
-        TelemetryValue::Float64(value) => Number::from_f64(value)
-            .map(Value::Number)
-            .unwrap_or(Value::Null),
-        TelemetryValue::Bool(value) => Value::from(value),
-        TelemetryValue::BitField(value) => Value::from(value.value()),
-        TelemetryValue::Array(values) => {
-            Value::Array(values.into_iter().map(telemetry_value_to_json).collect())
+impl Serialize for DynamicFrameSnapshot<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        OrderedTelemetry(&self.telemetry).serialize(serializer)
+    }
+}
+
+struct OrderedTelemetry<'a>(&'a [(&'a str, TelemetryValue)]);
+
+impl Serialize for OrderedTelemetry<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut telemetry = serializer.serialize_map(Some(self.0.len()))?;
+        for (name, value) in self.0 {
+            telemetry.serialize_entry(name, &SerializableTelemetryValue(value))?;
+        }
+        telemetry.end()
+    }
+}
+
+struct SerializableTelemetryValue<'a>(&'a TelemetryValue);
+
+impl Serialize for SerializableTelemetryValue<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.0 {
+            TelemetryValue::Char(value) => serializer.serialize_char(char::from(*value)),
+            TelemetryValue::Int8(value) => serializer.serialize_i8(*value),
+            TelemetryValue::UInt8(value) => serializer.serialize_u8(*value),
+            TelemetryValue::Int16(value) => serializer.serialize_i16(*value),
+            TelemetryValue::UInt16(value) => serializer.serialize_u16(*value),
+            TelemetryValue::Int32(value) => serializer.serialize_i32(*value),
+            TelemetryValue::UInt32(value) => serializer.serialize_u32(*value),
+            TelemetryValue::Float32(value) => serializer.serialize_f32(*value),
+            TelemetryValue::Float64(value) => serializer.serialize_f64(*value),
+            TelemetryValue::Bool(value) => serializer.serialize_bool(*value),
+            TelemetryValue::BitField(value) => serializer.serialize_u32(value.value()),
+            TelemetryValue::Array(values) => {
+                let mut sequence = serializer.serialize_seq(Some(values.len()))?;
+                for value in values {
+                    sequence.serialize_element(&SerializableTelemetryValue(value))?;
+                }
+                sequence.end()
+            }
         }
     }
 }
@@ -235,17 +275,34 @@ mod tests {
                 TelemetryValue::Array(vec![TelemetryValue::Int32(10), TelemetryValue::Int32(11)]),
                 serde_json::json!([10, 11]),
             ),
-            (TelemetryValue::Float32(f32::NAN), Value::Null),
-            (TelemetryValue::Float64(f64::INFINITY), Value::Null),
+            (TelemetryValue::Float32(f32::NAN), serde_json::Value::Null),
+            (
+                TelemetryValue::Float64(f64::INFINITY),
+                serde_json::Value::Null,
+            ),
         ];
 
         for (value, expected) in cases {
-            assert_eq!(telemetry_value_to_json(value), expected);
+            assert_eq!(
+                serde_json::to_value(SerializableTelemetryValue(&value)).unwrap(),
+                expected
+            );
         }
     }
 
     #[test]
-    fn dynamic_snapshot_wraps_tick_and_telemetry() -> Result<()> {
+    fn float32_values_use_the_shortest_round_trippable_representation() -> Result<()> {
+        let value = TelemetryValue::Float32(0.1);
+
+        assert_eq!(
+            serde_json::to_string(&SerializableTelemetryValue(&value))?,
+            "0.1"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dynamic_snapshot_preserves_variable_order() -> Result<()> {
         let variables = vec![variable("Speed"), variable("Gear")];
         let provider = TestTelemetryValueProvider {
             values: HashMap::from([
@@ -255,14 +312,17 @@ mod tests {
             failing_variable: None,
         };
 
-        let snapshot = DynamicFrameSnapshot::from_provider(123, &provider, &variables)?;
-        assert_eq!(
-            serde_json::to_value(snapshot)?,
-            serde_json::json!({
-                "tick_count": 123,
-                "telemetry": { "Speed": 42.5, "Gear": 3 }
-            })
-        );
+        let snapshot = DynamicFrameSnapshot::from_provider(&provider, &variables)?;
+        let output_path = output_path("ordered-dynamic-snapshot");
+        {
+            let mut writer = JsonTelemetryWriter::from_path(&output_path)?;
+            writer.write_snapshot(&snapshot)?;
+            writer.flush()?;
+        }
+
+        let output = std::fs::read_to_string(&output_path)?;
+        std::fs::remove_file(&output_path)?;
+        assert_eq!(output, "{\"Speed\":42.5,\"Gear\":3}\n");
         Ok(())
     }
 
@@ -274,7 +334,7 @@ mod tests {
             failing_variable: Some("Broken".to_string()),
         };
 
-        let error = DynamicFrameSnapshot::from_provider(0, &provider, &variables)
+        let error = DynamicFrameSnapshot::from_provider(&provider, &variables)
             .expect_err("snapshot construction should fail");
         assert!(error.to_string().contains("Failed to decode `Broken`"));
     }

@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     let snapshot = DynamicFrameSnapshot::from_frame(&frame, &variables)?;
 
     let mut writer = JsonTelemetryWriter::from_path(&output_path)?;
-    writer.write_record(&snapshot)?;
+    writer.write_snapshot(&snapshot)?;
     writer.flush()?;
 
     tracing::info!(
