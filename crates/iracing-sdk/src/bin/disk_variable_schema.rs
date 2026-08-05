@@ -15,6 +15,7 @@
 
 use anyhow::Result;
 use clap::Parser;
+use iracing_sdk::SchemaProvider;
 use iracing_sdk::ibt::IbtReader;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
@@ -57,7 +58,7 @@ pub fn main() -> Result<()> {
     // ------------------------------------------------------------
     let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
 
-    let variable_schema = reader.variables().clone();
+    let variable_schema = reader.schema().clone();
     let schema = schemars::schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;

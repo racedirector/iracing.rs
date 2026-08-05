@@ -17,11 +17,16 @@ Rust workspace for working with iRacing telemetry and simulation state:
 - [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
 - [`crates/iracing-sdk`](crates/iracing-sdk) — also contains the schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, `live-session-schema`, `live-variable-schema`, …).
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
-- [`crates/test-utils`](crates/test-utils) — generated fixture discovery + guardrails (`require_*` helpers) used by integration tests.
 
 ## Generated schema artifacts
 
 Schema snapshots are checked in under [`docs/reference`](docs/reference). Do not hand-edit them.
+They are also the starting point when constructing test/benchmark schemas,
+session YAML, or simulated telemetry frames: consult the
+[`docs/reference` usage guide](docs/reference/README.md) before creating fields
+or values from memory. The disk/live artifacts record concrete observed
+layouts, so keep each snapshot's frame size and offsets together; do not assume
+that one capture is an exhaustive schema for every car and session.
 
 | Artifact | Purpose | Regenerate from workspace root |
 | --- | --- | --- |
@@ -76,7 +81,7 @@ Defined in `.cargo/config.toml` for convenience:
 - **Session parsing**: `SessionInfoParser` caches YAML, so reuse it rather than reparsing on every frame.
 - **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
 - **Schema discovery**: When new fields appear, run the appropriate codegen bin with `--discover` and incorporate the results back into `iracing-sdk` to improve typings.
-- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `crates/test-utils`). Run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
+- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). Run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
 
 ## Testing
 

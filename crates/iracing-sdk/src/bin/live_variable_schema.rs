@@ -5,17 +5,17 @@
 //!
 //! # Behavior
 //! - Opens live iRacing connection
-//! - Optionally allows stale/not-connected state with `--allow-stale`
+//! - Waits until iRacing reports a connected telemetry session
 //! - Builds telemetry schema from variable headers + frame size
 //! - Writes schema YAML to `--output-path`
 //!
 //! # Usage
 //! ```text
-//! live-variable-schema --output-path <SCHEMA.yml> [--allow-stale]
+//! live-variable-schema --output-path <SCHEMA.yml>
 //! ```
 
 #[cfg(windows)]
-use clap::{ArgAction, Parser};
+use clap::Parser;
 #[cfg(windows)]
 use std::path::PathBuf;
 
@@ -27,10 +27,6 @@ struct Args {
     /// Path where the output schema YAML should be written.
     #[arg(short, long, default_value = "live-variable-schema.yml")]
     output_path: PathBuf,
-
-    /// Allow schema generation even if iRacing is disconnected (may be stale).
-    #[arg(long, action = ArgAction::SetTrue)]
-    allow_stale: bool,
 }
 
 pub fn main() -> anyhow::Result<()> {
@@ -57,24 +53,30 @@ pub fn main() -> anyhow::Result<()> {
     {
         use iracing_sdk::{VariableSchema, WindowsConnection};
         use std::{fs::File, io::BufWriter};
+        use std::{thread, time::Duration};
 
         // ------------------------------------------------------------
         // Parse CLI arguments
         // ------------------------------------------------------------
-        let Args {
-            output_path,
-            allow_stale,
-        } = Args::parse();
+        let Args { output_path } = Args::parse();
 
         // ------------------------------------------------------------
         // Open iRacing connection
         // ------------------------------------------------------------
-        let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
-        if !connection.is_connected() && !allow_stale {
-            return Err(anyhow::anyhow!(
-                "iRacing is not connected (pass --allow-stale to continue)."
-            ));
-        }
+        tracing::info!("Opening iRacing connection...");
+        let connection = loop {
+            match WindowsConnection::try_connect() {
+                Ok(connection) if connection.is_connected() => break connection,
+                Ok(_) => {
+                    tracing::debug!("Shared memory opened but telemetry is not connected yet");
+                }
+                Err(error) => {
+                    tracing::debug!(%error, "Waiting for iRacing shared memory");
+                }
+            }
+
+            thread::sleep(Duration::from_secs(1));
+        };
 
         // Build schema from variables
         let variables: Vec<_> = connection.get_variables();

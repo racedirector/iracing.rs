@@ -23,7 +23,7 @@ properties:
         units:
           type: string
 examples:
-- frame_size: 8622
+- frame_size: 8587
   variables:
     AirDensity:
       count: 1
@@ -455,7 +455,7 @@ examples:
       data_type: Float32
       description: Engine0Engine rpm
       name: Engine0_RPM
-      offset: 8250
+      offset: 8287
       units: revs/min
     EngineWarnings:
       count: 1
@@ -527,7 +527,7 @@ examples:
       data_type: Float32
       description: Liters of fuel remaining
       name: FuelLevel
-      offset: 8246
+      offset: 8283
       units: l
     FuelLevelPct:
       count: 1
@@ -543,7 +543,7 @@ examples:
       data_type: Float32
       description: Engine fuel pressure
       name: FuelPress
-      offset: 8226
+      offset: 8263
       units: bar
     FuelUsePerHour:
       count: 1
@@ -551,7 +551,7 @@ examples:
       data_type: Float32
       description: Engine fuel used instantaneous
       name: FuelUsePerHour
-      offset: 8210
+      offset: 8247
       units: kg/h
     Gear:
       count: 1
@@ -655,7 +655,7 @@ examples:
       data_type: Float32
       description: LF brake line pressure
       name: LFbrakeLinePress
-      offset: 8290
+      offset: 8211
       units: bar
     LFcoldPressure:
       count: 1
@@ -663,7 +663,7 @@ examples:
       data_type: Float32
       description: LF tire cold pressure  as set in the garage
       name: LFcoldPressure
-      offset: 8294
+      offset: 8215
       units: kPa
     LFodometer:
       count: 1
@@ -671,7 +671,7 @@ examples:
       data_type: Float32
       description: LF distance tire traveled since being placed on car
       name: LFodometer
-      offset: 8298
+      offset: 8219
       units: m
     LFshockDefl:
       count: 1
@@ -679,7 +679,7 @@ examples:
       data_type: Float32
       description: LF shock deflection
       name: LFshockDefl
-      offset: 8510
+      offset: 8475
       units: m
     LFshockDefl_ST:
       count: 6
@@ -687,7 +687,7 @@ examples:
       data_type: Float32
       description: LF shock deflection at 360 Hz
       name: LFshockDefl_ST
-      offset: 8514
+      offset: 8479
       units: m
     LFshockVel:
       count: 1
@@ -695,7 +695,7 @@ examples:
       data_type: Float32
       description: LF shock velocity
       name: LFshockVel
-      offset: 8538
+      offset: 8503
       units: m/s
     LFshockVel_ST:
       count: 6
@@ -703,7 +703,7 @@ examples:
       data_type: Float32
       description: LF shock velocity at 360 Hz
       name: LFshockVel_ST
-      offset: 8542
+      offset: 8507
       units: m/s
     LFtempCL:
       count: 1
@@ -711,7 +711,7 @@ examples:
       data_type: Float32
       description: LF tire left carcass temperature
       name: LFtempCL
-      offset: 8302
+      offset: 8223
       units: C
     LFtempCM:
       count: 1
@@ -719,7 +719,7 @@ examples:
       data_type: Float32
       description: LF tire middle carcass temperature
       name: LFtempCM
-      offset: 8306
+      offset: 8227
       units: C
     LFtempCR:
       count: 1
@@ -727,7 +727,7 @@ examples:
       data_type: Float32
       description: LF tire right carcass temperature
       name: LFtempCR
-      offset: 8310
+      offset: 8231
       units: C
     LFwearL:
       count: 1
@@ -735,7 +735,7 @@ examples:
       data_type: Float32
       description: LF tire left percent tread remaining
       name: LFwearL
-      offset: 8314
+      offset: 8235
       units: '%'
     LFwearM:
       count: 1
@@ -743,7 +743,7 @@ examples:
       data_type: Float32
       description: LF tire middle percent tread remaining
       name: LFwearM
-      offset: 8318
+      offset: 8239
       units: '%'
     LFwearR:
       count: 1
@@ -751,7 +751,7 @@ examples:
       data_type: Float32
       description: LF tire right percent tread remaining
       name: LFwearR
-      offset: 8322
+      offset: 8243
       units: '%'
     LRTiresAvailable:
       count: 1
@@ -775,7 +775,7 @@ examples:
       data_type: Float32
       description: LR brake line pressure
       name: LRbrakeLinePress
-      offset: 8362
+      offset: 8327
       units: bar
     LRcoldPressure:
       count: 1
@@ -783,7 +783,7 @@ examples:
       data_type: Float32
       description: LR tire cold pressure  as set in the garage
       name: LRcoldPressure
-      offset: 8366
+      offset: 8331
       units: kPa
     LRodometer:
       count: 1
@@ -791,7 +791,7 @@ examples:
       data_type: Float32
       description: LR distance tire traveled since being placed on car
       name: LRodometer
-      offset: 8370
+      offset: 8335
       units: m
     LRshockDefl:
       count: 1
@@ -799,7 +799,7 @@ examples:
       data_type: Float32
       description: LR shock deflection
       name: LRshockDefl
-      offset: 8398
+      offset: 8363
       units: m
     LRshockDefl_ST:
       count: 6
@@ -807,7 +807,7 @@ examples:
       data_type: Float32
       description: LR shock deflection at 360 Hz
       name: LRshockDefl_ST
-      offset: 8402
+      offset: 8367
       units: m
     LRshockVel:
       count: 1
@@ -815,7 +815,7 @@ examples:
       data_type: Float32
       description: LR shock velocity
       name: LRshockVel
-      offset: 8426
+      offset: 8391
       units: m/s
     LRshockVel_ST:
       count: 6
@@ -823,7 +823,7 @@ examples:
       data_type: Float32
       description: LR shock velocity at 360 Hz
       name: LRshockVel_ST
-      offset: 8430
+      offset: 8395
       units: m/s
     LRtempCL:
       count: 1
@@ -831,7 +831,7 @@ examples:
       data_type: Float32
       description: LR tire left carcass temperature
       name: LRtempCL
-      offset: 8374
+      offset: 8339
       units: C
     LRtempCM:
       count: 1
@@ -839,7 +839,7 @@ examples:
       data_type: Float32
       description: LR tire middle carcass temperature
       name: LRtempCM
-      offset: 8378
+      offset: 8343
       units: C
     LRtempCR:
       count: 1
@@ -847,7 +847,7 @@ examples:
       data_type: Float32
       description: LR tire right carcass temperature
       name: LRtempCR
-      offset: 8382
+      offset: 8347
       units: C
     LRwearL:
       count: 1
@@ -855,7 +855,7 @@ examples:
       data_type: Float32
       description: LR tire left percent tread remaining
       name: LRwearL
-      offset: 8386
+      offset: 8351
       units: '%'
     LRwearM:
       count: 1
@@ -863,7 +863,7 @@ examples:
       data_type: Float32
       description: LR tire middle percent tread remaining
       name: LRwearM
-      offset: 8390
+      offset: 8355
       units: '%'
     LRwearR:
       count: 1
@@ -871,7 +871,7 @@ examples:
       data_type: Float32
       description: LR tire right percent tread remaining
       name: LRwearR
-      offset: 8394
+      offset: 8359
       units: '%'
     Lap:
       count: 1
@@ -1151,7 +1151,7 @@ examples:
       data_type: Float32
       description: Engine manifold pressure
       name: ManifoldPress
-      offset: 8242
+      offset: 8279
       units: bar
     ManualBoost:
       count: 1
@@ -1191,7 +1191,7 @@ examples:
       data_type: Float32
       description: Engine oil level
       name: OilLevel
-      offset: 8238
+      offset: 8275
       units: l
     OilPress:
       count: 1
@@ -1199,7 +1199,7 @@ examples:
       data_type: Float32
       description: Engine oil pressure
       name: OilPress
-      offset: 8234
+      offset: 8271
       units: bar
     OilTemp:
       count: 1
@@ -1207,7 +1207,7 @@ examples:
       data_type: Float32
       description: Engine oil temperature
       name: OilTemp
-      offset: 8230
+      offset: 8267
       units: C
     OkToReloadTextures:
       count: 1
@@ -1583,7 +1583,7 @@ examples:
       data_type: Float32
       description: RF brake line pressure
       name: RFbrakeLinePress
-      offset: 8254
+      offset: 8175
       units: bar
     RFcoldPressure:
       count: 1
@@ -1591,7 +1591,7 @@ examples:
       data_type: Float32
       description: RF tire cold pressure  as set in the garage
       name: RFcoldPressure
-      offset: 8258
+      offset: 8179
       units: kPa
     RFodometer:
       count: 1
@@ -1599,7 +1599,7 @@ examples:
       data_type: Float32
       description: RF distance tire traveled since being placed on car
       name: RFodometer
-      offset: 8262
+      offset: 8183
       units: m
     RFshockDefl:
       count: 1
@@ -1607,7 +1607,7 @@ examples:
       data_type: Float32
       description: RF shock deflection
       name: RFshockDefl
-      offset: 8566
+      offset: 8531
       units: m
     RFshockDefl_ST:
       count: 6
@@ -1615,7 +1615,7 @@ examples:
       data_type: Float32
       description: RF shock deflection at 360 Hz
       name: RFshockDefl_ST
-      offset: 8570
+      offset: 8535
       units: m
     RFshockVel:
       count: 1
@@ -1623,7 +1623,7 @@ examples:
       data_type: Float32
       description: RF shock velocity
       name: RFshockVel
-      offset: 8594
+      offset: 8559
       units: m/s
     RFshockVel_ST:
       count: 6
@@ -1631,7 +1631,7 @@ examples:
       data_type: Float32
       description: RF shock velocity at 360 Hz
       name: RFshockVel_ST
-      offset: 8598
+      offset: 8563
       units: m/s
     RFtempCL:
       count: 1
@@ -1639,7 +1639,7 @@ examples:
       data_type: Float32
       description: RF tire left carcass temperature
       name: RFtempCL
-      offset: 8266
+      offset: 8187
       units: C
     RFtempCM:
       count: 1
@@ -1647,7 +1647,7 @@ examples:
       data_type: Float32
       description: RF tire middle carcass temperature
       name: RFtempCM
-      offset: 8270
+      offset: 8191
       units: C
     RFtempCR:
       count: 1
@@ -1655,7 +1655,7 @@ examples:
       data_type: Float32
       description: RF tire right carcass temperature
       name: RFtempCR
-      offset: 8274
+      offset: 8195
       units: C
     RFwearL:
       count: 1
@@ -1663,7 +1663,7 @@ examples:
       data_type: Float32
       description: RF tire left percent tread remaining
       name: RFwearL
-      offset: 8278
+      offset: 8199
       units: '%'
     RFwearM:
       count: 1
@@ -1671,7 +1671,7 @@ examples:
       data_type: Float32
       description: RF tire middle percent tread remaining
       name: RFwearM
-      offset: 8282
+      offset: 8203
       units: '%'
     RFwearR:
       count: 1
@@ -1679,7 +1679,7 @@ examples:
       data_type: Float32
       description: RF tire right percent tread remaining
       name: RFwearR
-      offset: 8286
+      offset: 8207
       units: '%'
     RPM:
       count: 1
@@ -1711,7 +1711,7 @@ examples:
       data_type: Float32
       description: RR brake line pressure
       name: RRbrakeLinePress
-      offset: 8326
+      offset: 8291
       units: bar
     RRcoldPressure:
       count: 1
@@ -1719,7 +1719,7 @@ examples:
       data_type: Float32
       description: RR tire cold pressure  as set in the garage
       name: RRcoldPressure
-      offset: 8330
+      offset: 8295
       units: kPa
     RRodometer:
       count: 1
@@ -1727,7 +1727,7 @@ examples:
       data_type: Float32
       description: RR distance tire traveled since being placed on car
       name: RRodometer
-      offset: 8334
+      offset: 8299
       units: m
     RRshockDefl:
       count: 1
@@ -1735,7 +1735,7 @@ examples:
       data_type: Float32
       description: RR shock deflection
       name: RRshockDefl
-      offset: 8454
+      offset: 8419
       units: m
     RRshockDefl_ST:
       count: 6
@@ -1743,7 +1743,7 @@ examples:
       data_type: Float32
       description: RR shock deflection at 360 Hz
       name: RRshockDefl_ST
-      offset: 8458
+      offset: 8423
       units: m
     RRshockVel:
       count: 1
@@ -1751,7 +1751,7 @@ examples:
       data_type: Float32
       description: RR shock velocity
       name: RRshockVel
-      offset: 8482
+      offset: 8447
       units: m/s
     RRshockVel_ST:
       count: 6
@@ -1759,7 +1759,7 @@ examples:
       data_type: Float32
       description: RR shock velocity at 360 Hz
       name: RRshockVel_ST
-      offset: 8486
+      offset: 8451
       units: m/s
     RRtempCL:
       count: 1
@@ -1767,7 +1767,7 @@ examples:
       data_type: Float32
       description: RR tire left carcass temperature
       name: RRtempCL
-      offset: 8338
+      offset: 8303
       units: C
     RRtempCM:
       count: 1
@@ -1775,7 +1775,7 @@ examples:
       data_type: Float32
       description: RR tire middle carcass temperature
       name: RRtempCM
-      offset: 8342
+      offset: 8307
       units: C
     RRtempCR:
       count: 1
@@ -1783,7 +1783,7 @@ examples:
       data_type: Float32
       description: RR tire right carcass temperature
       name: RRtempCR
-      offset: 8346
+      offset: 8311
       units: C
     RRwearL:
       count: 1
@@ -1791,7 +1791,7 @@ examples:
       data_type: Float32
       description: RR tire left percent tread remaining
       name: RRwearL
-      offset: 8350
+      offset: 8315
       units: '%'
     RRwearM:
       count: 1
@@ -1799,7 +1799,7 @@ examples:
       data_type: Float32
       description: RR tire middle percent tread remaining
       name: RRwearM
-      offset: 8354
+      offset: 8319
       units: '%'
     RRwearR:
       count: 1
@@ -1807,7 +1807,7 @@ examples:
       data_type: Float32
       description: RR tire right percent tread remaining
       name: RRwearR
-      offset: 8358
+      offset: 8323
       units: '%'
     RaceLaps:
       count: 1
@@ -2423,7 +2423,7 @@ examples:
       data_type: Float32
       description: Engine voltage
       name: Voltage
-      offset: 8214
+      offset: 8251
       units: V
     WaterLevel:
       count: 1
@@ -2431,7 +2431,7 @@ examples:
       data_type: Float32
       description: Engine coolant level
       name: WaterLevel
-      offset: 8222
+      offset: 8259
       units: l
     WaterTemp:
       count: 1
@@ -2439,7 +2439,7 @@ examples:
       data_type: Float32
       description: Engine coolant temp
       name: WaterTemp
-      offset: 8218
+      offset: 8255
       units: C
     WeatherDeclaredWet:
       count: 1
@@ -2497,21 +2497,13 @@ examples:
       name: YawRate_ST
       offset: 7956
       units: rad/s
-    dcABS:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: In car abs adjustment
-      name: dcABS
-      offset: 8192
-      units: ''
     dcBrakeBias:
       count: 1
       count_as_time: false
       data_type: Float32
       description: In car brake bias adjustment
       name: dcBrakeBias
-      offset: 8160
+      offset: 8155
       units: ''
     dcDashPage:
       count: 1
@@ -2519,23 +2511,7 @@ examples:
       data_type: Float32
       description: In car dash display page adjustment
       name: dcDashPage
-      offset: 8180
-      units: ''
-    dcHeadlightFlash:
-      count: 1
-      count_as_time: false
-      data_type: Bool
-      description: In car headlight flash control active
-      name: dcHeadlightFlash
-      offset: 8126
-      units: ''
-    dcLowFuelAccept:
-      count: 1
-      count_as_time: false
-      data_type: Bool
-      description: In car low fuel accept
-      name: dcLowFuelAccept
-      offset: 8127
+      offset: 8151
       units: ''
     dcPitSpeedLimiterToggle:
       count: 1
@@ -2553,45 +2529,13 @@ examples:
       name: dcStarter
       offset: 8124
       units: ''
-    dcThrottleShape:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: In car throttle shape adjustment
-      name: dcThrottleShape
-      offset: 8196
-      units: ''
-    dcToggleWindshieldWipers:
+    dcTearOffVisor:
       count: 1
       count_as_time: false
       data_type: Bool
-      description: In car turn wipers on or off
-      name: dcToggleWindshieldWipers
-      offset: 8208
-      units: ''
-    dcTractionControl:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: In car traction control adjustment
-      name: dcTractionControl
-      offset: 8184
-      units: ''
-    dcTractionControl2:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: In car traction control 2 adjustment
-      name: dcTractionControl2
-      offset: 8188
-      units: ''
-    dcTriggerWindshieldWipers:
-      count: 1
-      count_as_time: false
-      data_type: Bool
-      description: In car momentarily turn on wipers
-      name: dcTriggerWindshieldWipers
-      offset: 8209
+      description: In car tear off visor film
+      name: dcTearOffVisor
+      offset: 8126
       units: ''
     dpFastRepair:
       count: 1
@@ -2599,7 +2543,7 @@ examples:
       data_type: Float32
       description: Pitstop fast repair set
       name: dpFastRepair
-      offset: 8156
+      offset: 8147
       units: ''
     dpFuelAddKg:
       count: 1
@@ -2607,7 +2551,7 @@ examples:
       data_type: Float32
       description: Pitstop fuel add amount
       name: dpFuelAddKg
-      offset: 8152
+      offset: 8143
       units: kg
     dpFuelAutoFillActive:
       count: 1
@@ -2615,7 +2559,7 @@ examples:
       data_type: Float32
       description: Pitstop auto fill fuel next stop flag
       name: dpFuelAutoFillActive
-      offset: 8204
+      offset: 8139
       units: ''
     dpFuelAutoFillEnabled:
       count: 1
@@ -2623,7 +2567,7 @@ examples:
       data_type: Float32
       description: Pitstop auto fill fuel system enabled
       name: dpFuelAutoFillEnabled
-      offset: 8200
+      offset: 8135
       units: ''
     dpFuelFill:
       count: 1
@@ -2631,15 +2575,7 @@ examples:
       data_type: Float32
       description: Pitstop fuel fill flag
       name: dpFuelFill
-      offset: 8144
-      units: ''
-    dpLFTireChange:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: Pitstop lf tire change request
-      name: dpLFTireChange
-      offset: 8132
+      offset: 8131
       units: ''
     dpLFTireColdPress:
       count: 1
@@ -2647,61 +2583,37 @@ examples:
       data_type: Float32
       description: Pitstop lf tire cold pressure adjustment
       name: dpLFTireColdPress
-      offset: 8164
+      offset: 8159
       units: Pa
-    dpLRTireChange:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: Pitstop lr tire change request
-      name: dpLRTireChange
-      offset: 8140
-      units: ''
     dpLRTireColdPress:
       count: 1
       count_as_time: false
       data_type: Float32
       description: Pitstop lr tire cold pressure adjustment
       name: dpLRTireColdPress
-      offset: 8172
+      offset: 8167
       units: Pa
-    dpRFTireChange:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: Pitstop rf tire change request
-      name: dpRFTireChange
-      offset: 8128
-      units: ''
     dpRFTireColdPress:
       count: 1
       count_as_time: false
       data_type: Float32
       description: Pitstop rf cold tire pressure adjustment
       name: dpRFTireColdPress
-      offset: 8168
+      offset: 8163
       units: Pa
-    dpRRTireChange:
-      count: 1
-      count_as_time: false
-      data_type: Float32
-      description: Pitstop rr tire change request
-      name: dpRRTireChange
-      offset: 8136
-      units: ''
     dpRRTireColdPress:
       count: 1
       count_as_time: false
       data_type: Float32
       description: Pitstop rr cold tire pressure adjustment
       name: dpRRTireColdPress
-      offset: 8176
+      offset: 8171
       units: Pa
-    dpWindshieldTearoff:
+    dpTireChange:
       count: 1
       count_as_time: false
       data_type: Float32
-      description: Pitstop windshield tearoff
-      name: dpWindshieldTearoff
-      offset: 8148
+      description: Pitstop all tire change request
+      name: dpTireChange
+      offset: 8127
       units: ''
