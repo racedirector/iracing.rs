@@ -1,6 +1,19 @@
 #![allow(dead_code)] // Shared benchmark helpers are compiled separately by each benchmark target.
 
-use iracing_sdk::{FramePacket, VariableInfo, VariableSchema, VariableType};
+//! Shared deterministic inputs and validation helpers for Criterion targets.
+//!
+//! The live schema capture supplies a coherent frame size, variable set, types,
+//! counts, and offsets. This module generates type-correct sentinel bytes for
+//! that layout; it does not reproduce values recorded from a real driving
+//! session. Schema I/O, fixture construction, ordering, and verification are
+//! intended for benchmark setup rather than timed loops.
+
+pub mod telemetry_pipeline;
+pub mod workloads;
+
+use iracing_sdk::{
+    BitField, FramePacket, TelemetryValue, VariableInfo, VariableSchema, VariableType,
+};
 use serde::Deserialize;
 use std::{fs, path::PathBuf, sync::Arc};
 
@@ -16,7 +29,9 @@ struct VariableSchemaReference {
 /// A deterministic telemetry frame whose layout matches the checked-in live
 /// iRacing variable-schema capture.
 pub struct FullFrameFixture {
+    /// Deterministic bytes matching `schema`'s captured layout.
     pub data: Vec<u8>,
+    /// Validated metadata loaded from the checked-in live capture.
     pub schema: Arc<VariableSchema>,
 }
 
@@ -86,7 +101,8 @@ pub fn require_variable<'a>(
     info
 }
 
-fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
+/// Return every captured variable in stable frame traversal order.
+pub fn ordered_variables(schema: &VariableSchema) -> Vec<&VariableInfo> {
     let mut variables: Vec<_> = schema.variables.values().collect();
     variables.sort_unstable_by(|left, right| {
         left.offset
@@ -94,7 +110,101 @@ fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
             .then_with(|| left.name.cmp(&right.name))
     });
 
+    assert_eq!(
+        variables.len(),
+        schema.variable_count(),
+        "ordered full-frame workload lost schema variables"
+    );
+    variables
+}
+
+/// Verify that every variable in the captured frame decodes to its generated
+/// sentinel before the benchmark timer starts.
+pub fn verify_full_frame(packet: &FramePacket, variables: &[&VariableInfo]) {
+    assert_eq!(packet.data.len(), packet.schema.frame_size);
+    assert_eq!(variables.len(), packet.schema.variable_count());
+
     for info in variables {
+        let byte_len = info
+            .data_type
+            .size()
+            .checked_mul(info.count)
+            .unwrap_or_else(|| {
+                panic!(
+                    "byte length overflow for benchmark variable `{}`",
+                    info.name
+                )
+            });
+        let end = info.offset.checked_add(byte_len).unwrap_or_else(|| {
+            panic!("end offset overflow for benchmark variable `{}`", info.name)
+        });
+        assert!(
+            end <= packet.data.len(),
+            "benchmark variable `{}` at offset {} with type {:?} and count {} exceeds frame size {}",
+            info.name,
+            info.offset,
+            info.data_type,
+            info.count,
+            packet.data.len()
+        );
+
+        let actual = TelemetryValue::decode(packet.data.as_ref(), info).unwrap_or_else(|error| {
+            panic!(
+                "failed to decode benchmark variable `{}` at offset {} with type {:?} and count {}: {error}",
+                info.name, info.offset, info.data_type, info.count
+            )
+        });
+        let expected = expected_value(info);
+        assert_eq!(
+            actual, expected,
+            "decoded sentinel mismatch for benchmark variable `{}` with type {:?} and count {}",
+            info.name, info.data_type, info.count
+        );
+    }
+}
+
+/// Count scalar values represented by scalars and array elements together.
+pub fn total_elements(variables: &[&VariableInfo]) -> usize {
+    variables
+        .iter()
+        .try_fold(0_usize, |total, info| total.checked_add(info.count))
+        .expect("full-frame benchmark element count overflow")
+}
+
+fn expected_value(info: &VariableInfo) -> TelemetryValue {
+    if info.count == 1 {
+        expected_scalar(info.data_type, 0)
+    } else {
+        TelemetryValue::Array(
+            (0..info.count)
+                .map(|index| expected_scalar(info.data_type, index))
+                .collect(),
+        )
+    }
+}
+
+fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
+    let integer = (index as u32).wrapping_add(1);
+
+    match data_type {
+        VariableType::Char => TelemetryValue::Char(integer as u8),
+        VariableType::Int8 => TelemetryValue::Int8(integer as i8),
+        VariableType::UInt8 => TelemetryValue::UInt8(integer as u8),
+        VariableType::Int16 => TelemetryValue::Int16(integer as i16),
+        VariableType::UInt16 => TelemetryValue::UInt16(integer as u16),
+        VariableType::Int32 => TelemetryValue::Int32(integer as i32),
+        VariableType::UInt32 => TelemetryValue::UInt32(integer),
+        VariableType::Float32 => TelemetryValue::Float32(index as f32 + 0.5),
+        VariableType::Float64 => TelemetryValue::Float64(index as f64 + 0.5),
+        VariableType::Bool => TelemetryValue::Bool(index.is_multiple_of(2)),
+        VariableType::BitField => {
+            TelemetryValue::BitField(BitField::new(1_u32 << (index % u32::BITS as usize)))
+        }
+    }
+}
+
+fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
+    for info in ordered_variables(schema) {
         for index in 0..info.count {
             let offset = info.offset + index * info.data_type.size();
             let value = (index as u32).wrapping_add(1);

@@ -108,6 +108,26 @@ harness = false
 required-features = ["benchmark"]
 
 [[bench]]
+name = "aggregate_frame_parsing"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "telemetry_delivery_e2e"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "telemetry_delivery_allocations"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "subscriber_fanout"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
 name = "frame_construction"
 harness = false
 required-features = ["benchmark"]

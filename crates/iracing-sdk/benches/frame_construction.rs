@@ -1,11 +1,40 @@
-//! Benchmarks for core frame packet construction
+//! Microbenchmarks for [`FramePacket`] construction and supporting operations.
 //!
-//! Tests the <100μs frame construction latency goal for:
-//! - FramePacket creation with a representative full live frame
-//! - Arc<[u8]> cloning overhead for zero-copy data sharing
-//! - Tick count operations and wraparound handling
+//! # What is being measured
 //!
-//! Platform: Cross-platform (uses the checked-in live variable schema, CI-safe)
+//! The input is a deterministic byte buffer whose size comes from the
+//! checked-in live variable-schema capture. Schema loading and byte generation
+//! happen before timing.
+//!
+//! - `frame_packet_creation/allocate_copy_and_construct` clones the source
+//!   bytes inside the timed loop and transfers the clone into a new packet.
+//! - `frame_packet_creation/construct_from_owned_buffer` uses Criterion batch
+//!   setup to clone bytes outside the measured routine, isolating construction
+//!   from the source-buffer copy.
+//! - `frame_size_scaling` measures copy-and-construction cost for several byte
+//!   lengths. Its schemas are empty because parsing is not under test.
+//! - `arc_clone_frame_data` and `arc_clone_schema` measure shared-owner cloning,
+//!   not copying the underlying bytes or schema contents.
+//! - `tick_operations` measures field access and wraparound comparison math.
+//! - `frame_construction_latency/full_frame_pipeline` is a historical summary
+//!   case for byte cloning plus packet construction. Despite its name, it is
+//!   not an end-to-end telemetry pipeline.
+//!
+//! Outputs are passed to [`std::hint::black_box`] and destroyed normally. Byte
+//! throughput describes input copied or transferred; it does not imply that
+//! telemetry variables were decoded.
+//!
+//! # Reading results
+//!
+//! These cases exclude file or shared-memory reads, live buffer selection,
+//! schema discovery, providers, connections, subscriptions, decoding, and
+//! application work. Results describe local ownership and construction costs.
+//!
+//! Run this target with:
+//!
+//! ```text
+//! cargo bench -p iracing-sdk --features benchmark --bench frame_construction
+//! ```
 
 mod support;
 
@@ -21,6 +50,7 @@ fn load_full_frame_data() -> (Vec<u8>, u32, u32, Arc<VariableSchema>) {
     (fixture.data, 1, 1, fixture.schema)
 }
 
+/// Compare construction with a timed copy against construction from ownership.
 fn bench_frame_packet_creation(c: &mut Criterion) {
     let (data, tick, session_version, schema) = load_full_frame_data();
 
@@ -58,6 +88,7 @@ fn bench_frame_packet_creation(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measure copy-and-construction behavior across representative buffer sizes.
 fn bench_frame_size_scaling(c: &mut Criterion) {
     let (full_data, tick, session_version, _) = load_full_frame_data();
     let mut group = c.benchmark_group("frame_size_scaling");
@@ -87,6 +118,7 @@ fn bench_frame_size_scaling(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measure reference-counted handle cloning without copying owned contents.
 fn bench_arc_cloning(c: &mut Criterion) {
     let (data, tick, session_version, schema) = load_full_frame_data();
     let packet = FramePacket::new(data, tick, session_version, Arc::clone(&schema));
@@ -108,6 +140,7 @@ fn bench_arc_cloning(c: &mut Criterion) {
     });
 }
 
+/// Measure tick access and wraparound-comparison arithmetic.
 fn bench_tick_operations(c: &mut Criterion) {
     let (data, tick, session_version, schema) = load_full_frame_data();
 
@@ -135,6 +168,7 @@ fn bench_tick_operations(c: &mut Criterion) {
     group.finish();
 }
 
+/// Preserve the historical full-buffer copy-and-construction summary case.
 fn bench_frame_construction_latency(c: &mut Criterion) {
     let (data, tick, session_version, schema) = load_full_frame_data();
 

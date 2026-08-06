@@ -1,12 +1,40 @@
-//! Benchmarks for low-level VarData extraction from a captured live-frame schema
+//! Microbenchmarks for low-level [`VarData`] extraction and bitfield operations.
 //!
-//! Tests parsing performance for:
-//! - Scalar types (f64, f32, i32, bool) from a full live-frame layout
-//! - Array types (Vec<f32>, Vec<i32>, Vec<bool>) from CarIdx arrays
-//! - BitField operations on session flags
-//! - Bounds checking overhead
+//! # What is being measured
 //!
-//! Platform: Cross-platform (uses the checked-in live variable schema, CI-safe)
+//! The benchmark loads the checked-in live variable-schema capture and creates
+//! one deterministic frame before timing. Each group targets one narrow task:
+//!
+//! - `scalar_extraction` decodes individual `f64`, `f32`, `i32`, and `bool`
+//!   values using real captured names, types, counts, and offsets.
+//! - `array_extraction` decodes three captured 72-element `CarIdx` arrays into
+//!   fresh `Vec<f32>`, `Vec<i32>`, and `Vec<bool>` outputs. Element throughput
+//!   includes allocation, decoding, and destruction of each vector.
+//! - `bitfield_operations/bitfield_extraction` decodes `SessionFlags`; the
+//!   remaining bitfield cases operate on an already decoded [`BitField`].
+//! - `bounds_checking` compares successful scalar decoding with deliberately
+//!   invalid scalar and array offsets. Invalid cases measure the expected error
+//!   path rather than successful parsing throughput.
+//!
+//! Variable lookup, metadata validation, invalid-metadata construction, and
+//! sentinel assertions happen before timing. Timed results are passed to
+//! [`std::hint::black_box`] so the compiler must retain the operation.
+//!
+//! # Reading results
+//!
+//! These are isolated operations, not whole-frame parsing estimates.
+//! Multiplying one result by the schema variable count ignores the schema's
+//! type mix, arrays, result collection, allocation, and cache behavior. Use
+//! `aggregate_frame_parsing.rs` for complete consumer workloads.
+//!
+//! Frame acquisition, schema discovery, adapters, subscription delivery,
+//! serialization, and application processing are outside this target's scope.
+//!
+//! Run this target with:
+//!
+//! ```text
+//! cargo bench -p iracing-sdk --features benchmark --bench var_data_extraction
+//! ```
 
 mod support;
 
@@ -20,6 +48,7 @@ fn load_test_data() -> (Vec<u8>, iracing_sdk::VariableSchema) {
     (fixture.data, fixture.schema.as_ref().clone())
 }
 
+/// Measure successful extraction of representative captured scalar types.
 fn bench_scalar_extraction(c: &mut Criterion) {
     let (data, schema) = load_test_data();
 
@@ -77,6 +106,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measure fresh typed-vector decoding for three 72-element arrays.
 fn bench_array_extraction(c: &mut Criterion) {
     let (data, schema) = load_test_data();
 
@@ -129,6 +159,7 @@ fn bench_array_extraction(c: &mut Criterion) {
     group.finish();
 }
 
+/// Separate bitfield decoding cost from operations on an existing value.
 fn bench_bitfield_operations(c: &mut Criterion) {
     let (data, schema) = load_test_data();
 
@@ -170,6 +201,7 @@ fn bench_bitfield_operations(c: &mut Criterion) {
     group.finish();
 }
 
+/// Compare successful extraction with deliberate bounds-error paths.
 fn bench_bounds_checking(c: &mut Criterion) {
     let (data, schema) = load_test_data();
 

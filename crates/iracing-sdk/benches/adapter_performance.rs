@@ -1,12 +1,43 @@
-//! Benchmarks for frame adapter performance using a captured live-frame schema
+//! Performance benchmarks for dynamic and derived frame adapters.
 //!
-//! Tests the <100μs frame construction latency goal for:
-//! - DynamicFrame adapter (HashMap-based field lookups)
-//! - Derived adapters with varying field counts (5, 20, 47 fields)
-//! - Optional vs required field extraction overhead
-//! - Array field extraction performance
+//! # What is being measured
 //!
-//! Platform: Cross-platform (uses the checked-in live variable schema, CI-safe)
+//! Every group uses the deterministic frame built from the checked-in live
+//! variable-schema capture. Frame generation and adapter schema validation
+//! happen before Criterion starts timing. The timed operations begin with an
+//! already available [`FramePacket`] and exercise the public adapter or lookup
+//! APIs that an application would call for each frame.
+//!
+//! The groups answer different questions:
+//!
+//! - `dynamic_frame/adapt` measures creation of a dynamic view by cloning the
+//!   packet's shared data and schema handles; it does not decode every value.
+//! - The remaining `dynamic_frame` cases measure by-name hits and misses on an
+//!   existing view. The array hit creates a fresh `Vec<f32>` per iteration.
+//! - `derived_adapters` compares fresh typed output construction for adapters
+//!   containing 5, 20, and 47 fields. Their validation plans are prepared once.
+//! - `optional_fields` compares a fully populated validation plan with one in
+//!   which four optional variables are absent.
+//! - `missing_fields/type_defaults_5_fields` measures the adapter's fallback
+//!   behavior against an intentionally empty schema.
+//!
+//! Assertions before the timed loops verify that captured variables exist and
+//! produce the expected deterministic values. Timed outputs are passed to
+//! [`std::hint::black_box`] so the compiler cannot discard adapter work.
+//!
+//! # Reading results
+//!
+//! These are in-memory adaptation and lookup measurements, not end-to-end live
+//! telemetry latency. They exclude frame acquisition, connection and provider
+//! work, scheduling, subscription delivery, session parsing, serialization,
+//! and application processing. Results depend on the captured schema, build,
+//! machine, and allocator.
+//!
+//! Run this target with:
+//!
+//! ```text
+//! cargo bench -p iracing-sdk --features benchmark --bench adapter_performance
+//! ```
 
 #![allow(dead_code)] // JUSTIFICATION: Benchmark frame structs are exercised through generated adapters; fields stay unread by the harness.
 
@@ -21,6 +52,7 @@ use iracing_sdk::{
 use std::collections::HashMap;
 use std::hint::black_box;
 use std::sync::Arc;
+use support::workloads::ConsumerFrame47;
 
 // Small adapter (5 fields) - minimal overhead baseline
 #[derive(IRacingTelemetryFrame, Debug, Clone)]
@@ -93,114 +125,6 @@ struct MediumFrame {
     velocity_z: f32,
 }
 
-// Large adapter (47 fields) - comprehensive telemetry logging
-#[derive(IRacingTelemetryFrame, Debug, Clone)]
-struct LargeFrame {
-    // All fields from MediumFrame
-    #[field_name = "Speed"]
-    speed: f32,
-    #[field_name = "Gear"]
-    gear: i32,
-    #[field_name = "RPM"]
-    rpm: f32,
-    #[field_name = "Throttle"]
-    throttle: f32,
-    #[field_name = "Brake"]
-    brake: f32,
-    #[field_name = "Clutch"]
-    clutch: f32,
-    #[field_name = "SteeringWheelAngle"]
-    steering: f32,
-    #[field_name = "Lap"]
-    lap: i32,
-    #[field_name = "LapDist"]
-    lap_dist: f32,
-    #[field_name = "LapDistPct"]
-    lap_dist_pct: f32,
-    #[field_name = "LapCurrentLapTime"]
-    current_lap_time: f32,
-    #[field_name = "LapLastLapTime"]
-    last_lap_time: f32,
-    #[field_name = "LapBestLapTime"]
-    best_lap_time: f32,
-    #[field_name = "SessionTime"]
-    session_time: f64,
-    #[field_name = "SessionTick"]
-    session_tick: i32,
-    #[field_name = "SessionNum"]
-    session_num: i32,
-    #[field_name = "SessionState"]
-    session_state: i32,
-    #[field_name = "VelocityX"]
-    velocity_x: f32,
-    #[field_name = "VelocityY"]
-    velocity_y: f32,
-    #[field_name = "VelocityZ"]
-    velocity_z: f32,
-
-    // Additional fields for large frame
-    #[field_name = "YawRate"]
-    yaw_rate: f32,
-    #[field_name = "Pitch"]
-    pitch: f32,
-    #[field_name = "Roll"]
-    roll: f32,
-    #[field_name = "PitchRate"]
-    pitch_rate: f32,
-    #[field_name = "RollRate"]
-    roll_rate: f32,
-    #[field_name = "SteeringWheelTorque"]
-    steering_torque: f32,
-
-    // Engine/fuel
-    #[field_name = "FuelLevel"]
-    fuel: Option<f32>,
-    #[field_name = "FuelLevelPct"]
-    fuel_pct: Option<f32>,
-    #[field_name = "FuelUsePerHour"]
-    fuel_use: Option<f32>,
-    #[field_name = "WaterTemp"]
-    water_temp: Option<f32>,
-    #[field_name = "OilTemp"]
-    oil_temp: Option<f32>,
-    #[field_name = "OilPress"]
-    oil_press: Option<f32>,
-
-    // Tires
-    #[field_name = "LFtempCL"]
-    lf_temp_cl: Option<f32>,
-    #[field_name = "LFtempCM"]
-    lf_temp_cm: Option<f32>,
-    #[field_name = "LFtempCR"]
-    lf_temp_cr: Option<f32>,
-    #[field_name = "RFtempCL"]
-    rf_temp_cl: Option<f32>,
-    #[field_name = "RFtempCM"]
-    rf_temp_cm: Option<f32>,
-    #[field_name = "RFtempCR"]
-    rf_temp_cr: Option<f32>,
-    #[field_name = "LRtempCL"]
-    lr_temp_cl: Option<f32>,
-    #[field_name = "LRtempCM"]
-    lr_temp_cm: Option<f32>,
-    #[field_name = "LRtempCR"]
-    lr_temp_cr: Option<f32>,
-    #[field_name = "RRtempCL"]
-    rr_temp_cl: Option<f32>,
-    #[field_name = "RRtempCM"]
-    rr_temp_cm: Option<f32>,
-    #[field_name = "RRtempCR"]
-    rr_temp_cr: Option<f32>,
-
-    // Timing
-    #[field_name = "SessionTimeRemain"]
-    time_remain: Option<f64>,
-    #[field_name = "ReplayFrameNum"]
-    replay_frame: Option<i32>,
-    #[field_name = "IsReplayPlaying"]
-    is_replay: Option<bool>,
-}
-
 // Adapter testing optional fields overhead
 #[derive(IRacingTelemetryFrame, Debug, Clone)]
 struct OptionalFieldsFrame {
@@ -227,6 +151,7 @@ fn get_test_frame() -> (FramePacket, Arc<VariableSchema>) {
     (packet, fixture.schema)
 }
 
+/// Build and verify a fully mapped validation plan outside timed loops.
 fn require_complete_validation<T: FrameAdapter>(
     schema: &VariableSchema,
     expected_fields: usize,
@@ -246,6 +171,7 @@ fn require_complete_validation<T: FrameAdapter>(
     validation
 }
 
+/// Measure dynamic-view construction and by-name access on an existing view.
 fn bench_dynamic_frame(c: &mut Criterion) {
     let (packet, schema) = get_test_frame();
 
@@ -303,6 +229,7 @@ fn bench_dynamic_frame(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measure fresh typed outputs for increasing derived-adapter field counts.
 fn bench_derived_adapters(c: &mut Criterion) {
     let (packet, schema) = get_test_frame();
 
@@ -324,10 +251,10 @@ fn bench_derived_adapters(c: &mut Criterion) {
         })
     });
 
-    let large_validation = require_complete_validation::<LargeFrame>(&schema, 47);
+    let large_validation = require_complete_validation::<ConsumerFrame47>(&schema, 47);
     group.bench_function(BenchmarkId::new("large_frame", "47_fields"), |b| {
         b.iter(|| {
-            let frame = LargeFrame::adapt(black_box(&packet), black_box(&large_validation));
+            let frame = ConsumerFrame47::adapt(black_box(&packet), black_box(&large_validation));
             black_box(frame)
         })
     });
@@ -335,6 +262,7 @@ fn bench_derived_adapters(c: &mut Criterion) {
     group.finish();
 }
 
+/// Compare present and missing optional-field extraction plans.
 fn bench_optional_fields(c: &mut Criterion) {
     let (packet, schema) = get_test_frame();
 
@@ -386,6 +314,7 @@ fn bench_optional_fields(c: &mut Criterion) {
     group.finish();
 }
 
+/// Measure required-field type defaults against an intentionally empty schema.
 fn bench_type_defaults(c: &mut Criterion) {
     let (packet, _) = get_test_frame();
     let schema = Arc::new(VariableSchema::new(HashMap::new(), packet.data.len()).unwrap());

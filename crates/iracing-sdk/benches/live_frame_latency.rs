@@ -1,27 +1,59 @@
-//! Benchmarks for Windows live telemetry frame latency
+//! Manual benchmarks for the Windows live telemetry path.
 //!
-//! **MANUAL TESTING ONLY** - Requires running iRacing
+//! # Requirements
 //!
-//! Tests the <100μs frame construction latency goal for:
-//! - End-to-end latency: shared memory → FramePacket
-//! - Live provider frame construction
-//! - Sustained 60Hz throughput with zero drops
+//! This target requires Windows and an active iRacing session producing live
+//! telemetry. It exits on non-Windows platforms and is not suitable for stable
+//! unattended CI comparisons. Before running it:
 //!
-//! Platform: Windows-only (requires active iRacing session)
+//! 1. Start iRacing and enter a session that is actively producing telemetry.
+//! 2. Close avoidable background workloads that could disturb scheduling.
+//! 3. Run:
 //!
-//! ## Running These Benchmarks
+//!    ```text
+//!    cargo bench -p iracing-sdk --features benchmark --bench live_frame_latency
+//!    ```
 //!
-//! 1. Start iRacing and load into a session (practice, race, etc.)
-//! 2. Run: `just bench-live` or `cargo bench --bench live_frame_latency`
-//! 3. Results will include machine specifications for comparison
+//! The target prints available CPU, core-count, RAM, Windows, and simulator
+//! process information so results can be interpreted in their environment.
 //!
-//! ## Machine Spec Reporting
+//! # What is being measured
 //!
-//! Benchmark output includes:
-//! - CPU model and core count
-//! - System RAM
-//! - Windows version
-//! - iRacing version (if detectable)
+//! These cases exercise real subscriptions and therefore mix library work with
+//! simulator availability, source pacing, Tokio scheduling, and operating-system
+//! wake-up latency:
+//!
+//! - `live_frame_construction/shared_memory_to_packet` creates a new
+//!   `DynamicFrame` subscription inside each timed iteration and waits for its
+//!   first item. It includes subscription setup, validation, waiting, delivery,
+//!   and dynamic-view adaptation; it is not isolated packet construction.
+//! - `live_sustained_throughput/subscription_setup` measures creation of a live
+//!   `DynamicFrame` subscription without waiting for a frame.
+//! - `live_sustained_throughput/frame_delivery_rate` creates one subscription
+//!   before timing, then awaits one item per iteration. At `UpdateRate::Native`,
+//!   simulator frame cadence can dominate the reported time.
+//! - `live_sustained_throughput/burst_collection_100ms` creates each subscription
+//!   in Criterion's untimed batch setup, then counts delivered items during a
+//!   timed 100 ms wall-clock window.
+//! - `live_adapter_pipeline/full_live_pipeline` creates a new typed five-field
+//!   subscription per iteration and waits for its first adapted item. It includes
+//!   subscription setup and source waiting as well as typed adaptation.
+//!
+//! Connection creation and system-information collection happen before the
+//! corresponding timed group. Received values and counts are passed to
+//! [`std::hint::black_box`] so the compiler cannot discard the work.
+//!
+//! # Reading results
+//!
+//! Do not compare these timings directly with in-memory decoding or packet
+//! construction microbenchmarks. They measure different boundaries, and several
+//! cases intentionally include waiting for an external 60 Hz source. Results can
+//! vary with simulator state, telemetry cadence, Windows scheduling, hardware,
+//! other subscribers, and background load.
+//!
+//! The cases observe delivered frames but do not independently prove that no
+//! upstream frames were coalesced or dropped. They also exclude downstream
+//! serialization, networking, storage, rendering, and application computation.
 
 #[cfg(windows)]
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -35,6 +67,7 @@ use std::hint::black_box;
 use std::time::Duration;
 
 #[cfg(windows)]
+/// Print environmental context outside all Criterion timed loops.
 fn print_system_info() {
     use std::process::Command;
 
@@ -91,13 +124,30 @@ fn print_system_info() {
 }
 
 #[cfg(windows)]
+fn iracing_is_running() -> bool {
+    std::process::Command::new("tasklist")
+        .args(["/FI", "IMAGENAME eq iRacingSim64DX11.exe"])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .is_some_and(|output| output.contains("iRacingSim64DX11.exe"))
+}
+
+#[cfg(windows)]
+/// Measure first-item delivery after creating a dynamic subscription per iteration.
 fn bench_live_frame_construction(c: &mut Criterion) {
     print_system_info();
+    if !iracing_is_running() {
+        eprintln!("Skipping manual live benchmark because iRacing is not running");
+        return;
+    }
 
     // Attempt to connect to live telemetry
     let runtime = tokio::runtime::Runtime::new().unwrap();
-
-    let connection = LiveConnection::builder().build();
+    let connection = {
+        let _runtime_guard = runtime.enter();
+        LiveConnection::builder().build()
+    };
 
     let connection = match connection {
         Ok(conn) => conn,
@@ -133,10 +183,16 @@ fn bench_live_frame_construction(c: &mut Criterion) {
 }
 
 #[cfg(windows)]
+/// Separate subscription setup, ongoing delivery, and fixed-window collection.
 fn bench_live_sustained_throughput(c: &mut Criterion) {
+    if !iracing_is_running() {
+        return;
+    }
     let runtime = tokio::runtime::Runtime::new().unwrap();
-
-    let connection = LiveConnection::builder().build();
+    let connection = {
+        let _runtime_guard = runtime.enter();
+        LiveConnection::builder().build()
+    };
 
     let connection = match connection {
         Ok(conn) => conn,
@@ -210,7 +266,11 @@ fn bench_live_sustained_throughput(c: &mut Criterion) {
 }
 
 #[cfg(windows)]
+/// Measure first-item delivery through a new typed subscription per iteration.
 fn bench_live_adapter_pipeline(c: &mut Criterion) {
+    if !iracing_is_running() {
+        return;
+    }
     // Simple test adapter for live data
     #[allow(dead_code)]
     #[derive(IRacingTelemetryFrame, Debug)]
@@ -229,7 +289,10 @@ fn bench_live_adapter_pipeline(c: &mut Criterion) {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let connection = LiveConnection::builder().build();
+    let connection = {
+        let _runtime_guard = runtime.enter();
+        LiveConnection::builder().build()
+    };
 
     let connection = match connection {
         Ok(conn) => conn,
@@ -238,7 +301,7 @@ fn bench_live_adapter_pipeline(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("live_adapter_pipeline");
 
-    // End-to-end: shared memory → FramePacket → Adapter using subscribe API
+    // Subscription setup, source wait, delivery, and typed adaptation.
     group.bench_function("full_live_pipeline", |b| {
         b.iter(|| {
             runtime.block_on(async {
