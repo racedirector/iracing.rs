@@ -1,13 +1,14 @@
 use std::{collections::HashSet, sync::Arc};
 
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::{FramePacket, Result, telemetry::delivery_policy::ReplayDemand};
 
 /// Commands sent by subscriptions and the connection to the replay coordinator.
 #[derive(Debug)]
-pub(super) enum ReplayControl {
+pub(crate) enum ReplayControl {
     Start,
     Join { subscriber_id: u64 },
     Ack { subscriber_id: u64 },
@@ -15,19 +16,20 @@ pub(super) enum ReplayControl {
 }
 
 /// Spawn the task that turns request/response IBT delivery into a coordinated watch stream.
-pub(super) fn spawn(
+pub(crate) fn spawn(
     demands: mpsc::Sender<ReplayDemand>,
     cancel: CancellationToken,
 ) -> (
     watch::Receiver<Option<Arc<FramePacket>>>,
     mpsc::UnboundedSender<ReplayControl>,
+    JoinHandle<()>,
 ) {
     let (frames, frame_receiver) = watch::channel(None);
     let (controls, control_receiver) = mpsc::unbounded_channel();
 
-    tokio::spawn(run(demands, frames, control_receiver, cancel));
+    let task = tokio::spawn(run(demands, frames, control_receiver, cancel));
 
-    (frame_receiver, controls)
+    (frame_receiver, controls, task)
 }
 
 async fn run(

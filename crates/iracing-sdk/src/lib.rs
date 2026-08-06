@@ -70,6 +70,10 @@ pub mod providers;
 pub mod stream;
 pub mod telemetry;
 
+#[cfg(feature = "benchmark")]
+#[doc(hidden)]
+pub mod benchmarking;
+
 // Data source modules
 pub mod ibt;
 pub mod schema;

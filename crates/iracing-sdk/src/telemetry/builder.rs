@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::watch;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::{FramePacket, provider::Provider, schema::SessionInfo};
@@ -159,19 +160,32 @@ where
 {
     /// Spawn the configured telemetry task and return its consumer handles.
     pub(crate) fn build(self) -> TelemetryChannels<D::Frames, S::Sessions> {
+        self.build_with_task().0
+    }
+
+    /// Spawn the configured telemetry task and retain its task handle.
+    ///
+    /// Benchmark harnesses use the handle to prove that cancellation completed
+    /// instead of leaving detached tasks between samples.
+    pub(crate) fn build_with_task(
+        self,
+    ) -> (TelemetryChannels<D::Frames, S::Sessions>, JoinHandle<()>) {
         let (delivery, frames) = self.delivery.build();
         let (sessions, session_receiver) = self.sessions.build();
         let cancel = CancellationToken::new();
         let task_cancel = cancel.clone();
 
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             Telemetry::read_task(self.provider, delivery, sessions, task_cancel).await;
         });
 
-        TelemetryChannels {
-            frames,
-            sessions: session_receiver,
-            cancel,
-        }
+        (
+            TelemetryChannels {
+                frames,
+                sessions: session_receiver,
+                cancel,
+            },
+            task,
+        )
     }
 }

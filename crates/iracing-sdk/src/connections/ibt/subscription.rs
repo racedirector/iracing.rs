@@ -14,7 +14,7 @@ use crate::{AdapterValidation, FrameAdapter, FramePacket};
 use super::coordinator::ReplayControl;
 
 /// A coordinated IBT subscription that acknowledges a frame when polled again.
-pub(super) struct IbtSubscription<T> {
+pub(crate) struct IbtSubscription<T> {
     subscriber_id: u64,
     frames: WatchStream<Option<Arc<FramePacket>>>,
     controls: mpsc::UnboundedSender<ReplayControl>,
@@ -24,7 +24,7 @@ pub(super) struct IbtSubscription<T> {
 }
 
 impl<T> IbtSubscription<T> {
-    pub(super) fn new(
+    pub(crate) fn new(
         subscriber_id: u64,
         frames: watch::Receiver<Option<Arc<FramePacket>>>,
         controls: mpsc::UnboundedSender<ReplayControl>,

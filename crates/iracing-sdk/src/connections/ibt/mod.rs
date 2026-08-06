@@ -1,8 +1,8 @@
 //! IBT connection for disk telemetry.
 
 mod builder;
-mod coordinator;
-mod subscription;
+pub(crate) mod coordinator;
+pub(crate) mod subscription;
 
 pub use builder::{IbtConnectionBuilder, NoSource, PathSource, ProviderSource};
 
@@ -69,7 +69,8 @@ impl IbtConnection {
     {
         // Spawn telemetry channels task
         let channels = Telemetry::spawn_ibt(provider);
-        let (frames, controls) = coordinator::spawn(channels.frames, channels.cancel.clone());
+        let (frames, controls, _coordinator_task) =
+            coordinator::spawn(channels.frames, channels.cancel.clone());
 
         tracing::info!("IBT connection opened ({}Hz)", source_hz);
 
