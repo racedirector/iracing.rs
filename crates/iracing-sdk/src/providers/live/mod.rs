@@ -172,7 +172,7 @@ impl LiveProvider {
         }
     }
 
-    async fn session_yaml_impl(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
@@ -258,8 +258,8 @@ impl Provider for LiveProvider {
         self.next_frame_impl().await
     }
 
-    async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
-        self.session_yaml_impl(version).await
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        self.session_yaml_impl().await
     }
 
     fn tick_rate(&self) -> f64 {

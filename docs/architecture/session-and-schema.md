@@ -44,9 +44,8 @@ numeric session version. Repeated calls at the same version reuse the cache.
 The telemetry task does not use that cache directly. It has source-specific
 session policies:
 
-- live: detect version transitions, parse away from the frame task, and route
-  generation-tagged results through one coordinator so stale or post-shutdown
-  work cannot publish;
+- live: detect version transitions, immediately own the current YAML, and parse
+  queued snapshots sequentially on a background FIFO worker before publishing;
 - IBT: fetch and parse immutable session YAML once before frames.
 
 Architecture changes must distinguish parser caching from telemetry publication.

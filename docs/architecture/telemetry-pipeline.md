@@ -65,6 +65,77 @@ waits cooperatively for updates, returns the newest owned frame snapshot, and
 polls until iRacing connects or its configured no-connection limit is reached.
 The provider itself supplies live pacing.
 
+### Live session update acquisition
+
+iRacing exposes live session information differently from telemetry frames.
+Telemetry has rotating buffers identified by tick count, while the header
+describes one current session YAML region with a `session_info_update` counter.
+The SDK does not expose a history of session YAML regions: a consumer must copy
+the current region before another update replaces it if it needs every
+observable intermediate state.
+
+The current live read path is:
+
+1. `WindowsConnection::get_new_data` selects the telemetry buffer with the
+   highest tick count. It checks that buffer's tick before and after creating a
+   borrowed byte slice and returns the slice when the two reads agree.
+2. `LiveProvider::next_frame_impl` immediately copies that slice into an owned
+   `Vec<u8>`. It then reads the shared-memory header again, selects the latest
+   telemetry buffer again, and takes both the packet tick and
+   `session_info_update` from that later header view.
+3. The provider returns an owned `FramePacket` containing the frame bytes, tick,
+   and observed session version. `Telemetry::read_task` passes the packet to
+   `LiveSessionPolicy::observe` before publishing the frame.
+4. When the packet's session version differs from the last observed version,
+   the policy immediately calls `Provider::session_yaml`. For `LiveProvider`,
+   this calls `WindowsConnection::session_info`, which reads the offset and
+   length from the current header and copies/extracts the one current YAML
+   region into an owned `String`.
+5. `LiveProvider` performs iRacing YAML preprocessing on that owned string.
+   Typed `SessionInfo` deserialization is then dispatched away from the frame
+   task.
+
+This ordering intentionally keeps shared-memory acquisition ahead of typed
+deserialization. Deferring the YAML copy itself to a background parser would
+leave only a version number queued while the corresponding mutable region could
+already have been overwritten. Copying and cleaning the string does briefly
+hold the frame task, but once the policy owns the string, parsing can proceed
+without delaying acquisition of the next telemetry frame and its possible next
+session version.
+
+The current implementation has several consistency limits that matter when
+reasoning about session ordering:
+
+- `get_new_data` returns a borrowed slice; its tick consistency check finishes
+  before `LiveProvider` copies the bytes. The provider also selects the latest
+  buffer again for packet metadata, so the owned bytes and later tick/version
+  reads are not one atomic snapshot.
+- The `Provider::session_yaml` version argument is only a change trigger for
+  `LiveProvider`; it is intentionally ignored rather than treated as a lookup
+  key. `WindowsConnection::session_info` copies whichever YAML occupies the
+  single current session region at that moment. That copy does not compare
+  `session_info_update` before and after reading the region.
+- The data-valid event can signal a session-only change, but
+  `next_frame_impl` returns only after `get_new_data` finds a new telemetry
+  tick. Session version discovery is therefore associated with the next frame
+  the provider accepts, not with an independently emitted session event.
+- If iRacing replaces the session region more than once before this process
+  observes and copies it, the overwritten intermediate contents cannot be
+  reconstructed by downstream ordering logic.
+
+These limits define the strongest useful ordering contract: preserve every
+session snapshot that was successfully observed and copied, associate it with
+the frame version/tick that caused its discovery, and never reorder or silently
+coalesce those owned snapshots afterward. They do not establish that every
+session version produced by iRacing can always be recovered.
+
+Once an owned YAML snapshot has been captured, parsing does not need to be
+concurrent. A single background FIFO parser can keep typed deserialization off
+the frame task while naturally preserving observation order. Any observer-facing
+event stream must preserve the same FIFO property; a latest-value channel may
+remain useful for `current_session`, but it cannot by itself represent a
+lossless sequence of session changes.
+
 ## Telemetry task
 
 `Telemetry::read_task` owns a provider. It initializes the session policy, then
@@ -106,17 +177,22 @@ a later subscriber receives the retained frame and can resume replay.
 ## Session policies
 
 `LiveSessionPolicy` watches packet session versions. On a changed version it
-advances an internal generation, fetches YAML once, and submits parsing to a
-background task so typed YAML deserialization does not block the frame loop. A
-private coordinator is the sole owner of the live session publisher. The
-current semantics are:
+fetches and owns the current YAML immediately, then submits the snapshot to a
+single background FIFO parser so typed YAML deserialization does not block the
+frame loop. The current semantics are:
 
 - a version is marked observed even if fetch or parse fails;
 - repeated adjacent frames with the same version do not refetch YAML;
-- only a parse result matching the newest observed generation may publish;
-- older parses cannot overwrite a newer session snapshot;
-- `end` publishes `None` and waits for the coordinator to exit, after which
-  outstanding parse work cannot republish live session state.
+- owned snapshots are parsed and published one at a time in observation order;
+- a parse failure is logged and does not prevent a later queued snapshot from
+  being parsed;
+- `end` closes the task queue, drains every queued parse, and only then
+  publishes `None`.
+
+Live session publication still uses a watch channel. FIFO parsing determines
+send order, but the channel retains only the latest value and can coalesce
+updates that an observer does not receive promptly. Lossless observer delivery
+is a separate policy concern.
 
 `IbtSessionPolicy` fetches the file's single immutable YAML document once during
 initialization, parses inline, and publishes before frames. It does not retry a

@@ -40,8 +40,9 @@ pub(crate) type IbtTelemetryChannels =
 
 /// `Telemetry` spawns and manages telemetry processing tasks.
 ///
-/// Spawns a frame_read task that owns the `Provider` and detects session changes.
-/// YAML parsing happens in a short-lived, spawned task to maintain <1ms frame latency.
+/// Spawns a frame-read task that owns the `Provider` and detects session changes.
+/// Live YAML parsing runs on a separate FIFO worker so typed deserialization
+/// does not block frame acquisition.
 pub struct Telemetry;
 
 impl Telemetry {
