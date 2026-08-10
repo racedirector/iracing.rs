@@ -317,7 +317,7 @@ pub(crate) struct IbtSessionPolicy {
     sessions: watch::Sender<Option<Arc<SessionInfo>>>,
 
     /// Current exactly-once initialization state.
-    state: IbtSessionState,
+    pub(self) state: IbtSessionState,
 }
 
 impl IbtSessionPolicy {
