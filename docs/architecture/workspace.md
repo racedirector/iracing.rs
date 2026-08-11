@@ -13,6 +13,7 @@ workspace applications
                                 └─► iracing-simulation
 
 iracing-broadcast-grpc-service ───► iracing-sdk
+iracing-sdk-ws (WebSocket facade; runtime composition lives in its binary)
 iracing-sdk ── optional derive ───► iracing-sdk-derive
 ```
 
@@ -71,6 +72,12 @@ Owns the network boundary for broadcast controls:
 
 Raw Win32 message identifiers and packing remain in `iracing-sdk`. Generated
 protobuf types remain portable; the real service composition is Windows-only.
+
+### `iracing-sdk-ws`
+
+Owns the portable Axum WebSocket boundary. The library exposes the facade
+router, while listener binding and runtime startup belong to the crate's binary.
+Protocol and telemetry behavior have not yet been added.
 
 ### Workspace applications
 

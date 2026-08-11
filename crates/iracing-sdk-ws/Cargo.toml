@@ -1,0 +1,25 @@
+[package]
+name = "iracing-sdk-ws"
+version = "0.1.0"
+description = "WebSocket facade for the iRacing SDK"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+autobins = false
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = [
+  "http1",
+  "tokio",
+  "ws",
+] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
+
+[[bin]]
+name = "iracing-sdk-ws"
+path = "src/bin/server.rs"

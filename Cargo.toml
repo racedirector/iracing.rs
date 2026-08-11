@@ -4,6 +4,7 @@ members = [
   "crates/iracing-broadcast-grpc-service",
   "crates/iracing-sdk",
   "crates/iracing-sdk-derive",
+  "crates/iracing-sdk-ws",
   "crates/iracing-simulation",
   "examples/driver-inputs",
   "examples/iracing-lifecycle-monitor",
