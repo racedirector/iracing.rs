@@ -11,7 +11,8 @@ use std::{
 
 use crate::{
     FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    provider::Provider, yaml_utils,
+    provider::Provider,
+    schema::session::types::{SanitizedSessionYaml, SessionYamlSource},
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -81,8 +82,65 @@ impl LiveProvider {
     pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
         Arc::clone(&self.schema)
     }
+}
 
-    async fn next_frame_impl(&mut self) -> Result<Option<FramePacket>> {
+impl SchemaProvider for LiveProvider {
+    fn schema(&self) -> &VariableSchema {
+        self.schema.as_ref()
+    }
+}
+
+#[derive(Debug, Default)]
+struct NoConnectionState {
+    attempts: u32,
+    started_at: Option<Instant>,
+    last_progress_log_at: Option<Instant>,
+}
+
+impl NoConnectionState {
+    fn observe(&mut self, now: Instant) -> bool {
+        let first_observation = self.attempts == 0;
+        self.attempts = self.attempts.saturating_add(1);
+
+        if first_observation {
+            self.started_at = Some(now);
+            self.last_progress_log_at = Some(now);
+        }
+
+        first_observation
+    }
+
+    fn exhausted(&self, max_attempts: Option<u32>) -> bool {
+        max_attempts.is_some_and(|max_attempts| self.attempts >= max_attempts)
+    }
+
+    fn elapsed(&self, now: Instant) -> Duration {
+        self.started_at
+            .map_or(Duration::ZERO, |started_at| now.duration_since(started_at))
+    }
+
+    fn should_log_progress(&mut self, now: Instant) -> bool {
+        let should_log = self
+            .last_progress_log_at
+            .is_none_or(|last_log| now.duration_since(last_log) >= WAITING_LOG_INTERVAL);
+
+        if should_log {
+            self.last_progress_log_at = Some(now);
+        }
+
+        should_log
+    }
+
+    fn reset(&mut self) -> bool {
+        let had_observations = self.attempts > 0;
+        *self = Self::default();
+        had_observations
+    }
+}
+
+#[async_trait::async_trait]
+impl Provider for LiveProvider {
+    async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
         let mut no_connection = NoConnectionState::default();
 
         // Loop until we get a frame
@@ -172,94 +230,13 @@ impl LiveProvider {
         }
     }
 
-    async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
-        tracing::debug!("Fetching session YAML from shared memory");
-
-        // Get raw YAML from shared memory
-        let raw_yaml = match self.connection.session_info() {
-            Some(yaml) => yaml,
-            None => {
-                tracing::debug!("No session info available");
-                return Ok(None);
-            }
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
+        let Some(bytes) = self.connection.session_yaml_bytes()? else {
+            return Ok(None);
         };
 
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
-
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-
-        Ok(Some(cleaned_yaml))
-    }
-}
-
-impl SchemaProvider for LiveProvider {
-    fn schema(&self) -> &VariableSchema {
-        self.schema.as_ref()
-    }
-}
-
-#[derive(Debug, Default)]
-struct NoConnectionState {
-    attempts: u32,
-    started_at: Option<Instant>,
-    last_progress_log_at: Option<Instant>,
-}
-
-impl NoConnectionState {
-    fn observe(&mut self, now: Instant) -> bool {
-        let first_observation = self.attempts == 0;
-        self.attempts = self.attempts.saturating_add(1);
-
-        if first_observation {
-            self.started_at = Some(now);
-            self.last_progress_log_at = Some(now);
-        }
-
-        first_observation
-    }
-
-    fn exhausted(&self, max_attempts: Option<u32>) -> bool {
-        max_attempts.is_some_and(|max_attempts| self.attempts >= max_attempts)
-    }
-
-    fn elapsed(&self, now: Instant) -> Duration {
-        self.started_at
-            .map_or(Duration::ZERO, |started_at| now.duration_since(started_at))
-    }
-
-    fn should_log_progress(&mut self, now: Instant) -> bool {
-        let should_log = self
-            .last_progress_log_at
-            .is_none_or(|last_log| now.duration_since(last_log) >= WAITING_LOG_INTERVAL);
-
-        if should_log {
-            self.last_progress_log_at = Some(now);
-        }
-
-        should_log
-    }
-
-    fn reset(&mut self) -> bool {
-        let had_observations = self.attempts > 0;
-        *self = Self::default();
-        had_observations
-    }
-}
-
-#[async_trait::async_trait]
-impl Provider for LiveProvider {
-    async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
-        self.next_frame_impl().await
-    }
-
-    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        self.session_yaml_impl().await
+        let decoded = bytes.decode()?;
+        Ok(Some(decoded.sanitize()))
     }
 
     fn tick_rate(&self) -> f64 {

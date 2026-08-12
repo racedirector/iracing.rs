@@ -1,7 +1,7 @@
 //! Provider trait for data sources
 
 use super::types::FramePacket;
-use crate::Result;
+use crate::{Result, schema::session::types::SanitizedSessionYaml};
 
 /// Trait for telemetry data sources.
 ///
@@ -12,7 +12,7 @@ pub trait Provider: Send + 'static {
     async fn next_frame(&mut self) -> Result<Option<FramePacket>>;
 
     /// Return the session info YAML for `version`, or `Ok(None)` if unchanged.
-    async fn session_yaml(&mut self, version: u32) -> Result<Option<String>>;
+    async fn session_yaml(&mut self, version: u32) -> Result<Option<SanitizedSessionYaml>>;
 
     /// Get the native tick rate in Hz
     ///

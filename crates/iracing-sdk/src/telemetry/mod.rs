@@ -215,7 +215,10 @@ mod tests {
     use tokio::sync::{mpsc, oneshot, watch};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, Result, VariableSchema, provider::Provider};
+    use crate::{
+        FramePacket, Result, VariableSchema, provider::Provider,
+        schema::session::types::SanitizedSessionYaml,
+    };
 
     use super::{
         ReplayDemand, Telemetry, TelemetryChannels, delivery_policy::LatestDelivery,
@@ -304,8 +307,10 @@ mod tests {
             Ok(Some(live_frame(tick, 0)))
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-            Ok(self.session_yaml.map(str::to_owned))
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
+            Ok(Some(SanitizedSessionYaml::new(
+                self.session_yaml.map(str::to_owned).unwrap(),
+            )))
         }
 
         fn tick_rate(&self) -> f64 {
@@ -494,7 +499,7 @@ mod tests {
             Ok(frame)
         }
 
-        async fn session_yaml(&mut self, version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, version: u32) -> Result<Option<SanitizedSessionYaml>> {
             // The mock records fetches but returns no YAML because these tests
             // characterize version-change detection, not YAML parsing.
             let _ = self.session_requests.send(version);

@@ -17,7 +17,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
+use iracing_sdk::{provider::Provider, providers::ibt::IbtProvider, schema::SessionInfo};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the car setup schema generator.
@@ -41,38 +41,34 @@ struct Args {
 }
 
 /// Opens an `.ibt` file and parses session info from the embedded YAML.
-fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
+async fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
-    let reader = IbtReader::open(&ibt_path)?;
+    let mut provider = IbtProvider::open(&ibt_path)?;
 
-    let session_yaml = reader
-        .session_yaml()?
+    let session_yaml = provider
+        .session_yaml(0)
+        .await?
         .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?;
 
-    Ok(SessionInfo::parse(&session_yaml)?)
+    Ok(SessionInfo::parse_sanitized(&session_yaml)?)
 }
 
 /// Connects to live iRacing shared memory and parses the current session info.
 #[cfg(windows)]
-fn parse_live_session() -> Result<SessionInfo> {
-    use iracing_sdk::{WindowsConnection, schema::SessionInfoParser};
+async fn parse_live_session() -> Result<SessionInfo> {
+    use iracing_sdk::providers::live::LiveProvider;
 
     tracing::info!("Opening iRacing connection");
 
-    let connection = WindowsConnection::try_connect()?;
+    let mut provider = LiveProvider::new()?;
 
-    if !connection.is_connected() {
-        return Err(anyhow!("iRacing is not connected."));
-    }
-
-    let raw_session_yaml = connection
-        .session_info()
+    let raw_session_yaml = provider
+        .session_yaml(0)
+        .await?
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
 
-    let parser = SessionInfoParser::new();
-
-    parser.parse(&raw_session_yaml)
+    Ok(SessionInfo::parse(&raw_session_yaml)?)
 }
 
 /// Non-Windows stub — always returns an error directing the caller to use `--ibt-path`.
@@ -133,7 +129,8 @@ fn resolve_output_path(
     Ok(output_dir.join(file_name))
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
@@ -144,9 +141,9 @@ fn main() -> Result<()> {
     } = Args::parse();
 
     let session_info = if let Some(path) = ibt_path {
-        parse_disk_session(path)?
+        parse_disk_session(path).await?
     } else {
-        parse_live_session()?
+        parse_live_session().await?
     };
 
     let schema = schemars::schema_for_value!(session_info.car_setup);

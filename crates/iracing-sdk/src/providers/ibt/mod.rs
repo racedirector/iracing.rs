@@ -3,7 +3,10 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, Result, SchemaProvider, VariableSchema, ibt::IbtReader, provider::Provider,
+    FramePacket, Result, SchemaProvider, VariableSchema,
+    ibt::IbtReader,
+    provider::Provider,
+    schema::session::types::{SanitizedSessionYaml, SessionYamlSource},
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
@@ -97,8 +100,13 @@ impl Provider for IbtProvider {
         Ok(Some(packet))
     }
 
-    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        self.reader.session_yaml()
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
+        let Some(bytes) = self.reader.session_yaml_bytes()? else {
+            return Ok(None);
+        };
+
+        let decoded = bytes.decode()?;
+        Ok(Some(decoded.sanitize()))
     }
 
     fn tick_rate(&self) -> f64 {

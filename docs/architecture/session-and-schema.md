@@ -24,25 +24,16 @@ schema and frame types are platform-neutral.
 ## Session YAML path
 
 iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
-that standard parsers do not accept directly. The code has two cleanup surfaces:
+that standard parsers do not accept directly. `yaml_utils` is the single byte
+extraction, decoding, and compatibility-preprocessing surface.
 
-- `yaml_utils` extracts bounded memory regions, decodes UTF-8 with a
-  Windows-1252 fallback, and performs low-level control-character cleanup;
-- `SessionInfoParser` includes a compatibility preprocessor for problematic
-  unquoted fields, deserializes `SessionInfo`, validates required high-level
-  content, and can cache by session version.
-
-`SessionInfo::parse` is the lighter path for YAML that a provider has already
-cleaned. Provider and caller contracts must make preprocessing ownership clear;
-do not stack ad hoc cleaners at each call site.
+`SessionInfo::parse` applies that preprocessing and deserializes `SessionInfo`.
+Providers may preprocess before returning owned YAML, but parsing remains
+idempotent so direct callers receive the same control-character cleanup.
 
 ## Caching and publication
 
-`SessionInfoParser::parse_from_memory` caches a cloned `SessionInfo` keyed by the
-numeric session version. Repeated calls at the same version reuse the cache.
-
-The telemetry task does not use that cache directly. It has source-specific
-session policies:
+The telemetry task has source-specific session policies:
 
 - live: detect version transitions, immediately own the current YAML, and parse
   queued snapshots sequentially on a background FIFO worker before publishing;

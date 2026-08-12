@@ -4,8 +4,9 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::schema::header::IRSDKHeader;
+use crate::schema::session::types::{SessionYamlBytes, SessionYamlSource};
 use crate::schema::variables::IRSDKVarHeader;
-use crate::{IRacingSDKError, Result, yaml_utils};
+use crate::{IRacingSDKError, Result};
 use std::ptr::NonNull;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
@@ -235,29 +236,12 @@ impl Connection {
         None
     }
 
-    /// Get session info YAML string
-    pub fn session_info(&self) -> Option<String> {
-        let header = self.header();
-        if header.session_info_len <= 0 {
-            return None;
-        }
-        if header.session_info_offset < 0 {
-            return None;
-        }
-
+    fn session_info_update_volatile(&self) -> i32 {
         unsafe {
-            // Get the slice of the session yaml
-            let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
-            let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
-
-            // Parse and return
-            yaml_utils::extract_yaml_from_memory(info_slice, 0, header.session_info_len).ok()
+            std::ptr::read_volatile(std::ptr::addr_of!(
+                (*self.base.as_ptr().cast::<IRSDKHeader>()).session_info_update
+            ))
         }
-    }
-
-    /// Get session info update counter
-    pub fn session_info_update(&self) -> i32 {
-        self.header().session_info_update
     }
 
     /// Get all variable definitions from the header
@@ -312,6 +296,80 @@ impl Connection {
             }
         }
         latest
+    }
+}
+
+impl SessionYamlSource for Connection {
+    fn session_yaml_bytes(&self) -> Result<Option<SessionYamlBytes<'_>>> {
+        const MAX_SNAPSHOT_ATTEMPTS: usize = 3;
+
+        let mut last_versions = None;
+
+        // Attempt to read the session YAML MAX_SNAPSHOT_ATTEMPTS times.
+        for attempt in 1..=MAX_SNAPSHOT_ATTEMPTS {
+            // Capture the update count
+            let before = self.session_info_update_volatile();
+
+            // Capture the offset and length
+            let offset = self.header().session_info_offset;
+            let length = self.header().session_info_len;
+
+            // If there is no header, return None
+            if length == 0 {
+                return Ok(None);
+            }
+
+            // Validate the offset
+            if offset < 0 || length < 0 {
+                return Err(IRacingSDKError::invalid_session_yaml_region(
+                    offset, length, 0,
+                ));
+            }
+
+            let start = usize::try_from(offset)
+                .map_err(|_| IRacingSDKError::invalid_session_yaml_region(offset, length, 0))?;
+
+            let len = usize::try_from(length)
+                .map_err(|_| IRacingSDKError::invalid_session_yaml_region(offset, length, 0))?;
+
+            // TODO: Check end against the actual length
+
+            // Perform direct pointer math to get a copy of the data
+            // - start + len was checked for overflow
+            // - the mapping remains alive for the lifetime of self
+            // - the bytes are copied and are not returned borrowed.
+            let copied = unsafe {
+                let pointer = self.base.as_ptr().add(start);
+                std::slice::from_raw_parts(pointer, len).to_vec()
+            };
+
+            // Capture the current update count
+            let after = self.session_info_update_volatile();
+
+            // If the update is still valid, return the buffer
+            if before == after {
+                return SessionYamlBytes::from_owned(copied);
+            }
+
+            last_versions = Some((before, after));
+
+            tracing::trace!(
+                attempt,
+                max_attempts = MAX_SNAPSHOT_ATTEMPTS,
+                before,
+                after,
+                "Session YAML changed while being copied; retrying"
+            );
+        }
+
+        let (version_before, version_after) =
+            last_versions.expect("snapshot attempts must be nonzero");
+
+        Err(IRacingSDKError::unstable_session_yaml_snapshot(
+            version_before,
+            version_after,
+            MAX_SNAPSHOT_ATTEMPTS,
+        ))
     }
 }
 

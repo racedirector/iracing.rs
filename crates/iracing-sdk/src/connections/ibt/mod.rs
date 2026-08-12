@@ -160,6 +160,7 @@ impl Drop for IbtConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::session::types::SanitizedSessionYaml;
     use crate::test_utils::require_smallest_ibt_fixture;
     use crate::{DynamicFrame, IRacingSDKError};
     use futures::StreamExt;
@@ -197,7 +198,7 @@ mod tests {
             pending().await
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             Ok(None)
         }
 
@@ -214,7 +215,7 @@ mod tests {
             Err(IRacingSDKError::connection_failed("startup failed"))
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             Ok(None)
         }
 
@@ -242,7 +243,7 @@ mod tests {
             Ok(self.frames.recv().await)
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             Ok(None)
         }
 
@@ -271,7 +272,7 @@ mod tests {
             )))
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             Ok(None)
         }
 

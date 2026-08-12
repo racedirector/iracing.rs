@@ -181,7 +181,7 @@ async fn main() -> Result<()> {
     if let Some(yml_output) = yml_output_path {
         tracing::info!("Parsing session information...");
         if let Some(session) = ibt_provider.session_yaml(0).await? {
-            fs::write(&yml_output, session)?;
+            fs::write(&yml_output, session.to_string())?;
             tracing::info!(session_output_path = %yml_output.display(), "Session information written.")
         }
     }

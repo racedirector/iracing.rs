@@ -60,7 +60,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use iracing_sdk::ibt::IbtReader;
+use iracing_sdk::{ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider};
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -79,7 +79,8 @@ struct Args {
     output_path: Option<PathBuf>,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -99,23 +100,23 @@ fn main() -> Result<()> {
     // Open telemetry reader.
     // ------------------------------------------------------------
     let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
+    let mut provider = IbtProvider::from_reader(reader);
 
     // ------------------------------------------------------------
     // Write session string to output path.
     // ------------------------------------------------------------
     tracing::info!("Parsing session information");
 
-    let session_info_string = match reader.session_yaml() {
-        Ok(Some(session)) => session,
-        _ => return Err(anyhow::anyhow!("Could not parse session yaml.")),
-    };
+    if let Some(yaml) = provider.session_yaml(0).await? {
+        let session_info_string = yaml.into_string();
 
-    // If we have an output path, write the result to the file, otherwise log
-    if let Some(output_path) = output_path {
-        fs::write(output_path, session_info_string)?;
-    } else {
-        tracing::info!("\n{}", session_info_string);
-    }
+        // If we have an output path, write the result to the file, otherwise log
+        if let Some(output_path) = output_path {
+            fs::write(output_path, session_info_string)?;
+        } else {
+            tracing::info!("\n{}", session_info_string);
+        }
+    };
 
     tracing::info!("Finished parsing session information.");
 

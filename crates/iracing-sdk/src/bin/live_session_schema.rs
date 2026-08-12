@@ -25,7 +25,8 @@ struct Args {
     allow_stale: bool,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
@@ -42,7 +43,10 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::{WindowsConnection, schema::SessionInfoParser};
+        use iracing_sdk::{
+            WindowsConnection, provider::Provider, providers::live::LiveProvider,
+            schema::SessionInfo,
+        };
         use std::{fs::File, io::BufWriter};
 
         let Args {
@@ -59,12 +63,33 @@ fn main() -> anyhow::Result<()> {
             ));
         }
 
-        let raw_session_yaml = connection
-            .session_info()
+        let mut provider = LiveProvider::builder()
+            .with_connection(connection)
+            .build()?;
+
+        let raw_session_yaml = provider
+            .session_yaml(0)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("No live session YAML is available"))?;
 
-        let parser = SessionInfoParser::new();
-        let session = parser.parse(&raw_session_yaml)?;
+        let session = SessionInfo::parse_sanitized(&raw_session_yaml)?;
+        #[cfg(feature = "schema-discovery")]
+        {
+            let unknown_fields = session.collect_unknown_fields();
+
+            tracing::info!(
+                count = unknown_fields.len(),
+                "Discovered unknown session fields"
+            );
+            for field in &unknown_fields {
+                tracing::info!(
+                    path = %field.path,
+                    data_type = ?field.data_type,
+                    "Discovered unknown session field"
+                );
+            }
+        }
+
         let schema = schemars::schema_for_value!(session);
 
         let output_file = File::create(&output_path)?;

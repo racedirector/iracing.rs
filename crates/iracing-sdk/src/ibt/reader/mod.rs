@@ -31,7 +31,10 @@
 //! - Seeking operations are O(1) as they only update internal position counters
 
 use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{IRacingSDKError, Result, SchemaProvider, VariableSchema, yaml_utils};
+use crate::{
+    IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    schema::session::types::{SessionYamlBytes, SessionYamlSource},
+};
 use std::{
     fs::File,
     io::Read,
@@ -164,35 +167,6 @@ impl IbtReader {
         })
     }
 
-    /// Get cleaned session YAML from the IBT file
-    ///
-    /// Returns preprocessed YAML string ready for parsing. The YAML has been cleaned
-    /// to fix iRacing's non-standard format issues. Parsing happens at the Connection level.
-    /// This method extracts on-demand, no caching.
-    pub fn session_yaml(&self) -> Result<Option<String>> {
-        // Check if session info exists
-        if self.header.session_info_len <= 0 || self.header.session_info_offset <= 0 {
-            return Ok(None);
-        }
-
-        // Extract raw YAML from memory
-        let raw_yaml = yaml_utils::extract_yaml_from_memory(
-            &self.data,
-            self.header.session_info_offset,
-            self.header.session_info_len,
-        )?;
-
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
-
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        Ok(Some(cleaned_yaml))
-    }
-
     /// Get total number of frames in the file
     pub fn total_frames(&self) -> usize {
         self.total_frames
@@ -316,6 +290,16 @@ impl IbtReader {
         self.current_position = end_pos;
 
         Ok(Some((frame_data, tick_count, session_version)))
+    }
+}
+
+impl SessionYamlSource for IbtReader {
+    fn session_yaml_bytes(&self) -> Result<Option<SessionYamlBytes<'_>>> {
+        SessionYamlBytes::from_region(
+            &self.data,
+            self.header.session_info_offset,
+            self.header.session_info_len,
+        )
     }
 }
 
@@ -605,13 +589,13 @@ mod tests {
             test_file.display()
         );
 
-        // Extract session YAML
-        let yaml_result = reader
-            .session_yaml()
-            .with_context(|| "Extracting session YAML")?;
-
-        // Verify we got YAML
-        let yaml = yaml_result.expect("IBT file should contain session YAML");
+        let yaml = reader
+            .session_yaml_bytes()
+            .expect("Failed to parse session YAML from reader")
+            .unwrap()
+            .decode()
+            .expect("Could not decode session YAML")
+            .sanitize();
 
         // Verify YAML is non-empty
         ensure!(!yaml.is_empty(), "Session YAML should not be empty");
@@ -640,7 +624,7 @@ mod tests {
         }
 
         // Verify the YAML can be parsed into SessionInfo
-        let session = crate::schema::SessionInfo::parse(&yaml)
+        let session = crate::schema::SessionInfo::parse_sanitized(&yaml)
             .with_context(|| "Parsing extracted YAML into SessionInfo")?;
 
         println!("  Track: {}", session.weekend_info.track_name);

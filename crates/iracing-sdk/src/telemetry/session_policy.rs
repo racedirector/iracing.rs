@@ -7,7 +7,11 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{FramePacket, provider::Provider, schema::SessionInfo};
+use crate::{
+    FramePacket,
+    provider::Provider,
+    schema::{SessionInfo, session::types::SanitizedSessionYaml},
+};
 
 /// Controls how session information is discovered and published for a telemetry source.
 ///
@@ -80,7 +84,7 @@ struct SessionParseTask {
     observed_tick: u32,
 
     /// Owned YAML copied from the current shared-memory session region.
-    yaml: String,
+    yaml: SanitizedSessionYaml,
 }
 
 /// Tracks changing session information for a live telemetry source.
@@ -144,7 +148,7 @@ impl LiveSessionPolicy {
             // Await each blocking parse before receiving another task. Parsing
             // remains off the async runtime workers while FIFO completion is a
             // structural property of this single consumer.
-            match tokio::task::spawn_blocking(move || SessionInfo::parse(&yaml)).await {
+            match tokio::task::spawn_blocking(move || SessionInfo::parse_sanitized(&yaml)).await {
                 Ok(Ok(session)) => {
                     tracing::debug!(
                         version = observed_version,
@@ -362,7 +366,7 @@ impl<P: Provider> SessionPolicy<P> for IbtSessionPolicy {
             Ok(Some(yaml)) => {
                 tracing::debug!("Fetched IBT session YAML ({} bytes)", yaml.len());
 
-                match SessionInfo::parse(&yaml) {
+                match SessionInfo::parse_sanitized(&yaml) {
                     Ok(session) => {
                         tracing::debug!("Parsed IBT session info");
                         let _ = self.sessions.send(Some(Arc::new(session)));
@@ -424,7 +428,10 @@ mod tests {
     use tokio::sync::watch;
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider};
+    use crate::{
+        FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider,
+        schema::session::types::SanitizedSessionYaml,
+    };
 
     use super::{
         IbtSessionPolicy, IbtSessionState, LiveSessionPolicy, SessionParseTask, SessionPolicy,
@@ -439,7 +446,12 @@ mod tests {
     }
 
     /// Enqueue an owned YAML snapshot directly into the live FIFO parser.
-    fn enqueue_parse(policy: &LiveSessionPolicy, version: u32, tick: u32, yaml: String) {
+    fn enqueue_parse(
+        policy: &LiveSessionPolicy,
+        version: u32,
+        tick: u32,
+        yaml: SanitizedSessionYaml,
+    ) {
         policy
             .tasks
             .as_ref()
@@ -457,7 +469,12 @@ mod tests {
         let (sessions, mut session_receiver) = watch::channel(None);
         let mut policy = LiveSessionPolicy::new(sessions);
 
-        enqueue_parse(&policy, 1, 10, named_session_yaml("published"));
+        enqueue_parse(
+            &policy,
+            1,
+            10,
+            SanitizedSessionYaml::new(named_session_yaml("published")),
+        );
 
         tokio::time::timeout(Duration::from_secs(1), async {
             while session_receiver.borrow_and_update().is_none() {
@@ -488,8 +505,18 @@ mod tests {
         let (sessions, receiver) = watch::channel(None);
         let mut policy = LiveSessionPolicy::new(sessions);
 
-        enqueue_parse(&policy, 1, 10, named_session_yaml("older"));
-        enqueue_parse(&policy, 2, 11, named_session_yaml("newer"));
+        enqueue_parse(
+            &policy,
+            1,
+            10,
+            SanitizedSessionYaml::new(named_session_yaml("older")),
+        );
+        enqueue_parse(
+            &policy,
+            2,
+            11,
+            SanitizedSessionYaml::new(named_session_yaml("newer")),
+        );
 
         policy.tasks.take();
         policy
@@ -528,8 +555,18 @@ mod tests {
         let (sessions, receiver) = watch::channel(None);
         let mut policy = LiveSessionPolicy::new(sessions);
 
-        enqueue_parse(&policy, 1, 10, "not: [valid".to_owned());
-        enqueue_parse(&policy, 2, 11, named_session_yaml("recovered"));
+        enqueue_parse(
+            &policy,
+            1,
+            10,
+            SanitizedSessionYaml::new("not: [valid".to_owned()),
+        );
+        enqueue_parse(
+            &policy,
+            2,
+            11,
+            SanitizedSessionYaml::new(named_session_yaml("recovered")),
+        );
 
         // Closing and awaiting the parser proves both queued tasks settled in
         // FIFO order. The successful second task must not be blocked by the
@@ -587,11 +624,11 @@ mod tests {
             Ok(None)
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             self.fetch_count += 1;
 
             match self.outcome {
-                SessionOutcome::Yaml(yaml) => Ok(Some(yaml.to_owned())),
+                SessionOutcome::Yaml(yaml) => Ok(Some(SanitizedSessionYaml::new(yaml.to_owned()))),
                 SessionOutcome::Unavailable => Ok(None),
                 SessionOutcome::Error => {
                     Err(IRacingSDKError::connection_failed("session fetch failed"))

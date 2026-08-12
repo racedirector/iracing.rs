@@ -20,6 +20,7 @@ use iracing_sdk::{
     FrameAdapter, FramePacket, Result, VariableSchema,
     benchmarking::{LatestPipeline, OnDemandPipeline},
     provider::Provider,
+    schema::session::types::SanitizedSessionYaml,
 };
 use tokio::sync::mpsc;
 
@@ -103,7 +104,7 @@ impl Provider for DeterministicProvider {
         )))
     }
 
-    async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+    async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
         self.session_fetches.fetch_add(1, Ordering::Relaxed);
         Ok(None)
     }

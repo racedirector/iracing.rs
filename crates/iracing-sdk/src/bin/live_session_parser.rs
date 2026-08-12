@@ -89,7 +89,8 @@ struct Args {
     output_path: Option<PathBuf>,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -109,7 +110,7 @@ fn main() -> Result<()> {
 
     #[cfg(windows)]
     {
-        use iracing_sdk::WindowsConnection;
+        use iracing_sdk::{WindowsConnection, provider::Provider, providers::live::LiveProvider};
         use std::{fs, thread, time::Duration};
 
         let Args { output_path } = Args::parse();
@@ -129,17 +130,25 @@ fn main() -> Result<()> {
             thread::sleep(Duration::from_secs(1));
         };
 
+        let mut provider = LiveProvider::builder()
+            .with_connection(windows_connection)
+            .build()?;
+
         // ------------------------------------------------------------
         // Write session string to output path.
         // ------------------------------------------------------------
         tracing::info!("Parsing session information");
-        if let Some(session) = windows_connection.session_info() {
+
+        if let Some(yaml) = provider.session_yaml(0).await? {
+            let session_info_string = yaml.into_string();
+
+            // If we have an output path, write the result to the file, otherwise log
             if let Some(output_path) = output_path {
-                fs::write(output_path, session)?;
+                fs::write(output_path, session_info_string)?;
             } else {
-                tracing::info!("\n{}", session);
+                tracing::info!("\n{}", session_info_string);
             }
-        }
+        };
 
         tracing::info!("Finished parsing session information.");
 

@@ -218,7 +218,7 @@ mod tests {
     use futures::{StreamExt, future::join_all};
 
     use super::*;
-    use crate::DynamicFrame;
+    use crate::{DynamicFrame, schema::session::types::SanitizedSessionYaml};
 
     struct ControlledProvider {
         credits: mpsc::UnboundedReceiver<()>,
@@ -244,7 +244,7 @@ mod tests {
             )))
         }
 
-        async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
+        async fn session_yaml(&mut self, _version: u32) -> Result<Option<SanitizedSessionYaml>> {
             panic!("delivery benchmarks must not fetch session YAML")
         }
 
