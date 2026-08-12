@@ -1151,6 +1151,12 @@ $defs:
         - string
         - 'null'
         default: null
+      Encoding:
+        description: Encoding used for the raw session string (for example, `UTF8` or `ISO_8859_1`)
+        type:
+        - string
+        - 'null'
+        default: null
       EventType:
         description: Event type
         type:
@@ -1553,6 +1559,18 @@ $defs:
         default: null
       IncidentLimit:
         description: Incident limit
+        type:
+        - string
+        - 'null'
+        default: null
+      IncidentWarningInitialLimit:
+        description: Incident count at which the first warning is shown
+        type:
+        - string
+        - 'null'
+        default: null
+      IncidentWarningSubsequentLimit:
+        description: Incident interval at which subsequent warnings are shown
         type:
         - string
         - 'null'

@@ -16,6 +16,8 @@ use std::collections::HashMap;
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendInfo {
+    /// Encoding used for the raw session string (for example, `UTF8` or `ISO_8859_1`)
+    pub encoding: Option<String>,
     /// Track name
     pub track_name: String,
     /// Track ID
@@ -229,6 +231,10 @@ pub struct WeekendOptions {
     pub num_joker_laps: Option<i32>,
     /// Incident limit
     pub incident_limit: Option<String>,
+    /// Incident count at which the first warning is shown
+    pub incident_warning_initial_limit: Option<String>,
+    /// Incident interval at which subsequent warnings are shown
+    pub incident_warning_subsequent_limit: Option<String>,
     /// Fast repairs limit
     pub fast_repairs_limit: Option<String>,
     /// Green-white-checkered limit
@@ -242,4 +248,38 @@ pub struct WeekendOptions {
         schemars(with = "std::collections::HashMap<String, serde_json::Value>")
     )]
     pub unknown_fields: HashMap<String, serde_yaml_ng::Value>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_encoding_and_incident_warning_limits() {
+        let yaml = r#"
+Encoding: ISO_8859_1
+WeekendOptions:
+  IncidentWarningInitialLimit: unlimited
+  IncidentWarningSubsequentLimit: unlimited
+"#;
+
+        let weekend: WeekendInfo = serde_yaml_ng::from_str(yaml).unwrap();
+
+        assert_eq!(weekend.encoding.as_deref(), Some("ISO_8859_1"));
+        #[cfg(feature = "schema-discovery")]
+        assert!(weekend.unknown_fields.is_empty());
+
+        let options = weekend.weekend_options.unwrap();
+        assert_eq!(
+            options.incident_warning_initial_limit.as_deref(),
+            Some("unlimited")
+        );
+        assert_eq!(
+            options.incident_warning_subsequent_limit.as_deref(),
+            Some("unlimited")
+        );
+
+        #[cfg(feature = "schema-discovery")]
+        assert!(options.unknown_fields.is_empty());
+    }
 }
