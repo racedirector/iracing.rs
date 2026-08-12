@@ -1038,7 +1038,9 @@ properties:
         - string
         - 'null'
       Encoding:
-        type: string
+        type:
+        - string
+        - 'null'
       EventType:
         type:
         - string
@@ -1293,9 +1295,13 @@ properties:
             - string
             - 'null'
           IncidentWarningInitialLimit:
-            type: string
+            type:
+            - string
+            - 'null'
           IncidentWarningSubsequentLimit:
-            type: string
+            type:
+            - string
+            - 'null'
           IsFixedSetup:
             type:
             - integer
