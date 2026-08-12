@@ -4,8 +4,8 @@
 //! The session info contains metadata about the current racing session including track details,
 //! weather conditions, participant information, and session timing.
 //!
-//! Raw byte extraction and decoding live in `crate::yaml_utils`; this module
-//! owns the typed serde model and its deserialization entry point.
+//! Raw byte extraction, decoding, and sanitation live in [`types`]. This module
+//! owns the typed serde model and its deserialization entry points.
 
 use serde::{Deserialize, Serialize};
 
@@ -254,358 +254,90 @@ impl SessionInfo {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::schema::session::types::*;
-    use crate::test_utils::{find_git_repository_root, require_test_data_file};
-    use anyhow::{Context, Result};
-    use proptest::prelude::*;
+    use super::{SanitizedSessionYaml, SessionInfo};
+    use crate::IRacingSDKError;
 
-    #[test]
-    fn find_git_repository_root_works() {
-        // Test that we can find the git repository root
-        let repo_root = find_git_repository_root().expect("Should find git repository root");
-
-        // Verify it contains a .git directory
-        assert!(
-            repo_root.join(".git").exists(),
-            "Repository root should contain .git directory"
-        );
-
-        // Verify it contains expected project files (Cargo.toml should be at workspace root)
-        assert!(
-            repo_root.join("Cargo.toml").exists(),
-            "Repository root should contain Cargo.toml"
-        );
-
-        println!("Found git repository root: {:?}", repo_root);
-
-        let repo_path_name = repo_root.file_name().unwrap();
-
-        // The path should end with 'iracing.rs' (our project name)
-        assert!(
-            repo_path_name == "iracing.rs",
-            "Repository root should be named 'iracing.rs'. Received: {:?}",
-            repo_path_name
-        );
-    }
-
-    // Property tests for comprehensive validation
-    proptest! {
-        #[test]
-        fn prop_yaml_preprocessing_preserves_structure(
-            yaml_content in r"[a-zA-Z0-9: \n\-\._]+",
-        ) {
-            let decoded = DecodedSessionYaml::new(yaml_content.clone());
-            let processed = decoded.sanitize();
-
-            // Processing should not make content significantly shorter
-            // (Allow slight variations due to line ending normalization)
-            let len_diff = processed.len() as i32 - yaml_content.len() as i32;
-            prop_assert!(len_diff >= -2, "Processed length: {}, Original length: {}, Diff: {}", processed.len(), yaml_content.len(), len_diff);
-        }
-
-        #[test]
-        fn prop_memory_extraction_handles_various_inputs(
-            offset in 0..1000i32,
-            length in 1..1000i32,
-            memory_size in 1000..10000usize,
-        ) {
-            let memory = vec![65u8; memory_size]; // Fill with 'A' characters
-
-            let result = crate::yaml_utils::extract_yaml_from_memory(&memory, offset, length);
-
-            if (offset as usize + length as usize) <= memory_size {
-                // Should succeed if within bounds
-                prop_assert!(result.is_ok());
-            } else {
-                // Should fail if out of bounds
-                prop_assert!(result.is_err());
-            }
-        }
-    }
-
-    #[test]
-    #[ignore = "Need to implement known test structures"]
-    fn parses_real_iracing_yaml_snapshot() -> Result<()> {
-        // Test with real YAML data captured from live iRacing
-
-        let snapshot_path = require_test_data_file("live_session_snapshot.yml")?;
-
-        let yaml_content = std::fs::read_to_string(&snapshot_path)
-            .with_context(|| format!("Reading YAML snapshot from {}", snapshot_path.display()))?;
-
-        println!(
-            "Testing with real iRacing YAML snapshot ({} bytes)",
-            yaml_content.len()
-        );
-
-        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content)
-            .expect("Failed to preprocess YAML");
-
-        let session_info: SessionInfo = serde_yaml_ng::from_str(&preprocessed)
-            .context("Failed to parse YAML to SessionInfo")?;
-
-        // Validate the parsed structure matches what we expect from real data
-        assert_eq!(
-            session_info.weekend_info.track_name,
-            "watkinsglen 2021 fullcourse"
-        );
-        assert_eq!(session_info.weekend_info.track_display_name, "Watkins Glen");
-        assert_eq!(session_info.weekend_info.track_id, Some(434));
-        assert_eq!(session_info.session_info.current_session_num, 0);
-        assert_eq!(session_info.session_info.sessions.len(), 1);
-        assert_eq!(
-            session_info.session_info.sessions[0].session_type,
-            "Offline Testing"
-        );
-
-        // Validate driver info
-        let driver_info = session_info
-            .driver_info
-            .as_ref()
-            .expect("Should have driver info");
-        assert_eq!(driver_info.driver_car_idx, Some(0));
-        assert_eq!(driver_info.driver_user_id, Some(932438));
-
-        let drivers = driver_info
-            .drivers
-            .as_ref()
-            .expect("Should have drivers list");
-        assert_eq!(drivers.len(), 1);
-        assert_eq!(drivers[0].user_name, "Kevin A O Neill");
-        assert_eq!(drivers[0].car_idx, 0);
-        assert_eq!(drivers[0].car_number, Some("037".to_string()));
-
-        println!("✅ Real YAML snapshot parsing test passed!");
-        println!(
-            "   Track: {} ({})",
-            session_info.weekend_info.track_name, session_info.weekend_info.track_display_name
-        );
-        println!("   Drivers: {}", drivers.len());
-        println!("   Sessions: {}", session_info.session_info.sessions.len());
-
-        Ok(())
-    }
-
-    #[test]
-    #[cfg(feature = "benchmark")]
-    fn benchmark_session_info_parsing_performance() {
-        use std::time::Instant;
-
-        // Create realistic test YAML
-        let test_yaml = r#"
- DriverInfo:
-- CarIdx: 0
-  UserName: John O'Connor
-  AbbrevName: J O'Con
-  TeamName: '"Fast & Furious" Racing Team'
-  Initials: JO
-  CarNumber: "42"
-  CarClassShortName: GT3
-  CarIdxPosition: 1
-- CarIdx: 1
-  UserName: Sarah Mitchell
-  AbbrevName: S Mitch
-  TeamName: Lightning McQueen Racing
-  Initials: SM
-  CarNumber: "7"
-  CarClassShortName: GT3
-  CarIdxPosition: 2
-WeatherInfo:
-AirTemp: 25.0
-TrackTemp: 35.2
-Humidity: 65
-WeatherType: Clear
-TrackInfo:
-TrackName: Watkins Glen International
-TrackDisplayName: Watkins Glen
-TrackLength: 5.472 km
-TrackTurns: 11
-TrackSurface: Asphalt
+    const MINIMAL_SESSION: &str = r#"WeekendInfo:
+  TrackName: test
+  TrackDisplayName: Test Circuit
+  TrackLength: "1.00 km"
 SessionInfo:
-SessionType: Race
-SessionLaps: 50
-SessionTime: 3600.0
-SessionState: Racing
+  CurrentSessionNum: 0
+  Sessions:
+    - SessionNum: 0
+      SessionLaps: unlimited
+      SessionTime: "600 sec"
+      SessionType: Practice
 "#;
 
-        // Warm up
-        for _ in 0..10 {
-            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml);
-        }
-
-        // Benchmark YAML preprocessing
-        const NUM_ITERATIONS: usize = 1000;
-        let start = Instant::now();
-
-        for _ in 0..NUM_ITERATIONS {
-            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
-        }
-
-        let elapsed = start.elapsed();
-        let avg_duration_nanos = elapsed.as_nanos() as f64 / NUM_ITERATIONS as f64;
-        let avg_duration_micros = avg_duration_nanos / 1000.0;
-
-        println!(
-            "Session YAML preprocessing performance: avg {:.2}ns ({:.3}μs) per parse, {} iterations",
-            avg_duration_nanos, avg_duration_micros, NUM_ITERATIONS
-        );
-
-        // Target: <10ms total parse time (10,000μs) - should be much faster for preprocessing alone
-        assert!(
-            avg_duration_nanos < 1_000_000.0, // <1ms for preprocessing
-            "Session YAML preprocessing should be <1ms, got {:.2}ns",
-            avg_duration_nanos
-        );
-
-        // Benchmark complete parsing pipeline
-        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
-        let start = Instant::now();
-
-        for _ in 0..100 {
-            // Fewer iterations for full parsing
-            let _ = SessionInfo::parse(&preprocessed);
-        }
-
-        let elapsed = start.elapsed();
-        let avg_full_parse_micros = elapsed.as_micros() as f64 / 100.0;
-
-        println!(
-            "Complete session parsing performance: avg {:.2}μs per parse, 100 iterations",
-            avg_full_parse_micros
-        );
-
-        // Target: <10ms (10,000μs) total parse time including YAML deserialization
-        assert!(
-            avg_full_parse_micros < 10_000.0,
-            "Complete session parsing should be <10ms, got {:.2}μs",
-            avg_full_parse_micros
-        );
-
-        if avg_full_parse_micros < 1_000.0 {
-            println!("✅ Excellent performance: session parsing is <1ms");
-        } else {
-            println!("⚠️  Performance acceptable but could be optimized further");
+    fn parse_context(error: IRacingSDKError) -> String {
+        match error {
+            IRacingSDKError::Parse { context, .. } => context,
+            other => panic!("expected parse error, got {other:?}"),
         }
     }
 
-    #[cfg(windows)]
     #[test]
-    #[ignore = "iracing_required"]
-    fn parses_live_iracing_session_info() {
-        use crate::windows::Connection;
+    fn parse_deserializes_decoded_session_yaml() {
+        let session = SessionInfo::parse(MINIMAL_SESSION).unwrap();
 
-        // Open connection to live iRacing shared memory
-        let connection = Connection::try_connect()
-            .expect("Failed to connect to iRacing - ensure iRacing is running and in a session");
+        assert_eq!(session.weekend_info.track_name, "test");
+        assert_eq!(session.weekend_info.track_display_name, "Test Circuit");
+        assert_eq!(session.session_info.sessions.len(), 1);
+    }
 
-        let header = connection.header();
+    #[test]
+    fn parse_and_parse_sanitized_are_equivalent_for_clean_yaml() {
+        let sanitized = SanitizedSessionYaml::new(MINIMAL_SESSION.to_owned());
 
-        println!("Live iRacing header info:");
-        println!("  Session info length: {} bytes", header.session_info_len);
-        println!("  Session info offset: {}", header.session_info_offset);
-        println!(
-            "  Session info update counter: {}",
-            header.session_info_update
+        assert_eq!(
+            SessionInfo::parse(MINIMAL_SESSION).unwrap(),
+            SessionInfo::parse_sanitized(&sanitized).unwrap()
         );
+    }
 
-        // Validate we have session info
-        assert!(header.session_info_len > 0, "No session info available");
-        assert!(
-            header.session_info_offset >= 0,
-            "Invalid session info offset"
-        );
+    #[test]
+    fn parse_sanitizes_decoded_control_characters() {
+        let yaml = MINIMAL_SESSION.replace("TrackName: test", "TrackName: te\u{1}st");
+        let session = SessionInfo::parse(&yaml).unwrap();
 
-        // Get and parse session info
-        let raw_yaml = connection
-            .session_yaml_bytes()
-            .expect("Failed to get session info from iRacing")
-            .unwrap()
-            .decode()
-            .expect("Could not decode session YAML")
-            .sanitize();
+        assert_eq!(session.weekend_info.track_name, "test");
+    }
 
-        let session_info =
-            SessionInfo::parse_sanitized(&raw_yaml).expect("Failed to parse live session info");
+    #[test]
+    fn malformed_yaml_reports_deserialization_context() {
+        let error = SessionInfo::parse("WeekendInfo: [").unwrap_err();
 
-        // Validate session info content
-        println!("\nLive session info parsed successfully:");
-        println!(
-            "  Track: {} ({})",
-            session_info.weekend_info.track_name, session_info.weekend_info.track_display_name
-        );
-        println!("  Track length: {}", session_info.weekend_info.track_length);
-        println!(
-            "  Current session: {}",
-            session_info.session_info.current_session_num
-        );
-        if !session_info.session_info.sessions.is_empty() {
-            println!(
-                "  Session type: {}",
-                session_info.session_info.sessions[0].session_type
-            );
+        assert_eq!(parse_context(error), "session YAML deserialization");
+    }
+
+    #[test]
+    fn type_mismatch_reports_deserialization_context() {
+        let yaml = MINIMAL_SESSION.replace("CurrentSessionNum: 0", "CurrentSessionNum: nope");
+        let error = SessionInfo::parse(&yaml).unwrap_err();
+
+        assert_eq!(parse_context(error), "session YAML deserialization");
+    }
+
+    #[test]
+    fn missing_required_top_level_sections_are_rejected() {
+        for yaml in [
+            "SessionInfo:\n  CurrentSessionNum: 0\n",
+            "WeekendInfo:\n  TrackName: test\n",
+            "{}",
+        ] {
+            let error = SessionInfo::parse(yaml).unwrap_err();
+            assert_eq!(parse_context(error), "session YAML deserialization");
         }
-        println!(
-            "  Number of sessions: {}",
-            session_info.session_info.sessions.len()
-        );
-        if let Some(driver_info) = &session_info.driver_info {
-            if let Some(drivers) = &driver_info.drivers {
-                println!("  Number of drivers: {}", drivers.len());
-            } else {
-                println!("  No drivers list available");
-            }
-            if let Some(current_driver) = driver_info.driver_car_idx {
-                println!("  Current driver car index: {}", current_driver);
-            }
-        } else {
-            println!("  No driver info available (testing session)");
-        }
+    }
 
-        // Basic validation
-        assert!(
-            !session_info.weekend_info.track_name.is_empty(),
-            "Track name should not be empty"
-        );
-        assert!(
-            !session_info.weekend_info.track_display_name.is_empty(),
-            "Track display name should not be empty"
-        );
-        assert!(
-            !session_info.session_info.sessions.is_empty(),
-            "Should have at least one session"
-        );
-
-        // Test some drivers if available
-        if let Some(driver_info) = &session_info.driver_info
-            && let Some(drivers) = &driver_info.drivers
-            && !drivers.is_empty()
-        {
-            println!("\nDriver information:");
-            for (i, driver) in drivers.iter().take(3).enumerate() {
-                println!(
-                    "  Driver {}: {} ({})",
-                    i + 1,
-                    driver.user_name,
-                    driver.abbrev_name.as_deref().unwrap_or("N/A")
-                );
-            }
+    #[test]
+    fn empty_or_controls_only_input_is_rejected() {
+        for yaml in ["", "\u{0}\u{1}\u{7f}"] {
+            let error = SessionInfo::parse(yaml).unwrap_err();
+            assert_eq!(parse_context(error), "session YAML deserialization");
         }
-
-        // Test weather info if available
-        println!("\nWeather information:");
-        if let Some(air_temp) = &session_info.weekend_info.track_air_temp {
-            println!("  Air temperature: {}", air_temp);
-        }
-        if let Some(surface_temp) = &session_info.weekend_info.track_surface_temp {
-            println!("  Track surface temperature: {}", surface_temp);
-        }
-        if let Some(humidity) = &session_info.weekend_info.track_relative_humidity {
-            println!("  Relative humidity: {}", humidity);
-        }
-
-        println!("\n✅ Live session info parsing test completed successfully");
     }
 }

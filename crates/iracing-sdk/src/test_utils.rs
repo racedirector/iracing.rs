@@ -114,7 +114,7 @@ impl IbtFixture {
                 self.name, err, FIXTURE_INSTALL_GUIDANCE
             ))
         })?;
-        Ok(repo_root.join(&self.session_yaml_path))
+        require_fixture(repo_root.join(&self.session_yaml_path))
     }
 }
 
@@ -357,19 +357,6 @@ pub fn require_smallest_ibt_fixture() -> Result<PathBuf, FixtureError> {
             FIXTURE_INSTALL_GUIDANCE
         ))
     })
-}
-
-/// Require a file inside `test-data/` by name.
-#[cfg(windows)]
-pub fn require_test_data_file(file_name: &str) -> Result<PathBuf, FixtureError> {
-    let test_data_dir = get_test_data_dir().map_err(|err| {
-        FixtureError::new(format!(
-            "Failed to resolve test-data directory: {}. {}",
-            err, FIXTURE_INSTALL_GUIDANCE
-        ))
-    })?;
-
-    require_fixture(test_data_dir.join(file_name))
 }
 
 #[cfg(test)]
