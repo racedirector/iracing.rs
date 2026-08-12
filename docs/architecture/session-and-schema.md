@@ -23,13 +23,18 @@ schema and frame types are platform-neutral.
 
 ## Session YAML path
 
-iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
-that standard parsers do not accept directly. `yaml_utils` is the single byte
-extraction, decoding, and compatibility-preprocessing surface.
+iRacing session data can contain control characters and non-UTF-8 bytes. The
+provider-facing path is implemented by the representations in
+`schema/session/types.rs`: sources create bounded `SessionYamlBytes`, providers
+decode and sanitize them, and `Provider::session_yaml` returns owned
+`SanitizedSessionYaml`. `SessionInfo::parse_sanitized` then performs typed serde
+deserialization. `SessionInfo::parse` is the convenience entry point for an
+already-decoded string and applies the same sanitation before deserializing.
 
-`SessionInfo::parse` applies that preprocessing and deserializes `SessionInfo`.
-Providers may preprocess before returning owned YAML, but parsing remains
-idempotent so direct callers receive the same control-character cleanup.
+The public `yaml_utils` module is a legacy compatibility surface with different
+decoding behavior. Production providers do not use it. Migrating, deprecating,
+or removing that module is a separate public-API decision; tests for the active
+provider pipeline must not duplicate a second extraction/decoding matrix there.
 
 ## Caching and publication
 

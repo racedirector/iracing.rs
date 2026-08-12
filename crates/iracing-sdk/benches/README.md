@@ -6,6 +6,7 @@ different targets are not interchangeable measurements of “frame latency.”
 
 | Target | Measures | Does not measure |
 | --- | --- | --- |
+| `session_yaml_parsing` | Typed parsing through `SessionInfo::parse` and `parse_sanitized` using a generated fixture | Provider extraction, byte decoding, or sanitation in isolation |
 | `var_data_extraction` | Individual scalar, array, bitfield, and bounds-error operations | Whole-frame or delivery-pipeline cost |
 | `frame_construction` | Byte-buffer ownership, `FramePacket` construction, `Arc` cloning, and tick operations | Telemetry decoding or acquisition |
 | `adapter_performance` | Dynamic lookup and typed adapter construction from a prepared packet | Provider, connection, or subscription work |

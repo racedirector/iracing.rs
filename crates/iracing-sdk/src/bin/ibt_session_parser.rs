@@ -10,7 +10,7 @@
 //!
 //! # Behavior
 //! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
-//! - Extracts session YAML via `reader.session_yaml()?`
+//! - Extracts session YAML via `IbtProvider::session_yaml`
 //! - If session YAML is present, writes it to `--output-path`
 //! - If session YAML is **absent**, the tool exits successfully without writing a file
 //!

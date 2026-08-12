@@ -68,7 +68,7 @@
 //!
 //! # Notes
 //! If you want guaranteed output, add handling for the `None` case from
-//! `connection.session_info()` (e.g., return an error or write a placeholder file).
+//! `Provider::session_yaml()` (e.g., return an error or write a placeholder file).
 
 use anyhow::Result;
 #[cfg(windows)]

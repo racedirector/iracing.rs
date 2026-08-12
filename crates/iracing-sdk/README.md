@@ -71,12 +71,13 @@ fn main() -> iracing_sdk::Result<()> {
 ### Session YAML Parsing
 
 ```rust,no_run
-use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
+use iracing_sdk::{provider::Provider, providers::ibt::IbtProvider, schema::SessionInfo};
 
-fn main() -> iracing_sdk::Result<()> {
-    let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(yaml) = reader.session_yaml()? {
-        let session = SessionInfo::parse(&yaml)?;
+#[tokio::main]
+async fn main() -> iracing_sdk::Result<()> {
+    let mut provider = IbtProvider::open("telemetry.ibt")?;
+    if let Some(yaml) = provider.session_yaml(0).await? {
+        let session = SessionInfo::parse_sanitized(&yaml)?;
         println!("Track: {}", session.weekend_info.track_display_name);
     }
     Ok(())
@@ -198,4 +199,4 @@ impl FrameAdapter for Row {
 - `live-*` tools fail on non-Windows:
   - Live shared memory APIs are Windows-only.
 - No session YAML written by parser tools:
-  - `session_yaml()`/`session_info()` can legitimately return no content if unavailable.
+  - `Provider::session_yaml()` can legitimately return no content if unavailable.

@@ -143,6 +143,11 @@ name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
+[[bench]]
+name = "session_yaml_parsing"
+harness = false
+required-features = ["benchmark"]
+
 [[example]]
 name = "car-setup-observer"
 path = "examples/car_setup_observer.rs"

@@ -68,6 +68,9 @@ skip a required integration test because data is absent. The best-effort
   ports.
 - SDK parser/reader integration tests should use deterministic fixtures through
   `iracing_sdk::test_utils`.
+- Session parser unit tests are portable. Manifest-backed provider tests compare
+  each embedded document with its required companion under `test-data/session-yaml`;
+  only the explicit Windows live smoke test may be ignored for simulator availability.
 - Broadcast application tests should fake internal ports; transport tests should
   exercise tonic over a real listener where platform gates permit.
 - Simulation tests should inject `SimStatusClient`; only an explicit smoke test
