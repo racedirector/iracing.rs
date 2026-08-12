@@ -31,10 +31,9 @@ decode and sanitize them, and `Provider::session_yaml` returns owned
 deserialization. `SessionInfo::parse` is the convenience entry point for an
 already-decoded string and applies the same sanitation before deserializing.
 
-The public `yaml_utils` module is a legacy compatibility surface with different
-decoding behavior. Production providers do not use it. Migrating, deprecating,
-or removing that module is a separate public-API decision; tests for the active
-provider pipeline must not duplicate a second extraction/decoding matrix there.
+The former `yaml_utils` compatibility surface has been removed. Session YAML
+must flow through the provider-facing representations above so the crate does
+not maintain a second extraction, decoding, and sanitation implementation.
 
 ## Caching and publication
 

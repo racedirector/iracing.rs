@@ -1111,7 +1111,6 @@ dependencies = [
  "clap",
  "criterion",
  "csv",
- "encoding_rs",
  "futures",
  "iracing-sdk-derive",
  "pin-project-lite",

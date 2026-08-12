@@ -17,7 +17,6 @@
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
 //!   - [`schema::SessionInfo`]
-//!   - [`yaml_utils`] for iRacing YAML cleanup
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`
@@ -61,7 +60,6 @@ pub mod adapters;
 mod error;
 pub mod test_utils;
 pub mod types;
-pub mod yaml_utils;
 
 // Stream-based modules
 pub mod connections;

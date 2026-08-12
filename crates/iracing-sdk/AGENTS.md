@@ -22,8 +22,7 @@
 - `examples/`: cross-platform disk examples plus Windows live/broadcast examples.
 - `tests/`: integration and derive macro regression tests.
 - `benches/`: Criterion benchmarks gated by the `benchmark` feature.
-- `schema/session/types.rs`: owns provider-facing byte extraction, decoding, and sanitation. Do not duplicate those stages in callers or `yaml_utils` tests.
-- `yaml_utils`: retained public compatibility utilities; changes to its status or behavior require a separate API decision.
+- `schema/session/types.rs`: owns provider-facing byte extraction, decoding, and sanitation. Do not duplicate those stages in callers.
 
 ## Platform & Feature Guardrails
 
