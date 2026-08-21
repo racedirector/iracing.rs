@@ -222,10 +222,10 @@ impl Connection {
 
         // Double-read pattern to ensure data consistency: copy the buffer out
         // of shared memory *between* two volatile reads of its tick count, and
-        // discard the copy if they differ. Constructing a borrowed slice into
-        // shared memory (as this used to do) checks nothing - the caller reads
-        // the bytes after the check, so a concurrent write from the sim could
-        // hand it a torn frame.
+        // discard the copy if they differ. The copy has to happen between the
+        // two reads - a borrowed slice into shared memory would check nothing,
+        // because the caller reads the bytes after the check, and a concurrent
+        // write from the sim could hand it a torn frame.
         for attempt in 0..2 {
             let (tick_ptr, data_ptr, buf_len) = {
                 let header = self.header();
