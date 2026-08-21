@@ -48,6 +48,7 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = "0.1.85"
+axum = { version = "0.8.9", features = ["ws"] }
 clap = { workspace = true }
 csv = { workspace = true }
 futures = "0.3"
@@ -58,6 +59,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
+tower-http = { version = "0.6.10", features = ["trace"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 
@@ -94,6 +96,7 @@ criterion = "0.8.2"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive" }
 proptest = "1.11.0"
 tokio = { version = "1", features = ["test-util"] }
+tower = { version = "0.5.3", features = ["util"] }
 
 [features]
 default = ["derive"]
@@ -262,6 +265,10 @@ path = "src/bin/live_json_snapshot.rs"
 [[bin]]
 name = "live-to-jsonl"
 path = "src/bin/live_to_jsonl.rs"
+
+[[bin]]
+name = "telemetry-ws-server"
+path = "src/bin/telemetry_ws_server/main.rs"
 
 [[bin]]
 name = "session-schema"
