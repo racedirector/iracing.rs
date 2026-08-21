@@ -136,30 +136,43 @@ impl Connection {
         Self::wait_for_event(self.event, ms)
     }
 
-    /// Wait for new telemetry data (async wrapper over a bounded direct wait).
+    /// Wait for new telemetry data (async - waits on the calling thread).
     ///
-    /// The event wait previously ran on `spawn_blocking`, which costs two
-    /// scheduler wake-ups per 60 Hz telemetry frame: the blocking-pool thread
-    /// wakes on the iRacing event, then the runtime thread wakes again on the
-    /// task result. Running the wait directly on the calling thread lets the
-    /// event resume the caller with no intermediate hop, which matters for
-    /// consumers that run the provider on its own dedicated runtime.
+    /// The event wait runs directly on the calling thread, so the Windows
+    /// event resumes the caller with no intermediate scheduler hop. This
+    /// matters for latency-sensitive consumers that run the provider on a
+    /// dedicated runtime, where the extra wake-up per 60 Hz frame is pure
+    /// overhead.
     ///
-    /// Blocking the executor is made safe by bounding each wait to 50 ms and
-    /// yielding first - expired timers and ready sibling tasks run on the
-    /// yield, and a `Timeout` return just re-enters the caller's poll loop,
-    /// preserving the previous semantics. In the connected steady state the
-    /// event fires within one 60 Hz frame, so the cap never engages.
+    /// Blocking the executor is kept safe by splitting the requested timeout
+    /// into 50 ms chunks with a `yield_now` between them, so expired timers
+    /// and ready sibling tasks are serviced while the wait is in progress.
+    /// The event ends the current chunk immediately when it fires; `Timeout`
+    /// is returned only once the full requested duration has elapsed. In the
+    /// connected steady state the event fires within one 60 Hz frame
+    /// (~16.7 ms), so the wait completes inside the first chunk.
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
-        const WAIT_CHUNK_MS: u128 = 50;
+        const WAIT_CHUNK: Duration = Duration::from_millis(50);
 
-        // Let the runtime service expired timers and sibling tasks before the
-        // thread commits to the blocking wait.
-        tokio::task::yield_now().await;
+        let mut remaining = timeout;
+        loop {
+            // Let the runtime service expired timers and sibling tasks before
+            // the thread commits to the blocking wait.
+            tokio::task::yield_now().await;
 
-        let timeout_ms = timeout.as_millis().min(WAIT_CHUNK_MS) as u32;
-        tracing::trace!(timeout_ms, "Waiting for Windows event on the calling thread");
-        Self::wait_for_event(self.event, timeout_ms)
+            let chunk = remaining.min(WAIT_CHUNK);
+            let chunk_ms = chunk.as_millis() as u32;
+            tracing::trace!(chunk_ms, "Waiting for Windows event on the calling thread");
+            match Self::wait_for_event(self.event, chunk_ms)? {
+                WaitResult::Timeout => {
+                    remaining = remaining.saturating_sub(chunk);
+                    if remaining.is_zero() {
+                        return Ok(WaitResult::Timeout);
+                    }
+                }
+                signaled => return Ok(signaled),
+            }
+        }
     }
 
     /// Get latest telemetry data if available
