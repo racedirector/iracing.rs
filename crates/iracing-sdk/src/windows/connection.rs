@@ -136,37 +136,30 @@ impl Connection {
         Self::wait_for_event(self.event, ms)
     }
 
-    /// Wait for new telemetry data (async - cooperative, non-blocking)
+    /// Wait for new telemetry data (async wrapper over a bounded direct wait).
     ///
-    /// This method uses `spawn_blocking` to isolate the synchronous Windows event wait
-    /// on a dedicated blocking thread pool, preventing starvation of other async tasks.
-    /// The async worker thread yields cooperatively via `.await` while the blocking
-    /// thread waits for the Windows event signal.
+    /// The event wait previously ran on `spawn_blocking`, which costs two
+    /// scheduler wake-ups per 60 Hz telemetry frame: the blocking-pool thread
+    /// wakes on the iRacing event, then the runtime thread wakes again on the
+    /// task result. Running the wait directly on the calling thread lets the
+    /// event resume the caller with no intermediate hop, which matters for
+    /// consumers that run the provider on its own dedicated runtime.
     ///
-    /// At 60Hz (16.67ms frames), the hot path (data already available) never reaches
-    /// this method, so spawn_blocking overhead is only paid during startup, pauses,
-    /// or frame drops - exactly when we want cooperative yielding anyway.
+    /// Blocking the executor is made safe by bounding each wait to 50 ms and
+    /// yielding first - expired timers and ready sibling tasks run on the
+    /// yield, and a `Timeout` return just re-enters the caller's poll loop,
+    /// preserving the previous semantics. In the connected steady state the
+    /// event fires within one 60 Hz frame, so the cap never engages.
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
-        // Convert HANDLE to raw pointer value (usize) to make it Send
-        // SAFETY: Windows event handles are thread-safe kernel objects
-        let event_raw = self.event.0 as usize;
-        let timeout_ms = timeout.as_millis().min(u32::MAX as u128) as u32;
+        const WAIT_CHUNK_MS: u128 = 50;
 
-        tokio::task::spawn_blocking(move || {
-            tracing::trace!(timeout_ms, "Async waiting for Windows event");
+        // Let the runtime service expired timers and sibling tasks before the
+        // thread commits to the blocking wait.
+        tokio::task::yield_now().await;
 
-            // Reconstruct HANDLE from raw pointer value
-            // SAFETY: event_raw came from a valid HANDLE, kernel object is still alive
-            let event = HANDLE(event_raw as *mut std::ffi::c_void);
-            Self::wait_for_event(event, timeout_ms)
-        })
-        .await
-        .map_err(|e| {
-            IRacingSDKError::buffer_operation_error(
-                format!("Event wait task panicked: {}", e),
-                None,
-            )
-        })?
+        let timeout_ms = timeout.as_millis().min(WAIT_CHUNK_MS) as u32;
+        tracing::trace!(timeout_ms, "Waiting for Windows event on the calling thread");
+        Self::wait_for_event(self.event, timeout_ms)
     }
 
     /// Get latest telemetry data if available
