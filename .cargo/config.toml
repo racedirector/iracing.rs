@@ -122,6 +122,15 @@ live-json-snapshot = [
 
 live-to-jsonl = ["run", "-p", "iracing-sdk", "--bin", "live-to-jsonl", "--"]
 
+telemetry-ws-server = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--bin",
+  "telemetry-ws-server",
+  "--",
+]
+
 live-variable-schema = [
   "run",
   "-p",
