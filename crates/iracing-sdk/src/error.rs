@@ -276,21 +276,6 @@ impl IRacingSDKError {
         }
     }
 
-    pub(crate) fn unstable_session_yaml_snapshot(
-        version_before: i32,
-        version_after: i32,
-        attempts: usize,
-    ) -> Self {
-        Self::buffer_operation_error(
-            format!(
-                "session YAML changed while being copied after \
-             {attempts} attempts: version {version_before} -> \
-             {version_after}"
-            ),
-            None,
-        )
-    }
-
     /// Helper constructor for unsupported platform errors.
     pub fn unsupported_platform(
         feature: impl Into<String>,
@@ -316,40 +301,6 @@ impl IRacingSDKError {
             context: context.into(),
             details: details.into(),
         }
-    }
-
-    pub(crate) fn invalid_session_yaml_region(
-        offset: i32,
-        length: i32,
-        buffer_size: usize,
-    ) -> Self {
-        Self::parse_error(
-            "session YAML extraction",
-            format!(
-                "invalid byte region: offset={offset} length={length} buffer_size={buffer_size}"
-            ),
-        )
-    }
-
-    pub(crate) fn session_yaml_deserialization(error: serde_yaml_ng::Error) -> Self {
-        Self::parse_error("session YAML deserialization", error.to_string())
-    }
-
-    pub(crate) fn invalid_session_yaml_utf8(error: std::str::Utf8Error) -> Self {
-        let details = match error.error_len() {
-            Some(length) => format!(
-                "document declares UTF8 but contains an invalid \
-             {length}-byte sequence starting at byte {}",
-                error.valid_up_to(),
-            ),
-            None => format!(
-                "document declares UTF8 but ends with an incomplete \
-             sequence starting at byte {}",
-                error.valid_up_to(),
-            ),
-        };
-
-        Self::parse_error("session YAML decoding", details)
     }
 }
 
