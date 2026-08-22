@@ -154,10 +154,10 @@ mod tests {
     impl TelemetryValueProvider for TestTelemetryValueProvider {
         fn telemetry_value(&self, info: &VariableInfo) -> iracing_sdk::Result<TelemetryValue> {
             if self.failing_variable.as_deref() == Some(info.name.as_str()) {
-                return Err(IRacingSDKError::Parse {
-                    context: "test provider".to_string(),
-                    details: "intentional failure".to_string(),
-                });
+                return Err(IRacingSDKError::parse_error(
+                    "test provider",
+                    "intentional failure",
+                ));
             }
 
             Ok(self.values[&info.name].clone())

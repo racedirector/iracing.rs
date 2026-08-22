@@ -5,7 +5,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::IRacingSDKError;
+
 use super::VariableType;
+
+fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
+    IRacingSDKError::parse_error("Schema validation", details)
+}
 
 /// # Variable info
 /// Information about a specific telemetry variable.
@@ -64,30 +70,24 @@ impl VariableSchema {
         for (name, var_info) in &self.variables {
             // Validate variable count
             if var_info.count == 0 {
-                return Err(crate::IRacingSDKError::Parse {
-                    context: "Schema validation".to_string(),
-                    details: format!("Variable '{}' has count of 0", name),
-                });
+                return Err(schema_validation_error(format!(
+                    "Variable '{}' has count of 0",
+                    name
+                )));
             }
 
             // Validate variable name matches info name
             if var_info.name != *name {
-                return Err(crate::IRacingSDKError::Parse {
-                    context: "Schema validation".to_string(),
-                    details: format!(
-                        "Variable map key '{}' doesn't match info name '{}'",
-                        name, var_info.name
-                    ),
-                });
+                return Err(schema_validation_error(format!(
+                    "Variable map key '{}' doesn't match info name '{}'",
+                    name, var_info.name
+                )));
             }
 
             // Validate that variable fits within frame
             let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
             if end_offset > self.frame_size {
-                return Err(crate::IRacingSDKError::Memory {
-                    offset: var_info.offset,
-                    source: None,
-                });
+                return Err(IRacingSDKError::memory_access_error(var_info.offset));
             }
         }
 

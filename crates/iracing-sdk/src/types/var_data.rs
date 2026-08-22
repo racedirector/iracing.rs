@@ -47,17 +47,15 @@ impl VarData for BitField {
 impl VarData for u8 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         if !matches!(info.data_type, VariableType::UInt8 | VariableType::Char) {
-            return Err(crate::IRacingSDKError::TypeConversion {
-                details: format!("Expected UInt8 or Char, got {:?}", info.data_type),
-            });
+            return Err(crate::IRacingSDKError::type_conversion(
+                "BitField",
+                info.data_type,
+            ));
         }
 
         data.get(info.offset)
             .copied()
-            .ok_or(crate::IRacingSDKError::Memory {
-                offset: info.offset,
-                source: None,
-            })
+            .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))
     }
 }
 
@@ -110,21 +108,15 @@ impl<T: VarData> VarData for Vec<T> {
 
         for i in 0..info.count {
             // Check the offset of the item
-            let offset_delta =
-                i.checked_mul(element_size)
-                    .ok_or(crate::IRacingSDKError::Memory {
-                        offset: info.offset,
-                        source: None,
-                    })?;
+            let offset_delta = i
+                .checked_mul(element_size)
+                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
 
             // Set the offset
-            var_info.offset =
-                info.offset
-                    .checked_add(offset_delta)
-                    .ok_or(crate::IRacingSDKError::Memory {
-                        offset: info.offset,
-                        source: None,
-                    })?;
+            var_info.offset = info
+                .offset
+                .checked_add(offset_delta)
+                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
 
             // Parse the variable and store it in the result.
             result.push(T::from_bytes(data, &var_info)?);
@@ -143,9 +135,10 @@ fn read_fixed_impl<const SIZE: usize, T>(
 ) -> crate::Result<T> {
     // Validate we have the right data type
     if info.data_type != expected {
-        return Err(crate::IRacingSDKError::TypeConversion {
-            details: format!("Expected {:?}, got {:?}", expected, info.data_type),
-        });
+        return Err(crate::IRacingSDKError::type_conversion(
+            expected,
+            info.data_type,
+        ));
     }
 
     // Read the bytes
@@ -153,10 +146,7 @@ fn read_fixed_impl<const SIZE: usize, T>(
         .get(info.offset..)
         .and_then(|remaining| remaining.first_chunk::<SIZE>())
         .copied()
-        .ok_or(crate::IRacingSDKError::Memory {
-            offset: info.offset,
-            source: None,
-        })?;
+        .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
 
     // Decode and return
     Ok(decode(bytes))

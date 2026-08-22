@@ -139,9 +139,7 @@ macro_rules! define_irsdk_bitflags {
         impl VarData for $name {
             fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
                 if info.data_type != VariableType::BitField {
-                    return Err(crate::IRacingSDKError::TypeConversion {
-                        details: format!("Expected BitField, got {:?}", info.data_type),
-                    });
+                    return Err(crate::IRacingSDKError::type_conversion("BitField", info.data_type));
                 }
 
                 Ok(Self::from(BitField::from_bytes(data, info)?))
@@ -579,9 +577,10 @@ impl VarData for IncidentFlags {
     /// ```
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         if info.data_type != VariableType::BitField {
-            return Err(crate::IRacingSDKError::TypeConversion {
-                details: format!("Expected BitField, got {:?}", info.data_type),
-            });
+            return Err(crate::IRacingSDKError::type_conversion(
+                "BitField",
+                info.data_type,
+            ));
         }
 
         Ok(Self::from(BitField::from_bytes(data, info)?))
