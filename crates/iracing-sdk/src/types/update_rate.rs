@@ -22,10 +22,10 @@ impl UpdateRate {
     pub fn max(hz: u32) -> Result<Self, IRacingSDKError> {
         NonZeroU32::new(hz)
             .map(Self::Max)
-            .ok_or(IRacingSDKError::Parse {
-                context: "UpdateRate".to_string(),
-                details: format!("{} could not be parsed to NonZeroU32", hz),
-            })
+            .ok_or(IRacingSDKError::parse_error(
+                "Update Rate".to_string(),
+                format!("{} could not be parsed to NonZeroU32", hz),
+            ))
     }
 
     /// Normalize rate against source frequency

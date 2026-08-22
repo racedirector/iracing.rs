@@ -209,6 +209,8 @@ mod tests {
                 .with_output_path(&output_path)
                 .with_variables(variables)
                 .build()?;
+            assert_eq!(writer.variable_count(), 2);
+            assert_eq!(writer.column_count(), 4);
             writer.write_telemetry(&provider)?;
             writer.flush()?;
         }

@@ -3,6 +3,7 @@
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
 
@@ -33,6 +34,12 @@ pub enum VariableType {
     Bool,
     /// 32-bit bitfield (maps to irsdk_bitField)
     BitField,
+}
+
+impl fmt::Display for VariableType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 impl VariableType {
@@ -136,21 +143,14 @@ impl TelemetryValue {
         element_info.count = 1;
 
         for index in 0..info.count {
-            let offset_delta =
-                index
-                    .checked_mul(element_size)
-                    .ok_or_else(|| IRacingSDKError::Memory {
-                        offset: info.offset,
-                        source: None,
-                    })?;
+            let offset_delta = index
+                .checked_mul(element_size)
+                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
 
-            element_info.offset =
-                info.offset
-                    .checked_add(offset_delta)
-                    .ok_or_else(|| IRacingSDKError::Memory {
-                        offset: info.offset,
-                        source: None,
-                    })?;
+            element_info.offset = info
+                .offset
+                .checked_add(offset_delta)
+                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
 
             values.push(Self::decode_scalar(data, &element_info)?);
         }

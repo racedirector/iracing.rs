@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use thiserror::Error;
 
@@ -133,84 +133,84 @@ impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
         match self {
-            IRacingSDKError::Connection { .. } => true,
-            IRacingSDKError::Buffer { .. } => true,
-            IRacingSDKError::File { .. } => false,
-            IRacingSDKError::Memory { .. } => false,
-            IRacingSDKError::Version { .. } => false,
-            IRacingSDKError::Parse { .. } => false,
-            IRacingSDKError::FieldNotFound { .. } => false,
-            IRacingSDKError::TypeConversion { .. } => false,
-            IRacingSDKError::UnsupportedPlatform { .. } => false,
+            Self::Connection { .. } => true,
+            Self::Buffer { .. } => true,
+            Self::File { .. } => false,
+            Self::Memory { .. } => false,
+            Self::Version { .. } => false,
+            Self::Parse { .. } => false,
+            Self::FieldNotFound { .. } => false,
+            Self::TypeConversion { .. } => false,
+            Self::UnsupportedPlatform { .. } => false,
             #[cfg(windows)]
-            IRacingSDKError::WindowsApi { .. } => true,
-            IRacingSDKError::SchemaValidation { .. } => false,
-            IRacingSDKError::InvalidConfiguration { .. } => false,
+            Self::WindowsApi { .. } => true,
+            Self::SchemaValidation { .. } => false,
+            Self::InvalidConfiguration { .. } => false,
         }
     }
 
     /// Returns suggested recovery actions for this error.
     pub fn recovery_suggestions(&self) -> Vec<&'static str> {
         match self {
-            IRacingSDKError::Connection { .. } => vec![
+            Self::Connection { .. } => vec![
                 "Ensure iRacing is running",
                 "Check Windows permissions for shared memory access",
                 "Verify iRacing SDK version compatibility",
                 "Try restarting iRacing",
             ],
-            IRacingSDKError::Memory { .. } => vec![
+            Self::Memory { .. } => vec![
                 "Check memory access bounds",
                 "Verify shared memory is still valid",
                 "Restart the application",
             ],
-            IRacingSDKError::File { .. } => vec![
+            Self::File { .. } => vec![
                 "Check file exists and is readable",
                 "Verify IBT file format and version",
                 "Ensure sufficient disk space",
                 "Check file permissions",
             ],
-            IRacingSDKError::Version { .. } => vec![
+            Self::Version { .. } => vec![
                 "Update iRacing to latest version",
                 "Update library to compatible version",
                 "Check SDK compatibility matrix",
             ],
-            IRacingSDKError::Parse { .. } => vec![
+            Self::Parse { .. } => vec![
                 "Check data format compatibility",
                 "Verify source data integrity",
                 "Update parsing logic if needed",
             ],
-            IRacingSDKError::FieldNotFound { .. } => vec![
+            Self::FieldNotFound { .. } => vec![
                 "Check field name spelling",
                 "Verify field exists in current iRacing version",
                 "Use optional field access patterns",
             ],
-            IRacingSDKError::TypeConversion { .. } => vec![
+            Self::TypeConversion { .. } => vec![
                 "Check data type compatibility",
                 "Verify expected vs actual data types",
                 "Use appropriate conversion methods",
             ],
-            IRacingSDKError::UnsupportedPlatform { .. } => vec![
+            Self::UnsupportedPlatform { .. } => vec![
                 "Use platform-appropriate features",
                 "Consider IBT file replay for cross-platform testing",
                 "Check documentation for platform requirements",
             ],
             #[cfg(windows)]
-            IRacingSDKError::WindowsApi { .. } => vec![
+            Self::WindowsApi { .. } => vec![
                 "Check Windows API permissions",
                 "Verify system resources availability",
                 "Check Windows version compatibility",
             ],
-            IRacingSDKError::SchemaValidation { .. } => vec![
+            Self::SchemaValidation { .. } => vec![
                 "Check schema version compatibility",
                 "Update to compatible data format",
                 "Verify data structure integrity",
             ],
-            IRacingSDKError::Buffer { .. } => vec![
+            Self::Buffer { .. } => vec![
                 "Check buffer synchronization",
                 "Verify buffer access patterns",
                 "Restart buffer management",
             ],
-            IRacingSDKError::InvalidConfiguration { .. } => vec![
+            Self::InvalidConfiguration { .. } => vec![
                 "Review the documented requirements for the configuration field",
                 "Provide a supported nonzero configuration value",
             ],
@@ -219,7 +219,7 @@ impl IRacingSDKError {
 
     /// Helper constructor for connection errors.
     pub fn connection_failed(reason: impl Into<String>) -> Self {
-        IRacingSDKError::Connection {
+        Self::Connection {
             reason: reason.into(),
             source: None,
         }
@@ -227,12 +227,12 @@ impl IRacingSDKError {
 
     /// Helper constructor for file errors with path context.
     pub fn file_error(path: PathBuf, source: std::io::Error) -> Self {
-        IRacingSDKError::File { path, source }
+        Self::File { path, source }
     }
 
     /// Helper constructor for memory access errors.
     pub fn memory_access_error(offset: usize) -> Self {
-        IRacingSDKError::Memory {
+        Self::Memory {
             offset,
             source: None,
         }
@@ -241,7 +241,7 @@ impl IRacingSDKError {
     /// Helper constructor for Windows API errors.
     #[cfg(windows)]
     pub fn windows_api_error(operation: impl Into<String>, source: core::Error) -> Self {
-        IRacingSDKError::WindowsApi {
+        Self::WindowsApi {
             operation: operation.into(),
             source,
         }
@@ -253,7 +253,7 @@ impl IRacingSDKError {
         expected_version: Option<u32>,
         actual_version: Option<u32>,
     ) -> Self {
-        IRacingSDKError::SchemaValidation {
+        Self::SchemaValidation {
             reason: reason.into(),
             expected_version,
             actual_version,
@@ -262,10 +262,17 @@ impl IRacingSDKError {
 
     /// Helper constructor for buffer operation errors.
     pub fn buffer_operation_error(context: impl Into<String>, buffer_index: Option<usize>) -> Self {
-        IRacingSDKError::Buffer {
+        Self::Buffer {
             context: context.into(),
             buffer_index,
             source: None,
+        }
+    }
+
+    /// Factory for type conversion errors.
+    pub fn type_conversion(expected: impl Display, actual: impl Display) -> Self {
+        Self::TypeConversion {
+            details: format!("Expected {}, got {}", expected, actual),
         }
     }
 
@@ -274,7 +281,7 @@ impl IRacingSDKError {
         feature: impl Into<String>,
         required_platform: impl Into<String>,
     ) -> Self {
-        IRacingSDKError::UnsupportedPlatform {
+        Self::UnsupportedPlatform {
             feature: feature.into(),
             required_platform: required_platform.into(),
         }
@@ -282,9 +289,17 @@ impl IRacingSDKError {
 
     /// Helper constructor for invalid SDK configuration values.
     pub fn invalid_configuration(field: &'static str, reason: impl Into<String>) -> Self {
-        IRacingSDKError::InvalidConfiguration {
+        Self::InvalidConfiguration {
             field,
             reason: reason.into(),
+        }
+    }
+
+    /// Creates an error for malformed structured or textual source data.
+    pub fn parse_error(context: impl Into<String>, details: impl Into<String>) -> Self {
+        Self::Parse {
+            context: context.into(),
+            details: details.into(),
         }
     }
 }
@@ -293,7 +308,7 @@ impl IRacingSDKError {
 #[cfg(windows)]
 impl From<core::Error> for IRacingSDKError {
     fn from(err: core::Error) -> Self {
-        IRacingSDKError::WindowsApi {
+        Self::WindowsApi {
             operation: "Unknown Windows operation".to_string(),
             source: err,
         }

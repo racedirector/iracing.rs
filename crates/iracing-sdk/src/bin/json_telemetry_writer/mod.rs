@@ -139,10 +139,14 @@ impl Serialize for SerializableTelemetryValue<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iracing_sdk::{BitField, IRacingSDKError, VariableType};
+    use iracing_sdk::{
+        AdapterValidation, BitField, FrameAdapter, FramePacket, IRacingSDKError, VariableSchema,
+        VariableType,
+    };
     use serde::ser::Error as _;
     use std::{
         collections::HashMap,
+        sync::Arc,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -154,10 +158,10 @@ mod tests {
     impl TelemetryValueProvider for TestTelemetryValueProvider {
         fn telemetry_value(&self, info: &VariableInfo) -> iracing_sdk::Result<TelemetryValue> {
             if self.failing_variable.as_deref() == Some(info.name.as_str()) {
-                return Err(IRacingSDKError::Parse {
-                    context: "test provider".to_string(),
-                    details: "intentional failure".to_string(),
-                });
+                return Err(IRacingSDKError::parse_error(
+                    "test provider",
+                    "intentional failure",
+                ));
             }
 
             Ok(self.values[&info.name].clone())
@@ -323,6 +327,26 @@ mod tests {
         let output = std::fs::read_to_string(&output_path)?;
         std::fs::remove_file(&output_path)?;
         assert_eq!(output, "{\"Speed\":42.5,\"Gear\":3}\n");
+        Ok(())
+    }
+
+    #[test]
+    fn dynamic_snapshot_decodes_a_dynamic_frame() -> Result<()> {
+        let value = variable("Value");
+        let variables = vec![value.clone()];
+        let schema = VariableSchema {
+            variables: HashMap::from([(value.name.clone(), value)]),
+            frame_size: 4,
+        };
+        let packet = FramePacket::new(42i32.to_le_bytes().to_vec(), 1, 0, Arc::new(schema));
+        let frame = DynamicFrame::adapt(&packet, &AdapterValidation::new(Vec::new()));
+
+        let snapshot = DynamicFrameSnapshot::from_frame(&frame, &variables)?;
+
+        assert_eq!(
+            serde_json::to_value(snapshot)?,
+            serde_json::json!({ "Value": 42 })
+        );
         Ok(())
     }
 

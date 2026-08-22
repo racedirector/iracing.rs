@@ -33,6 +33,10 @@ const IRSDK_VAR_NAME_SIZE: usize = 32;
 const IRSDK_VAR_DESC_SIZE: usize = 64;
 const IRSDK_VAR_UNIT_SIZE: usize = 32;
 
+fn header_validation_error(details: impl Into<String>) -> IRacingSDKError {
+    IRacingSDKError::parse_error("Header validation", details)
+}
+
 /// IBT file header structure (matches iRacing's irsdk_header)
 #[derive(Debug, Clone)]
 pub struct IbtHeader {
@@ -158,57 +162,48 @@ impl IbtHeader {
 
         // Basic sanity checks for negative values
         if self.num_vars < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Number of variables cannot be negative".to_string(),
-            });
+            return Err(header_validation_error(
+                "Number of variables cannot be negative",
+            ));
         }
 
         // Note: buf_len can be 0 in IBT files that contain only session info without telemetry data
         if self.buf_len < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Buffer length cannot be negative".to_string(),
-            });
+            return Err(header_validation_error("Buffer length cannot be negative"));
         }
 
         // Validate offset fields are non-negative (defensive correctness)
         if self.session_info_offset < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Session info offset cannot be negative".to_string(),
-            });
+            return Err(header_validation_error(
+                "Session info offset cannot be negative",
+            ));
         }
 
         if self.session_info_len < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Session info length cannot be negative".to_string(),
-            });
+            return Err(header_validation_error(
+                "Session info length cannot be negative",
+            ));
         }
 
         if self.var_header_offset < 0 {
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Variable header offset cannot be negative".to_string(),
-            });
+            return Err(header_validation_error(
+                "Variable header offset cannot be negative",
+            ));
         }
 
         // Check for extreme/invalid values that indicate corruption
         if self.buf_len > 100_000_000 {
             // 100MB frame size is unreasonable
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Buffer length is unreasonably large".to_string(),
-            });
+            return Err(header_validation_error(
+                "Buffer length is unreasonably large",
+            ));
         }
 
         if self.num_vars > 10_000 {
             // 10k variables is unreasonable
-            return Err(IRacingSDKError::Parse {
-                context: "Header validation".to_string(),
-                details: "Number of variables is unreasonably large".to_string(),
-            });
+            return Err(header_validation_error(
+                "Number of variables is unreasonably large",
+            ));
         }
 
         Ok(())
