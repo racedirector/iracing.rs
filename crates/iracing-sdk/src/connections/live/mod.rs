@@ -102,19 +102,15 @@ impl LiveConnection {
             })
             .filter_map(|opt| async move { opt });
 
-        let effective_rate = rate.normalize(self.source_hz);
-
-        let stream = match effective_rate {
-            UpdateRate::Native => frames
+        let stream = if let Some(interval) = rate.throttle_interval(self.source_hz) {
+            frames
+                .throttle(interval)
                 .map(move |packet| T::adapt(&packet, &validation))
-                .boxed(),
-            UpdateRate::Max(hz) => {
-                let interval = Duration::from_secs_f64(1.0 / hz as f64);
-                frames
-                    .throttle(interval)
-                    .map(move |packet| T::adapt(&packet, &validation))
-                    .boxed()
-            }
+                .boxed()
+        } else {
+            frames
+                .map(move |packet| T::adapt(&packet, &validation))
+                .boxed()
         };
 
         Ok(stream)
