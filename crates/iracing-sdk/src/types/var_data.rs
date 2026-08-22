@@ -48,7 +48,7 @@ impl VarData for u8 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         if !matches!(info.data_type, VariableType::UInt8 | VariableType::Char) {
             return Err(crate::IRacingSDKError::type_conversion(
-                "BitField",
+                "UInt8 or Char",
                 info.data_type,
             ));
         }

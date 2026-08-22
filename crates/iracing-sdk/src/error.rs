@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use thiserror::Error;
 
@@ -270,9 +270,9 @@ impl IRacingSDKError {
     }
 
     /// Factory for type conversion errors.
-    pub fn type_conversion(expected: impl std::fmt::Debug, actual: impl std::fmt::Debug) -> Self {
+    pub fn type_conversion(expected: impl Display, actual: impl Display) -> Self {
         Self::TypeConversion {
-            details: format!("Expected {:?}, got {:?}", expected, actual),
+            details: format!("Expected {}, got {}", expected, actual),
         }
     }
 

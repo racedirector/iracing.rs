@@ -3,6 +3,7 @@
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
 
@@ -33,6 +34,12 @@ pub enum VariableType {
     Bool,
     /// 32-bit bitfield (maps to irsdk_bitField)
     BitField,
+}
+
+impl fmt::Display for VariableType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 impl VariableType {
