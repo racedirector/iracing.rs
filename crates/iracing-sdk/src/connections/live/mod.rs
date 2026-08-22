@@ -19,7 +19,7 @@ use {
         types::{FramePacket, UpdateRate},
     },
     futures::{Stream, StreamExt},
-    std::{sync::Arc, time::Duration},
+    std::sync::Arc,
     tokio::sync::watch,
     tokio_stream::wrappers::WatchStream,
     tokio_util::sync::CancellationToken,
