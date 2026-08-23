@@ -50,6 +50,7 @@ mod broadcast;
 mod codegen;
 mod dynamic_frame;
 mod frame;
+mod header;
 mod incident;
 mod irsdk_bitflags;
 mod irsdk_enums;
