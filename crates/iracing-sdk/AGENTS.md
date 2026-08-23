@@ -12,7 +12,7 @@
 - `ibt/`: `IbtReader` iterates `.ibt` telemetry; rely on `VariableSchema` and `VariableInfo` metadata instead of re-parsing frame bytes.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
 - `schema/session/`: `SessionInfoParser` caches YAML; only re-parse when `session_version` changes.
-- `schema/header.rs` and `schema/variables.rs`: Windows-only live schema discovery for shared-memory headers and variable definitions.
+- `types/headers.rs`: shared live/IBT wire headers and source-specific validation; `schema/variables.rs`: Windows-only legacy variable-schema discovery.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
 - `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. `IbtConnection` coordinates one shared cursor across acknowledged subscribers; `LiveConnection` exposes watch-backed latest snapshots.
 - `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.

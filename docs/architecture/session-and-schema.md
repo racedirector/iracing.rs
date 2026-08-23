@@ -18,8 +18,9 @@ Consumers should resolve fields through the schema and decode through `VarData`
 or `TelemetryValue`. This keeps type sizes, arrays, bitfields, bounds, and
 little-endian conversion centralized.
 
-The live header/variable discovery modules are Windows-gated. The resulting
-schema and frame types are platform-neutral.
+The shared live/IBT header representation is platform-neutral. Windows-gated
+live code reads that header and discovers variable definitions from shared
+memory; the resulting schema and frame types remain platform-neutral.
 
 ## Session YAML path
 
