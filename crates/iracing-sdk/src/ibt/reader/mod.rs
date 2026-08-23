@@ -30,8 +30,12 @@
 //! - Frame reading is allocation-minimal except for the returned frame bytes
 //! - Seeking operations are O(1) as they only update internal position counters
 
-use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{IRacingSDKError, Result, SchemaProvider, VariableSchema, yaml_utils};
+use super::format::{IRSDK_VAR_HEADER_SIZE, extract_variable_schema};
+use crate::{
+    IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    headers::{DiskSubHeader, Header},
+    yaml_utils,
+};
 use std::{
     fs::File,
     io::Read,
@@ -43,8 +47,8 @@ pub struct IbtReader {
     data: Vec<u8>,
     current_position: usize,
     path: Option<PathBuf>,
-    header: IbtHeader,
-    disk_header: IbtDiskSubHeader,
+    header: Header,
+    disk_header: DiskSubHeader,
     variable_schema: VariableSchema,
     current_frame: usize,
     total_frames: usize,
@@ -80,11 +84,11 @@ impl IbtReader {
         let mut cursor = std::io::Cursor::new(data.as_slice());
 
         // Parse IBT header
-        let header = IbtHeader::parse_from_reader(&mut cursor)?;
+        let header = Header::try_from_reader(&mut cursor)?;
         header.validate()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
-        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut cursor, &header)?;
+        let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
 
         // Extract variable schema
         let variable_schema = extract_variable_schema(&mut cursor, &header)?;
@@ -93,7 +97,7 @@ impl IbtReader {
         // Frame data starts AFTER both variable headers AND session info
         // 1. Variable headers are at header.var_header_offset and each is IRSDK_VAR_HEADER_SIZE bytes
         let var_headers_size = header
-            .num_vars
+            .variable_count
             .checked_mul(IRSDK_VAR_HEADER_SIZE as i32)
             .ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame data calculation".to_string(),
@@ -101,7 +105,7 @@ impl IbtReader {
             })?;
 
         let var_headers_end = header
-            .var_header_offset
+            .variable_header_offset
             .checked_add(var_headers_size)
             .ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame data calculation".to_string(),
@@ -133,8 +137,8 @@ impl IbtReader {
                     details: "Frame data start position exceeds file size".to_string(),
                 })?;
 
-        let total_frames = if header.buf_len > 0 {
-            remaining_bytes / header.buf_len as usize
+        let total_frames = if header.buffer_length > 0 {
+            remaining_bytes / header.buffer_length as usize
         } else {
             0 // No telemetry data if buf_len is 0
         };
@@ -233,12 +237,12 @@ impl IbtReader {
     }
 
     /// Get disk metadata from the disk sub-header
-    pub fn disk_header(&self) -> &IbtDiskSubHeader {
+    pub fn disk_header(&self) -> &DiskSubHeader {
         &self.disk_header
     }
 
     /// Get the IBT header information
-    pub fn header(&self) -> &IbtHeader {
+    pub fn header(&self) -> &Header {
         &self.header
     }
 
@@ -255,7 +259,7 @@ impl IbtReader {
         }
 
         // Calculate position for frame with checked arithmetic
-        let frame_size = self.header.buf_len as usize;
+        let frame_size = self.header.buffer_length as usize;
         let frame_byte_offset =
             frame_number
                 .checked_mul(frame_size)
@@ -287,11 +291,11 @@ impl IbtReader {
         }
 
         // Handle IBT files with no telemetry data
-        if self.header.buf_len == 0 {
+        if self.header.buffer_length == 0 {
             return Ok(None);
         }
 
-        let frame_size = self.header.buf_len as usize;
+        let frame_size = self.header.buffer_length as usize;
         let start_pos = self.current_position;
         let end_pos = start_pos + frame_size;
 

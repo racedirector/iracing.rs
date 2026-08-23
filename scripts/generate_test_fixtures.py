@@ -2,8 +2,8 @@
 """Generate deterministic IBT test fixtures.
 
 The generated layout intentionally follows the source-of-truth parser in
-crates/iracing-sdk/src/ibt/format.rs and the live header shape in
-crates/iracing-sdk/src/schema/header.rs:
+crates/iracing-sdk/src/ibt/format.rs and the common header shape in
+crates/iracing-sdk/src/types/headers.rs:
 
 - bytes 0..112: live-compatible irsdk_header prefix
 - bytes 112..144: IBT disk sub-header
@@ -25,9 +25,10 @@ IBT_DIR = REPO_ROOT / "test-data" / "ibt"
 YAML_DIR = REPO_ROOT / "test-data" / "session-yaml"
 MANIFEST_PATH = IBT_DIR / "manifest.json"
 
-IRSDK_HEADER_SIZE = 144
-IRSDK_LIVE_HEADER_PREFIX_SIZE = 112
+IRSDK_HEADER_SIZE = 112
+IRSDK_LIVE_HEADER_PREFIX_SIZE = IRSDK_HEADER_SIZE
 IRSDK_DISK_SUBHEADER_SIZE = 32
+IRSDK_IBT_HEADER_SIZE = IRSDK_HEADER_SIZE + IRSDK_DISK_SUBHEADER_SIZE
 IRSDK_VAR_HEADER_SIZE = 144
 
 VAR_TYPES = {
@@ -227,12 +228,12 @@ def build_frame(profile: Profile, frame_index: int, rng: random.Random) -> bytes
 
 def build_ibt(profile: Profile, yaml_bytes: bytes) -> bytes:
     num_vars = len(profile.variables)
-    var_header_offset = IRSDK_HEADER_SIZE
+    var_header_offset = IRSDK_IBT_HEADER_SIZE
     var_headers_len = num_vars * IRSDK_VAR_HEADER_SIZE
     session_info_offset = var_header_offset + var_headers_len
     end_time = profile.start_time + (profile.frame_count / profile.tick_rate)
 
-    header = bytearray(IRSDK_HEADER_SIZE)
+    header = bytearray(IRSDK_IBT_HEADER_SIZE)
     header[0:4] = pack_i32(2)
     header[4:8] = pack_i32(1)
     header[8:12] = pack_i32(profile.tick_rate)
@@ -283,7 +284,7 @@ def main() -> None:
         ibt_bytes = build_ibt(profile, yaml_bytes)
         ibt_path.write_bytes(ibt_bytes)
 
-        session_info_offset = IRSDK_HEADER_SIZE + len(profile.variables) * IRSDK_VAR_HEADER_SIZE
+        session_info_offset = IRSDK_IBT_HEADER_SIZE + len(profile.variables) * IRSDK_VAR_HEADER_SIZE
         fixtures.append(
             {
                 "name": profile.name,
@@ -294,7 +295,7 @@ def main() -> None:
                 "num_vars": len(profile.variables),
                 "frame_size": profile.frame_size,
                 "num_frames": profile.frame_count,
-                "var_header_offset": IRSDK_HEADER_SIZE,
+                "var_header_offset": IRSDK_IBT_HEADER_SIZE,
                 "disk_sub_header_offset": IRSDK_LIVE_HEADER_PREFIX_SIZE,
                 "session_info_update": 0,
                 "session_info_len": len(yaml_bytes),
@@ -317,7 +318,7 @@ def main() -> None:
         "generated_by": "scripts/generate_test_fixtures.py",
         "layout": {
             "live_header_prefix_size": IRSDK_LIVE_HEADER_PREFIX_SIZE,
-            "ibt_header_size": IRSDK_HEADER_SIZE,
+            "ibt_header_size": IRSDK_IBT_HEADER_SIZE,
             "disk_sub_header_size": IRSDK_DISK_SUBHEADER_SIZE,
             "variable_header_size": IRSDK_VAR_HEADER_SIZE,
             "disk_sub_header_offset_rule": "var_header_offset - disk_sub_header_size",

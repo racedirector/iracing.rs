@@ -39,7 +39,7 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.live-variable-schema]
 targets = ["x86_64-pc-windows-msvc"]
 
-[package.metadata.dist.bin.live-headers]
+[package.metadata.dist.bin.headers]
 targets = ["x86_64-pc-windows-msvc"]
 
 [lints]
@@ -61,6 +61,7 @@ serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+type-layout = "0.2.0"
 
 # Windows-specific dependencies (for live telemetry)
 [target.'cfg(windows)'.dependencies]
@@ -205,8 +206,8 @@ path = "src/bin/disk_variable_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
-name = "ibt-headers"
-path = "src/bin/ibt_headers.rs"
+name = "headers"
+path = "src/bin/headers.rs"
 
 [[bin]]
 name = "ibt-session-parser"
@@ -238,10 +239,6 @@ path = "src/bin/ibt_json_snapshot.rs"
 [[bin]]
 name = "ibt-to-json"
 path = "src/bin/ibt_to_json.rs"
-
-[[bin]]
-name = "live-headers"
-path = "src/bin/live_headers.rs"
 
 [[bin]]
 name = "live-session-parser"

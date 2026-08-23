@@ -1,18 +1,28 @@
 //! Utils useful for parsing raw values from buffers
 
-use crate::{IRacingSDKError, VariableInfo, VariableType};
+use crate::{IRacingSDKError, Result, VariableInfo, VariableType};
 
-pub(crate) fn bytes_at<const SIZE: usize>(
-    data: &[u8],
-    offset: usize,
-) -> crate::Result<&[u8; SIZE]> {
+pub(crate) fn bytes_at_size(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
     let end = offset
-        .checked_add(SIZE)
+        .checked_add(length)
         .ok_or_else(|| IRacingSDKError::memory_access_error(offset))?;
 
     data.get(offset..end)
-        .and_then(|slice| slice.first_chunk::<SIZE>())
         .ok_or_else(|| IRacingSDKError::memory_access_error(offset))
+}
+pub(crate) fn bytes_at<const SIZE: usize>(data: &[u8], offset: usize) -> Result<&[u8; SIZE]> {
+    bytes_at_size(data, offset, SIZE)?
+        .try_into()
+        .map_err(|_| IRacingSDKError::memory_access_error(offset))
+}
+
+pub(crate) fn nul_terminated_bytes(bytes: &[u8]) -> &[u8] {
+    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+    &bytes[..end]
+}
+
+pub(crate) fn c_string_to_string(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(nul_terminated_bytes(bytes)).to_string()
 }
 
 #[inline]
@@ -21,7 +31,7 @@ pub(crate) fn decode_bytes_for_variable_info<const SIZE: usize, T>(
     info: &VariableInfo,
     expected: VariableType,
     decode: impl FnOnce([u8; SIZE]) -> T,
-) -> crate::Result<T> {
+) -> Result<T> {
     if info.data_type != expected {
         return Err(IRacingSDKError::type_conversion(expected, info.data_type));
     }

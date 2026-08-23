@@ -62,16 +62,7 @@ fn run() -> Result<()> {
         return Err(anyhow!("iRacing is not connected."));
     }
 
-    // Build schema from variables
-    let variables: Vec<_> = connection.get_variables();
-    let mut variable_map = std::collections::HashMap::new();
-
-    for var_info in variables {
-        variable_map.insert(var_info.name.clone(), var_info);
-    }
-
-    let frame_size = connection.header().buf_len as usize;
-    let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
+    let schema = Arc::new(VariableSchema::from_connection(&connection)?);
 
     // ------------------------------------------------------------
     // Resolve required variable metadata
@@ -131,7 +122,7 @@ fn run() -> Result<()> {
         }
 
         if let Some(raw_data) = connection.get_new_data() {
-            let data = raw_data.to_vec();
+            let data: Vec<u8> = raw_data.into();
 
             // Extract strongly-typed values from raw frame bytes.
             let lap_distance_meters = f32::from_bytes(&data, lap_distance_meters_info).unwrap();

@@ -20,7 +20,7 @@ edition = "2024"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 csv = "1.4.0"
 schemars = { version = "1.2", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }

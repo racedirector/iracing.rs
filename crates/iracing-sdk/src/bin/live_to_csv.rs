@@ -65,7 +65,10 @@ async fn run() -> Result<()> {
     }
 
     // Sort the variables for extraction by the offset of each variable info
-    let mut variables = connection.get_variables();
+    let variable_buffer = connection
+        .variable_info_buffer()
+        .ok_or_else(|| anyhow!("No telemetry variables were available from the live connection"))?;
+    let mut variables: Vec<iracing_sdk::VariableInfo> = variable_buffer.try_into()?;
     if variables.is_empty() {
         return Err(anyhow!(
             "No telemetry variables were available from the live connection"
