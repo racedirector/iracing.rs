@@ -50,7 +50,7 @@ mod broadcast;
 mod codegen;
 mod dynamic_frame;
 mod frame;
-pub mod headers;
+mod ibt_header;
 mod incident;
 mod irsdk;
 mod irsdk_bitflags;
@@ -71,8 +71,13 @@ pub use bitfield::{
 pub use broadcast::PitCommand;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
+pub use ibt_header::IbtHeader;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
+pub use irsdk::{
+    DiskSubHeader, FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
+    VariableInfoBuffer, WireType,
+};
 pub use irsdk_bitflags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
 };

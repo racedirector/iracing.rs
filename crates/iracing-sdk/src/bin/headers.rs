@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use iracing_sdk::headers::{DiskSubHeader, Header, IbtHeader, VariableBuffer};
+use iracing_sdk::types::{DiskSubHeader, Header, IbtHeader, VariableBuffer};
 use std::{fs::File, io::BufReader, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 use type_layout::TypeLayout;

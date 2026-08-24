@@ -16,8 +16,6 @@ pub struct VariableBuffer {
     _pad: [i32; 1],
 }
 
-unsafe impl WireType for VariableBuffer {}
-
 impl VariableBuffer {
     /// Convenience constructor. Automatically inserts padding.
     pub fn new(tick_count: i32, buffer_offset: i32, tick_count_begin: i32) -> Self {
@@ -29,6 +27,8 @@ impl VariableBuffer {
         }
     }
 }
+
+unsafe impl WireType for VariableBuffer {}
 
 #[cfg(test)]
 mod tests {

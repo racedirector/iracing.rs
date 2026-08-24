@@ -3,7 +3,6 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::headers::{Header, VariableBuffer, VariableHeader, status_is_connected};
 use crate::{IRacingSDKError, Result, VariableInfo};
 use std::collections::HashMap;
 use std::mem::{MaybeUninit, size_of};
@@ -37,82 +36,6 @@ pub enum WaitResult {
     Signaled,
     /// Wait time elapsed.
     Timeout,
-}
-
-/// Owned snapshot of a live telemetry frame.
-#[derive(Debug, Clone)]
-pub struct FrameBuffer(Vec<u8>);
-
-impl From<FrameBuffer> for Vec<u8> {
-    fn from(buffer: FrameBuffer) -> Self {
-        buffer.0
-    }
-}
-
-/// Owned snapshot of the live session YAML region.
-#[derive(Debug, Clone)]
-pub struct SessionInfoBuffer(Vec<u8>);
-
-impl TryFrom<SessionInfoBuffer> for String {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: SessionInfoBuffer) -> Result<Self> {
-        let length = i32::try_from(buffer.0.len()).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "SessionInfoBuffer",
-                "Session YAML length cannot be represented by the SDK header",
-            )
-        })?;
-
-        crate::yaml_utils::extract_yaml_from_memory(&buffer.0, 0, length)
-    }
-}
-
-/// Owned snapshot of the live variable header region.
-#[derive(Debug, Clone)]
-pub struct VariableInfoBuffer {
-    bytes: Vec<u8>,
-    count: usize,
-}
-
-impl From<VariableInfoBuffer> for Vec<VariableHeader> {
-    fn from(buffer: VariableInfoBuffer) -> Self {
-        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
-
-        buffer
-            .bytes
-            .chunks_exact(VariableHeader::SIZE)
-            .map(VariableHeader::read_from_bytes)
-            .collect()
-    }
-}
-
-impl TryFrom<VariableInfoBuffer> for Vec<VariableInfo> {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
-        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
-
-        buffer
-            .bytes
-            .chunks_exact(VariableHeader::SIZE)
-            .map(|bytes| VariableHeader::read_from_bytes(bytes).try_into())
-            .collect()
-    }
-}
-
-impl TryFrom<VariableInfoBuffer> for HashMap<String, VariableInfo> {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
-        let variables: Vec<VariableInfo> = buffer.try_into()?;
-        let mut variable_map = HashMap::with_capacity(variables.len());
-        for info in variables {
-            variable_map.insert(info.name.clone(), info);
-        }
-
-        Ok(variable_map)
-    }
 }
 
 /// Direct connection to iRacing shared memory

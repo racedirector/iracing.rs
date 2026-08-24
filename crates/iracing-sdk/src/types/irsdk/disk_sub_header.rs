@@ -1,6 +1,7 @@
+use std::io::Read;
 use type_layout::TypeLayout;
 
-use crate::types::irsdk::wire_type::WireType;
+use crate::{IRacingSDKError, Result, types::irsdk::WireType};
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
@@ -20,6 +21,21 @@ pub struct DiskSubHeader {
     pub lap_count: i32,
     /// Total number of telemetry frames (records) in the file.
     pub record_count: i32,
+}
+
+impl DiskSubHeader {
+    pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
+        let mut buffer = [0u8; Self::WIRE_SIZE];
+
+        reader.read_exact(&mut buffer).map_err(|e| {
+            IRacingSDKError::parse_error(
+                "Header reading",
+                format!("Failed to read {} header bytes: {}", Self::WIRE_SIZE, e),
+            )
+        })?;
+
+        Self::read_from_bytes(&buffer)
+    }
 }
 
 unsafe impl WireType for DiskSubHeader {}

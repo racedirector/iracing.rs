@@ -5,11 +5,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{IRacingSDKError, Result, parse_utils};
+use crate::{
+    IRacingSDKError, Result, parse_utils,
+    types::{VariableInfoBuffer, WireType},
+};
 #[cfg(windows)]
 use crate::{Result, WindowsConnection};
 
-use super::{VariableType, irsdk::variable_header::VariableHeader};
+use super::{VariableType, irsdk::VariableHeader};
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -52,7 +55,7 @@ impl TryFrom<VariableHeader> for VariableInfo {
             name: parse_utils::c_string_to_string(&value.name),
             description: parse_utils::c_string_to_string(&value.description),
             units: parse_utils::c_string_to_string(&value.unit),
-            data_type: value.variable_type.into(),
+            data_type: value.variable_type.try_into()?,
             offset: usize::try_from(value.offset).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "TryFrom<VariableHeader> for VariableInfo",
@@ -67,6 +70,20 @@ impl TryFrom<VariableHeader> for VariableInfo {
             })?,
             count_as_time: value.count_as_time != 0,
         })
+    }
+}
+
+impl TryFrom<VariableInfoBuffer> for Vec<VariableInfo> {
+    type Error = IRacingSDKError;
+
+    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
+        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::WIRE_SIZE);
+
+        buffer
+            .bytes
+            .chunks_exact(VariableHeader::WIRE_SIZE)
+            .map(|bytes| VariableHeader::read_from_bytes(bytes)?.try_into())
+            .collect()
     }
 }
 

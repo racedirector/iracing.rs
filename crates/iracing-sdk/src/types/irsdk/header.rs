@@ -1,3 +1,4 @@
+use std::io::Read;
 use type_layout::TypeLayout;
 
 use super::{
@@ -7,7 +8,7 @@ use super::{
     variable_buffer::VariableBuffer,
     variable_header::VariableHeader,
 };
-use crate::{Result, types::irsdk::wire_type::WireType};
+use crate::{IRacingSDKError, Result, types::irsdk::wire_type::WireType};
 
 /// An iRacing SDK header.
 #[repr(C)]
@@ -43,12 +44,27 @@ pub struct Header {
     pub buffers: [VariableBuffer; Self::MAX_BUFFERS],
 }
 
-unsafe impl WireType for Header {}
-
+/// Constructors
 impl Header {
-    const MAX_BUFFERS: usize = IRSDK_MAX_BUFFERS;
+    /// The max number of buffers that can be found in the buffers array.
+    pub const MAX_BUFFERS: usize = IRSDK_MAX_BUFFERS;
     const MAX_LIVE_VARIABLES: i32 = 5_000;
     const MAX_LIVE_BUFFER_LENGTH: i32 = 10_000_000;
+
+    /// Reads a buffer of `Self::WIRE_SIZE` from the provided reader and uses
+    /// the `read_from_bytes` of `WireType` to create an instance of `Self`
+    pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
+        let mut buffer = [0u8; Self::WIRE_SIZE];
+
+        reader.read_exact(&mut buffer).map_err(|e| {
+            IRacingSDKError::parse_error(
+                "Header reading",
+                format!("Failed to read {} header bytes: {}", Header::WIRE_SIZE, e),
+            )
+        })?;
+
+        Self::read_from_bytes(&buffer)
+    }
 
     #[allow(clippy::too_many_arguments)]
     /// Constructs a header value, filling the ABI padding automatically.
@@ -84,7 +100,10 @@ impl Header {
             buffers,
         }
     }
+}
 
+/// Validation utilities
+impl Header {
     /// Performs general validation on the header for common corruption indicators and
     /// invalid values.
     pub fn validate(&self) -> Result<()> {
@@ -280,6 +299,8 @@ impl Header {
         self.session_info_update != last_update
     }
 }
+
+unsafe impl WireType for Header {}
 
 #[cfg(test)]
 mod tests {

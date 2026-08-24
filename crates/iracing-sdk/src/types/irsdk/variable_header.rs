@@ -1,6 +1,8 @@
 use type_layout::TypeLayout;
 
-use super::{IRSDK_MAX_DESC, IRSDK_MAX_STRING, wire_type::WireType};
+use crate::IRacingSDKError;
+
+use super::{IRSDK_MAX_DESC, IRSDK_MAX_STRING, VariableInfoBuffer, wire_type::WireType};
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
@@ -25,6 +27,20 @@ pub struct VariableHeader {
 }
 
 unsafe impl WireType for VariableHeader {}
+
+impl TryFrom<VariableInfoBuffer> for Vec<VariableHeader> {
+    type Error = IRacingSDKError;
+
+    fn try_from(buffer: VariableInfoBuffer) -> Result<Self, Self::Error> {
+        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::WIRE_SIZE);
+
+        buffer
+            .bytes
+            .chunks_exact(VariableHeader::WIRE_SIZE)
+            .map(VariableHeader::read_from_bytes)
+            .collect()
+    }
+}
 
 #[cfg(test)]
 mod tests {

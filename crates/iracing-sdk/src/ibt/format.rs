@@ -20,9 +20,11 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::headers::DiskSubHeader;
 use crate::parse_utils::{bytes_at, bytes_at_size, c_string_to_string};
-use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType, headers::Header};
+use crate::{
+    IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType,
+    types::{DiskSubHeader, Header},
+};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
@@ -172,6 +174,7 @@ mod tests {
     use crate::test_utils::{
         IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
     };
+    use crate::{ibt_header::IbtHeader, types::irsdk::WireType};
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
     use std::path::Path;
@@ -201,34 +204,31 @@ mod tests {
         assert_eq!(actual.units, expected.units);
     }
 
-    fn parse_fixture(fixture: &IbtFixture) -> Result<(Header, DiskSubHeader, VariableSchema)> {
+    fn parse_fixture(fixture: &IbtFixture) -> Result<(IbtHeader, VariableSchema)> {
         let file_path = fixture.fixture_path()?;
         let mut reader = open_buf_reader(&file_path)?;
 
-        let header = Header::try_from_reader(&mut reader)
+        let ibt_header = IbtHeader::try_from_reader(&mut reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
 
-        let disk_header = DiskSubHeader::try_from_reader(&mut reader)
-            .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
-
-        let schema = extract_variable_schema(&mut reader, &header)
+        let schema = extract_variable_schema(&mut reader, &ibt_header.header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
-        Ok((header, disk_header, schema))
+        Ok((ibt_header, schema))
     }
 
     #[test]
     fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         let manifest = load_fixture_manifest()?;
         assert_eq!(manifest.layout.live_header_prefix_size, 112);
+        assert_eq!(manifest.layout.ibt_header_size, Header::WIRE_SIZE);
         assert_eq!(
-            manifest.layout.ibt_header_size,
-            Header::SIZE + DiskSubHeader::SIZE
+            manifest.layout.disk_sub_header_size,
+            DiskSubHeader::WIRE_SIZE
         );
-        assert_eq!(manifest.layout.disk_sub_header_size, DiskSubHeader::SIZE);
         assert_eq!(manifest.layout.variable_header_size, IRSDK_VAR_HEADER_SIZE);
 
         for fixture in &manifest.fixtures {
-            let (header, disk_header, _) = parse_fixture(fixture)?;
+            let (IbtHeader { header, sub_header }, disk_header) = parse_fixture(fixture)?;
 
             assert_eq!(header.version, 2);
             assert_eq!(header.status, 1);
@@ -244,13 +244,13 @@ mod tests {
 
             assert_eq!(
                 fixture.disk_sub_header_offset,
-                header.variable_header_offset - DiskSubHeader::SIZE as i32
+                header.variable_header_offset - DiskSubHeader::WIRE_SIZE as i32
             );
-            assert_eq!(disk_header.start_date, fixture.disk_header.start_date);
-            assert!((disk_header.start_time - fixture.disk_header.start_time).abs() < f64::EPSILON);
-            assert!((disk_header.end_time - fixture.disk_header.end_time).abs() < f64::EPSILON);
-            assert_eq!(disk_header.lap_count, fixture.disk_header.lap_count);
-            assert_eq!(disk_header.record_count, fixture.disk_header.record_count);
+            assert_eq!(sub_header.start_date, fixture.disk_header.start_date);
+            assert!((sub_header.start_time - fixture.disk_header.start_time).abs() < f64::EPSILON);
+            assert!((sub_header.end_time - fixture.disk_header.end_time).abs() < f64::EPSILON);
+            assert_eq!(sub_header.lap_count, fixture.disk_header.lap_count);
+            assert_eq!(sub_header.record_count, fixture.disk_header.record_count);
 
             header.validate()?;
         }
@@ -263,7 +263,7 @@ mod tests {
         let manifest = load_fixture_manifest()?;
 
         for fixture in &manifest.fixtures {
-            let (_, _, schema) = parse_fixture(fixture)?;
+            let (_, schema) = parse_fixture(fixture)?;
 
             assert_eq!(schema.frame_size, fixture.frame_size);
             assert_eq!(schema.variable_count(), fixture.num_vars as usize);
