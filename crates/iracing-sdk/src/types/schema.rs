@@ -5,11 +5,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::IRacingSDKError;
+use crate::{IRacingSDKError, Result, parse_utils};
 #[cfg(windows)]
 use crate::{Result, WindowsConnection};
 
-use super::VariableType;
+use super::{VariableType, irsdk::variable_header::VariableHeader};
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -41,6 +41,33 @@ pub struct VariableInfo {
     /// # Description
     /// Human-readable description
     pub description: String,
+}
+
+impl TryFrom<VariableHeader> for VariableInfo {
+    type Error = IRacingSDKError;
+
+    /// Convert the wire-format VariableHeader into library type `VariableInfo`.
+    fn try_from(value: VariableHeader) -> Result<Self> {
+        Ok(VariableInfo {
+            name: parse_utils::c_string_to_string(&value.name),
+            description: parse_utils::c_string_to_string(&value.description),
+            units: parse_utils::c_string_to_string(&value.unit),
+            data_type: value.variable_type.into(),
+            offset: usize::try_from(value.offset).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "TryFrom<VariableHeader> for VariableInfo",
+                    format!("Could not convert {} to usize", value.offset),
+                )
+            })?,
+            count: usize::try_from(value.count).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "TryFrom<VariableHeader> for VariableInfo",
+                    format!("Could not convert {} to usize", value.count),
+                )
+            })?,
+            count_as_time: value.count_as_time != 0,
+        })
+    }
 }
 
 /// # Variable schema

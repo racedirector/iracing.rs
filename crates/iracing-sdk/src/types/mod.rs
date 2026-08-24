@@ -52,6 +52,7 @@ mod dynamic_frame;
 mod frame;
 pub mod headers;
 mod incident;
+mod irsdk;
 mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
