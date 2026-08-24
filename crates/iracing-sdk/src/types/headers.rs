@@ -259,7 +259,7 @@ impl Header {
 
         self.validate_variable_offset()?;
 
-        if self.tick_rate < 0 || self.session_info_len < -1 {
+        if self.tick_rate < 0 {
             return Err(header_validation_error(
                 "Header contains invalid negative values",
             ));
@@ -465,7 +465,7 @@ pub struct IbtHeader {
 
 impl IbtHeader {
     /// The size of the header in bytes
-    pub const SIZE: usize = std::mem::size_of::<Self>();
+    pub const SIZE: usize = Header::SIZE + DiskSubHeader::SIZE;
 
     /// Attempts to read and prase the header and sub header from the provided reader.
     /// It's assumed that the sub header immediately follows the header in the buffer.
@@ -485,17 +485,16 @@ impl IbtHeader {
     /// Attempts to parse an `IbtHeader` from the provided buffer.
     pub fn try_from_buffer(buffer: &[u8; IbtHeader::SIZE]) -> Result<Self> {
         // Load the first `Header::SIZE` bytes into a buffer
-        let header_buffer: &[u8; Header::SIZE] = (&buffer[..Header::SIZE]).try_into().unwrap();
+        let header_buffer: &[u8; Header::SIZE] = bytes_at(buffer, 0)?;
 
         // Load the remaining bytes from the end of the header into a buffer
-        let sub_header_buffer: &[u8; DiskSubHeader::SIZE] =
-            (&buffer[Header::SIZE..]).try_into().unwrap();
+        let sub_header_buffer: &[u8; DiskSubHeader::SIZE] = bytes_at(buffer, Header::SIZE)?;
 
         Ok(Self {
             // Try to parse a header
-            header: Header::try_from_buffer(&header_buffer)?,
+            header: Header::try_from_buffer(header_buffer)?,
             // Try to parse a sub header
-            sub_header: DiskSubHeader::try_from_buffer(&sub_header_buffer)?,
+            sub_header: DiskSubHeader::try_from_buffer(sub_header_buffer)?,
         })
     }
 
@@ -538,10 +537,14 @@ impl VariableHeader {
 
     /// Reads a variable header from its SDK wire representation.
     #[inline]
-    pub fn read_from_bytes(bytes: &[u8]) -> Self {
-        debug_assert_eq!(bytes.len(), Self::SIZE);
-
+    pub fn read_from_bytes(bytes: &[u8; Self::SIZE]) -> Self {
         unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast()) }
+    }
+
+    /// Creates a sized slice of bytes and internally uses `read_from_bytes`.
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self> {
+        let bytes: &[u8; Self::SIZE] = bytes_at(bytes, 0)?;
+        Ok(Self::read_from_bytes(bytes))
     }
 }
 
@@ -553,7 +556,7 @@ impl TryFrom<VariableHeader> for VariableInfo {
             name: parse_utils::c_string_to_string(&value.name),
             description: parse_utils::c_string_to_string(&value.description),
             units: parse_utils::c_string_to_string(&value.unit),
-            data_type: value.variable_type.into(),
+            data_type: value.variable_type.try_into()?,
             offset: usize::try_from(value.offset).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "TryFrom<VariableHeader> for VariableInfo",

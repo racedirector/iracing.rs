@@ -35,7 +35,10 @@ enum Commands {
         wait: bool,
         /// How long to wait before timeout. No value wait indefinitely.
         #[arg(short, long)]
-        timeout_ms: Option<u32>,
+        timeout_ms: Option<u64>,
+        /// How often to poll for a connection. Default is 1 second.
+        #[arg(short, long, default_value_t = 1)]
+        poll_s: u64,
     },
     /// Prints the type information for the header data structures.
     Type,
@@ -59,8 +62,12 @@ fn main() -> Result<()> {
             print_ibt_header(path)?;
         }
         #[cfg(windows)]
-        Commands::Live { wait, timeout_ms } => {
-            print_live_header(wait, timeout_ms)?;
+        Commands::Live {
+            wait,
+            timeout_ms,
+            poll_s,
+        } => {
+            print_live_header(wait, timeout_ms, poll_s)?;
         }
         Commands::Type => print_type_layout()?,
     }
@@ -90,10 +97,15 @@ fn print_type_layout() -> Result<()> {
  * Attempts to acquire a windows connection, parse the header, and print it to stdout via tracing at level info.
  */
 #[cfg(windows)]
-fn print_live_header(wait: bool, _timeout_ms: Option<u32>) -> Result<()> {
+fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result<()> {
     use iracing_sdk::WindowsConnection;
+    use std::time::{Duration, Instant};
+
+    const POLL_INTERVAL: Duration = Duration::from_secs(poll_s);
 
     let connection = if wait {
+        let deadline = timeout_ms.map(|ms| Instant::now() + Duration::from_millis(ms));
+
         loop {
             match WindowsConnection::try_connect() {
                 Ok(connection) if connection.is_connected() => break connection,
@@ -105,10 +117,16 @@ fn print_live_header(wait: bool, _timeout_ms: Option<u32>) -> Result<()> {
                 }
             }
 
-            // TODO: Handle a timeout
+            if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+                return Err(anyhow::anyhow!(
+                    "Timed out waiting for an iRacing connection"
+                ));
+            }
+
+            std::sleep(POLL_INTERVAL);
         }
     } else {
-        WindowsConnection::try_connect().expect("Could not connect to iRacing")
+        WindowsConnection::try_connect().context("Could not connect to iRacing")?
     };
 
     let header = connection.header_snapshot();

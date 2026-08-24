@@ -68,6 +68,7 @@ impl TryFrom<SessionInfoBuffer> for String {
     }
 }
 
+/// Owned snapshot of the live variable header region.
 #[derive(Debug, Clone)]
 pub struct VariableInfoBuffer {
     bytes: Vec<u8>,

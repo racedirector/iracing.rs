@@ -1,55 +1,12 @@
 //! Telemetry variable type definitions
 
-use std::fmt;
+use std::{fmt, write};
 
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
 
-use crate::{BitField, IRacingSDKError, Result, VarData, VariableInfo};
-
-fn variable_header_validation_error(details: impl Into<String>) -> IRacingSDKError {
-    IRacingSDKError::parse_error("Variable header validation", details)
-}
-
-#[repr(i32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum IrsdkVarType {
-    Char = 0,
-    Bool = 1,
-    Int = 2,
-    BitField = 3,
-    Float = 4,
-    Double = 5,
-}
-
-impl IrsdkVarType {
-    pub const fn size(&self) -> usize {
-        match self {
-            IrsdkVarType::Char | IrsdkVarType::Bool | IrsdkVarType::Int => 1,
-            IrsdkVarType::BitField | IrsdkVarType::Float => 4,
-            IrsdkVarType::Double => 8,
-        }
-    }
-}
-
-impl TryFrom<i32> for IrsdkVarType {
-    type Error = IRacingSDKError;
-
-    fn try_from(value: i32) -> Result<Self> {
-        match value {
-            0 => Ok(Self::Char),
-            1 => Ok(Self::Bool),
-            2 => Ok(Self::Int),
-            3 => Ok(Self::BitField),
-            4 => Ok(Self::Float),
-            5 => Ok(Self::Double),
-            value => Err(variable_header_validation_error(format!(
-                "Invalid variable type: {value}"
-            ))),
-        }
-    }
-}
+use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
 
 /// Supported telemetry data types.
 /// Maps to iRacing SDK's irsdk_VarType enum.
@@ -103,19 +60,21 @@ impl VariableType {
     }
 }
 
-impl From<i32> for VariableType {
-    fn from(value: i32) -> Self {
+impl TryFrom<i32> for VariableType {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
-            0 => Self::Char,
-            1 => Self::Bool,
-            2 => Self::Int32,
-            3 => Self::BitField,
-            4 => Self::Float32,
-            5 => Self::Float64,
-            _ => {
-                tracing::warn!(value, "Unknown iRacing variable type, defaulting to Int32");
-                VariableType::Int32
-            }
+            0 => Ok(Self::Char),
+            1 => Ok(Self::Bool),
+            2 => Ok(Self::Int32),
+            3 => Ok(Self::BitField),
+            4 => Ok(Self::Float32),
+            5 => Ok(Self::Float64),
+            _ => Err(IRacingSDKError::parse_error(
+                "TryFrom<i32> for VariableType",
+                format!("Could not parse {} to VariableType", value),
+            )),
         }
     }
 }
@@ -139,19 +98,6 @@ impl From<VariableType> for Schema {
         json_schema!({
             "type": type_value
         })
-    }
-}
-
-impl From<IrsdkVarType> for VariableType {
-    fn from(value: IrsdkVarType) -> Self {
-        match value {
-            IrsdkVarType::Char => Self::Char,
-            IrsdkVarType::Bool => Self::Bool,
-            IrsdkVarType::Int => Self::Int32,
-            IrsdkVarType::BitField => Self::BitField,
-            IrsdkVarType::Float => Self::Float32,
-            IrsdkVarType::Double => Self::Float64,
-        }
     }
 }
 
