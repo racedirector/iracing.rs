@@ -42,7 +42,7 @@ pub(crate) fn decode_bytes_for_variable_info<const SIZE: usize, T>(
 /// Decodes a provided `VariableInfo` to it's scalar type.
 macro_rules! decode_variable_type {
     ($data:expr, $info:expr, $variant:ident, $decode:expr $(,)?) => {{
-        const EXPECTED: VariableType = VariableType::$variant;
+        const EXPECTED: $crate::VariableType = $crate::VariableType::$variant;
 
         $crate::parse_utils::decode_bytes_for_variable_info::<{ EXPECTED.size() }, _>(
             $data, $info, EXPECTED, $decode,

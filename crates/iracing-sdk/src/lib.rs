@@ -59,7 +59,7 @@
 //!
 pub mod adapters;
 mod error;
-pub mod parse_utils;
+pub(crate) parse_utils;
 pub mod test_utils;
 pub mod types;
 pub mod yaml_utils;

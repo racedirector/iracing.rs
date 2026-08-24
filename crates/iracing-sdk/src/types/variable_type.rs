@@ -48,8 +48,7 @@ impl VariableType {
     /// Matches the irsdk_VarTypeBytes array from the iRacing SDK.
     pub const fn size(&self) -> usize {
         match self {
-            VariableType::Char | VariableType::Bool => 1,
-            VariableType::Int8 | VariableType::UInt8 => 1,
+            VariableType::Char | VariableType::Bool | VariableType::Int8 | VariableType::UInt8 => 1,
             VariableType::Int16 | VariableType::UInt16 => 2,
             VariableType::Int32
             | VariableType::UInt32
