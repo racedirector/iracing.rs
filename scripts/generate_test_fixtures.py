@@ -226,7 +226,7 @@ def build_frame(profile: Profile, frame_index: int, rng: random.Random) -> bytes
     return bytes(frame)
 
 
-def build_ibt(profile: Profile, yaml_bytes: bytes) -> bytes:
+def build_ibt(profile: Profile, yaml_bytes: bytes) -> tuple[bytes, int, int, int]:
     num_vars = len(profile.variables)
     var_header_offset = IRSDK_IBT_HEADER_SIZE
     var_headers_len = num_vars * IRSDK_VAR_HEADER_SIZE
@@ -256,7 +256,8 @@ def build_ibt(profile: Profile, yaml_bytes: bytes) -> bytes:
     var_headers = b"".join(build_var_header(variable) for variable in profile.variables)
     rng = random.Random(profile.seed)
     frames = b"".join(build_frame(profile, index, rng) for index in range(profile.frame_count))
-    return bytes(header) + var_headers + yaml_bytes + frames
+    ibt_bytes = bytes(header) + var_headers + yaml_bytes + frames
+    return ibt_bytes, var_header_offset, disk_offset, session_info_offset
 
 
 def manifest_variable(variable: Variable) -> dict[str, object]:
@@ -281,10 +282,11 @@ def main() -> None:
         ibt_path = IBT_DIR / f"{profile.name}.ibt"
 
         yaml_path.write_bytes(yaml_bytes)
-        ibt_bytes = build_ibt(profile, yaml_bytes)
+        ibt_bytes, var_header_offset, disk_offset, session_info_offset = build_ibt(
+            profile, yaml_bytes
+        )
         ibt_path.write_bytes(ibt_bytes)
 
-        session_info_offset = IRSDK_IBT_HEADER_SIZE + len(profile.variables) * IRSDK_VAR_HEADER_SIZE
         fixtures.append(
             {
                 "name": profile.name,
@@ -295,8 +297,8 @@ def main() -> None:
                 "num_vars": len(profile.variables),
                 "frame_size": profile.frame_size,
                 "num_frames": profile.frame_count,
-                "var_header_offset": IRSDK_IBT_HEADER_SIZE,
-                "disk_sub_header_offset": IRSDK_LIVE_HEADER_PREFIX_SIZE,
+                "var_header_offset": var_header_offset,
+                "disk_sub_header_offset": disk_offset,
                 "session_info_update": 0,
                 "session_info_len": len(yaml_bytes),
                 "session_info_offset": session_info_offset,

@@ -44,12 +44,7 @@ def verify_fixture(fixture: dict[str, object], layout: dict[str, object]) -> Non
         fail(f"{relative_path} sha256 mismatch: {actual_sha} != {expected_sha}")
 
     ibt_header_size = int(layout["ibt_header_size"])
-    live_header_size = int(layout["live_header_prefix_size"])
     disk_size = int(layout["disk_sub_header_size"])
-    if ibt_header_size != live_header_size + disk_size:
-        fail(
-            "IBT header size does not equal the live header prefix plus disk sub-header size"
-        )
     if len(data) < ibt_header_size:
         fail(f"{relative_path} is shorter than IBT header size")
 
@@ -116,6 +111,14 @@ def main() -> None:
         fail("unsupported manifest schema_version")
 
     layout = manifest["layout"]
+    ibt_header_size = int(layout["ibt_header_size"])
+    live_header_size = int(layout["live_header_prefix_size"])
+    disk_size = int(layout["disk_sub_header_size"])
+    if ibt_header_size != live_header_size + disk_size:
+        fail(
+            "IBT header size does not equal the live header prefix plus disk sub-header size"
+        )
+
     fixtures = manifest["fixtures"]
     if len(fixtures) < 3:
         fail("expected at least three fixtures")
