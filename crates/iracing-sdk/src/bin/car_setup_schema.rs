@@ -66,9 +66,10 @@ fn parse_live_session() -> Result<SessionInfo> {
         return Err(anyhow!("iRacing is not connected."));
     }
 
-    let raw_session_yaml = connection
-        .session_info()
+    let session_buffer = connection
+        .session_info_buffer()
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
+    let raw_session_yaml: String = session_buffer.try_into()?;
 
     let parser = SessionInfoParser::new();
 

@@ -39,7 +39,7 @@
 //!
 //! # Schema Building Process
 //!
-//! 1. Use `SchemaInfo` from parsed header to locate variable definitions
+//! 1. Use [`crate::headers::Header`] to locate the variable definitions
 //! 2. Parse `numVars` count of 144-byte variable headers from `varHeaderOffset`
 //! 3. Convert C strings to Rust `String` with proper encoding handling
 //! 4. Map iRacing types to `VariableType` enum with validation

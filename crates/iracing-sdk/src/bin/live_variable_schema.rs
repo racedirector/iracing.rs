@@ -52,8 +52,7 @@ pub fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
     {
         use iracing_sdk::{VariableSchema, WindowsConnection};
-        use std::{fs::File, io::BufWriter};
-        use std::{thread, time::Duration};
+        use std::{fs::File, io::BufWriter, thread, time::Duration};
 
         // ------------------------------------------------------------
         // Parse CLI arguments
@@ -78,16 +77,7 @@ pub fn main() -> anyhow::Result<()> {
             thread::sleep(Duration::from_secs(1));
         };
 
-        // Build schema from variables
-        let variables: Vec<_> = connection.get_variables();
-        let mut variable_map = std::collections::HashMap::new();
-
-        for var_info in variables {
-            variable_map.insert(var_info.name.clone(), var_info);
-        }
-
-        let frame_size = connection.header().buf_len as usize;
-        let variable_schema = VariableSchema::new(variable_map, frame_size)?;
+        let variable_schema = VariableSchema::from_connection(&connection)?;
         let schema = schemars::schema_for_value!(variable_schema);
 
         let output_file = File::create(&output_path)?;

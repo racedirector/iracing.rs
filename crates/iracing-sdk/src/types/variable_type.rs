@@ -1,9 +1,10 @@
 //! Telemetry variable type definitions
 
+use std::{fmt, write};
+
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
 
@@ -47,14 +48,32 @@ impl VariableType {
     /// Matches the irsdk_VarTypeBytes array from the iRacing SDK.
     pub const fn size(&self) -> usize {
         match self {
-            VariableType::Char | VariableType::Bool => 1,
-            VariableType::Int8 | VariableType::UInt8 => 1,
+            VariableType::Char | VariableType::Bool | VariableType::Int8 | VariableType::UInt8 => 1,
             VariableType::Int16 | VariableType::UInt16 => 2,
             VariableType::Int32
             | VariableType::UInt32
             | VariableType::Float32
             | VariableType::BitField => 4,
             VariableType::Float64 => 8,
+        }
+    }
+}
+
+impl TryFrom<i32> for VariableType {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Char),
+            1 => Ok(Self::Bool),
+            2 => Ok(Self::Int32),
+            3 => Ok(Self::BitField),
+            4 => Ok(Self::Float32),
+            5 => Ok(Self::Float64),
+            _ => Err(IRacingSDKError::parse_error(
+                "TryFrom<i32> for VariableType",
+                format!("Could not parse {} to VariableType", value),
+            )),
         }
     }
 }

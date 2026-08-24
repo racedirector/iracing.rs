@@ -58,16 +58,7 @@ impl LiveProvider {
         poll_interval: Duration,
         max_no_connection_attempts: Option<u32>,
     ) -> Result<Self> {
-        let header = connection.header();
-        let variables = connection.get_variables();
-        let mut variable_map = std::collections::HashMap::new();
-
-        for var_info in variables {
-            variable_map.insert(var_info.name.clone(), var_info);
-        }
-
-        let frame_size = header.buf_len as usize;
-        let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
+        let schema = Arc::new(VariableSchema::from_connection(&connection)?);
 
         Ok(Self {
             connection,
@@ -128,11 +119,14 @@ impl LiveProvider {
             // Try to get data BEFORE waiting (C++ SDK pattern)
             // This catches frames that arrived since our last check
             if let Some(data) = self.connection.get_new_data() {
-                let frame_data = data.to_vec();
-                let header = self.connection.header();
-                let latest_buf_idx = self.connection.find_latest_buffer(header);
-                let tick = header.var_buf[latest_buf_idx].tick_count as u32;
-                let session_version = header.session_info_update as u32;
+                let frame_data: Vec<u8> = data.into();
+
+                // TODO: Refactor this bit to conform with the newest connection stuff... To be honest, it should
+                // probably come from `get_new_data` instead of being parsed separately here.
+                let header = self.connection.header_snapshot();
+                let latest_buf_idx = self.connection.current_buffer_index();
+                let tick = header.buffers[latest_buf_idx as usize].tick_count as u32;
+                let session_version = self.connection.session_info_update() as u32;
 
                 tracing::trace!(
                     "Frame: tick={}, session_version={}, size={}",
@@ -174,24 +168,20 @@ impl LiveProvider {
 
     async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
-
-        // Get raw YAML from shared memory
-        let raw_yaml = match self.connection.session_info() {
-            Some(yaml) => yaml,
+        let buffer = match self.connection.session_info_buffer() {
+            Some(buffer) => buffer,
             None => {
                 tracing::debug!("No session info available");
                 return Ok(None);
             }
         };
 
-        // Return None if empty
+        let raw_yaml: String = buffer.try_into()?;
         if raw_yaml.trim().is_empty() {
             return Ok(None);
         }
 
-        // Preprocess to fix iRacing's YAML issues
         let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
         tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
 
         Ok(Some(cleaned_yaml))
@@ -263,7 +253,7 @@ impl Provider for LiveProvider {
     }
 
     fn tick_rate(&self) -> f64 {
-        self.connection.header().tick_rate as f64
+        self.connection.tick_rate() as f64
     }
 }
 

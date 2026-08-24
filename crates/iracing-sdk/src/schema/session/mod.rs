@@ -700,7 +700,7 @@ SessionState: Racing
         let connection = Connection::try_connect()
             .expect("Failed to connect to iRacing - ensure iRacing is running and in a session");
 
-        let header = connection.header();
+        let header = connection.header_snapshot();
 
         println!("Live iRacing header info:");
         println!("  Session info length: {} bytes", header.session_info_len);
@@ -719,9 +719,12 @@ SessionState: Racing
 
         // Get and parse session info
         let parser = SessionInfoParser::new();
-        let raw_yaml = connection
-            .session_info()
+        let session_buffer = connection
+            .session_info_buffer()
             .expect("Failed to get session info from iRacing");
+        let raw_yaml: String = session_buffer
+            .try_into()
+            .expect("Failed to decode session info from iRacing");
 
         // Preprocess the YAML to handle control characters
         let preprocessed_yaml = parser

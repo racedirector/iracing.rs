@@ -67,6 +67,7 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo ibt-session-parser` | `cargo run -p iracing-sdk --bin ibt-session-parser --` | Extract session YAML from `.ibt`. |
 | `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
+| `cargo headers` | `cargo run -p iracing-sdk --bin headers --` | Inspect IBT headers, live headers on Windows, or SDK header layouts. |
 | `cargo session-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session-schema --` | Emit baseline session schema. |
 | `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin variable-schema --` | Emit baseline variable schema. |
 | `cargo primitives-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin primitives-schema --` | Emit the `irsdk_*` primitive schema catalog. |

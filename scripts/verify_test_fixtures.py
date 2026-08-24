@@ -65,6 +65,8 @@ def verify_fixture(fixture: dict[str, object], layout: dict[str, object]) -> Non
             fail(f"{relative_path} {label} mismatch: {actual} != {expected}")
 
     disk_offset = int(fixture["var_header_offset"]) - disk_size
+    if int(fixture["var_header_offset"]) != ibt_header_size:
+        fail(f"{relative_path} variable headers do not immediately follow the IBT header")
     if disk_offset != int(fixture["disk_sub_header_offset"]):
         fail(f"{relative_path} disk offset does not follow var_header_offset - disk_size")
 
@@ -109,6 +111,14 @@ def main() -> None:
         fail("unsupported manifest schema_version")
 
     layout = manifest["layout"]
+    ibt_header_size = int(layout["ibt_header_size"])
+    live_header_size = int(layout["live_header_prefix_size"])
+    disk_size = int(layout["disk_sub_header_size"])
+    if ibt_header_size != live_header_size + disk_size:
+        fail(
+            "IBT header size does not equal the live header prefix plus disk sub-header size"
+        )
+
     fixtures = manifest["fixtures"]
     if len(fixtures) < 3:
         fail("expected at least three fixtures")

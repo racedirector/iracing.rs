@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::IRacingSDKError;
+#[cfg(windows)]
+use crate::{Result, WindowsConnection};
 
 use super::VariableType;
 
@@ -117,6 +119,30 @@ impl VariableSchema {
     /// Get all available variables in the schema.
     pub fn variables(&self) -> Vec<VariableInfo> {
         self.variables.values().cloned().collect()
+    }
+}
+
+#[cfg(windows)]
+impl VariableSchema {
+    /// Creates a VariableSchema from components of a WindowsConnection.
+    pub fn from_connection(connection: &WindowsConnection) -> Result<VariableSchema> {
+        let header = connection.header_snapshot();
+
+        let variable_map = if let Some(v) = connection.variable_info_buffer() {
+            v.try_into()?
+        } else {
+            HashMap::new()
+        };
+
+        Ok(VariableSchema {
+            variables: variable_map,
+            frame_size: usize::try_from(header.buffer_length).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "VariableSchema",
+                    format!("Could not convert {} to usize", header.buffer_length),
+                )
+            })?,
+        })
     }
 }
 

@@ -52,7 +52,7 @@ disk-variable-schema = [
   "--",
 ]
 
-ibt-headers = ["run", "-p", "iracing-sdk", "--bin", "ibt-headers", "--"]
+headers = ["run", "-p", "iracing-sdk", "--bin", "headers", "--"]
 
 ibt-session-parser = [
   "run",
@@ -86,8 +86,6 @@ primitives-schema = [
   "primitives-schema",
   "--",
 ]
-
-live-headers = ["run", "-p", "iracing-sdk", "--bin", "live-headers", "--"]
 
 live-session-parser = [
   "run",

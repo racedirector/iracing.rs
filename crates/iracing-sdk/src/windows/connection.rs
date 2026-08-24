@@ -3,14 +3,16 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::schema::header::IRSDKHeader;
-use crate::schema::variables::IRSDKVarHeader;
-use crate::{IRacingSDKError, Result, yaml_utils};
+use crate::headers::{Header, VariableBuffer, VariableHeader, status_is_connected};
+use crate::{IRacingSDKError, Result, VariableInfo};
+use std::collections::HashMap;
+use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Memory::{
-    FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile,
+    FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
+    OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
 };
 use windows::Win32::System::Threading::{
     OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject,
@@ -24,7 +26,8 @@ const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
 /// Expected SDK version
 #[cfg(test)]
 const IRSDK_VER: i32 = 2;
-/// Connection status flag
+/// Connection status flag used by Windows-only tests.
+#[cfg(test)]
 const IRSDK_ST_CONNECTED: i32 = 1;
 
 /// Result of waiting for data updates
@@ -36,11 +39,88 @@ pub enum WaitResult {
     Timeout,
 }
 
+/// Owned snapshot of a live telemetry frame.
+#[derive(Debug, Clone)]
+pub struct FrameBuffer(Vec<u8>);
+
+impl From<FrameBuffer> for Vec<u8> {
+    fn from(buffer: FrameBuffer) -> Self {
+        buffer.0
+    }
+}
+
+/// Owned snapshot of the live session YAML region.
+#[derive(Debug, Clone)]
+pub struct SessionInfoBuffer(Vec<u8>);
+
+impl TryFrom<SessionInfoBuffer> for String {
+    type Error = IRacingSDKError;
+
+    fn try_from(buffer: SessionInfoBuffer) -> Result<Self> {
+        let length = i32::try_from(buffer.0.len()).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "SessionInfoBuffer",
+                "Session YAML length cannot be represented by the SDK header",
+            )
+        })?;
+
+        crate::yaml_utils::extract_yaml_from_memory(&buffer.0, 0, length)
+    }
+}
+
+/// Owned snapshot of the live variable header region.
+#[derive(Debug, Clone)]
+pub struct VariableInfoBuffer {
+    bytes: Vec<u8>,
+    count: usize,
+}
+
+impl From<VariableInfoBuffer> for Vec<VariableHeader> {
+    fn from(buffer: VariableInfoBuffer) -> Self {
+        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
+
+        buffer
+            .bytes
+            .chunks_exact(VariableHeader::SIZE)
+            .map(VariableHeader::read_from_bytes)
+            .collect()
+    }
+}
+
+impl TryFrom<VariableInfoBuffer> for Vec<VariableInfo> {
+    type Error = IRacingSDKError;
+
+    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
+        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
+
+        buffer
+            .bytes
+            .chunks_exact(VariableHeader::SIZE)
+            .map(|bytes| VariableHeader::read_from_bytes(bytes).try_into())
+            .collect()
+    }
+}
+
+impl TryFrom<VariableInfoBuffer> for HashMap<String, VariableInfo> {
+    type Error = IRacingSDKError;
+
+    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
+        let variables: Vec<VariableInfo> = buffer.try_into()?;
+        let mut variable_map = HashMap::with_capacity(variables.len());
+        for info in variables {
+            variable_map.insert(info.name.clone(), info);
+        }
+
+        Ok(variable_map)
+    }
+}
+
 /// Direct connection to iRacing shared memory
 #[derive(Debug)]
 pub struct Connection {
     mapping: HANDLE,
     base: NonNull<u8>,
+    mapped_length: usize,
     event: HANDLE,
     last_tick_count: i32,
 }
@@ -103,31 +183,29 @@ impl Connection {
 
         // Initialize with i32::MAX to match C++ SDK's INT_MAX
         // This ensures the first frame is always accepted as "new"
-        let connection = Self {
+        let mut connection = Self {
             mapping,
             base,
+            mapped_length: 0,
             event,
             last_tick_count: i32::MAX,
         };
 
+        connection.mapped_length = connection.query_mapped_length()?;
+        connection.validate_mapped_range(0, Header::SIZE)?;
+
         // Validate the connection
         connection.validate_connection()?;
 
-        tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
-
-        tracing::debug!("Successfully connected to iRacing shared memory");
         Ok(connection)
     }
 
-    /// Get direct access to the header
-    pub fn header(&self) -> &IRSDKHeader {
-        unsafe { &*(self.base.as_ptr() as *const IRSDKHeader) }
-    }
+    /// Get a snapshot of the header
+    #[inline]
+    pub fn header_snapshot(&self) -> Header {
+        let bytes = unsafe { &*self.base.as_ptr().cast::<[u8; Header::SIZE]>() };
 
-    /// Check if iRacing is connected
-    pub fn is_connected(&self) -> bool {
-        let header = self.header();
-        header.status & IRSDK_ST_CONNECTED != 0
+        Header::read_from_bytes(bytes)
     }
 
     /// Wait for new telemetry data (synchronous - blocks thread)
@@ -169,149 +247,279 @@ impl Connection {
         })?
     }
 
-    /// Get latest telemetry data if available
-    pub fn get_new_data(&mut self) -> Option<&[u8]> {
+    /// Get latest telemetry data if available.
+    pub fn get_new_data(&mut self) -> Option<FrameBuffer> {
         if !self.is_connected() {
             tracing::debug!("Not connected to iRacing");
             self.last_tick_count = i32::MAX;
             return None;
         }
 
-        let header = self.header();
-
-        // Find the buffer with the highest tick count (most recent)
-        let latest_buf_idx = self.find_latest_buffer(header);
-        let latest_buf = &header.var_buf[latest_buf_idx];
-
-        tracing::trace!(
-            "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
-            self.last_tick_count,
-            latest_buf.tick_count,
-            latest_buf_idx
-        );
-
-        // Check if we have new data
-        if self.last_tick_count == latest_buf.tick_count {
-            tracing::trace!("No new data (same tick count)");
+        // Cheap fast-path: has iRacing advertised a new frame?
+        if self.current_buffer_tick_count() == self.last_tick_count {
             return None;
         }
 
-        // Handle potential tick count reset or wraparound
-        if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
-            tracing::trace!(
-                "Tick count reset detected: {} -> {}",
-                self.last_tick_count,
-                latest_buf.tick_count
-            );
-        }
+        let header = self.header_snapshot();
+        let buffer_length = usize::try_from(header.buffer_length).ok()?;
 
-        // Double-read pattern to ensure data consistency
         for attempt in 0..2 {
-            let tick_before = latest_buf.tick_count;
-            let data_ptr = unsafe { self.base.as_ptr().add(latest_buf.buf_offset as usize) };
-            let data_slice =
-                unsafe { std::slice::from_raw_parts(data_ptr, header.buf_len as usize) };
-            let tick_after = latest_buf.tick_count;
-
-            if tick_before == tick_after {
-                self.last_tick_count = tick_before;
-                tracing::trace!(
-                    "Returning new data: tick={}, size={} bytes",
-                    tick_before,
-                    data_slice.len()
-                );
-                return Some(data_slice);
-            } else {
-                tracing::trace!(
-                    "Data consistency check failed on attempt {}: before={}, after={}",
-                    attempt + 1,
-                    tick_before,
-                    tick_after
-                );
+            let (latest_buffer, _) = self.read_latest_buffer()?;
+            if latest_buffer.tick_count == self.last_tick_count {
+                return None;
             }
+
+            let buffer_offset = usize::try_from(latest_buffer.buffer_offset).ok()?;
+            let frame = self.snapshot_region(buffer_offset, buffer_length)?;
+
+            if self.current_buffer_tick_count() != latest_buffer.tick_count {
+                tracing::trace!("Telemetry advanced during copy on attempt {}", attempt + 1);
+                continue;
+            }
+
+            self.last_tick_count = latest_buffer.tick_count;
+
+            tracing::trace!(
+                "Returning new data: tick={}, size={} bytes",
+                latest_buffer.tick_count,
+                frame.len()
+            );
+
+            return Some(FrameBuffer(frame));
         }
 
         tracing::warn!("Failed consistency checks, no data returned");
         None
     }
 
-    /// Get session info YAML string
-    pub fn session_info(&self) -> Option<String> {
-        let header = self.header();
-        if header.session_info_len <= 0 {
-            return None;
-        }
-        if header.session_info_offset < 0 {
-            return None;
-        }
-
-        unsafe {
-            // Get the slice of the session yaml
-            let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
-            let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
-
-            // Parse and return
-            yaml_utils::extract_yaml_from_memory(info_slice, 0, header.session_info_len).ok()
-        }
-    }
-
-    /// Get session info update counter
-    pub fn session_info_update(&self) -> i32 {
-        self.header().session_info_update
-    }
-
-    /// Get all variable definitions from the header
-    pub fn get_variables(&self) -> Vec<crate::VariableInfo> {
-        let header = self.header();
-        if header.num_vars <= 0 || header.var_header_offset <= 0 {
-            return Vec::new();
-        }
-
-        let mut variables = Vec::new();
-
-        unsafe {
-            let var_header_ptr = self.base.as_ptr().add(header.var_header_offset as usize);
-
-            for i in 0..header.num_vars {
-                let var_ptr =
-                    var_header_ptr.add(i as usize * std::mem::size_of::<IRSDKVarHeader>());
-                let var_header = &*(var_ptr as *const IRSDKVarHeader);
-
-                // Convert to our VariableInfo format
-                let var_info = var_header.to_variable_info();
-
-                variables.push(var_info);
-            }
-        }
-
-        variables
-    }
-
     /// Validate initial connection
     fn validate_connection(&self) -> Result<()> {
-        let header = self.header();
-        header.validate()?;
+        let header = self.header_snapshot();
+        header.validate_live()?;
+        self.validate_header_ranges(&header)?;
 
         tracing::debug!(
-            ver = header.ver,
-            num_vars = header.num_vars,
-            num_buf = header.num_buf,
+            ver = header.version,
+            num_vars = header.variable_count,
+            num_buf = header.buffer_count,
             "Validated iRacing header"
         );
 
         Ok(())
     }
 
-    /// Find the buffer with the highest tick count
-    pub fn find_latest_buffer(&self, header: &IRSDKHeader) -> usize {
-        let mut latest = 0;
-        let num_buf = std::cmp::min(header.num_buf, 4) as usize;
-        for i in 1..num_buf {
-            if header.var_buf[latest].tick_count < header.var_buf[i].tick_count {
-                latest = i;
+    fn query_mapped_length(&self) -> Result<usize> {
+        let mut information = MaybeUninit::<MEMORY_BASIC_INFORMATION>::uninit();
+        let bytes_written = unsafe {
+            VirtualQuery(
+                Some(self.base.as_ptr().cast()),
+                information.as_mut_ptr(),
+                size_of::<MEMORY_BASIC_INFORMATION>(),
+            )
+        };
+
+        if bytes_written != size_of::<MEMORY_BASIC_INFORMATION>() {
+            return Err(IRacingSDKError::windows_api_error(
+                "VirtualQuery",
+                windows::core::Error::from_thread(),
+            ));
+        }
+
+        let information = unsafe { information.assume_init() };
+        Ok(information.RegionSize)
+    }
+
+    fn validate_header_ranges(&self, header: &Header) -> Result<()> {
+        let session_offset = usize::try_from(header.session_info_offset)
+            .map_err(|_| IRacingSDKError::memory_access_error(0))?;
+        let session_length = usize::try_from(header.session_info_len)
+            .map_err(|_| IRacingSDKError::memory_access_error(session_offset))?;
+        self.validate_mapped_range(session_offset, session_length)?;
+
+        let variable_offset = usize::try_from(header.variable_header_offset)
+            .map_err(|_| IRacingSDKError::memory_access_error(0))?;
+        let variable_count = usize::try_from(header.variable_count)
+            .map_err(|_| IRacingSDKError::memory_access_error(variable_offset))?;
+        let variable_length = variable_count
+            .checked_mul(VariableHeader::SIZE)
+            .ok_or_else(|| IRacingSDKError::memory_access_error(variable_offset))?;
+        self.validate_mapped_range(variable_offset, variable_length)?;
+
+        let buffer_length = usize::try_from(header.buffer_length)
+            .map_err(|_| IRacingSDKError::memory_access_error(0))?;
+        for buffer in &header.buffers[..header.buffer_count as usize] {
+            let buffer_offset = usize::try_from(buffer.buffer_offset)
+                .map_err(|_| IRacingSDKError::memory_access_error(0))?;
+            self.validate_mapped_range(buffer_offset, buffer_length)?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_mapped_range(&self, offset: usize, length: usize) -> Result<()> {
+        let end = offset
+            .checked_add(length)
+            .ok_or_else(|| IRacingSDKError::memory_access_error(offset))?;
+
+        if end > self.mapped_length {
+            return Err(IRacingSDKError::memory_access_error(end));
+        }
+
+        Ok(())
+    }
+}
+
+/// Utilities and helpers for reading from the header efficiently
+impl Connection {
+    // Reads a value directly from the header memory
+    #[inline]
+    unsafe fn read_header_at<T: Copy>(&self, offset: usize) -> T {
+        debug_assert!(
+            offset
+                .checked_add(std::mem::size_of::<T>())
+                .is_some_and(|end| end <= Header::SIZE)
+        );
+
+        unsafe {
+            let ptr = self.base.as_ptr().add(offset).cast::<T>();
+
+            debug_assert_eq!(ptr.align_offset(std::mem::align_of::<T>()), 0);
+
+            std::ptr::read_volatile(ptr)
+        }
+    }
+
+    // Unsafe read directly from base pointer
+    #[inline]
+    fn snapshot_region(&self, offset: usize, length: usize) -> Option<Vec<u8>> {
+        self.validate_mapped_range(offset, length).ok()?;
+        let mut buffer = Vec::with_capacity(length);
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.base.as_ptr().add(offset),
+                buffer.as_mut_ptr(),
+                length,
+            );
+
+            buffer.set_len(length);
+        }
+
+        Some(buffer)
+    }
+
+    #[inline]
+    fn buffer_snapshot(&self, index: usize) -> VariableBuffer {
+        debug_assert!(index < Header::MAX_BUFFERS);
+
+        // Get the offset to the buffer at `index`
+        let offset = std::mem::offset_of!(Header, buffers) + index * VariableBuffer::SIZE;
+
+        let bytes = unsafe {
+            &*self
+                .base
+                .as_ptr()
+                .add(offset)
+                .cast::<[u8; VariableBuffer::SIZE]>()
+        };
+
+        VariableBuffer::read_from_bytes(bytes)
+    }
+
+    #[inline]
+    fn read_latest_buffer(&self) -> Option<(VariableBuffer, usize)> {
+        loop {
+            let index = self.current_buffer_index() as usize;
+            let buffer_count = self.buffer_count();
+
+            if !(3..=Header::MAX_BUFFERS).contains(&buffer_count) || index >= buffer_count {
+                tracing::warn!(
+                    index,
+                    buffer_count,
+                    "iRacing advertised an invalid current buffer index"
+                );
+                return None;
+            }
+
+            let buffer = self.buffer_snapshot(index);
+            let current_tick = self.current_buffer_tick_count();
+
+            if buffer.tick_count == current_tick && buffer.tick_count_begin == current_tick {
+                return Some((buffer, index));
             }
         }
-        latest
+    }
+
+    /// Get the tick rate for the session
+    pub fn tick_rate(&self) -> i32 {
+        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, tick_rate)) }
+    }
+
+    /// Get session info update counter
+    pub fn session_info_update(&self) -> i32 {
+        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, session_info_update)) }
+    }
+
+    /// Reads the YAML session string out of the pointer
+    pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
+        let header = self.header_snapshot();
+
+        let offset = usize::try_from(header.session_info_offset).ok()?;
+        let length = usize::try_from(header.session_info_len).ok()?;
+
+        if length == 0 {
+            return None;
+        }
+
+        Some(SessionInfoBuffer(self.snapshot_region(offset, length)?))
+    }
+
+    /// Reads an available variables snapshot out of the pointer
+    pub fn variable_info_buffer(&self) -> Option<VariableInfoBuffer> {
+        let header = self.header_snapshot();
+
+        let offset = usize::try_from(header.variable_header_offset).ok()?;
+        let count = usize::try_from(header.variable_count).ok()?;
+
+        if count == 0 {
+            return None;
+        }
+
+        let length = count.checked_mul(VariableHeader::SIZE)?;
+
+        Some(VariableInfoBuffer {
+            bytes: self.snapshot_region(offset, length)?,
+            count,
+        })
+    }
+
+    /// The latest buffer's tick count
+    pub fn current_buffer_tick_count(&self) -> i32 {
+        unsafe {
+            self.read_header_at::<i32>(std::mem::offset_of!(Header, current_buffer_tick_count))
+        }
+    }
+
+    /// The index of the current buffer
+    pub fn current_buffer_index(&self) -> u8 {
+        unsafe { self.read_header_at::<u8>(std::mem::offset_of!(Header, current_buffer)) }
+    }
+
+    fn buffer_count(&self) -> usize {
+        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, buffer_count)) }
+            .try_into()
+            .unwrap_or(0)
+    }
+
+    /// The status bit from the header.
+    pub fn connection_status(&self) -> i32 {
+        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, status)) }
+    }
+
+    /// Check if iRacing is connected
+    pub fn is_connected(&self) -> bool {
+        let status = self.connection_status();
+        status_is_connected(status)
     }
 }
 
@@ -335,55 +543,42 @@ unsafe impl Sync for Connection {}
 
 #[cfg(all(test, windows))]
 mod tests {
+    use crate::{VariableInfo, headers::VariableBuffer};
+
     use super::*;
-    use crate::schema::header::IRSDKVarBuf;
     use std::mem::ManuallyDrop;
 
     fn test_connection() -> ManuallyDrop<Connection> {
         ManuallyDrop::new(Connection {
             mapping: HANDLE::default(),
             base: NonNull::dangling(),
+            mapped_length: 0,
             event: HANDLE::default(),
             last_tick_count: i32::MAX,
         })
     }
 
-    fn test_header(num_buf: i32) -> IRSDKHeader {
-        IRSDKHeader {
-            ver: IRSDK_VER,
-            status: IRSDK_ST_CONNECTED,
-            tick_rate: 60,
-            session_info_update: 0,
-            session_info_len: 0,
-            session_info_offset: 0,
-            num_vars: 1,
-            var_header_offset: 112,
-            num_buf,
-            buf_len: 4,
-            pad1: [0; 2],
-            var_buf: [
-                IRSDKVarBuf {
-                    tick_count: 1,
-                    buf_offset: 256,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 4,
-                    buf_offset: 260,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 3,
-                    buf_offset: 264,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 2,
-                    buf_offset: 268,
-                    pad: [0; 2],
-                },
+    fn test_header(buffer_count: i32) -> Header {
+        Header::new(
+            IRSDK_VER,
+            IRSDK_ST_CONNECTED,
+            60,
+            0,
+            0,
+            0,
+            1,
+            112,
+            buffer_count,
+            4,
+            0,
+            0,
+            [
+                VariableBuffer::new(1, 256, 0),
+                VariableBuffer::new(4, 260, 0),
+                VariableBuffer::new(3, 264, 0),
+                VariableBuffer::new(2, 268, 0),
             ],
-        }
+        )
     }
 
     #[test]
@@ -395,40 +590,14 @@ mod tests {
     }
 
     #[test]
-    fn header_struct_layout() {
-        // Verify the header struct matches expected C layout
-        assert_eq!(std::mem::size_of::<IRSDKHeader>(), 112); // Expected size
-        assert_eq!(std::mem::align_of::<IRSDKHeader>(), 4);
-
-        // Check VarBuf size and alignment
-        assert_eq!(std::mem::size_of::<IRSDKVarBuf>(), 16);
-        assert_eq!(std::mem::align_of::<IRSDKVarBuf>(), 4);
-    }
-
-    #[test]
-    fn find_latest_buffer_caps_count_at_backing_array_length() {
-        let connection = test_connection();
-        let header = test_header(5);
-
-        assert_eq!(connection.find_latest_buffer(&header), 1);
-    }
-
-    #[test]
-    #[ignore = "known bug: a negative num_buf is cast to usize after applying only an upper bound"]
-    fn find_latest_buffer_does_not_panic_for_negative_count() {
-        let connection = test_connection();
-        let header = test_header(-1);
-
-        let result = std::panic::catch_unwind(|| connection.find_latest_buffer(&header));
-
-        assert!(result.is_ok(), "negative num_buf must not cause a panic");
-    }
-
-    #[test]
     #[ignore = "iracing_required"]
     fn test_read_rpm_variable() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
-        let variables = connection.get_variables();
+        let buffer = connection
+            .variable_info_buffer()
+            .expect("Could not get VariableInfo from connection");
+
+        let variables: Vec<VariableInfo> = buffer.try_into().expect("Could not get VariableInfo");
 
         // Look for exact "RPM" match to verify variable schema
         let exact_rpm = variables.iter().find(|v| v.name == "RPM");
@@ -444,20 +613,20 @@ mod tests {
     #[ignore = "iracing_required"]
     fn connects_to_live_iracing() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
-        let header = connection.header();
+        let header = connection.header_snapshot();
 
         // Validate header structure sizes match expected C SDK layout
         assert_eq!(
-            std::mem::size_of::<IRSDKHeader>(),
+            std::mem::size_of::<Header>(),
             112,
             "Header size must match C SDK"
         );
         assert!(header.tick_rate > 0, "Tick rate should be positive");
 
-        assert_eq!(header.ver, IRSDK_VER);
-        assert!(header.num_vars > 0);
-        assert!(header.num_buf >= 3);
-        assert!(header.buf_len > 0);
+        assert_eq!(header.version, IRSDK_VER);
+        assert!(header.variable_count > 0);
+        assert!(header.buffer_count >= 3);
+        assert!(header.buffer_count > 0);
     }
 
     #[test]

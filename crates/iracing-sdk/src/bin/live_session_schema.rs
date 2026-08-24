@@ -59,9 +59,10 @@ fn main() -> anyhow::Result<()> {
             ));
         }
 
-        let raw_session_yaml = connection
-            .session_info()
+        let session_buffer = connection
+            .session_info_buffer()
             .ok_or_else(|| anyhow::anyhow!("No live session YAML is available"))?;
+        let raw_session_yaml: String = session_buffer.try_into()?;
 
         let parser = SessionInfoParser::new();
         let session = parser.parse(&raw_session_yaml)?;

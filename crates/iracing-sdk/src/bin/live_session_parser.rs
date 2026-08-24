@@ -68,7 +68,7 @@
 //!
 //! # Notes
 //! If you want guaranteed output, add handling for the `None` case from
-//! `connection.session_info()` (e.g., return an error or write a placeholder file).
+//! `connection.session_info_buffer()` (e.g., return an error or write a placeholder file).
 
 use anyhow::Result;
 #[cfg(windows)]
@@ -133,7 +133,8 @@ fn main() -> Result<()> {
         // Write session string to output path.
         // ------------------------------------------------------------
         tracing::info!("Parsing session information");
-        if let Some(session) = windows_connection.session_info() {
+        if let Some(buffer) = windows_connection.session_info_buffer() {
+            let session: String = buffer.try_into()?;
             if let Some(output_path) = output_path {
                 fs::write(output_path, session)?;
             } else {
