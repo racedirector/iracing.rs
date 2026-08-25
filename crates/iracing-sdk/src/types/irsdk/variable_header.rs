@@ -1,8 +1,11 @@
 use type_layout::TypeLayout;
 
-use crate::IRacingSDKError;
+use crate::{IRacingSDKError, Result};
 
-use super::{IRSDK_MAX_DESC, IRSDK_MAX_STRING, VariableInfoBuffer, wire_type::WireType};
+use super::{
+    IRSDK_MAX_DESC, IRSDK_MAX_STRING, VariableInfoBuffer, error::variable_header_validation_error,
+    wire_type::WireType,
+};
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
@@ -24,6 +27,29 @@ pub struct VariableHeader {
     pub description: [u8; IRSDK_MAX_DESC],
     /// Variable units (32 bytes, null-terminated)
     pub unit: [u8; IRSDK_MAX_STRING],
+}
+
+impl VariableHeader {
+    /// Validates the semantic fields of a decoded variable header.
+    pub fn validate(&self) -> Result<()> {
+        if self.name.is_empty() {
+            return Err(variable_header_validation_error("Name cannot be empty"));
+        }
+
+        if self.offset < 0 {
+            return Err(variable_header_validation_error(
+                "Offset cannot be negative",
+            ));
+        }
+
+        if self.count <= 0 {
+            return Err(variable_header_validation_error(
+                "Count cannot be 0 or less",
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 unsafe impl WireType for VariableHeader {}

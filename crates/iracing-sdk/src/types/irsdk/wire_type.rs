@@ -44,6 +44,7 @@ pub unsafe trait WireType: Copy + Sized {
     ///
     /// Returns [`IRacingSDKError::WireSize`] when `bytes.len()` is not exactly
     /// [`WIRE_SIZE`](Self::WIRE_SIZE).
+    #[inline]
     fn read_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != Self::WIRE_SIZE {
             return Err(IRacingSDKError::WireSize {
@@ -53,6 +54,24 @@ pub unsafe trait WireType: Copy + Sized {
             .into());
         }
 
+        // SAFETY:
+        // - The length check guarantees that `WIRE_SIZE` bytes are readable.
+        // - The `WireType` implementation guarantees that every byte pattern is
+        //   valid for `Self` and that its layout matches the wire representation.
         Ok(unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>()) })
+    }
+
+    /// Reads a value without checking the input length.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must contain at least `Self::WIRE_SIZE` readable bytes.
+    #[inline]
+    unsafe fn read_from_bytes_unchecked(bytes: &[u8]) -> Self {
+        debug_assert!(bytes.len() >= Self::WIRE_SIZE);
+
+        // SAFETY: The caller guarantees sufficient readable bytes, and the
+        // `WireType` contract guarantees that the representation is valid.
+        unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>()) }
     }
 }

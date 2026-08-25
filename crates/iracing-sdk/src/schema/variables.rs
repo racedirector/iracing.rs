@@ -305,7 +305,7 @@ pub fn parse_variable_schema(
     );
 
     // Build schema with validation
-    let schema = VariableSchema::new(variables, buffer_length as usize)?;
+    let schema = VariableSchema::new(variables.into(), buffer_length as usize)?;
 
     Ok(schema)
 }

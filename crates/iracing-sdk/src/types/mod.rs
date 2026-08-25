@@ -75,8 +75,8 @@ pub use ibt_header::IbtHeader;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
 pub use irsdk::{
-    DiskSubHeader, FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
-    VariableInfoBuffer, WireType,
+    DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
+    VariableBuffer, VariableHeader, VariableInfoBuffer, WireType, status_is_connected,
 };
 pub use irsdk_bitflags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
@@ -160,7 +160,7 @@ mod tests {
             }
 
             let schema = VariableSchema {
-                variables: adjusted_variables,
+                variables: adjusted_variables.into(),
                 frame_size,
             };
 

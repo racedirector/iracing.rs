@@ -3,8 +3,10 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::{IRacingSDKError, Result, VariableInfo};
-use std::collections::HashMap;
+use crate::{
+    FrameBuffer, Header, IRacingSDKError, Result, SessionInfoBuffer, VariableBuffer,
+    VariableHeader, VariableInfoBuffer, WireType, status_is_connected,
+};
 use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
 use std::time::Duration;
@@ -115,7 +117,7 @@ impl Connection {
         };
 
         connection.mapped_length = connection.query_mapped_length()?;
-        connection.validate_mapped_range(0, Header::SIZE)?;
+        connection.validate_mapped_range(0, Header::WIRE_SIZE)?;
 
         // Validate the connection
         connection.validate_connection()?;
@@ -126,9 +128,9 @@ impl Connection {
     /// Get a snapshot of the header
     #[inline]
     pub fn header_snapshot(&self) -> Header {
-        let bytes = unsafe { &*self.base.as_ptr().cast::<[u8; Header::SIZE]>() };
+        let bytes = unsafe { &*self.base.as_ptr().cast::<[u8; Header::WIRE_SIZE]>() };
 
-        Header::read_from_bytes(bytes)
+        Header::read_from_bytes(bytes).expect("Could not parse header from live connection")
     }
 
     /// Wait for new telemetry data (synchronous - blocks thread)
@@ -264,7 +266,7 @@ impl Connection {
         let variable_count = usize::try_from(header.variable_count)
             .map_err(|_| IRacingSDKError::memory_access_error(variable_offset))?;
         let variable_length = variable_count
-            .checked_mul(VariableHeader::SIZE)
+            .checked_mul(VariableHeader::WIRE_SIZE)
             .ok_or_else(|| IRacingSDKError::memory_access_error(variable_offset))?;
         self.validate_mapped_range(variable_offset, variable_length)?;
 
@@ -300,7 +302,7 @@ impl Connection {
         debug_assert!(
             offset
                 .checked_add(std::mem::size_of::<T>())
-                .is_some_and(|end| end <= Header::SIZE)
+                .is_some_and(|end| end <= Header::WIRE_SIZE)
         );
 
         unsafe {
@@ -336,17 +338,18 @@ impl Connection {
         debug_assert!(index < Header::MAX_BUFFERS);
 
         // Get the offset to the buffer at `index`
-        let offset = std::mem::offset_of!(Header, buffers) + index * VariableBuffer::SIZE;
+        let offset = std::mem::offset_of!(Header, buffers) + index * VariableBuffer::WIRE_SIZE;
 
         let bytes = unsafe {
             &*self
                 .base
                 .as_ptr()
                 .add(offset)
-                .cast::<[u8; VariableBuffer::SIZE]>()
+                .cast::<[u8; VariableBuffer::WIRE_SIZE]>()
         };
 
         VariableBuffer::read_from_bytes(bytes)
+            .expect("Could not parse valid buffer from connection")
     }
 
     #[inline]
@@ -408,7 +411,7 @@ impl Connection {
             return None;
         }
 
-        let length = count.checked_mul(VariableHeader::SIZE)?;
+        let length = count.checked_mul(VariableHeader::WIRE_SIZE)?;
 
         Some(VariableInfoBuffer {
             bytes: self.snapshot_region(offset, length)?,
@@ -428,7 +431,8 @@ impl Connection {
         unsafe { self.read_header_at::<u8>(std::mem::offset_of!(Header, current_buffer)) }
     }
 
-    fn buffer_count(&self) -> usize {
+    /// Returns the number of telemetry buffers advertised by the live header.
+    pub fn buffer_count(&self) -> usize {
         unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, buffer_count)) }
             .try_into()
             .unwrap_or(0)
@@ -466,7 +470,7 @@ unsafe impl Sync for Connection {}
 
 #[cfg(all(test, windows))]
 mod tests {
-    use crate::{VariableInfo, headers::VariableBuffer};
+    use crate::{VariableBuffer, VariableInfo};
 
     use super::*;
     use std::mem::ManuallyDrop;

@@ -87,7 +87,7 @@ mod tests {
             description: "Engine RPM".into(),
         };
         let schema = Arc::new(VariableSchema {
-            variables: HashMap::from([("RPM".to_string(), rpm_info)]),
+            variables: HashMap::from([("RPM".to_string(), rpm_info)]).into(),
             frame_size: 4,
         });
         let packet = FramePacket::new(1234i32.to_le_bytes().to_vec(), 10, 2, Arc::clone(&schema));

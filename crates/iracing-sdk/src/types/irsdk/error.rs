@@ -11,3 +11,7 @@ pub(super) fn mismatched_version_error(actual: u32) -> IRacingSDKError {
         found: actual,
     }
 }
+
+pub(super) fn variable_header_validation_error(details: impl Into<String>) -> IRacingSDKError {
+    IRacingSDKError::parse_error("Variable header validation", details)
+}

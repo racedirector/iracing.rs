@@ -1,7 +1,8 @@
 const IRSDK_MAX_BUFFERS: usize = 4;
 const IRSDK_MAX_DESC: usize = 64;
 const IRSDK_MAX_STRING: usize = 32;
-const IRSDK_VERSION: i32 = 2;
+/// Wire-format version supported by this SDK implementation.
+pub const IRSDK_VERSION: i32 = 2;
 
 /// Status flag indicating that the simulator is actively publishing telemetry
 pub const IRSDK_STATUS_CONNECTED: i32 = 0x1;
@@ -23,7 +24,7 @@ use crate::{IRacingSDKError, Result, yaml_utils};
 
 /// Owned snapshot of the live session YAML region.
 #[derive(Debug, Clone)]
-pub struct SessionInfoBuffer(Vec<u8>);
+pub struct SessionInfoBuffer(pub(crate) Vec<u8>);
 
 impl TryFrom<SessionInfoBuffer> for String {
     type Error = IRacingSDKError;
@@ -42,7 +43,7 @@ impl TryFrom<SessionInfoBuffer> for String {
 
 /// Owned snapshot of a live telemetry frame.
 #[derive(Debug, Clone)]
-pub struct FrameBuffer(Vec<u8>);
+pub struct FrameBuffer(pub(crate) Vec<u8>);
 
 impl From<FrameBuffer> for Vec<u8> {
     fn from(buffer: FrameBuffer) -> Self {

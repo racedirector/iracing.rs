@@ -24,6 +24,8 @@ pub struct DiskSubHeader {
 }
 
 impl DiskSubHeader {
+    /// Attempts to read a buffer of `Self::WIRE_SIZE` from the reader and uses
+    /// `WireType::read_from_bytes` to construct `DiskSubHeader`.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut buffer = [0u8; Self::WIRE_SIZE];
 

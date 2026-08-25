@@ -171,10 +171,11 @@ pub fn verify_min_length(file_len: u64, header: &Header, disk: &DiskSubHeader) -
 mod tests {
     use super::*;
 
+    use crate::VariableHeader;
     use crate::test_utils::{
         IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
     };
-    use crate::{ibt_header::IbtHeader, types::irsdk::WireType};
+    use crate::types::{IbtHeader, WireType};
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
     use std::path::Path;
@@ -219,16 +220,19 @@ mod tests {
     #[test]
     fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         let manifest = load_fixture_manifest()?;
-        assert_eq!(manifest.layout.live_header_prefix_size, 112);
-        assert_eq!(manifest.layout.ibt_header_size, Header::WIRE_SIZE);
+        assert_eq!(manifest.layout.live_header_prefix_size, Header::WIRE_SIZE);
+        assert_eq!(manifest.layout.ibt_header_size, IbtHeader::SIZE);
         assert_eq!(
             manifest.layout.disk_sub_header_size,
             DiskSubHeader::WIRE_SIZE
         );
-        assert_eq!(manifest.layout.variable_header_size, IRSDK_VAR_HEADER_SIZE);
+        assert_eq!(
+            manifest.layout.variable_header_size,
+            VariableHeader::WIRE_SIZE
+        );
 
         for fixture in &manifest.fixtures {
-            let (IbtHeader { header, sub_header }, disk_header) = parse_fixture(fixture)?;
+            let (IbtHeader { header, sub_header }, _) = parse_fixture(fixture)?;
 
             assert_eq!(header.version, 2);
             assert_eq!(header.status, 1);

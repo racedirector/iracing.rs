@@ -166,6 +166,15 @@ impl VariableSchema {
     }
 }
 
+impl Default for VariableSchema {
+    fn default() -> Self {
+        Self {
+            variables: HashMap::new(),
+            frame_size: 0,
+        }
+    }
+}
+
 #[cfg(windows)]
 impl VariableSchema {
     /// Creates a VariableSchema from components of a WindowsConnection.
@@ -173,7 +182,11 @@ impl VariableSchema {
         let header = connection.header_snapshot();
 
         let variable_map = if let Some(v) = connection.variable_info_buffer() {
-            v.try_into()?
+            let variables: Vec<VariableInfo> = v.try_into()?;
+            variables
+                .into_iter()
+                .map(|info| (info.name.clone(), info))
+                .collect()
         } else {
             HashMap::new()
         };

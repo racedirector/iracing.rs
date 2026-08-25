@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn dynamic_frame_basic_lookup() {
         // Build minimal schema
-        let mut vars = HashMap::new();
+        let mut vars = HashMap::with_capacity(3);
         vars.insert(
             "RPM".to_string(),
             VariableInfo {
@@ -142,7 +142,7 @@ mod tests {
             },
         );
         let schema = VariableSchema {
-            variables: vars,
+            variables: vars.into(),
             frame_size: 24,
         };
 
