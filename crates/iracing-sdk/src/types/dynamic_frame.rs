@@ -38,11 +38,6 @@ impl DynamicFrame {
         self.get(name)
     }
 
-    /// Look up a variable as `u32`, or `None` if missing or the wrong type.
-    pub fn u32(&self, name: &str) -> Option<u32> {
-        self.get(name)
-    }
-
     /// Look up a variable as `f64`, or `None` if missing or the wrong type.
     pub fn f64(&self, name: &str) -> Option<f64> {
         self.get(name)
@@ -109,7 +104,7 @@ mod tests {
             "RPM".to_string(),
             VariableInfo {
                 name: "RPM".into(),
-                data_type: VariableType::Int32,
+                data_type: VariableType::Integer,
                 offset: 0,
                 count: 1,
                 count_as_time: false,
@@ -121,7 +116,7 @@ mod tests {
             "Speed".to_string(),
             VariableInfo {
                 name: "Speed".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 4,
                 count: 1,
                 count_as_time: false,
@@ -133,7 +128,7 @@ mod tests {
             "CarIdxLapDistPct".to_string(),
             VariableInfo {
                 name: "CarIdxLapDistPct".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 8,
                 count: 4,
                 count_as_time: false,
@@ -175,6 +170,5 @@ mod tests {
         assert!(df.f32("Speed").unwrap() - 42.5 < 1e-5);
         let lap_dist_values: Vec<f32> = df.get("CarIdxLapDistPct").unwrap();
         assert_eq!(lap_dist_values, lap_dist);
-        assert_eq!(df.u32("Missing"), None);
     }
 }

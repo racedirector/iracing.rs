@@ -2,6 +2,7 @@ use type_layout::TypeLayout;
 
 use crate::Result;
 
+use super::VariableType;
 use super::{
     IRSDK_MAX_DESC, IRSDK_MAX_STRING, error::variable_header_validation_error, wire_type::WireType,
 };
@@ -53,8 +54,25 @@ pub struct VariableHeader {
 }
 
 impl VariableHeader {
+    /// Returns the validated SDK storage type advertised by this header.
+    pub fn variable_type(&self) -> Result<VariableType> {
+        let variable_type = VariableType::try_from(self.variable_type).map_err(|raw| {
+            variable_header_validation_error(format!("Unknown variable type value: {raw}"))
+        })?;
+
+        if !variable_type.is_storage_type() {
+            return Err(variable_header_validation_error(
+                "ElementTypeCount cannot describe a telemetry variable",
+            ));
+        }
+
+        Ok(variable_type)
+    }
+
     /// Validates the semantic fields of a decoded variable header.
     pub fn validate(&self) -> Result<()> {
+        self.variable_type()?;
+
         // Skip empty or invalid variables
         if self.name.is_empty() {
             return Err(variable_header_validation_error("Name cannot be empty"));
@@ -102,5 +120,27 @@ mod tests {
         assert_eq!(offset_of!(VariableHeader, name), 16);
         assert_eq!(offset_of!(VariableHeader, description), 48);
         assert_eq!(offset_of!(VariableHeader, unit), 112);
+    }
+
+    #[test]
+    fn variable_type_rejects_the_sentinel_and_unknown_values() {
+        let mut header = VariableHeader {
+            variable_type: i32::from(VariableType::Double),
+            offset: 0,
+            count: 1,
+            count_as_time: 0,
+            _pad: [0; 3],
+            name: [0; IRSDK_MAX_STRING],
+            description: [0; IRSDK_MAX_DESC],
+            unit: [0; IRSDK_MAX_STRING],
+        };
+
+        assert_eq!(header.variable_type().unwrap(), VariableType::Double);
+
+        header.variable_type = i32::from(VariableType::ElementTypeCount);
+        assert!(header.variable_type().is_err());
+
+        header.variable_type = 99;
+        assert!(header.variable_type().is_err());
     }
 }

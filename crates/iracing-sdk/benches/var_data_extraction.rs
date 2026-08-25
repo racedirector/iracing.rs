@@ -56,7 +56,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
 
     // Benchmark common scalar types with real variables
     let session_time_info =
-        support::require_variable(&schema, "SessionTime", VariableType::Float64, 1);
+        support::require_variable(&schema, "SessionTime", VariableType::Double, 1);
     assert_eq!(f64::from_bytes(&data, session_time_info).unwrap(), 0.5);
     group.bench_function("f64_session_time", |b| {
         b.iter(|| {
@@ -65,7 +65,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
         })
     });
 
-    let speed_info = support::require_variable(&schema, "Speed", VariableType::Float32, 1);
+    let speed_info = support::require_variable(&schema, "Speed", VariableType::Float, 1);
     assert_eq!(f32::from_bytes(&data, speed_info).unwrap(), 0.5);
     group.bench_function("f32_speed", |b| {
         b.iter(|| {
@@ -74,7 +74,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
         })
     });
 
-    let gear_info = support::require_variable(&schema, "Gear", VariableType::Int32, 1);
+    let gear_info = support::require_variable(&schema, "Gear", VariableType::Integer, 1);
     assert_eq!(i32::from_bytes(&data, gear_info).unwrap(), 1);
     group.bench_function("i32_gear", |b| {
         b.iter(|| {
@@ -84,7 +84,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
     });
 
     let session_tick_info =
-        support::require_variable(&schema, "SessionTick", VariableType::Int32, 1);
+        support::require_variable(&schema, "SessionTick", VariableType::Integer, 1);
     assert_eq!(i32::from_bytes(&data, session_tick_info).unwrap(), 1);
     group.bench_function("i32_session_tick", |b| {
         b.iter(|| {
@@ -94,7 +94,7 @@ fn bench_scalar_extraction(c: &mut Criterion) {
     });
 
     let driver_marker_info =
-        support::require_variable(&schema, "DriverMarker", VariableType::Bool, 1);
+        support::require_variable(&schema, "DriverMarker", VariableType::Boolean, 1);
     assert!(bool::from_bytes(&data, driver_marker_info).unwrap());
     group.bench_function("bool_driver_marker", |b| {
         b.iter(|| {
@@ -115,7 +115,7 @@ fn bench_array_extraction(c: &mut Criterion) {
 
     // Benchmark the 72-element CarIdx arrays in the captured live schema.
     let lap_dist_pct_info =
-        support::require_variable(&schema, "CarIdxLapDistPct", VariableType::Float32, 72);
+        support::require_variable(&schema, "CarIdxLapDistPct", VariableType::Float, 72);
     let lap_distances = Vec::<f32>::from_bytes(&data, lap_dist_pct_info).unwrap();
     assert_eq!(lap_distances.len(), 72);
     assert_eq!(lap_distances[0], 0.5);
@@ -129,7 +129,7 @@ fn bench_array_extraction(c: &mut Criterion) {
     });
 
     let track_surface_info =
-        support::require_variable(&schema, "CarIdxTrackSurface", VariableType::Int32, 72);
+        support::require_variable(&schema, "CarIdxTrackSurface", VariableType::Integer, 72);
     let track_surfaces = Vec::<i32>::from_bytes(&data, track_surface_info).unwrap();
     assert_eq!(track_surfaces.len(), 72);
     assert_eq!(track_surfaces[0], 1);
@@ -143,7 +143,7 @@ fn bench_array_extraction(c: &mut Criterion) {
     });
 
     let on_pit_road_info =
-        support::require_variable(&schema, "CarIdxOnPitRoad", VariableType::Bool, 72);
+        support::require_variable(&schema, "CarIdxOnPitRoad", VariableType::Boolean, 72);
     let pit_road = Vec::<bool>::from_bytes(&data, on_pit_road_info).unwrap();
     assert_eq!(pit_road.len(), 72);
     assert!(pit_road[0]);
@@ -207,7 +207,7 @@ fn bench_bounds_checking(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("bounds_checking");
 
-    let speed_info = support::require_variable(&schema, "Speed", VariableType::Float32, 1);
+    let speed_info = support::require_variable(&schema, "Speed", VariableType::Float, 1);
     let mut invalid_scalar_info = speed_info.clone();
     invalid_scalar_info.offset = data.len();
     assert!(f32::from_bytes(&data, &invalid_scalar_info).is_err());
@@ -227,7 +227,7 @@ fn bench_bounds_checking(c: &mut Criterion) {
     });
 
     let lap_dist_pct_info =
-        support::require_variable(&schema, "CarIdxLapDistPct", VariableType::Float32, 72);
+        support::require_variable(&schema, "CarIdxLapDistPct", VariableType::Float, 72);
     let mut invalid_array_info = lap_dist_pct_info.clone();
     invalid_array_info.offset = data.len();
     assert!(Vec::<f32>::from_bytes(&data, &invalid_array_info).is_err());

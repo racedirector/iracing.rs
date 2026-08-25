@@ -27,7 +27,7 @@
 //! let mut variables = HashMap::new();
 //! variables.insert("RPM".to_string(), VariableInfo {
 //!     name: "RPM".to_string(),
-//!     data_type: VariableType::Float32,
+//!     data_type: VariableType::Float,
 //!     offset: 0,
 //!     count: 1,
 //!     count_as_time: false,
@@ -60,7 +60,6 @@ mod schema;
 mod telemetry_value;
 mod update_rate;
 mod var_data;
-mod variable_type;
 
 // Re-export all public types
 pub use bitfield::{
@@ -78,7 +77,7 @@ pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, deco
 pub(crate) use irsdk::VariableHeadersBuffer;
 pub use irsdk::{
     DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
-    VariableBuffer, VariableHeader, WireType, status_is_connected,
+    VariableBuffer, VariableHeader, VariableType, WireType, status_is_connected,
 };
 pub use irsdk_bitflags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
@@ -93,7 +92,6 @@ pub use schema::{SchemaProvider, VariableInfo, VariableSchema, VariablesHashMap}
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_type::VariableType;
 
 #[cfg(test)]
 mod tests {
@@ -106,10 +104,8 @@ mod tests {
         fn arb_variable_info()(
             name in "[a-zA-Z][a-zA-Z0-9_]*",
             data_type in prop::sample::select(vec![
-                VariableType::Char, VariableType::Int8, VariableType::UInt8,
-                VariableType::Int16, VariableType::UInt16, VariableType::Int32,
-                VariableType::UInt32, VariableType::Float32, VariableType::Float64,
-                VariableType::Bool, VariableType::BitField
+                VariableType::Character, VariableType::Boolean, VariableType::Integer,
+                VariableType::BitField, VariableType::Float, VariableType::Double,
             ]),
             offset in 0..1024usize,
             count in 1..10usize,
@@ -149,7 +145,7 @@ mod tests {
             // Adjust variable offsets to ensure they fit within frame_size
             for (name, mut var_info) in variables.into_iter() {
                 // Ensure offset is within reasonable bounds for the frame size
-                let max_size = var_info.data_type.size() * var_info.count;
+                let max_size = var_info.data_type.byte_size().unwrap() * var_info.count;
                 if max_size < frame_size {
                     var_info.offset %= frame_size - max_size;
                 } else {
@@ -173,7 +169,8 @@ mod tests {
 
             // All variable offsets should be reasonable
             for var_info in schema.variables.values() {
-                let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
+                let end_offset = var_info.offset
+                    + (var_info.data_type.byte_size().unwrap() * var_info.count);
                 prop_assert!(end_offset <= schema.frame_size);
                 prop_assert!(var_info.count > 0);
             }
@@ -185,29 +182,25 @@ mod tests {
 
         #[test]
         fn prop_variable_type_size_calculations_correct(var_type in prop::sample::select(vec![
-            VariableType::Char, VariableType::Int8, VariableType::UInt8,
-            VariableType::Int16, VariableType::UInt16, VariableType::Int32,
-            VariableType::UInt32, VariableType::Float32, VariableType::Float64,
-            VariableType::Bool, VariableType::BitField
+            VariableType::Character, VariableType::Boolean, VariableType::Integer,
+            VariableType::BitField, VariableType::Float, VariableType::Double,
         ])) {
             // VariableType size calculations correct for all enum variants
-            let size = var_type.size();
+            let size = var_type.byte_size().unwrap();
             prop_assert!(size > 0);
             prop_assert!(size <= 8);
 
             match var_type {
-                VariableType::Char | VariableType::Int8 | VariableType::UInt8 | VariableType::Bool => {
+                VariableType::Character | VariableType::Boolean => {
                     prop_assert_eq!(size, 1);
                 },
-                VariableType::Int16 | VariableType::UInt16 => {
-                    prop_assert_eq!(size, 2);
-                },
-                VariableType::Int32 | VariableType::UInt32 | VariableType::Float32 | VariableType::BitField => {
+                VariableType::Integer | VariableType::Float | VariableType::BitField => {
                     prop_assert_eq!(size, 4);
                 },
-                VariableType::Float64 => {
+                VariableType::Double => {
                     prop_assert_eq!(size, 8);
                 },
+                VariableType::ElementTypeCount => unreachable!(),
             }
         }
 
@@ -223,7 +216,7 @@ mod tests {
 
             let var_info = VariableInfo {
                 name: "test".to_string(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset,
                 count: 1,
                 count_as_time: false,
@@ -255,7 +248,7 @@ mod tests {
 
             let var_info = VariableInfo {
                 name: "test".to_string(),
-                data_type: VariableType::Int32,
+                data_type: VariableType::Integer,
                 offset,
                 count: 1,
                 count_as_time: false,
@@ -331,17 +324,13 @@ mod tests {
     // Unit tests for trivial constructors and pure functions
     #[test]
     fn variable_type_size_returns_correct_values() {
-        assert_eq!(VariableType::Char.size(), 1);
-        assert_eq!(VariableType::Int8.size(), 1);
-        assert_eq!(VariableType::UInt8.size(), 1);
-        assert_eq!(VariableType::Bool.size(), 1);
-        assert_eq!(VariableType::Int16.size(), 2);
-        assert_eq!(VariableType::UInt16.size(), 2);
-        assert_eq!(VariableType::Int32.size(), 4);
-        assert_eq!(VariableType::UInt32.size(), 4);
-        assert_eq!(VariableType::Float32.size(), 4);
-        assert_eq!(VariableType::BitField.size(), 4);
-        assert_eq!(VariableType::Float64.size(), 8);
+        assert_eq!(VariableType::Character.byte_size(), Some(1));
+        assert_eq!(VariableType::Boolean.byte_size(), Some(1));
+        assert_eq!(VariableType::Integer.byte_size(), Some(4));
+        assert_eq!(VariableType::Float.byte_size(), Some(4));
+        assert_eq!(VariableType::BitField.byte_size(), Some(4));
+        assert_eq!(VariableType::Double.byte_size(), Some(8));
+        assert_eq!(VariableType::ElementTypeCount.byte_size(), None);
     }
 
     #[test]

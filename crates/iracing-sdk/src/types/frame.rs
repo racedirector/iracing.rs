@@ -73,7 +73,7 @@ mod tests {
     fn frame_packet_provides_schema_and_telemetry_values() {
         let rpm_info = VariableInfo {
             name: "RPM".into(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,

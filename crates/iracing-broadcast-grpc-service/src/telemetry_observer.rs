@@ -357,11 +357,11 @@ mod tests {
     fn full_schema() -> Arc<VariableSchema> {
         make_schema(
             &[
-                ("CamCarIdx", VariableType::Int32, 0),
-                ("CamGroupNumber", VariableType::Int32, 4),
-                ("CamCameraNumber", VariableType::Int32, 8),
-                ("ReplayPlaySpeed", VariableType::Int32, 12),
-                ("ReplayPlaySlowMotion", VariableType::Bool, 16),
+                ("CamCarIdx", VariableType::Integer, 0),
+                ("CamGroupNumber", VariableType::Integer, 4),
+                ("CamCameraNumber", VariableType::Integer, 8),
+                ("ReplayPlaySpeed", VariableType::Integer, 12),
+                ("ReplayPlaySlowMotion", VariableType::Boolean, 16),
             ],
             17,
         )
@@ -370,8 +370,8 @@ mod tests {
     fn schema_missing_camera_fields() -> Arc<VariableSchema> {
         make_schema(
             &[
-                ("ReplayPlaySpeed", VariableType::Int32, 12),
-                ("ReplayPlaySlowMotion", VariableType::Bool, 16),
+                ("ReplayPlaySpeed", VariableType::Integer, 12),
+                ("ReplayPlaySlowMotion", VariableType::Boolean, 16),
             ],
             17,
         )

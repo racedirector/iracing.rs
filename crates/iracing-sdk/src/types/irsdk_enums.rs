@@ -468,7 +468,7 @@ mod tests {
 
         let info = VariableInfo {
             name: "TrackLocation".to_string(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,

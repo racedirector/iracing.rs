@@ -190,7 +190,7 @@ mod tests {
     fn variable(name: &str) -> VariableInfo {
         VariableInfo {
             name: name.to_string(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,

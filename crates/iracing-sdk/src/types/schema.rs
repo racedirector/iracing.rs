@@ -51,11 +51,13 @@ impl TryFrom<VariableHeader> for VariableInfo {
 
     /// Convert the wire-format VariableHeader into library type `VariableInfo`.
     fn try_from(value: VariableHeader) -> Result<Self> {
+        value.validate()?;
+
         Ok(VariableInfo {
             name: parse_utils::c_string_to_string(&value.name),
             description: parse_utils::c_string_to_string(&value.description),
             units: parse_utils::c_string_to_string(&value.unit),
-            data_type: value.variable_type.try_into()?,
+            data_type: value.variable_type()?,
             offset: usize::try_from(value.offset).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "TryFrom<VariableHeader> for VariableInfo",
@@ -166,7 +168,13 @@ impl VariableSchema {
             }
 
             // Validate that variable fits within frame
-            let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
+            let element_size = var_info.data_type.byte_size().ok_or_else(|| {
+                schema_validation_error(format!(
+                    "Variable '{}' uses the non-storage ElementTypeCount sentinel",
+                    name
+                ))
+            })?;
+            let end_offset = var_info.offset + (element_size * var_info.count);
             if end_offset > self.frame_size {
                 return Err(IRacingSDKError::memory_access_error(var_info.offset));
             }
@@ -287,7 +295,7 @@ mod tests {
     fn schema_provider_basic_usage() {
         let speed = VariableInfo {
             name: "Speed".to_string(),
-            data_type: VariableType::Float32,
+            data_type: VariableType::Float,
             offset: 0,
             count: 1,
             count_as_time: false,

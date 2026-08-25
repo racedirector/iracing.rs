@@ -145,12 +145,12 @@ mod tests {
 
     fn variable_type(expected: &str) -> VariableType {
         match expected {
-            "Char" => VariableType::Char,
-            "Bool" => VariableType::Bool,
-            "Int32" => VariableType::Int32,
+            "Char" => VariableType::Character,
+            "Bool" => VariableType::Boolean,
+            "Int32" => VariableType::Integer,
             "BitField" => VariableType::BitField,
-            "Float32" => VariableType::Float32,
-            "Float64" => VariableType::Float64,
+            "Float32" => VariableType::Float,
+            "Float64" => VariableType::Double,
             other => panic!("Unsupported manifest variable type: {}", other),
         }
     }

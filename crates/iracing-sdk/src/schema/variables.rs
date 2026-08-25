@@ -30,12 +30,12 @@
 //! # Type Mapping
 //!
 //! iRacing SDK types map to our `VariableType` enum:
-//! - `irsdk_char` (0) → `VariableType::Char`
-//! - `irsdk_bool` (1) → `VariableType::Bool`
-//! - `irsdk_int` (2) → `VariableType::Int32`
+//! - `irsdk_char` (0) → `VariableType::Character`
+//! - `irsdk_bool` (1) → `VariableType::Boolean`
+//! - `irsdk_int` (2) → `VariableType::Integer`
 //! - `irsdk_bitField` (3) → `VariableType::BitField`
-//! - `irsdk_float` (4) → `VariableType::Float32`
-//! - `irsdk_double` (5) → `VariableType::Float64`
+//! - `irsdk_float` (4) → `VariableType::Float`
+//! - `irsdk_double` (5) → `VariableType::Double`
 //!
 //! # Schema Building Process
 //!
@@ -61,20 +61,6 @@ use std::collections::HashMap;
 const IRSDK_MAX_STRING: usize = 32; // For name and unit fields
 const IRSDK_MAX_DESC: usize = 64; // For description field
 const VAR_HEADER_SIZE: usize = std::mem::size_of::<IRSDKVarHeader>();
-
-/// iRacing SDK variable type constants (for reference)
-///
-/// These constants map to the irsdk_VarType enum values used in IBT files
-/// and live telemetry. They document the numeric values found in the type
-/// field of IRSDKVarHeader structs.
-mod irsdk_var_type {
-    pub const IRSDK_CHAR: i32 = 0;
-    pub const IRSDK_BOOL: i32 = 1;
-    pub const IRSDK_INT: i32 = 2;
-    pub const IRSDK_BITFIELD: i32 = 3;
-    pub const IRSDK_FLOAT: i32 = 4;
-    pub const IRSDK_DOUBLE: i32 = 5;
-}
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
@@ -133,23 +119,23 @@ impl IRSDKVarHeader {
         String::from_utf8_lossy(&bytes[..end]).to_string()
     }
 
-    /// Map iRacing variable type to our VariableType enum
-    fn map_variable_type(irsdk_type: i32) -> VariableType {
-        match irsdk_type {
-            irsdk_var_type::IRSDK_CHAR => VariableType::Char,
-            irsdk_var_type::IRSDK_BOOL => VariableType::Bool,
-            irsdk_var_type::IRSDK_INT => VariableType::Int32,
-            irsdk_var_type::IRSDK_BITFIELD => VariableType::BitField,
-            irsdk_var_type::IRSDK_FLOAT => VariableType::Float32,
-            irsdk_var_type::IRSDK_DOUBLE => VariableType::Float64,
-            _ => {
-                tracing::warn!(
-                    irsdk_type,
-                    "Unknown iRacing variable type, defaulting to Int32"
-                );
-                VariableType::Int32 // Safe default for unknown types
-            }
+    /// Maps and validates an SDK variable type.
+    fn map_variable_type(irsdk_type: i32) -> Result<VariableType> {
+        let variable_type = VariableType::try_from(irsdk_type).map_err(|raw| {
+            IRacingSDKError::parse_error(
+                "Variable header validation",
+                format!("Unknown variable type value: {raw}"),
+            )
+        })?;
+
+        if !variable_type.is_storage_type() {
+            return Err(IRacingSDKError::parse_error(
+                "Variable header validation",
+                "ElementTypeCount cannot describe a telemetry variable",
+            ));
         }
+
+        Ok(variable_type)
     }
 }
 
@@ -170,12 +156,14 @@ impl IRSDKVarHeader {
     }
 
     /// Convert iRacing variable type to our VariableType
-    pub fn data_type(&self) -> VariableType {
+    pub fn data_type(&self) -> Result<VariableType> {
         Self::map_variable_type(self.var_type)
     }
 
     /// Validate header fields for reasonable values
     fn validate(&self) -> Result<()> {
+        self.data_type()?;
+
         // iRacing reserves count >= 0 and count_as_time <= 1
         if self.count < 0 {
             return Err(IRacingSDKError::Parse {
@@ -195,16 +183,16 @@ impl IRSDKVarHeader {
     }
 
     /// Convert to VariableInfo for schema building
-    pub fn to_variable_info(&self) -> VariableInfo {
-        VariableInfo {
+    pub fn to_variable_info(&self) -> Result<VariableInfo> {
+        Ok(VariableInfo {
             name: self.name(),
-            data_type: self.data_type(),
+            data_type: self.data_type()?,
             offset: self.offset as usize,
             count: self.count as usize,
             count_as_time: self.count_as_time(),
             units: self.unit(),
             description: self.description(),
-        }
+        })
     }
 
     /// Indicates whether the variable count should be treated as elapsed time
@@ -262,10 +250,10 @@ pub fn parse_variable_schema(
     for i in 0..num_vars {
         let header_offset = headers_start + (i as usize * VAR_HEADER_SIZE);
 
-        match IRSDKVarHeader::parse_from_memory(memory, header_offset) {
-            Ok(var_header) => {
-                let var_info = var_header.to_variable_info();
-
+        match IRSDKVarHeader::parse_from_memory(memory, header_offset)
+            .and_then(|var_header| var_header.to_variable_info())
+        {
+            Ok(var_info) => {
                 // Skip variables with empty names or invalid properties (common with padding/unused slots)
                 if var_info.name.is_empty() || var_info.count == 0 {
                     continue;
@@ -372,15 +360,32 @@ mod tests {
 
     #[test]
     fn variable_type_mapping_works() {
-        assert_eq!(IRSDKVarHeader::map_variable_type(0), VariableType::Char);
-        assert_eq!(IRSDKVarHeader::map_variable_type(1), VariableType::Bool);
-        assert_eq!(IRSDKVarHeader::map_variable_type(2), VariableType::Int32);
-        assert_eq!(IRSDKVarHeader::map_variable_type(3), VariableType::BitField);
-        assert_eq!(IRSDKVarHeader::map_variable_type(4), VariableType::Float32);
-        assert_eq!(IRSDKVarHeader::map_variable_type(5), VariableType::Float64);
-
-        // Unknown types default to Int32
-        assert_eq!(IRSDKVarHeader::map_variable_type(99), VariableType::Int32);
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(0).unwrap(),
+            VariableType::Character
+        );
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(1).unwrap(),
+            VariableType::Boolean
+        );
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(2).unwrap(),
+            VariableType::Integer
+        );
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(3).unwrap(),
+            VariableType::BitField
+        );
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(4).unwrap(),
+            VariableType::Float
+        );
+        assert_eq!(
+            IRSDKVarHeader::map_variable_type(5).unwrap(),
+            VariableType::Double
+        );
+        assert!(IRSDKVarHeader::map_variable_type(6).is_err());
+        assert!(IRSDKVarHeader::map_variable_type(99).is_err());
     }
 
     #[test]
@@ -468,7 +473,7 @@ mod tests {
             prop_assert!(parsed.is_ok());
 
             // Convert to VariableInfo and validate
-            let var_info = header.to_variable_info();
+            let var_info = header.to_variable_info().unwrap();
             prop_assert!(!var_info.name.is_empty());
             prop_assert!(var_info.count > 0);
         }
@@ -486,33 +491,23 @@ mod tests {
             };
 
             // Parsing corrupted headers should either fail validation or handle gracefully
-            let parsed = IRSDKVarHeader::parse_from_memory(header_bytes, 0);
-            if let Ok(parsed_header) = parsed {
-                // If parsing succeeded, conversion to VariableInfo should work
-                let var_info = parsed_header.to_variable_info();
-                // Unknown types should default to Int32
-                let is_known_type = matches!(header.var_type, 0..=5);
-                if !is_known_type {
-                    prop_assert_eq!(var_info.data_type, VariableType::Int32);
-                }
-            }
-            // Otherwise, validation should have caught the error
+            prop_assert!(IRSDKVarHeader::parse_from_memory(header_bytes, 0).is_err());
         }
 
         #[test]
         fn prop_all_irsdk_types_map_correctly(
             irsdk_type in 0..6i32
         ) {
-            let mapped_type = IRSDKVarHeader::map_variable_type(irsdk_type);
+            let mapped_type = IRSDKVarHeader::map_variable_type(irsdk_type).unwrap();
 
             // All valid iRacing types should map to known VariableType variants
             match irsdk_type {
-                0 => prop_assert_eq!(mapped_type, VariableType::Char),
-                1 => prop_assert_eq!(mapped_type, VariableType::Bool),
-                2 => prop_assert_eq!(mapped_type, VariableType::Int32),
+                0 => prop_assert_eq!(mapped_type, VariableType::Character),
+                1 => prop_assert_eq!(mapped_type, VariableType::Boolean),
+                2 => prop_assert_eq!(mapped_type, VariableType::Integer),
                 3 => prop_assert_eq!(mapped_type, VariableType::BitField),
-                4 => prop_assert_eq!(mapped_type, VariableType::Float32),
-                5 => prop_assert_eq!(mapped_type, VariableType::Float64),
+                4 => prop_assert_eq!(mapped_type, VariableType::Float),
+                5 => prop_assert_eq!(mapped_type, VariableType::Double),
                 _ => panic!("Invalid irsdk_type {} outside valid range 0-5", irsdk_type),
             }
         }

@@ -1,8 +1,13 @@
 //! Exact Rust representation of `irsdk_VarType`.
 
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
 /// Variable kinds advertised by an iRacing SDK variable header.
 #[repr(i32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 pub enum VariableType {
     /// `irsdk_char`.
     Character = 0,
@@ -20,6 +25,12 @@ pub enum VariableType {
     ElementTypeCount = 6,
 }
 
+impl fmt::Display for VariableType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
 impl VariableType {
     /// Exact contents of `irsdk_VarTypeBytes`.
     pub const BYTE_SIZES: [usize; Self::ElementTypeCount as usize] = [1, 1, 4, 4, 4, 8];
@@ -33,6 +44,11 @@ impl VariableType {
             Self::Double => Some(8),
             Self::ElementTypeCount => None,
         }
+    }
+
+    /// Returns whether this value can describe telemetry storage.
+    pub const fn is_storage_type(self) -> bool {
+        !matches!(self, Self::ElementTypeCount)
     }
 }
 
@@ -70,5 +86,6 @@ mod tests {
         assert_eq!(VariableType::BYTE_SIZES, [1, 1, 4, 4, 4, 8]);
         assert_eq!(VariableType::Double.byte_size(), Some(8));
         assert_eq!(VariableType::ElementTypeCount.byte_size(), None);
+        assert!(!VariableType::ElementTypeCount.is_storage_type());
     }
 }
