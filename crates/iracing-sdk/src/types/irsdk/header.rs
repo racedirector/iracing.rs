@@ -221,9 +221,9 @@ impl Header {
             )));
         }
 
-        if self.buffer_length <= 0 || self.buffer_length > Self::MAX_BUFFERS as i32 {
+        if self.buffer_length <= 0 || self.buffer_length > Self::MAX_LIVE_BUFFER_LENGTH as i32 {
             return Err(header_validation_error(format!(
-                "Expected buffer length in 1..={{Self::MaxBuffers}}, found {}",
+                "Expected buffer length in 1..={{Self::MAX_LIVE_BUFFER_LENGTH}}, found {}",
                 self.buffer_length
             )));
         }

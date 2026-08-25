@@ -5,6 +5,9 @@ use std::{fs::File, io::BufReader, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 use type_layout::TypeLayout;
 
+#[cfg(windows)]
+use std::time::Duration;
+
 /// iRacing header utilities.
 #[derive(Parser)]
 #[command(
@@ -67,7 +70,7 @@ fn main() -> Result<()> {
             timeout_ms,
             poll_s,
         } => {
-            print_live_header(wait, timeout_ms, poll_s)?;
+            print_live_header(wait, timeout_ms, Duration::from_secs(poll_s))?;
         }
         Commands::Type => print_type_layout()?,
     }
@@ -97,11 +100,9 @@ fn print_type_layout() -> Result<()> {
  * Attempts to acquire a windows connection, parse the header, and print it to stdout via tracing at level info.
  */
 #[cfg(windows)]
-fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result<()> {
+fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_interval: Duration) -> Result<()> {
     use iracing_sdk::WindowsConnection;
     use std::time::{Duration, Instant};
-
-    const POLL_INTERVAL: Duration = Duration::from_secs(poll_s);
 
     let connection = if wait {
         let deadline = timeout_ms.map(|ms| Instant::now() + Duration::from_millis(ms));
@@ -123,7 +124,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result
                 ));
             }
 
-            std::sleep(POLL_INTERVAL);
+            std::thread::sleep(poll_interval);
         }
     } else {
         WindowsConnection::try_connect().context("Could not connect to iRacing")?
