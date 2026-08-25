@@ -4,7 +4,7 @@ use type_layout::TypeLayout;
 use super::{
     IRSDK_MAX_BUFFERS, IRSDK_VERSION,
     error::{header_validation_error, mismatched_version_error},
-    status_is_connected,
+    flags::StatusField,
     variable_buffer::VariableBuffer,
     variable_header::VariableHeader,
 };
@@ -17,7 +17,7 @@ pub struct Header {
     /// API version
     pub version: i32,
     /// Status bitfield
-    pub status: i32,
+    pub status: StatusField,
     /// Ticks per second
     pub tick_rate: i32,
     /// Incremented when session info changes
@@ -70,7 +70,7 @@ impl Header {
     /// Constructs a header value, filling the ABI padding automatically.
     pub fn new(
         version: i32,
-        status: i32,
+        status: StatusField,
         tick_rate: i32,
         session_info_update: i32,
         session_info_len: i32,
@@ -109,7 +109,7 @@ impl Header {
     pub fn validate(&self) -> Result<()> {
         // Check that core fields are not equal to 0
         if self.version == 0
-            && self.status == 0
+            && self.status.bits() == 0
             && self.tick_rate == 0
             && self.variable_count == 0
             && self.buffer_length == 0
@@ -291,7 +291,7 @@ impl Header {
 
     /// Indicates whether the header is connected.
     pub fn is_connected(&self) -> bool {
-        status_is_connected(self.status)
+        self.status.contains(StatusField::CONNECTED)
     }
 
     /// Indicates whether the session info has changed compared to `last_update`.
@@ -305,13 +305,12 @@ unsafe impl WireType for Header {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::irsdk::IRSDK_STATUS_CONNECTED;
     use std::mem::{align_of, offset_of};
 
     fn valid_live_header() -> Header {
         Header::new(
             IRSDK_VERSION,
-            IRSDK_STATUS_CONNECTED,
+            StatusField::CONNECTED,
             60,
             0,
             1_000,

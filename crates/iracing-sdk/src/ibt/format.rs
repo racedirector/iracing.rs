@@ -132,7 +132,7 @@ mod tests {
     use crate::test_utils::{
         IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
     };
-    use crate::types::{IbtHeader, WireType};
+    use crate::types::{IbtHeader, WireType, irsdk::StatusField};
     use crate::{VariableHeader, VariableInfo, VariableType};
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
@@ -193,7 +193,7 @@ mod tests {
             let (IbtHeader { header, sub_header }, _) = parse_fixture(fixture)?;
 
             assert_eq!(header.version, 2);
-            assert_eq!(header.status, 1);
+            assert_eq!(header.status, StatusField::CONNECTED);
             assert_eq!(header.tick_rate, fixture.tick_rate);
             assert_eq!(header.variable_count, fixture.num_vars);
             assert_eq!(header.variable_header_offset, fixture.var_header_offset);

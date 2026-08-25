@@ -5,7 +5,7 @@ use type_layout::TypeLayout;
 
 use crate::{IRacingSDKError, Result, parse_utils::bytes_at};
 
-use super::{DiskSubHeader, Header, VariableBuffer, WireType};
+use super::{DiskSubHeader, Header, VariableBuffer, WireType, irsdk::StatusField};
 
 /// The header and sub header in an IBT file.
 #[derive(Debug, Clone, Copy, TypeLayout)]
@@ -69,7 +69,7 @@ impl IbtHeader {
         self.header.version
     }
 
-    pub fn status(&self) -> i32 {
+    pub fn status(&self) -> StatusField {
         self.header.status
     }
 

@@ -466,7 +466,7 @@ unsafe impl Sync for Connection {}
 
 #[cfg(all(test, windows))]
 mod tests {
-    use crate::{IRSDK_STATUS_CONNECTED, IRSDK_VERSION, VariableBuffer, VariableSchema};
+    use crate::{IRSDK_VERSION, VariableBuffer, VariableSchema, types::irsdk::StatusField};
 
     use super::*;
     use std::mem::ManuallyDrop;
@@ -484,7 +484,7 @@ mod tests {
     fn test_header(buffer_count: i32) -> Header {
         Header::new(
             IRSDK_VERSION,
-            IRSDK_STATUS_CONNECTED,
+            StatusField::CONNECTED,
             60,
             0,
             0,

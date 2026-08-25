@@ -52,7 +52,7 @@ mod dynamic_frame;
 mod frame;
 mod ibt_header;
 mod incident;
-mod irsdk;
+pub mod irsdk;
 mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
@@ -74,7 +74,11 @@ pub use frame::FramePacket;
 pub use ibt_header::IbtHeader;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
-pub use irsdk::*;
+pub(crate) use irsdk::VariableHeadersBuffer;
+pub use irsdk::{
+    DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
+    VariableBuffer, VariableHeader, WireType, status_is_connected,
+};
 pub use irsdk_bitflags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
 };
