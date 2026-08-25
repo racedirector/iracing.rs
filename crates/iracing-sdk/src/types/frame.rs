@@ -2,10 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{
-    SchemaProvider, TelemetryValue, VariableInfo, VariableSchema,
-    types::variable_type::TelemetryValueProvider,
-};
+use crate::{SchemaProvider, TelemetryValue, TelemetryValueProvider, VariableInfo, VariableSchema};
 
 /// Raw telemetry frame packet for the stream-based architecture
 ///
@@ -45,10 +42,7 @@ impl FramePacket {
 
 impl FramePacket {
     /// Retrieves the variable from the frame by name.
-    pub fn value(
-        &self,
-        name: &str,
-    ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
+    pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
         let Some(info) = self.variable(name) else {
             return Ok(None);
         };

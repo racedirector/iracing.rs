@@ -6,9 +6,9 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo, VariableSchema,
+    FramePacket, Result, SchemaProvider, TelemetryValue, TelemetryValueProvider, VarData,
+    VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
-    types::variable_type::TelemetryValueProvider,
 };
 use std::sync::Arc;
 

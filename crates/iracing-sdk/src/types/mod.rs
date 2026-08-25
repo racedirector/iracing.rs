@@ -57,6 +57,7 @@ mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
 mod schema;
+mod telemetry_value;
 mod update_rate;
 mod var_data;
 mod variable_type;
@@ -89,9 +90,10 @@ pub use irsdk_enums::{
     TrackWetness, VideoCaptureMode,
 };
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema, VariablesHashMap};
+pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_type::{TelemetryValue, TelemetryValueProvider, VariableType};
+pub use variable_type::VariableType;
 
 #[cfg(test)]
 mod tests {
