@@ -5,12 +5,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[cfg(windows)]
+use crate::WindowsConnection;
 use crate::{
     IRacingSDKError, Result, parse_utils,
     types::{VariableInfoBuffer, WireType},
 };
-#[cfg(windows)]
-use crate::{Result, WindowsConnection};
 
 use super::{VariableType, irsdk::VariableHeader};
 
@@ -102,7 +102,7 @@ pub struct VariableSchema {
 
 impl VariableSchema {
     /// Create a new VariableSchema with validation.
-    pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> crate::Result<Self> {
+    pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> Result<Self> {
         let schema = Self {
             variables,
             frame_size,
@@ -112,7 +112,7 @@ impl VariableSchema {
     }
 
     /// Validate the schema for consistency.
-    pub fn validate(&self) -> crate::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         for (name, var_info) in &self.variables {
             // Validate variable count
             if var_info.count == 0 {

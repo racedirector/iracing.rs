@@ -19,22 +19,24 @@ pub use variable_buffer::VariableBuffer;
 pub use variable_header::VariableHeader;
 pub use wire_type::WireType;
 
+use crate::{IRacingSDKError, Result, yaml_utils};
+
 /// Owned snapshot of the live session YAML region.
 #[derive(Debug, Clone)]
 pub struct SessionInfoBuffer(Vec<u8>);
 
 impl TryFrom<SessionInfoBuffer> for String {
-    type Error = crate::IRacingSDKError;
+    type Error = IRacingSDKError;
 
-    fn try_from(buffer: SessionInfoBuffer) -> crate::Result<Self> {
+    fn try_from(buffer: SessionInfoBuffer) -> Result<Self> {
         let length = i32::try_from(buffer.0.len()).map_err(|_| {
-            crate::IRacingSDKError::parse_error(
+            IRacingSDKError::parse_error(
                 "SessionInfoBuffer",
                 "Session YAML length cannot be represented by the SDK header",
             )
         })?;
 
-        crate::yaml_utils::extract_yaml_from_memory(&buffer.0, 0, length)
+        yaml_utils::extract_yaml_from_memory(&buffer.0, 0, length)
     }
 }
 

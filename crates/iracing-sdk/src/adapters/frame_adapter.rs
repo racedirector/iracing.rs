@@ -1,6 +1,6 @@
 //! Frame adapter trait for type-safe telemetry extraction
 
-use crate::VariableSchema;
+use crate::{Result, VariableSchema};
 
 use super::AdapterValidation;
 
@@ -20,7 +20,7 @@ pub trait FrameAdapter: Sized {
     /// # Performance
     /// This method is called once per connection, not per frame.
     /// Expensive operations like HashMap lookups and string matching are acceptable here.
-    fn validate_schema(schema: &VariableSchema) -> crate::Result<AdapterValidation>;
+    fn validate_schema(schema: &VariableSchema) -> Result<AdapterValidation>;
 
     /// Extract data from frame packet using pre-validated extraction plan.
     ///

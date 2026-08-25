@@ -1,36 +1,36 @@
 //! Variable data parsing trait and implementations
 
-use crate::parse_utils::decode_variable_type;
+use crate::{IRacingSDKError, Result, parse_utils::decode_variable_type};
 
 use super::{BitField, VariableInfo, VariableType};
 
 /// Trait for types that can be parsed from binary telemetry data.
 pub trait VarData: Sized {
     /// Parse this type from binary data at the given offset.
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self>;
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self>;
 }
 
 // Implement VarData for basic types
 impl VarData for f32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Float32, f32::from_le_bytes)
     }
 }
 
 impl VarData for i32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Int32, i32::from_le_bytes)
     }
 }
 
 impl VarData for bool {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Bool, |[byte]| byte != 0)
     }
 }
 
 impl VarData for BitField {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, BitField, |bytes| {
             BitField(u32::from_le_bytes(bytes))
         })
@@ -39,9 +39,9 @@ impl VarData for BitField {
 
 // Additional VarData implementations for all iRacing SDK types
 impl VarData for u8 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         if !matches!(info.data_type, VariableType::UInt8 | VariableType::Char) {
-            return Err(crate::IRacingSDKError::type_conversion(
+            return Err(IRacingSDKError::type_conversion(
                 "UInt8 or Char",
                 info.data_type,
             ));
@@ -49,43 +49,43 @@ impl VarData for u8 {
 
         data.get(info.offset)
             .copied()
-            .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))
+            .ok_or(IRacingSDKError::memory_access_error(info.offset))
     }
 }
 
 impl VarData for i8 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Int8, i8::from_le_bytes)
     }
 }
 
 impl VarData for u16 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, UInt16, u16::from_le_bytes)
     }
 }
 
 impl VarData for i16 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Int16, i16::from_le_bytes)
     }
 }
 
 impl VarData for u32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, UInt32, u32::from_le_bytes)
     }
 }
 
 impl VarData for f64 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Float64, f64::from_le_bytes)
     }
 }
 
 // Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         if info.count == 0 {
             return Ok(Vec::new());
         }
@@ -104,13 +104,13 @@ impl<T: VarData> VarData for Vec<T> {
             // Check the offset of the item
             let offset_delta = i
                 .checked_mul(element_size)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+                .ok_or(IRacingSDKError::memory_access_error(info.offset))?;
 
             // Set the offset
             var_info.offset = info
                 .offset
                 .checked_add(offset_delta)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+                .ok_or(IRacingSDKError::memory_access_error(info.offset))?;
 
             // Parse the variable and store it in the result.
             result.push(T::from_bytes(data, &var_info)?);
