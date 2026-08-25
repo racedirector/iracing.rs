@@ -7,6 +7,7 @@ pub const IRSDK_VERSION: i32 = 2;
 /// Status flag indicating that the simulator is actively publishing telemetry
 pub const IRSDK_STATUS_CONNECTED: i32 = 0x1;
 
+// Module API
 mod disk_sub_header;
 mod error;
 mod header;
@@ -14,11 +15,15 @@ mod variable_buffer;
 mod variable_header;
 mod wire_type;
 
+// Public API
 pub use disk_sub_header::DiskSubHeader;
 pub use header::Header;
 pub use variable_buffer::VariableBuffer;
 pub use variable_header::VariableHeader;
 pub use wire_type::WireType;
+
+// Crate-public API
+pub(crate) use variable_header::VariableHeadersBuffer;
 
 use crate::{IRacingSDKError, Result, yaml_utils};
 
@@ -49,13 +54,6 @@ impl From<FrameBuffer> for Vec<u8> {
     fn from(buffer: FrameBuffer) -> Self {
         buffer.0
     }
-}
-
-/// Owned snapshot of the live variable header region.
-#[derive(Debug, Clone)]
-pub struct VariableInfoBuffer {
-    pub bytes: Vec<u8>,
-    pub count: usize,
 }
 
 /// Returns whether the connected status bit is set.

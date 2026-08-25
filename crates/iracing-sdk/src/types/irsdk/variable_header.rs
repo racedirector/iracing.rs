@@ -1,11 +1,34 @@
 use type_layout::TypeLayout;
 
-use crate::{IRacingSDKError, Result};
+use crate::Result;
 
 use super::{
-    IRSDK_MAX_DESC, IRSDK_MAX_STRING, VariableInfoBuffer, error::variable_header_validation_error,
-    wire_type::WireType,
+    IRSDK_MAX_DESC, IRSDK_MAX_STRING, error::variable_header_validation_error, wire_type::WireType,
 };
+
+/// Exact, owned snapshot of a variable-header region advertised by an SDK header.
+///
+/// Construction is restricted to crate-internal source adapters after they have
+/// checked the advertised region and copied or read it in full. Semantic
+/// validation of individual headers belongs to later wire-to-domain conversion.
+#[derive(Debug, Clone)]
+pub(crate) struct VariableHeadersBuffer {
+    bytes: Vec<u8>,
+}
+
+impl VariableHeadersBuffer {
+    /// Records bytes that a source adapter read in full from a checked region.
+    pub(crate) fn from_snapshot(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+
+    /// Iterates over the wire headers represented by this exact snapshot.
+    pub(crate) fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
+        self.bytes
+            .chunks_exact(VariableHeader::WIRE_SIZE)
+            .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })
+    }
+}
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
@@ -32,6 +55,7 @@ pub struct VariableHeader {
 impl VariableHeader {
     /// Validates the semantic fields of a decoded variable header.
     pub fn validate(&self) -> Result<()> {
+        // Skip empty or invalid variables
         if self.name.is_empty() {
             return Err(variable_header_validation_error("Name cannot be empty"));
         }
@@ -54,17 +78,9 @@ impl VariableHeader {
 
 unsafe impl WireType for VariableHeader {}
 
-impl TryFrom<VariableInfoBuffer> for Vec<VariableHeader> {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: VariableInfoBuffer) -> Result<Self, Self::Error> {
-        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::WIRE_SIZE);
-
-        buffer
-            .bytes
-            .chunks_exact(VariableHeader::WIRE_SIZE)
-            .map(VariableHeader::read_from_bytes)
-            .collect()
+impl From<VariableHeadersBuffer> for Vec<VariableHeader> {
+    fn from(buffer: VariableHeadersBuffer) -> Self {
+        buffer.iter_headers().collect()
     }
 }
 

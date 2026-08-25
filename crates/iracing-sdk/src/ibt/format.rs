@@ -20,19 +20,15 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::parse_utils::{bytes_at, bytes_at_size, c_string_to_string};
 use crate::{
-    IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType,
+    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, VariablesHashMap,
     types::{DiskSubHeader, Header},
 };
-use std::collections::HashMap;
-use std::io::{Read, Seek};
+use crate::{VariableHeader, WireType};
+use std::io::{Read, Seek, SeekFrom};
 
 /// Size in bytes of a single variable header entry (`irsdk_varHeader`).
 pub const IRSDK_VAR_HEADER_SIZE: usize = 144;
-const IRSDK_VAR_NAME_SIZE: usize = 32;
-const IRSDK_VAR_DESC_SIZE: usize = 64;
-const IRSDK_VAR_UNIT_SIZE: usize = 32;
 
 /// Extract variable schema from IBT file headers
 pub fn extract_variable_schema<R: Read + Seek>(
@@ -43,104 +39,66 @@ pub fn extract_variable_schema<R: Read + Seek>(
         "Extracting variable schema for {} variables",
         header.variable_count
     );
+
     // Handle IBT files with no telemetry data frames (bufLen = 0)
     if header.buffer_length == 0 || header.variable_count <= 0 {
         // File contains only session info, no telemetry data
-        return VariableSchema::new(HashMap::new(), 0);
+        return Ok(VariableSchema::default());
     }
 
-    // Seek to the variable headers section and parse all variables
-    reader
-        .seek(std::io::SeekFrom::Start(
-            header.variable_header_offset as u64,
-        ))
-        .map_err(|e| IRacingSDKError::Parse {
-            context: "Variable headers seek".to_string(),
-            details: format!(
-                "Failed to seek to variable headers at offset {}: {}",
-                header.variable_header_offset, e
+    let offset = u64::try_from(header.variable_header_offset).map_err(|_| {
+        IRacingSDKError::parse_error(
+            "Schema parse",
+            format!(
+                "Variable header offset {} cannot be converted to u64",
+                header.variable_header_offset
             ),
-        })?;
+        )
+    })?;
+    let count = usize::try_from(header.variable_count).map_err(|_| IRacingSDKError::Parse {
+        context: "Variable count conversion".to_string(),
+        details: format!(
+            "Number of variables {} cannot be converted to usize",
+            header.variable_count
+        ),
+    })?;
 
-    // Convert num_vars to usize upfront to avoid i32-typed ranges
-    let num_vars_usize =
-        usize::try_from(header.variable_count).map_err(|_| IRacingSDKError::Parse {
-            context: "Variable count conversion".to_string(),
-            details: format!(
-                "Number of variables {} cannot be converted to usize",
-                header.variable_count
+    let length =
+        count
+            .checked_mul(VariableHeader::WIRE_SIZE)
+            .ok_or(IRacingSDKError::parse_error(
+                "Schema parse",
+                "Invalid length for variables buffer",
+            ))?;
+
+    reader.seek(SeekFrom::Start(offset)).map_err(|error| {
+        IRacingSDKError::parse_error(
+            "Schema parse",
+            format!("Could not seek to variable headers at {offset}: {error}"),
+        )
+    })?;
+
+    let mut bytes = vec![0u8; length];
+    reader.read_exact(&mut bytes).map_err(|error| {
+        IRacingSDKError::parse_error(
+            "Schema parse",
+            format!("Could not read variable-header snapshot: {error}"),
+        )
+    })?;
+
+    let variable_headers = VariableHeadersBuffer::from_snapshot(bytes);
+    let variables: VariablesHashMap = variable_headers.try_into()?;
+    let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
+        IRacingSDKError::parse_error(
+            "Schema parse",
+            format!(
+                "Frame size {} cannot be converted to usize",
+                header.buffer_length
             ),
-        })?;
+        )
+    })?;
 
-    // Pre-allocate HashMap to minimize reallocation
-    let mut variables = HashMap::with_capacity(num_vars_usize);
-
-    // Parse each variable header
-    for i in 0..num_vars_usize {
-        let mut var_header_bytes = [0u8; IRSDK_VAR_HEADER_SIZE];
-        reader
-            .read_exact(&mut var_header_bytes)
-            .map_err(|e| IRacingSDKError::Parse {
-                context: format!("Variable header {} reading", i),
-                details: format!("Failed to read variable header {}: {}", i, e),
-            })?;
-
-        // Parse variable header fields
-        let var_type = i32::from_le_bytes(*bytes_at(&var_header_bytes, 0)?);
-        let offset = i32::from_le_bytes(*bytes_at(&var_header_bytes, 4)?);
-        let count = i32::from_le_bytes(*bytes_at(&var_header_bytes, 8)?);
-
-        // Extract null-terminated strings using constants for offsets
-        let name = c_string_to_string(bytes_at_size(&var_header_bytes, 16, IRSDK_VAR_NAME_SIZE)?);
-        let desc = c_string_to_string(bytes_at_size(&var_header_bytes, 48, IRSDK_VAR_DESC_SIZE)?);
-        let unit = c_string_to_string(bytes_at_size(&var_header_bytes, 112, IRSDK_VAR_UNIT_SIZE)?);
-
-        let count_as_time = var_header_bytes[12] != 0;
-
-        // Skip empty or invalid variables
-        if name.is_empty() || offset < 0 || count <= 0 {
-            continue;
-        }
-
-        // Convert iRacing var type to our VariableType
-        let data_type = match var_type {
-            0 => VariableType::Char,     // char
-            1 => VariableType::Bool,     // bool
-            2 => VariableType::Int32,    // int
-            3 => VariableType::BitField, // bitField (treat as int32)
-            4 => VariableType::Float32,  // float
-            5 => VariableType::Float64,  // double
-            _ => {
-                // Log unknown types for diagnostics
-                tracing::debug!(
-                    "Skipping variable '{}' with unknown type {}",
-                    name,
-                    var_type
-                );
-                continue;
-            }
-        };
-
-        variables.insert(
-            name.clone(),
-            VariableInfo {
-                name,
-                data_type,
-                offset: offset as usize,
-                count: count as usize,
-                count_as_time,
-                units: unit,
-                description: desc,
-            },
-        );
-    }
-
-    tracing::debug!(
-        "Extracted {} variables with frame size {}",
-        variables.len(),
-        header.buffer_length
-    );
-    VariableSchema::new(variables, header.buffer_length as usize)
+    VariableSchema::new(variables, frame_size)
 }
 
 /// Verify that the IBT file length is at least large enough to contain headers and all records
@@ -171,11 +129,11 @@ pub fn verify_min_length(file_len: u64, header: &Header, disk: &DiskSubHeader) -
 mod tests {
     use super::*;
 
-    use crate::VariableHeader;
     use crate::test_utils::{
         IbtFixture, IbtVariableManifest, load_fixture_manifest, require_smallest_ibt_fixture,
     };
     use crate::types::{IbtHeader, WireType};
+    use crate::{VariableHeader, VariableInfo, VariableType};
     use anyhow::{Context, Result, ensure};
     use std::fs::File;
     use std::path::Path;

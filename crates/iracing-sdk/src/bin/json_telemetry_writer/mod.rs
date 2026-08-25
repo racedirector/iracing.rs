@@ -335,7 +335,7 @@ mod tests {
         let value = variable("Value");
         let variables = vec![value.clone()];
         let schema = VariableSchema {
-            variables: HashMap::from([(value.name.clone(), value)]),
+            variables: HashMap::from([(value.name.clone(), value)]).into(),
             frame_size: 4,
         };
         let packet = FramePacket::new(42i32.to_le_bytes().to_vec(), 1, 0, Arc::new(schema));

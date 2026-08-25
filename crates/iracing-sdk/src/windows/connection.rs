@@ -4,8 +4,11 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::{
-    FrameBuffer, Header, IRacingSDKError, Result, SessionInfoBuffer, VariableBuffer,
-    VariableHeader, VariableInfoBuffer, WireType, status_is_connected,
+    IRacingSDKError, Result, status_is_connected,
+    types::{
+        FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
+        VariableHeadersBuffer, WireType,
+    },
 };
 use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
@@ -24,12 +27,6 @@ use windows::core::PCWSTR;
 const IRSDK_MEMMAPFILENAME: &str = "Local\\IRSDKMemMapFileName";
 /// iRacing data valid event name
 const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
-/// Expected SDK version
-#[cfg(test)]
-const IRSDK_VER: i32 = 2;
-/// Connection status flag used by Windows-only tests.
-#[cfg(test)]
-const IRSDK_ST_CONNECTED: i32 = 1;
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -401,7 +398,7 @@ impl Connection {
     }
 
     /// Reads an available variables snapshot out of the pointer
-    pub fn variable_info_buffer(&self) -> Option<VariableInfoBuffer> {
+    pub(crate) fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header_snapshot();
 
         let offset = usize::try_from(header.variable_header_offset).ok()?;
@@ -413,10 +410,9 @@ impl Connection {
 
         let length = count.checked_mul(VariableHeader::WIRE_SIZE)?;
 
-        Some(VariableInfoBuffer {
-            bytes: self.snapshot_region(offset, length)?,
-            count,
-        })
+        Some(VariableHeadersBuffer::from_snapshot(
+            self.snapshot_region(offset, length)?,
+        ))
     }
 
     /// The latest buffer's tick count
@@ -431,7 +427,7 @@ impl Connection {
         unsafe { self.read_header_at::<u8>(std::mem::offset_of!(Header, current_buffer)) }
     }
 
-    /// Returns the number of telemetry buffers advertised by the live header.
+    /// The current buffer count.
     pub fn buffer_count(&self) -> usize {
         unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, buffer_count)) }
             .try_into()
@@ -470,7 +466,7 @@ unsafe impl Sync for Connection {}
 
 #[cfg(all(test, windows))]
 mod tests {
-    use crate::{VariableBuffer, VariableInfo};
+    use crate::{IRSDK_STATUS_CONNECTED, IRSDK_VERSION, VariableBuffer, VariableSchema};
 
     use super::*;
     use std::mem::ManuallyDrop;
@@ -487,8 +483,8 @@ mod tests {
 
     fn test_header(buffer_count: i32) -> Header {
         Header::new(
-            IRSDK_VER,
-            IRSDK_ST_CONNECTED,
+            IRSDK_VERSION,
+            IRSDK_STATUS_CONNECTED,
             60,
             0,
             0,
@@ -509,22 +505,19 @@ mod tests {
     }
 
     #[test]
-    fn constants_match_iracing_sdk() {
-        assert_eq!(IRSDK_MEMMAPFILENAME, "Local\\IRSDKMemMapFileName");
-        assert_eq!(IRSDK_DATAVALIDEVENTNAME, "Local\\IRSDKDataValidEvent");
-        assert_eq!(IRSDK_VER, 2);
-        assert_eq!(IRSDK_ST_CONNECTED, 1);
-    }
-
-    #[test]
     #[ignore = "iracing_required"]
     fn test_read_rpm_variable() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
         let buffer = connection
-            .variable_info_buffer()
+            .variable_headers_buffer()
             .expect("Could not get VariableInfo from connection");
 
-        let variables: Vec<VariableInfo> = buffer.try_into().expect("Could not get VariableInfo");
+        let headers: Vec<VariableHeader> = buffer.into();
+        assert!(!headers.is_empty(), "Buffer should have some variables");
+
+        let variables = VariableSchema::from_connection(&connection)
+            .expect("Could not get variable schema")
+            .variables();
 
         // Look for exact "RPM" match to verify variable schema
         let exact_rpm = variables.iter().find(|v| v.name == "RPM");
@@ -550,7 +543,7 @@ mod tests {
         );
         assert!(header.tick_rate > 0, "Tick rate should be positive");
 
-        assert_eq!(header.version, IRSDK_VER);
+        assert_eq!(header.version, IRSDK_VERSION);
         assert!(header.variable_count > 0);
         assert!(header.buffer_count >= 3);
         assert!(header.buffer_count > 0);

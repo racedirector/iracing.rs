@@ -218,7 +218,7 @@ mod tests {
     use futures::{StreamExt, future::join_all};
 
     use super::*;
-    use crate::DynamicFrame;
+    use crate::{DynamicFrame, VariablesHashMap};
 
     struct ControlledProvider {
         credits: mpsc::UnboundedReceiver<()>,
@@ -261,8 +261,10 @@ mod tests {
     ) {
         let (credits, receiver) = mpsc::unbounded_channel();
         let reads = Arc::new(AtomicUsize::new(0));
-        let schema =
-            Arc::new(VariableSchema::new(HashMap::new(), 0).expect("empty schema should validate"));
+        let schema = Arc::new(
+            VariableSchema::new(VariablesHashMap::default(), 0)
+                .expect("empty schema should validate"),
+        );
         (
             ControlledProvider {
                 credits: receiver,
