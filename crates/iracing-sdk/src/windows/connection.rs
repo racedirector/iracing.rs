@@ -3,30 +3,31 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
+use super::utils::wide_string;
 use crate::{
-    IRacingSDKError, Result, status_is_connected,
+    IRacingSDKError, Result, parse_utils, status_is_connected,
     types::{
         FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
         VariableHeadersBuffer, WireType,
+        irsdk::constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
 };
 use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
 use std::time::Duration;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
-use windows::Win32::System::Memory::{
-    FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
-    OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
+use windows::{
+    Win32::{
+        Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT},
+        System::{
+            Memory::{
+                FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
+                OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
+            },
+            Threading::{OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject},
+        },
+    },
+    core::PCWSTR,
 };
-use windows::Win32::System::Threading::{
-    OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject,
-};
-use windows::core::PCWSTR;
-
-/// iRacing shared memory file name
-const IRSDK_MEMMAPFILENAME: &str = "Local\\IRSDKMemMapFileName";
-/// iRacing data valid event name
-const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +79,7 @@ impl Connection {
 
         // Open the memory mapping
         let mapping = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_MEMMAPFILENAME);
+            let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
             OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
                 .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
         };
@@ -94,7 +95,7 @@ impl Connection {
 
         // Open the data valid event
         let event = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_DATAVALIDEVENTNAME);
+            let wide_name = wide_string(IRSDK_DATAVALIDEVENTNAME);
             OpenEventW(
                 SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000),
                 false,
@@ -207,7 +208,7 @@ impl Connection {
                 frame.len()
             );
 
-            return Some(FrameBuffer(frame));
+            return Some(FrameBuffer::from_snapshot(frame));
         }
 
         tracing::warn!("Failed consistency checks, no data returned");
@@ -394,7 +395,10 @@ impl Connection {
             return None;
         }
 
-        Some(SessionInfoBuffer(self.snapshot_region(offset, length)?))
+        self.snapshot_region(offset, length).map(|region| {
+            let buffer = parse_utils::nul_terminated_bytes(&region);
+            SessionInfoBuffer::from_snapshot(buffer.to_vec())
+        })
     }
 
     /// Reads an available variables snapshot out of the pointer
@@ -471,6 +475,7 @@ mod tests {
     use super::*;
     use std::mem::ManuallyDrop;
 
+    #[allow(dead_code)]
     fn test_connection() -> ManuallyDrop<Connection> {
         ManuallyDrop::new(Connection {
             mapping: HANDLE::default(),
@@ -481,6 +486,7 @@ mod tests {
         })
     }
 
+    #[allow(dead_code)]
     fn test_header(buffer_count: i32) -> Header {
         Header::new(
             IRSDK_VERSION,

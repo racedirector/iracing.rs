@@ -10,9 +10,10 @@ generation paths.
 
 ## Variable schema
 
-Disk variable headers are parsed from `.ibt` files. Live variable headers are
-discovered from Windows shared memory. Both become `VariableSchema` containing
-named `VariableInfo` entries and a frame size.
+Disk variable headers are copied as `VariableHeadersBuffer` snapshots by the
+IBT reader, then interpreted by `IbtProvider`. Live variable headers are copied
+from Windows shared memory. Both become `VariableSchema` containing named
+`VariableInfo` entries and a frame size outside the byte-acquisition layer.
 
 Consumers should resolve fields through the schema and decode through `VarData`
 or `TelemetryValue`. This keeps type sizes, arrays, bitfields, bounds, and

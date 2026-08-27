@@ -22,10 +22,12 @@ same.
 
 ## Wire and schema layer
 
-`IbtReader` parses the fixed header, disk sub-header, variable headers, session
-YAML region, and fixed-size frame records from `.ibt` data. Live
+`reader::ibt::IbtRecording` parses and validates the fixed header, disk
+sub-header, metadata regions, and fixed-size frame layout from immutable `.ibt`
+data. It supports indexed frame snapshots without mutable position.
+`reader::ibt::IbtReader` adds a cursor over that recording. Live
 `WindowsConnection` interprets the related shared-memory header and rotating
-buffers.
+buffers through the same positioned-access and header-region representations.
 
 `VariableSchema` maps names to `VariableInfo` and records the frame size. A
 `VariableInfo` carries type, byte offset, element count, time-count marker,
@@ -57,8 +59,10 @@ bytes and schema for exploratory name-based lookup. Hot paths should implement
 - return session YAML when available;
 - report the source tick rate.
 
-`IbtProvider` wraps `IbtReader`, preserves its cursor, and exposes seek/time
-metadata. Its reads complete as fast as the file can be decoded.
+`IbtProvider` wraps `IbtReader`, converts owned variable-header snapshots into
+`VariableSchema`, cleans the owned session YAML snapshot, and assigns replay
+ticks when it builds `FramePacket` values. It preserves the reader cursor and
+exposes seek/time metadata; reads complete as fast as the file can be copied.
 
 `LiveProvider` is Windows-only. It builds a schema from shared-memory metadata,
 waits cooperatively for updates, returns the newest owned frame snapshot, and

@@ -9,8 +9,8 @@
 //! - Converting `.ibt` session info into a standalone YAML file for sharing
 //!
 //! # Behavior
-//! - Opens the `.ibt` file using [`iracing_sdk::ibt::IbtReader`]
-//! - Extracts session YAML via `reader.session_yaml()?`
+//! - Opens the `.ibt` file using [`iracing_sdk::reader::ibt::IbtReader`]
+//! - Extracts the session-information snapshot from the reader
 //! - If session YAML is present, writes it to `--output-path`
 //! - If session YAML is **absent**, the tool exits successfully without writing a file
 //!
@@ -60,7 +60,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use iracing_sdk::ibt::IbtReader;
+use iracing_sdk::{reader::ibt::IbtReader, yaml_utils};
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -105,10 +105,11 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     tracing::info!("Parsing session information");
 
-    let session_info_string = match reader.session_yaml() {
-        Ok(Some(session)) => session,
-        _ => return Err(anyhow::anyhow!("Could not parse session yaml.")),
-    };
+    let session_buffer = reader
+        .session_info_buffer()?
+        .ok_or_else(|| anyhow::anyhow!("IBT file does not contain session YAML"))?;
+    let raw_session_yaml: String = session_buffer.try_into()?;
+    let session_info_string = yaml_utils::preprocess_iracing_yaml(&raw_session_yaml)?;
 
     // If we have an output path, write the result to the file, otherwise log
     if let Some(output_path) = output_path {

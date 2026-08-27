@@ -10,11 +10,14 @@
 //! # API map
 //!
 //! - Replay/offline path (cross-platform):
-//!   - [`ibt::IbtReader`]
+//!   - [`reader::ibt::IbtReader`]
 //!   - [`types::VariableSchema`], [`types::VarData`]
 //! - Streaming adapter path:
 //!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
+//! - Source acquisition primitives:
+//!   - [`reader`] for checked random access, header-directed snapshots, and
+//!     borrowed mapped-memory access
 //! - Session data path:
 //!   - [`schema::SessionInfo`], [`schema::SessionInfoParser`]
 //!   - [`yaml_utils`] for iRacing YAML cleanup
@@ -26,20 +29,30 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+//! use iracing_sdk::{VarData, VariableSchema, reader::ibt::IbtReader};
 //!
 //! fn main() -> iracing_sdk::Result<()> {
 //!     let mut reader = IbtReader::open("telemetry.ibt")?;
-//!     let speed_info = reader
-//!         .schema()
+//!     let variable_headers = reader
+//!         .variable_headers_buffer()?
+//!         .ok_or_else(|| iracing_sdk::IRacingSDKError::parse_error(
+//!             "schema lookup",
+//!             "recording does not contain variable headers",
+//!         ))?;
+//!     let schema = VariableSchema::from_variable_headers(
+//!         variable_headers,
+//!         reader.recording().frame_length(),
+//!     )?;
+//!     let speed_info = schema
 //!         .get_variable("Speed")
-//!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-//!             context: "schema lookup".to_string(),
-//!             details: "missing Speed variable".to_string(),
-//!         })?
+//!         .ok_or_else(|| iracing_sdk::IRacingSDKError::parse_error(
+//!             "schema lookup",
+//!             "missing Speed variable",
+//!         ))?
 //!         .clone();
 //!
-//!     while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
+//!     while let Some(frame) = reader.read_next_frame()? {
+//!         let frame: Vec<u8> = frame.into_buffer().into();
 //!         let speed_mps = f32::from_bytes(&frame, &speed_info)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
@@ -60,6 +73,7 @@
 pub mod adapters;
 mod error;
 mod parse_utils;
+pub mod reader;
 pub mod test_utils;
 pub mod types;
 pub mod yaml_utils;
@@ -75,8 +89,7 @@ pub mod telemetry;
 #[doc(hidden)]
 pub mod benchmarking;
 
-// Data source modules
-pub mod ibt;
+// Data model modules
 pub mod schema;
 
 // Core exports

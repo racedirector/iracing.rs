@@ -13,7 +13,7 @@ use super::{
 /// checked the advertised region and copied or read it in full. Semantic
 /// validation of individual headers belongs to later wire-to-domain conversion.
 #[derive(Debug, Clone)]
-pub(crate) struct VariableHeadersBuffer {
+pub struct VariableHeadersBuffer {
     bytes: Vec<u8>,
 }
 
@@ -24,7 +24,7 @@ impl VariableHeadersBuffer {
     }
 
     /// Iterates over the wire headers represented by this exact snapshot.
-    pub(crate) fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
+    pub fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
         self.bytes
             .chunks_exact(VariableHeader::WIRE_SIZE)
             .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })

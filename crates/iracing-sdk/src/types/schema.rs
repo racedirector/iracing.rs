@@ -10,7 +10,9 @@ use std::{
 
 #[cfg(windows)]
 use crate::WindowsConnection;
-use crate::{IRacingSDKError, Result, parse_utils, types::VariableHeadersBuffer};
+use crate::{
+    IRacingSDKError, Result, parse_utils, reader::ibt::IbtReader, types::VariableHeadersBuffer,
+};
 
 use super::{VariableType, irsdk::VariableHeader};
 
@@ -76,7 +78,7 @@ impl TryFrom<VariableHeader> for VariableInfo {
 }
 
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Owned variable metadata keyed by its wire-format name.
 pub struct VariablesHashMap(HashMap<String, VariableInfo>);
 
@@ -91,12 +93,6 @@ impl Deref for VariablesHashMap {
 impl DerefMut for VariablesHashMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl Default for VariablesHashMap {
-    fn default() -> Self {
-        VariablesHashMap(HashMap::new())
     }
 }
 
@@ -126,7 +122,7 @@ impl TryFrom<VariableHeadersBuffer> for VariablesHashMap {
 /// # Variable schema
 /// Schema describing the structure and metadata of telemetry variables.
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VariableSchema {
     /// # Variables map
     /// Map of variable names to their metadata (provides O(1) lookup)
@@ -137,6 +133,14 @@ pub struct VariableSchema {
 }
 
 impl VariableSchema {
+    /// Builds a validated schema from an owned variable-header snapshot.
+    pub fn from_variable_headers(
+        variable_headers: VariableHeadersBuffer,
+        frame_size: usize,
+    ) -> Result<Self> {
+        Self::new(VariablesHashMap::try_from(variable_headers)?, frame_size)
+    }
+
     /// Create a new VariableSchema with validation.
     pub fn new(variables: impl Into<VariablesHashMap>, frame_size: usize) -> Result<Self> {
         let schema = Self {
@@ -209,19 +213,10 @@ impl VariableSchema {
     }
 }
 
-impl Default for VariableSchema {
-    fn default() -> Self {
-        Self {
-            variables: VariablesHashMap::default(),
-            frame_size: 0,
-        }
-    }
-}
-
 #[cfg(windows)]
 impl VariableSchema {
     /// Creates a VariableSchema from components of a WindowsConnection.
-    pub fn from_connection(connection: &WindowsConnection) -> Result<VariableSchema> {
+    pub fn from_connection(connection: &WindowsConnection) -> Result<Self> {
         let header = connection.header_snapshot();
         let variable_headers =
             connection
@@ -231,7 +226,7 @@ impl VariableSchema {
                     "Could not find variable headers from connection",
                 ))?;
 
-        Ok(VariableSchema {
+        Ok(Self {
             variables: variable_headers.try_into()?,
             frame_size: usize::try_from(header.buffer_length).map_err(|_| {
                 IRacingSDKError::parse_error(
@@ -240,6 +235,21 @@ impl VariableSchema {
                 )
             })?,
         })
+    }
+}
+
+impl VariableSchema {
+    /// Creates a VariableSchema from components of an `IbtReader`.
+    pub fn from_reader(reader: &IbtReader) -> Result<Self> {
+        let variable_headers =
+            reader
+                .variable_headers_buffer()?
+                .ok_or(IRacingSDKError::parse_error(
+                    "VariableSchema",
+                    "Could not find variable headers from IbtReader",
+                ))?;
+
+        VariableSchema::from_variable_headers(variable_headers, reader.recording().frame_length())
     }
 }
 
