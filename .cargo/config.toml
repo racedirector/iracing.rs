@@ -37,8 +37,9 @@ disk-session-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "disk-session-schema",
+  "session-schema",
   "--",
+  "ibt",
 ]
 
 disk-variable-schema = [
@@ -48,8 +49,9 @@ disk-variable-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "disk-variable-schema",
+  "variable-schema",
   "--",
+  "ibt",
 ]
 
 headers = ["run", "-p", "iracing-sdk", "--bin", "headers", "--"]
@@ -103,8 +105,9 @@ live-session-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "live-session-schema",
+  "session-schema",
   "--",
+  "live",
 ]
 
 live-to-csv = ["run", "-p", "iracing-sdk", "--bin", "live-to-csv", "--"]
@@ -127,8 +130,9 @@ live-variable-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "live-variable-schema",
+  "variable-schema",
   "--",
+  "live",
 ]
 
 session-schema = [

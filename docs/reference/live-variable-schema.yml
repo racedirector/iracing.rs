@@ -23,12 +23,12 @@ properties:
         units:
           type: string
 examples:
-- frame_size: 8587
+- frame_size: 8586
   variables:
     AirDensity:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Density of air at start/finish line
       name: AirDensity
       offset: 7169
@@ -36,7 +36,7 @@ examples:
     AirPressure:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pressure of air at start/finish line
       name: AirPressure
       offset: 7173
@@ -44,7 +44,7 @@ examples:
     AirTemp:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Temperature of air at start/finish line
       name: AirTemp
       offset: 7157
@@ -52,7 +52,7 @@ examples:
     Brake:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: 0=brake released to 1=max pedal force
       name: Brake
       offset: 6988
@@ -60,7 +60,7 @@ examples:
     BrakeABSactive:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: true if abs is currently reducing brake force pressure
       name: BrakeABSactive
       offset: 7363
@@ -68,7 +68,7 @@ examples:
     BrakeRaw:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Raw brake input 0=brake released to 1=max pedal force
       name: BrakeRaw
       offset: 7351
@@ -76,7 +76,7 @@ examples:
     CamCameraNumber:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Active camera number
       name: CamCameraNumber
       offset: 7321
@@ -92,7 +92,7 @@ examples:
     CamCarIdx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Active camera's focus car index
       name: CamCarIdx
       offset: 7317
@@ -100,7 +100,7 @@ examples:
     CamGroupNumber:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Active camera group number
       name: CamGroupNumber
       offset: 7325
@@ -108,7 +108,7 @@ examples:
     CarDistAhead:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Distance to first car in front of player in meters
       name: CarDistAhead
       offset: 7040
@@ -116,7 +116,7 @@ examples:
     CarDistBehind:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Distance to first car behind player in meters
       name: CarDistBehind
       offset: 7044
@@ -124,7 +124,7 @@ examples:
     CarIdxBestLapNum:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars best lap number
       name: CarIdxBestLapNum
       offset: 3740
@@ -132,7 +132,7 @@ examples:
     CarIdxBestLapTime:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Cars best lap time
       name: CarIdxBestLapTime
       offset: 3452
@@ -140,7 +140,7 @@ examples:
     CarIdxClass:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars class id by car index
       name: CarIdxClass
       offset: 2300
@@ -148,7 +148,7 @@ examples:
     CarIdxClassPosition:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars class position in race by car index
       name: CarIdxClassPosition
       offset: 2012
@@ -156,7 +156,7 @@ examples:
     CarIdxEstTime:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Estimated time to reach current location on track
       name: CarIdxEstTime
       offset: 2876
@@ -164,7 +164,7 @@ examples:
     CarIdxF2Time:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Race time behind leader or fastest lap time otherwise
       name: CarIdxF2Time
       offset: 2588
@@ -172,7 +172,7 @@ examples:
     CarIdxFastRepairsUsed:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many fast repairs each car has used
       name: CarIdxFastRepairsUsed
       offset: 4676
@@ -180,7 +180,7 @@ examples:
     CarIdxGear:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: -1=reverse  0=neutral  1..n=current gear by car index
       name: CarIdxGear
       offset: 6692
@@ -188,7 +188,7 @@ examples:
     CarIdxLap:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Laps started by car index
       name: CarIdxLap
       offset: 212
@@ -196,7 +196,7 @@ examples:
     CarIdxLapCompleted:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Laps completed by car index
       name: CarIdxLapCompleted
       offset: 500
@@ -204,7 +204,7 @@ examples:
     CarIdxLapDistPct:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percentage distance around lap by car index
       name: CarIdxLapDistPct
       offset: 788
@@ -212,7 +212,7 @@ examples:
     CarIdxLastLapTime:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Cars last lap time
       name: CarIdxLastLapTime
       offset: 3164
@@ -220,7 +220,7 @@ examples:
     CarIdxOnPitRoad:
       count: 72
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: On pit road between the cones by car index
       name: CarIdxOnPitRoad
       offset: 1652
@@ -228,7 +228,7 @@ examples:
     CarIdxP2P_Count:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Push2Pass count of usage (or remaining in Race)
       name: CarIdxP2P_Count
       offset: 7476
@@ -236,7 +236,7 @@ examples:
     CarIdxP2P_Status:
       count: 72
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Push2Pass active or not
       name: CarIdxP2P_Status
       offset: 7404
@@ -252,7 +252,7 @@ examples:
     CarIdxPaceLine:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: What line cars are pacing in  or -1 if not pacing
       name: CarIdxPaceLine
       offset: 5252
@@ -260,7 +260,7 @@ examples:
     CarIdxPaceRow:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: What row cars are pacing in  or -1 if not pacing
       name: CarIdxPaceRow
       offset: 5540
@@ -268,7 +268,7 @@ examples:
     CarIdxPosition:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars position in race by car index
       name: CarIdxPosition
       offset: 1724
@@ -276,7 +276,7 @@ examples:
     CarIdxQualTireCompound:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars Qual tire compound
       name: CarIdxQualTireCompound
       offset: 4316
@@ -284,7 +284,7 @@ examples:
     CarIdxQualTireCompoundLocked:
       count: 72
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Cars Qual tire compound is locked-in
       name: CarIdxQualTireCompoundLocked
       offset: 4604
@@ -292,7 +292,7 @@ examples:
     CarIdxRPM:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine rpm by car index
       name: CarIdxRPM
       offset: 6404
@@ -308,7 +308,7 @@ examples:
     CarIdxSteer:
       count: 72
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Steering wheel angle by car index
       name: CarIdxSteer
       offset: 6116
@@ -316,7 +316,7 @@ examples:
     CarIdxTireCompound:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Cars current tire compound
       name: CarIdxTireCompound
       offset: 4028
@@ -324,7 +324,7 @@ examples:
     CarIdxTrackSurface:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Track surface type by car index
       name: CarIdxTrackSurface
       offset: 1076
@@ -332,7 +332,7 @@ examples:
     CarIdxTrackSurfaceMaterial:
       count: 72
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Track surface material type by car index
       name: CarIdxTrackSurfaceMaterial
       offset: 1364
@@ -340,7 +340,7 @@ examples:
     CarLeftRight:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Notify if car is to the left or right of driver
       name: CarLeftRight
       offset: 7217
@@ -348,7 +348,7 @@ examples:
     ChanAvgLatency:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Communications average latency
       name: ChanAvgLatency
       offset: 110
@@ -356,7 +356,7 @@ examples:
     ChanClockSkew:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Communications server clock skew
       name: ChanClockSkew
       offset: 130
@@ -364,7 +364,7 @@ examples:
     ChanLatency:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Communications latency
       name: ChanLatency
       offset: 114
@@ -372,7 +372,7 @@ examples:
     ChanPartnerQuality:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Partner communications quality
       name: ChanPartnerQuality
       offset: 122
@@ -380,7 +380,7 @@ examples:
     ChanQuality:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Communications quality
       name: ChanQuality
       offset: 118
@@ -388,7 +388,7 @@ examples:
     Clutch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: 0=disengaged to 1=fully engaged
       name: Clutch
       offset: 6992
@@ -396,7 +396,7 @@ examples:
     ClutchRaw:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Raw clutch input 0=disengaged to 1=fully engaged
       name: ClutchRaw
       offset: 7355
@@ -404,7 +404,7 @@ examples:
     CpuUsageBG:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percent of available time bg thread took with a 1 sec avg
       name: CpuUsageBG
       offset: 126
@@ -412,7 +412,7 @@ examples:
     CpuUsageFG:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percent of available time fg thread took with a 1 sec avg
       name: CpuUsageFG
       offset: 102
@@ -420,7 +420,7 @@ examples:
     DCDriversSoFar:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Number of team drivers who have run a stint
       name: DCDriversSoFar
       offset: 7211
@@ -428,7 +428,7 @@ examples:
     DCLapStatus:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Status of driver change lap requirements
       name: DCLapStatus
       offset: 7207
@@ -436,7 +436,7 @@ examples:
     DisplayUnits:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Default units for the user interface 0 = english 1 = metric
       name: DisplayUnits
       offset: 77
@@ -444,7 +444,7 @@ examples:
     DriverMarker:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Driver activated flag
       name: DriverMarker
       offset: 81
@@ -452,10 +452,10 @@ examples:
     Engine0_RPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine0Engine rpm
       name: Engine0_RPM
-      offset: 8287
+      offset: 8286
       units: revs/min
     EngineWarnings:
       count: 1
@@ -468,7 +468,7 @@ examples:
     EnterExitReset:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Indicate action the reset key will take 0 enter 1 exit 2 reset
       name: EnterExitReset
       offset: 7145
@@ -476,7 +476,7 @@ examples:
     FastRepairAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many fast repairs left  255 is unlimited
       name: FastRepairAvailable
       offset: 7241
@@ -484,7 +484,7 @@ examples:
     FastRepairUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many fast repairs used so far
       name: FastRepairUsed
       offset: 7237
@@ -492,7 +492,7 @@ examples:
     FogLevel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Fog level at start/finish line
       name: FogLevel
       offset: 7189
@@ -500,7 +500,7 @@ examples:
     FrameRate:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Average frames per second
       name: FrameRate
       offset: 98
@@ -508,7 +508,7 @@ examples:
     FrontTireSetsAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many front tire sets are remaining  255 is unlimited
       name: FrontTireSetsAvailable
       offset: 7305
@@ -516,7 +516,7 @@ examples:
     FrontTireSetsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many front tire sets used so far
       name: FrontTireSetsUsed
       offset: 7269
@@ -524,15 +524,15 @@ examples:
     FuelLevel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Liters of fuel remaining
       name: FuelLevel
-      offset: 8283
+      offset: 8282
       units: l
     FuelLevelPct:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percent fuel remaining
       name: FuelLevelPct
       offset: 7372
@@ -540,23 +540,23 @@ examples:
     FuelPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine fuel pressure
       name: FuelPress
-      offset: 8263
+      offset: 8262
       units: bar
     FuelUsePerHour:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine fuel used instantaneous
       name: FuelUsePerHour
-      offset: 8247
+      offset: 8246
       units: kg/h
     Gear:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: -1=reverse  0=neutral  1..n=current gear
       name: Gear
       offset: 6996
@@ -564,7 +564,7 @@ examples:
     GpuUsage:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percent of available time gpu took with a 1 sec avg
       name: GpuUsage
       offset: 106
@@ -572,7 +572,7 @@ examples:
     HandbrakeRaw:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Raw handbrake input 0=handbrake released to 1=max force
       name: HandbrakeRaw
       offset: 7359
@@ -580,7 +580,7 @@ examples:
     IsDiskLoggingActive:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 0=disk based telemetry file not being written  1=being written
       name: IsDiskLoggingActive
       offset: 97
@@ -588,7 +588,7 @@ examples:
     IsDiskLoggingEnabled:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 0=disk based telemetry turned off  1=turned on
       name: IsDiskLoggingEnabled
       offset: 96
@@ -596,7 +596,7 @@ examples:
     IsGarageVisible:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 1=Garage screen is visible
       name: IsGarageVisible
       offset: 7810
@@ -604,7 +604,7 @@ examples:
     IsInGarage:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 1=Car in garage physics running
       name: IsInGarage
       offset: 7334
@@ -612,7 +612,7 @@ examples:
     IsOnTrack:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 1=Car on track physics running with player in car
       name: IsOnTrack
       offset: 86
@@ -620,7 +620,7 @@ examples:
     IsOnTrackCar:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 1=Car on track physics running
       name: IsOnTrackCar
       offset: 7333
@@ -628,7 +628,7 @@ examples:
     IsReplayPlaying:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 0=replay not playing  1=replay playing
       name: IsReplayPlaying
       offset: 87
@@ -636,7 +636,7 @@ examples:
     LFTiresAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left front tires are remaining  255 is unlimited
       name: LFTiresAvailable
       offset: 7281
@@ -644,7 +644,7 @@ examples:
     LFTiresUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left front tires used so far
       name: LFTiresUsed
       offset: 7245
@@ -652,111 +652,111 @@ examples:
     LFbrakeLinePress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF brake line pressure
       name: LFbrakeLinePress
-      offset: 8211
+      offset: 8210
       units: bar
     LFcoldPressure:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire cold pressure  as set in the garage
       name: LFcoldPressure
-      offset: 8215
+      offset: 8214
       units: kPa
     LFodometer:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF distance tire traveled since being placed on car
       name: LFodometer
-      offset: 8219
+      offset: 8218
       units: m
     LFshockDefl:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF shock deflection
       name: LFshockDefl
-      offset: 8475
+      offset: 8474
       units: m
     LFshockDefl_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: LF shock deflection at 360 Hz
       name: LFshockDefl_ST
-      offset: 8479
+      offset: 8478
       units: m
     LFshockVel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF shock velocity
       name: LFshockVel
-      offset: 8503
+      offset: 8502
       units: m/s
     LFshockVel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: LF shock velocity at 360 Hz
       name: LFshockVel_ST
-      offset: 8507
+      offset: 8506
       units: m/s
     LFtempCL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire left carcass temperature
       name: LFtempCL
-      offset: 8223
+      offset: 8222
       units: C
     LFtempCM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire middle carcass temperature
       name: LFtempCM
-      offset: 8227
+      offset: 8226
       units: C
     LFtempCR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire right carcass temperature
       name: LFtempCR
-      offset: 8231
+      offset: 8230
       units: C
     LFwearL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire left percent tread remaining
       name: LFwearL
-      offset: 8235
+      offset: 8234
       units: '%'
     LFwearM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire middle percent tread remaining
       name: LFwearM
-      offset: 8239
+      offset: 8238
       units: '%'
     LFwearR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LF tire right percent tread remaining
       name: LFwearR
-      offset: 8243
+      offset: 8242
       units: '%'
     LRTiresAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left rear tires are remaining  255 is unlimited
       name: LRTiresAvailable
       offset: 7289
@@ -764,7 +764,7 @@ examples:
     LRTiresUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left rear tires used so far
       name: LRTiresUsed
       offset: 7253
@@ -772,111 +772,111 @@ examples:
     LRbrakeLinePress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR brake line pressure
       name: LRbrakeLinePress
-      offset: 8327
+      offset: 8326
       units: bar
     LRcoldPressure:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire cold pressure  as set in the garage
       name: LRcoldPressure
-      offset: 8331
+      offset: 8330
       units: kPa
     LRodometer:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR distance tire traveled since being placed on car
       name: LRodometer
-      offset: 8335
+      offset: 8334
       units: m
     LRshockDefl:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR shock deflection
       name: LRshockDefl
-      offset: 8363
+      offset: 8362
       units: m
     LRshockDefl_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: LR shock deflection at 360 Hz
       name: LRshockDefl_ST
-      offset: 8367
+      offset: 8366
       units: m
     LRshockVel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR shock velocity
       name: LRshockVel
-      offset: 8391
+      offset: 8390
       units: m/s
     LRshockVel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: LR shock velocity at 360 Hz
       name: LRshockVel_ST
-      offset: 8395
+      offset: 8394
       units: m/s
     LRtempCL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire left carcass temperature
       name: LRtempCL
-      offset: 8339
+      offset: 8338
       units: C
     LRtempCM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire middle carcass temperature
       name: LRtempCM
-      offset: 8343
+      offset: 8342
       units: C
     LRtempCR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire right carcass temperature
       name: LRtempCR
-      offset: 8347
+      offset: 8346
       units: C
     LRwearL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire left percent tread remaining
       name: LRwearL
-      offset: 8351
+      offset: 8350
       units: '%'
     LRwearM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire middle percent tread remaining
       name: LRwearM
-      offset: 8355
+      offset: 8354
       units: '%'
     LRwearR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: LR tire right percent tread remaining
       name: LRwearR
-      offset: 8359
+      offset: 8358
       units: '%'
     Lap:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Laps started count
       name: Lap
       offset: 7020
@@ -884,7 +884,7 @@ examples:
     LapBestLap:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players best lap number
       name: LapBestLap
       offset: 7048
@@ -892,7 +892,7 @@ examples:
     LapBestLapTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players best lap time
       name: LapBestLapTime
       offset: 7052
@@ -900,7 +900,7 @@ examples:
     LapBestNLapLap:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Player last lap in best N average lap time
       name: LapBestNLapLap
       offset: 7072
@@ -908,7 +908,7 @@ examples:
     LapBestNLapTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Player best N average lap time
       name: LapBestNLapTime
       offset: 7076
@@ -916,7 +916,7 @@ examples:
     LapCompleted:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Laps completed count
       name: LapCompleted
       offset: 7024
@@ -924,7 +924,7 @@ examples:
     LapCurrentLapTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Estimate of players current lap time as shown in F3 box
       name: LapCurrentLapTime
       offset: 7060
@@ -932,7 +932,7 @@ examples:
     LapDeltaToBestLap:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Delta time for best lap
       name: LapDeltaToBestLap
       offset: 7080
@@ -940,7 +940,7 @@ examples:
     LapDeltaToBestLap_DD:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Rate of change of delta time for best lap
       name: LapDeltaToBestLap_DD
       offset: 7084
@@ -948,7 +948,7 @@ examples:
     LapDeltaToBestLap_OK:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Delta time for best lap is valid
       name: LapDeltaToBestLap_OK
       offset: 7088
@@ -956,7 +956,7 @@ examples:
     LapDeltaToOptimalLap:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Delta time for optimal lap
       name: LapDeltaToOptimalLap
       offset: 7089
@@ -964,7 +964,7 @@ examples:
     LapDeltaToOptimalLap_DD:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Rate of change of delta time for optimal lap
       name: LapDeltaToOptimalLap_DD
       offset: 7093
@@ -972,7 +972,7 @@ examples:
     LapDeltaToOptimalLap_OK:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Delta time for optimal lap is valid
       name: LapDeltaToOptimalLap_OK
       offset: 7097
@@ -980,7 +980,7 @@ examples:
     LapDeltaToSessionBestLap:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Delta time for session best lap
       name: LapDeltaToSessionBestLap
       offset: 7098
@@ -988,7 +988,7 @@ examples:
     LapDeltaToSessionBestLap_DD:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Rate of change of delta time for session best lap
       name: LapDeltaToSessionBestLap_DD
       offset: 7102
@@ -996,7 +996,7 @@ examples:
     LapDeltaToSessionBestLap_OK:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Delta time for session best lap is valid
       name: LapDeltaToSessionBestLap_OK
       offset: 7106
@@ -1004,7 +1004,7 @@ examples:
     LapDeltaToSessionLastlLap:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Delta time for session last lap
       name: LapDeltaToSessionLastlLap
       offset: 7116
@@ -1012,7 +1012,7 @@ examples:
     LapDeltaToSessionLastlLap_DD:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Rate of change of delta time for session last lap
       name: LapDeltaToSessionLastlLap_DD
       offset: 7120
@@ -1020,7 +1020,7 @@ examples:
     LapDeltaToSessionLastlLap_OK:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Delta time for session last lap is valid
       name: LapDeltaToSessionLastlLap_OK
       offset: 7124
@@ -1028,7 +1028,7 @@ examples:
     LapDeltaToSessionOptimalLap:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Delta time for session optimal lap
       name: LapDeltaToSessionOptimalLap
       offset: 7107
@@ -1036,7 +1036,7 @@ examples:
     LapDeltaToSessionOptimalLap_DD:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Rate of change of delta time for session optimal lap
       name: LapDeltaToSessionOptimalLap_DD
       offset: 7111
@@ -1044,7 +1044,7 @@ examples:
     LapDeltaToSessionOptimalLap_OK:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Delta time for session optimal lap is valid
       name: LapDeltaToSessionOptimalLap_OK
       offset: 7115
@@ -1052,7 +1052,7 @@ examples:
     LapDist:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Meters traveled from S/F this lap
       name: LapDist
       offset: 7028
@@ -1060,7 +1060,7 @@ examples:
     LapDistPct:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Percentage distance around lap
       name: LapDistPct
       offset: 7032
@@ -1068,7 +1068,7 @@ examples:
     LapLasNLapSeq:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Player num consecutive clean laps completed for N average
       name: LapLasNLapSeq
       offset: 7064
@@ -1076,7 +1076,7 @@ examples:
     LapLastLapTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players last lap time
       name: LapLastLapTime
       offset: 7056
@@ -1084,7 +1084,7 @@ examples:
     LapLastNLapTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Player last N average lap time
       name: LapLastNLapTime
       offset: 7068
@@ -1092,7 +1092,7 @@ examples:
     LatAccel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Lateral acceleration (including gravity)
       name: LatAccel
       offset: 8116
@@ -1100,7 +1100,7 @@ examples:
     LatAccel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Lateral acceleration (including gravity) at 360 Hz
       name: LatAccel_ST
       offset: 8064
@@ -1108,7 +1108,7 @@ examples:
     LeftTireSetsAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left tire sets are remaining  255 is unlimited
       name: LeftTireSetsAvailable
       offset: 7297
@@ -1116,7 +1116,7 @@ examples:
     LeftTireSetsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many left tire sets used so far
       name: LeftTireSetsUsed
       offset: 7261
@@ -1124,7 +1124,7 @@ examples:
     LoadNumTextures:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if the car_num texture will be loaded
       name: LoadNumTextures
       offset: 7216
@@ -1132,7 +1132,7 @@ examples:
     LongAccel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Longitudinal acceleration (including gravity)
       name: LongAccel
       offset: 8120
@@ -1140,7 +1140,7 @@ examples:
     LongAccel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Longitudinal acceleration (including gravity) at 360 Hz
       name: LongAccel_ST
       offset: 8088
@@ -1148,15 +1148,15 @@ examples:
     ManifoldPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine manifold pressure
       name: ManifoldPress
-      offset: 8279
+      offset: 8278
       units: bar
     ManualBoost:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Hybrid manual boost state
       name: ManualBoost
       offset: 84
@@ -1164,7 +1164,7 @@ examples:
     ManualNoBoost:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Hybrid manual no boost state
       name: ManualNoBoost
       offset: 85
@@ -1172,7 +1172,7 @@ examples:
     MemPageFaultSec:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Memory page faults per second
       name: MemPageFaultSec
       offset: 134
@@ -1180,7 +1180,7 @@ examples:
     MemSoftPageFaultSec:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Memory soft page faults per second
       name: MemSoftPageFaultSec
       offset: 138
@@ -1188,31 +1188,31 @@ examples:
     OilLevel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine oil level
       name: OilLevel
-      offset: 8275
+      offset: 8274
       units: l
     OilPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine oil pressure
       name: OilPress
-      offset: 8271
+      offset: 8270
       units: bar
     OilTemp:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine oil temperature
       name: OilTemp
-      offset: 8267
+      offset: 8266
       units: C
     OkToReloadTextures:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if it is ok to reload car textures at this time
       name: OkToReloadTextures
       offset: 7215
@@ -1220,7 +1220,7 @@ examples:
     OnPitRoad:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Is the player car on pit road between the cones
       name: OnPitRoad
       offset: 207
@@ -1228,7 +1228,7 @@ examples:
     P2P_Count:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Push2Pass count of usage (or remaining in Race) on your car
       name: P2P_Count
       offset: 7765
@@ -1236,7 +1236,7 @@ examples:
     P2P_Status:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Push2Pass active or not on your car
       name: P2P_Status
       offset: 7764
@@ -1244,7 +1244,7 @@ examples:
     PaceMode:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Are we pacing or not
       name: PaceMode
       offset: 208
@@ -1252,7 +1252,7 @@ examples:
     PitOptRepairLeft:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Time left for optional repairs if repairs are active
       name: PitOptRepairLeft
       offset: 7232
@@ -1260,7 +1260,7 @@ examples:
     PitRepairLeft:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Time left for mandatory pit repairs if repairs are active
       name: PitRepairLeft
       offset: 7228
@@ -1276,7 +1276,7 @@ examples:
     PitSvFuel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pit service fuel add amount
       name: PitSvFuel
       offset: 7396
@@ -1284,7 +1284,7 @@ examples:
     PitSvLFP:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pit service left front tire pressure
       name: PitSvLFP
       offset: 7380
@@ -1292,7 +1292,7 @@ examples:
     PitSvLRP:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pit service left rear tire pressure
       name: PitSvLRP
       offset: 7388
@@ -1300,7 +1300,7 @@ examples:
     PitSvRFP:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pit service right front tire pressure
       name: PitSvRFP
       offset: 7384
@@ -1308,7 +1308,7 @@ examples:
     PitSvRRP:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pit service right rear tire pressure
       name: PitSvRRP
       offset: 7392
@@ -1316,7 +1316,7 @@ examples:
     PitSvTireCompound:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Pit service pending tire compound
       name: PitSvTireCompound
       offset: 7400
@@ -1324,7 +1324,7 @@ examples:
     Pitch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitch orientation
       name: Pitch
       offset: 7137
@@ -1332,7 +1332,7 @@ examples:
     PitchRate:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitch rate
       name: PitchRate
       offset: 8032
@@ -1340,7 +1340,7 @@ examples:
     PitchRate_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Pitch rate at 360 Hz
       name: PitchRate_ST
       offset: 7980
@@ -1348,7 +1348,7 @@ examples:
     PitsOpen:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if pit stop is allowed for the current player
       name: PitsOpen
       offset: 7221
@@ -1356,7 +1356,7 @@ examples:
     PitstopActive:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Is the player getting pit stop service
       name: PitstopActive
       offset: 7236
@@ -1364,7 +1364,7 @@ examples:
     PlayerCarClass:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Player car class id
       name: PlayerCarClass
       offset: 150
@@ -1372,7 +1372,7 @@ examples:
     PlayerCarClassPosition:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players class position in race
       name: PlayerCarClassPosition
       offset: 146
@@ -1380,7 +1380,7 @@ examples:
     PlayerCarDriverIncidentCount:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Teams current drivers incident count for this session
       name: PlayerCarDriverIncidentCount
       offset: 174
@@ -1388,7 +1388,7 @@ examples:
     PlayerCarDryTireSetLimit:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players dry tire set limit
       name: PlayerCarDryTireSetLimit
       offset: 186
@@ -1396,7 +1396,7 @@ examples:
     PlayerCarIdx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players carIdx
       name: PlayerCarIdx
       offset: 162
@@ -1404,7 +1404,7 @@ examples:
     PlayerCarInPitStall:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Players car is properly in their pitstall
       name: PlayerCarInPitStall
       offset: 194
@@ -1412,7 +1412,7 @@ examples:
     PlayerCarMyIncidentCount:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players own incident count for this session
       name: PlayerCarMyIncidentCount
       offset: 170
@@ -1420,7 +1420,7 @@ examples:
     PlayerCarPitSvStatus:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players car pit service status bits
       name: PlayerCarPitSvStatus
       offset: 195
@@ -1428,7 +1428,7 @@ examples:
     PlayerCarPosition:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players position in race
       name: PlayerCarPosition
       offset: 142
@@ -1436,7 +1436,7 @@ examples:
     PlayerCarPowerAdjust:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players power adjust
       name: PlayerCarPowerAdjust
       offset: 182
@@ -1444,7 +1444,7 @@ examples:
     PlayerCarSLBlinkRPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Shift light blink rpm
       name: PlayerCarSLBlinkRPM
       offset: 7016
@@ -1452,7 +1452,7 @@ examples:
     PlayerCarSLFirstRPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Shift light first light rpm
       name: PlayerCarSLFirstRPM
       offset: 7004
@@ -1460,7 +1460,7 @@ examples:
     PlayerCarSLLastRPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Shift light last light rpm
       name: PlayerCarSLLastRPM
       offset: 7012
@@ -1468,7 +1468,7 @@ examples:
     PlayerCarSLShiftRPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Shift light shift rpm
       name: PlayerCarSLShiftRPM
       offset: 7008
@@ -1476,7 +1476,7 @@ examples:
     PlayerCarTeamIncidentCount:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players team incident count for this session
       name: PlayerCarTeamIncidentCount
       offset: 166
@@ -1484,7 +1484,7 @@ examples:
     PlayerCarTowTime:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players car is being towed if time is greater than zero
       name: PlayerCarTowTime
       offset: 190
@@ -1492,7 +1492,7 @@ examples:
     PlayerCarWeightPenalty:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players weight penalty
       name: PlayerCarWeightPenalty
       offset: 178
@@ -1500,7 +1500,7 @@ examples:
     PlayerFastRepairsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players car number of fast repairs used
       name: PlayerFastRepairsUsed
       offset: 203
@@ -1508,7 +1508,7 @@ examples:
     PlayerIncidents:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Log incidents that the player recieved
       name: PlayerIncidents
       offset: 7224
@@ -1516,7 +1516,7 @@ examples:
     PlayerTireCompound:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players car current tire compound
       name: PlayerTireCompound
       offset: 199
@@ -1524,7 +1524,7 @@ examples:
     PlayerTrackSurface:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players car track surface type
       name: PlayerTrackSurface
       offset: 154
@@ -1532,7 +1532,7 @@ examples:
     PlayerTrackSurfaceMaterial:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Players car track surface material type
       name: PlayerTrackSurfaceMaterial
       offset: 158
@@ -1540,7 +1540,7 @@ examples:
     Precipitation:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Precipitation at start/finish line
       name: Precipitation
       offset: 7193
@@ -1548,7 +1548,7 @@ examples:
     PushToPass:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Push to pass button state
       name: PushToPass
       offset: 83
@@ -1556,7 +1556,7 @@ examples:
     PushToTalk:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Push to talk button state
       name: PushToTalk
       offset: 82
@@ -1564,7 +1564,7 @@ examples:
     RFTiresAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right front tires are remaining  255 is unlimited
       name: RFTiresAvailable
       offset: 7285
@@ -1572,7 +1572,7 @@ examples:
     RFTiresUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right front tires used so far
       name: RFTiresUsed
       offset: 7249
@@ -1580,111 +1580,111 @@ examples:
     RFbrakeLinePress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF brake line pressure
       name: RFbrakeLinePress
-      offset: 8175
+      offset: 8174
       units: bar
     RFcoldPressure:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire cold pressure  as set in the garage
       name: RFcoldPressure
-      offset: 8179
+      offset: 8178
       units: kPa
     RFodometer:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF distance tire traveled since being placed on car
       name: RFodometer
-      offset: 8183
+      offset: 8182
       units: m
     RFshockDefl:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF shock deflection
       name: RFshockDefl
-      offset: 8531
+      offset: 8530
       units: m
     RFshockDefl_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: RF shock deflection at 360 Hz
       name: RFshockDefl_ST
-      offset: 8535
+      offset: 8534
       units: m
     RFshockVel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF shock velocity
       name: RFshockVel
-      offset: 8559
+      offset: 8558
       units: m/s
     RFshockVel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: RF shock velocity at 360 Hz
       name: RFshockVel_ST
-      offset: 8563
+      offset: 8562
       units: m/s
     RFtempCL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire left carcass temperature
       name: RFtempCL
-      offset: 8187
+      offset: 8186
       units: C
     RFtempCM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire middle carcass temperature
       name: RFtempCM
-      offset: 8191
+      offset: 8190
       units: C
     RFtempCR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire right carcass temperature
       name: RFtempCR
-      offset: 8195
+      offset: 8194
       units: C
     RFwearL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire left percent tread remaining
       name: RFwearL
-      offset: 8199
+      offset: 8198
       units: '%'
     RFwearM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire middle percent tread remaining
       name: RFwearM
-      offset: 8203
+      offset: 8202
       units: '%'
     RFwearR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RF tire right percent tread remaining
       name: RFwearR
-      offset: 8207
+      offset: 8206
       units: '%'
     RPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine rpm
       name: RPM
       offset: 7000
@@ -1692,7 +1692,7 @@ examples:
     RRTiresAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right rear tires are remaining  255 is unlimited
       name: RRTiresAvailable
       offset: 7293
@@ -1700,7 +1700,7 @@ examples:
     RRTiresUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right rear tires used so far
       name: RRTiresUsed
       offset: 7257
@@ -1708,111 +1708,111 @@ examples:
     RRbrakeLinePress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR brake line pressure
       name: RRbrakeLinePress
-      offset: 8291
+      offset: 8290
       units: bar
     RRcoldPressure:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire cold pressure  as set in the garage
       name: RRcoldPressure
-      offset: 8295
+      offset: 8294
       units: kPa
     RRodometer:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR distance tire traveled since being placed on car
       name: RRodometer
-      offset: 8299
+      offset: 8298
       units: m
     RRshockDefl:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR shock deflection
       name: RRshockDefl
-      offset: 8419
+      offset: 8418
       units: m
     RRshockDefl_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: RR shock deflection at 360 Hz
       name: RRshockDefl_ST
-      offset: 8423
+      offset: 8422
       units: m
     RRshockVel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR shock velocity
       name: RRshockVel
-      offset: 8447
+      offset: 8446
       units: m/s
     RRshockVel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: RR shock velocity at 360 Hz
       name: RRshockVel_ST
-      offset: 8451
+      offset: 8450
       units: m/s
     RRtempCL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire left carcass temperature
       name: RRtempCL
-      offset: 8303
+      offset: 8302
       units: C
     RRtempCM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire middle carcass temperature
       name: RRtempCM
-      offset: 8307
+      offset: 8306
       units: C
     RRtempCR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire right carcass temperature
       name: RRtempCR
-      offset: 8311
+      offset: 8310
       units: C
     RRwearL:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire left percent tread remaining
       name: RRwearL
-      offset: 8315
+      offset: 8314
       units: '%'
     RRwearM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire middle percent tread remaining
       name: RRwearM
-      offset: 8319
+      offset: 8318
       units: '%'
     RRwearR:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RR tire right percent tread remaining
       name: RRwearR
-      offset: 8323
+      offset: 8322
       units: '%'
     RaceLaps:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Laps completed in race
       name: RaceLaps
       offset: 7036
@@ -1820,7 +1820,7 @@ examples:
     RadioTransmitCarIdx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: The car index of the current person speaking on the radio
       name: RadioTransmitCarIdx
       offset: 65
@@ -1828,7 +1828,7 @@ examples:
     RadioTransmitFrequencyIdx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: The frequency index of the current person speaking on the radio
       name: RadioTransmitFrequencyIdx
       offset: 73
@@ -1836,7 +1836,7 @@ examples:
     RadioTransmitRadioIdx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: The radio index of the current person speaking on the radio
       name: RadioTransmitRadioIdx
       offset: 69
@@ -1844,7 +1844,7 @@ examples:
     RearTireSetsAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many rear tire sets are remaining  255 is unlimited
       name: RearTireSetsAvailable
       offset: 7309
@@ -1852,7 +1852,7 @@ examples:
     RearTireSetsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many rear tire sets used so far
       name: RearTireSetsUsed
       offset: 7273
@@ -1860,7 +1860,7 @@ examples:
     RelativeHumidity:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Relative Humidity at start/finish line
       name: RelativeHumidity
       offset: 7185
@@ -1868,7 +1868,7 @@ examples:
     ReplayFrameNum:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Integer replay frame number (60 per second)
       name: ReplayFrameNum
       offset: 88
@@ -1876,7 +1876,7 @@ examples:
     ReplayFrameNumEnd:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Integer replay frame number from end of tape
       name: ReplayFrameNumEnd
       offset: 92
@@ -1884,7 +1884,7 @@ examples:
     ReplayPlaySlowMotion:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: 0=not slow motion  1=replay is in slow motion
       name: ReplayPlaySlowMotion
       offset: 7815
@@ -1892,7 +1892,7 @@ examples:
     ReplayPlaySpeed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Replay playback speed
       name: ReplayPlaySpeed
       offset: 7811
@@ -1900,7 +1900,7 @@ examples:
     ReplaySessionNum:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Replay session number
       name: ReplaySessionNum
       offset: 7824
@@ -1908,7 +1908,7 @@ examples:
     ReplaySessionTime:
       count: 1
       count_as_time: false
-      data_type: Float64
+      data_type: Double
       description: Seconds since replay session start
       name: ReplaySessionTime
       offset: 7816
@@ -1916,7 +1916,7 @@ examples:
     RightTireSetsAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right tire sets are remaining  255 is unlimited
       name: RightTireSetsAvailable
       offset: 7301
@@ -1924,7 +1924,7 @@ examples:
     RightTireSetsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many right tire sets used so far
       name: RightTireSetsUsed
       offset: 7265
@@ -1932,7 +1932,7 @@ examples:
     Roll:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Roll orientation
       name: Roll
       offset: 7141
@@ -1940,7 +1940,7 @@ examples:
     RollRate:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Roll rate
       name: RollRate
       offset: 8036
@@ -1948,7 +1948,7 @@ examples:
     RollRate_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Roll rate at 360 Hz
       name: RollRate_ST
       offset: 8004
@@ -1964,7 +1964,7 @@ examples:
     SessionJokerLapsRemain:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Joker laps remaining to be taken
       name: SessionJokerLapsRemain
       offset: 56
@@ -1972,7 +1972,7 @@ examples:
     SessionLapsRemain:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Old laps left till session ends use SessionLapsRemainEx
       name: SessionLapsRemain
       offset: 36
@@ -1980,7 +1980,7 @@ examples:
     SessionLapsRemainEx:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: New improved laps left till session ends
       name: SessionLapsRemainEx
       offset: 40
@@ -1988,7 +1988,7 @@ examples:
     SessionLapsTotal:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Total number of laps in session
       name: SessionLapsTotal
       offset: 52
@@ -1996,7 +1996,7 @@ examples:
     SessionNum:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Session number
       name: SessionNum
       offset: 12
@@ -2004,7 +2004,7 @@ examples:
     SessionOnJokerLap:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Player is currently completing a joker lap
       name: SessionOnJokerLap
       offset: 60
@@ -2012,7 +2012,7 @@ examples:
     SessionState:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Session state
       name: SessionState
       offset: 16
@@ -2020,7 +2020,7 @@ examples:
     SessionTick:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Current update number
       name: SessionTick
       offset: 8
@@ -2028,7 +2028,7 @@ examples:
     SessionTime:
       count: 1
       count_as_time: false
-      data_type: Float64
+      data_type: Double
       description: Seconds since session start
       name: SessionTime
       offset: 0
@@ -2036,7 +2036,7 @@ examples:
     SessionTimeOfDay:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Time of day in seconds
       name: SessionTimeOfDay
       offset: 61
@@ -2044,7 +2044,7 @@ examples:
     SessionTimeRemain:
       count: 1
       count_as_time: false
-      data_type: Float64
+      data_type: Double
       description: Seconds left till session ends
       name: SessionTimeRemain
       offset: 28
@@ -2052,7 +2052,7 @@ examples:
     SessionTimeTotal:
       count: 1
       count_as_time: false
-      data_type: Float64
+      data_type: Double
       description: Total number of seconds in session
       name: SessionTimeTotal
       offset: 44
@@ -2060,7 +2060,7 @@ examples:
     SessionUniqueID:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Session ID
       name: SessionUniqueID
       offset: 20
@@ -2068,7 +2068,7 @@ examples:
     ShiftGrindRPM:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: RPM of shifter grinding noise
       name: ShiftGrindRPM
       offset: 7343
@@ -2076,7 +2076,7 @@ examples:
     ShiftIndicatorPct:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: DEPRECATED use DriverCarSLBlinkRPM instead
       name: ShiftIndicatorPct
       offset: 7806
@@ -2084,7 +2084,7 @@ examples:
     ShiftPowerPct:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Friction torque applied to gears when shifting or grinding
       name: ShiftPowerPct
       offset: 7339
@@ -2092,7 +2092,7 @@ examples:
     Shifter:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Log inputs from the players shifter control
       name: Shifter
       offset: 7364
@@ -2100,7 +2100,7 @@ examples:
     Skies:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: Skies (0=clear/1=p cloudy/2=m cloudy/3=overcast)
       name: Skies
       offset: 7165
@@ -2108,7 +2108,7 @@ examples:
     SolarAltitude:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Sun angle above horizon in radians
       name: SolarAltitude
       offset: 7197
@@ -2116,7 +2116,7 @@ examples:
     SolarAzimuth:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Sun angle clockwise from north in radians
       name: SolarAzimuth
       offset: 7201
@@ -2124,7 +2124,7 @@ examples:
     Speed:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: GPS vehicle speed
       name: Speed
       offset: 7125
@@ -2132,7 +2132,7 @@ examples:
     SteeringFFBEnabled:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: Force feedback is enabled
       name: SteeringFFBEnabled
       offset: 7206
@@ -2140,7 +2140,7 @@ examples:
     SteeringWheelAngle:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Steering wheel angle
       name: SteeringWheelAngle
       offset: 6980
@@ -2148,7 +2148,7 @@ examples:
     SteeringWheelAngleMax:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Steering wheel max angle
       name: SteeringWheelAngleMax
       offset: 7335
@@ -2156,7 +2156,7 @@ examples:
     SteeringWheelLimiter:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback limiter strength limits impacts and oscillation
       name: SteeringWheelLimiter
       offset: 7793
@@ -2164,7 +2164,7 @@ examples:
     SteeringWheelMaxForceNm:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Value of strength or max force slider in Nm for FFB
       name: SteeringWheelMaxForceNm
       offset: 7797
@@ -2172,7 +2172,7 @@ examples:
     SteeringWheelPctDamper:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max damping
       name: SteeringWheelPctDamper
       offset: 7789
@@ -2180,7 +2180,7 @@ examples:
     SteeringWheelPctIntensity:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max intensity
       name: SteeringWheelPctIntensity
       offset: 7781
@@ -2188,7 +2188,7 @@ examples:
     SteeringWheelPctSmoothing:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max smoothing
       name: SteeringWheelPctSmoothing
       offset: 7785
@@ -2196,7 +2196,7 @@ examples:
     SteeringWheelPctTorque:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max torque on steering shaft unsigned
       name: SteeringWheelPctTorque
       offset: 7769
@@ -2204,7 +2204,7 @@ examples:
     SteeringWheelPctTorqueSign:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max torque on steering shaft signed
       name: SteeringWheelPctTorqueSign
       offset: 7773
@@ -2212,7 +2212,7 @@ examples:
     SteeringWheelPctTorqueSignStops:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Force feedback % max torque on steering shaft signed stops
       name: SteeringWheelPctTorqueSignStops
       offset: 7777
@@ -2220,7 +2220,7 @@ examples:
     SteeringWheelPeakForceNm:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Peak torque mapping to direct input units for FFB
       name: SteeringWheelPeakForceNm
       offset: 7801
@@ -2228,7 +2228,7 @@ examples:
     SteeringWheelTorque:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Output torque on steering shaft
       name: SteeringWheelTorque
       offset: 7868
@@ -2236,7 +2236,7 @@ examples:
     SteeringWheelTorque_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Output torque on steering shaft at 360 Hz
       name: SteeringWheelTorque_ST
       offset: 7844
@@ -2244,7 +2244,7 @@ examples:
     SteeringWheelUseLinear:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if steering wheel force is using linear mode
       name: SteeringWheelUseLinear
       offset: 7805
@@ -2252,7 +2252,7 @@ examples:
     Throttle:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: 0=off throttle to 1=full throttle
       name: Throttle
       offset: 6984
@@ -2260,7 +2260,7 @@ examples:
     ThrottleRaw:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Raw throttle input 0=off throttle to 1=full throttle
       name: ThrottleRaw
       offset: 7347
@@ -2268,7 +2268,7 @@ examples:
     TireLF_RumblePitch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players LF Tire Sound rumblestrip pitch
       name: TireLF_RumblePitch
       offset: 7828
@@ -2276,7 +2276,7 @@ examples:
     TireLR_RumblePitch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players LR Tire Sound rumblestrip pitch
       name: TireLR_RumblePitch
       offset: 7836
@@ -2284,7 +2284,7 @@ examples:
     TireRF_RumblePitch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players RF Tire Sound rumblestrip pitch
       name: TireRF_RumblePitch
       offset: 7832
@@ -2292,7 +2292,7 @@ examples:
     TireRR_RumblePitch:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Players RR Tire Sound rumblestrip pitch
       name: TireRR_RumblePitch
       offset: 7840
@@ -2300,7 +2300,7 @@ examples:
     TireSetsAvailable:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many tire sets are remaining  255 is unlimited
       name: TireSetsAvailable
       offset: 7313
@@ -2308,7 +2308,7 @@ examples:
     TireSetsUsed:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How many tire sets used so far
       name: TireSetsUsed
       offset: 7277
@@ -2316,7 +2316,7 @@ examples:
     TrackTemp:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Deprecated  set to TrackTempCrew
       name: TrackTemp
       offset: 7149
@@ -2324,7 +2324,7 @@ examples:
     TrackTempCrew:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Temperature of track measured by crew around track
       name: TrackTempCrew
       offset: 7153
@@ -2332,7 +2332,7 @@ examples:
     TrackWetness:
       count: 1
       count_as_time: false
-      data_type: Int32
+      data_type: Integer
       description: How wet is the average track surface
       name: TrackWetness
       offset: 7161
@@ -2340,7 +2340,7 @@ examples:
     VelocityX:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: X velocity
       name: VelocityX
       offset: 7952
@@ -2348,7 +2348,7 @@ examples:
     VelocityX_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: X velocity
       name: VelocityX_ST
       offset: 7920
@@ -2356,7 +2356,7 @@ examples:
     VelocityY:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Y velocity
       name: VelocityY
       offset: 7948
@@ -2364,7 +2364,7 @@ examples:
     VelocityY_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Y velocity
       name: VelocityY_ST
       offset: 7896
@@ -2372,7 +2372,7 @@ examples:
     VelocityZ:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Z velocity
       name: VelocityZ
       offset: 7944
@@ -2380,7 +2380,7 @@ examples:
     VelocityZ_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Z velocity
       name: VelocityZ_ST
       offset: 7872
@@ -2388,7 +2388,7 @@ examples:
     VertAccel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Vertical acceleration (including gravity)
       name: VertAccel
       offset: 8112
@@ -2396,7 +2396,7 @@ examples:
     VertAccel_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Vertical acceleration (including gravity) at 360 Hz
       name: VertAccel_ST
       offset: 8040
@@ -2404,7 +2404,7 @@ examples:
     VidCapActive:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if video currently being captured
       name: VidCapActive
       offset: 7223
@@ -2412,7 +2412,7 @@ examples:
     VidCapEnabled:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: True if video capture system is enabled
       name: VidCapEnabled
       offset: 7222
@@ -2420,31 +2420,31 @@ examples:
     Voltage:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine voltage
       name: Voltage
-      offset: 8251
+      offset: 8250
       units: V
     WaterLevel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine coolant level
       name: WaterLevel
-      offset: 8259
+      offset: 8258
       units: l
     WaterTemp:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Engine coolant temp
       name: WaterTemp
-      offset: 8255
+      offset: 8254
       units: C
     WeatherDeclaredWet:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: The steward says rain tires can be used
       name: WeatherDeclaredWet
       offset: 7205
@@ -2452,7 +2452,7 @@ examples:
     WindDir:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Wind direction at start/finish line
       name: WindDir
       offset: 7181
@@ -2460,7 +2460,7 @@ examples:
     WindVel:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Wind velocity at start/finish line
       name: WindVel
       offset: 7177
@@ -2468,7 +2468,7 @@ examples:
     Yaw:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Yaw orientation
       name: Yaw
       offset: 7129
@@ -2476,7 +2476,7 @@ examples:
     YawNorth:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Yaw orientation relative to north
       name: YawNorth
       offset: 7133
@@ -2484,7 +2484,7 @@ examples:
     YawRate:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Yaw rate
       name: YawRate
       offset: 8028
@@ -2492,7 +2492,7 @@ examples:
     YawRate_ST:
       count: 6
       count_as_time: true
-      data_type: Float32
+      data_type: Float
       description: Yaw rate at 360 Hz
       name: YawRate_ST
       offset: 7956
@@ -2500,31 +2500,23 @@ examples:
     dcBrakeBias:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: In car brake bias adjustment
       name: dcBrakeBias
-      offset: 8155
+      offset: 8142
       units: ''
     dcDashPage:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: In car dash display page adjustment
       name: dcDashPage
-      offset: 8151
-      units: ''
-    dcPitSpeedLimiterToggle:
-      count: 1
-      count_as_time: false
-      data_type: Bool
-      description: Track if pit speed limiter system is enabled
-      name: dcPitSpeedLimiterToggle
-      offset: 8125
+      offset: 8162
       units: ''
     dcStarter:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: In car trigger car starter
       name: dcStarter
       offset: 8124
@@ -2532,88 +2524,88 @@ examples:
     dcTearOffVisor:
       count: 1
       count_as_time: false
-      data_type: Bool
+      data_type: Boolean
       description: In car tear off visor film
       name: dcTearOffVisor
-      offset: 8126
+      offset: 8125
       units: ''
     dpFastRepair:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop fast repair set
       name: dpFastRepair
-      offset: 8147
+      offset: 8138
       units: ''
     dpFuelAddKg:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop fuel add amount
       name: dpFuelAddKg
-      offset: 8143
+      offset: 8134
       units: kg
     dpFuelAutoFillActive:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop auto fill fuel next stop flag
       name: dpFuelAutoFillActive
-      offset: 8139
+      offset: 8170
       units: ''
     dpFuelAutoFillEnabled:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop auto fill fuel system enabled
       name: dpFuelAutoFillEnabled
-      offset: 8135
+      offset: 8166
       units: ''
     dpFuelFill:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop fuel fill flag
       name: dpFuelFill
-      offset: 8131
+      offset: 8130
       units: ''
     dpLFTireColdPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop lf tire cold pressure adjustment
       name: dpLFTireColdPress
-      offset: 8159
+      offset: 8146
       units: Pa
     dpLRTireColdPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop lr tire cold pressure adjustment
       name: dpLRTireColdPress
-      offset: 8167
+      offset: 8154
       units: Pa
     dpRFTireColdPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop rf cold tire pressure adjustment
       name: dpRFTireColdPress
-      offset: 8163
+      offset: 8150
       units: Pa
     dpRRTireColdPress:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop rr cold tire pressure adjustment
       name: dpRRTireColdPress
-      offset: 8171
+      offset: 8158
       units: Pa
     dpTireChange:
       count: 1
       count_as_time: false
-      data_type: Float32
+      data_type: Float
       description: Pitstop all tire change request
       name: dpTireChange
-      offset: 8127
+      offset: 8126
       units: ''

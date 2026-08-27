@@ -196,32 +196,12 @@ path = "src/bin/car_setup_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
-name = "disk-session-schema"
-path = "src/bin/disk_session_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
-name = "disk-variable-schema"
-path = "src/bin/disk_variable_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
 name = "headers"
 path = "src/bin/headers.rs"
 
 [[bin]]
 name = "ibt-session-parser"
 path = "src/bin/ibt_session_parser.rs"
-
-[[bin]]
-name = "live-session-schema"
-path = "src/bin/live_session_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
-name = "live-variable-schema"
-path = "src/bin/live_variable_schema.rs"
-required-features = ["codegen"]
 
 [[bin]]
 name = "primitives-schema"
