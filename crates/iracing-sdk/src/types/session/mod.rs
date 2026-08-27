@@ -290,23 +290,16 @@ mod tests {
     }
 
     #[test]
-    fn yaml_preprocessing_fixes_problematic_characters() {
-        let problematic_yaml = r#"
+    fn yaml_preprocessing_preserves_printable_characters() {
+        let yaml = r#"
 UserName: O'Connor, Mike
 TeamName: "Fast & Furious" Racing
 AbbrevName: O'Con
 "#;
 
-        let result = crate::yaml_utils::preprocess_iracing_yaml(problematic_yaml).unwrap();
-        println!("Original: {}", problematic_yaml);
-        println!("Processed: {}", result);
+        let result = crate::yaml_utils::preprocess_iracing_yaml(yaml).unwrap();
 
-        // Should have quotes added around problematic values
-        assert!(result.contains("UserName:  'O''Connor, Mike'"));
-        assert!(result.contains("AbbrevName:  'O''Con'"));
-
-        // TeamName already has quotes in the input, so it shouldn't be modified
-        assert!(result.contains("TeamName: \"Fast & Furious\" Racing"));
+        assert_eq!(result, yaml);
     }
 
     // Property tests for comprehensive validation
@@ -317,14 +310,11 @@ AbbrevName: O'Con
         ) {
             let result = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content);
 
-            // Should not fail on well-formed content
-            prop_assert!(result.is_ok());
-
-            // Processing should not make content significantly shorter
-            // (Allow slight variations due to line ending normalization)
-            let processed = result.unwrap();
-            let len_diff = processed.len() as i32 - yaml_content.len() as i32;
-            prop_assert!(len_diff >= -2, "Processed length: {}, Original length: {}, Diff: {}", processed.len(), yaml_content.len(), len_diff);
+            if yaml_content.trim().is_empty() {
+                prop_assert!(result.is_err());
+            } else {
+                prop_assert_eq!(result.unwrap(), yaml_content);
+            }
         }
 
     }

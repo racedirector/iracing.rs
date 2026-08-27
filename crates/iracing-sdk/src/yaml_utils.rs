@@ -1,22 +1,18 @@
 //! YAML utilities for iRacing data preprocessing
 //!
-//! iRacing's YAML output has several non-standard issues that need correction:
-//! - Unescaped special characters in strings (quotes, backslashes, etc.)
-//! - Control characters that break YAML parsers
-//! - Inconsistent string quoting
+//! iRacing's YAML output can contain control characters that standard YAML
+//! parsers reject.
 //!
 //! This module provides low-level YAML cleaning without parsing.
 
 use crate::{IRacingSDKError, Result};
 use encoding_rs::WINDOWS_1252;
 
-/// Preprocess iRacing YAML to fix known issues
+/// Preprocess iRacing YAML to remove unsupported control characters.
 ///
-/// This function cleans up iRacing's non-standard YAML format to make it
-/// parseable by standard YAML libraries. It handles:
+/// This function sanitizes iRacing's YAML before parsing. It handles:
 /// - Control character removal (except \n, \r, \t)
-/// - String escaping for special characters
-/// - Consistent quoting
+/// - Rejection of input that is empty after cleanup
 ///
 /// Returns the cleaned YAML string ready for parsing.
 pub fn preprocess_iracing_yaml(yaml: &str) -> Result<String> {
