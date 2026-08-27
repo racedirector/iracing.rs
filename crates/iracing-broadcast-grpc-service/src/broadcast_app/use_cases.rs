@@ -1,9 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
-use iracing_sdk::{
-    BroadcastCommand, CameraState, PitCommand, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
+use iracing_sdk::types::irsdk::{
+    CameraState, ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode,
+    VideoCaptureMode,
 };
+use iracing_sdk::{BroadcastCommand, PitCommand};
 
 use super::{
     AvailableCameras, BroadcastCommandPort, BroadcastError, CameraSelectionExpectation,
@@ -381,7 +382,8 @@ mod tests {
     };
 
     use async_trait::async_trait;
-    use iracing_sdk::{CameraState, ChatCommandMode, PitCommand, ReplayPositionMode};
+    use iracing_sdk::PitCommand;
+    use iracing_sdk::types::irsdk::{CameraState, ChatCommandMode, ReplayPositionMode};
 
     use super::*;
     use crate::broadcast_app::AvailableCameraGroup;
@@ -833,7 +835,9 @@ mod tests {
             selection_snapshot: camera_snapshot(1, 2, 3),
             selection_wait: StdMutex::new(Some(camera_selection_wait)),
             state_snapshot: camera_state(0),
-            state_wait: StdMutex::new(Some(Ok(camera_state(CameraState::UI_HIDDEN.bits())))),
+            state_wait: StdMutex::new(Some(Ok(camera_state(
+                CameraState::USER_INTERFACE_HIDDEN.bits(),
+            )))),
             resolutions: StdMutex::new(HashMap::from([
                 ("001".to_string(), 1),
                 ("012".to_string(), 12),
@@ -1064,20 +1068,25 @@ mod tests {
         let Fixture { events, use_cases } = fixture();
 
         let result = use_cases
-            .camera_set_state(Some(CameraState::UI_HIDDEN))
+            .camera_set_state(Some(CameraState::USER_INTERFACE_HIDDEN))
             .await
             .expect("camera state should succeed");
 
-        assert_eq!(result, camera_state(CameraState::UI_HIDDEN.bits()));
+        assert_eq!(
+            result,
+            camera_state(CameraState::USER_INTERFACE_HIDDEN.bits())
+        );
         assert_eq!(
             *events.lock().expect("events mutex poisoned"),
             vec![
                 Event::CameraStateSnapshot,
-                Event::Send(BroadcastCommand::CameraSetState(CameraState::UI_HIDDEN)),
+                Event::Send(BroadcastCommand::CameraSetState(
+                    CameraState::USER_INTERFACE_HIDDEN,
+                )),
                 Event::CameraStateWait {
                     previous: camera_state(0),
                     expected: CameraStateExpectation {
-                        state: CameraState::UI_HIDDEN.bits(),
+                        state: CameraState::USER_INTERFACE_HIDDEN.bits(),
                     },
                     timeout: Duration::from_millis(25),
                 },
@@ -1094,7 +1103,10 @@ mod tests {
             .await
             .expect("camera state should succeed");
 
-        assert_eq!(result, camera_state(CameraState::UI_HIDDEN.bits()));
+        assert_eq!(
+            result,
+            camera_state(CameraState::USER_INTERFACE_HIDDEN.bits())
+        );
         assert_eq!(
             *events.lock().expect("events mutex poisoned"),
             vec![

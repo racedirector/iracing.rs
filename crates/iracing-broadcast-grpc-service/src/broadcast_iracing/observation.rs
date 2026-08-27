@@ -4,11 +4,12 @@ use std::{
 };
 
 use async_trait::async_trait;
+use iracing_sdk::types::{
+    irsdk::{CameraState, PitServiceFlags},
+    session::SessionInfo,
+};
 use iracing_sdk::{
-    CameraState, FrameAdapter, SchemaProvider, VariableSchema,
-    provider::Provider,
-    providers::live::LiveProvider,
-    schema::{SessionInfo, SessionInfoParser},
+    FrameAdapter, SchemaProvider, VariableSchema, provider::Provider, providers::live::LiveProvider,
 };
 use tokio::sync::Mutex;
 
@@ -37,7 +38,6 @@ struct CachedSessionInfo {
 pub(crate) struct IracingObservation<P> {
     provider: Arc<Mutex<P>>,
     telemetry: TelemetryObserver<P>,
-    session_parser: Arc<StdMutex<SessionInfoParser>>,
     session_cache: Arc<StdMutex<Option<CachedSessionInfo>>>,
     camera_selection_available: bool,
     camera_state_available: bool,
@@ -95,7 +95,6 @@ where
                 "force feedback",
             ),
             telemetry,
-            session_parser: Arc::new(StdMutex::new(SessionInfoParser::new())),
             session_cache: Arc::new(StdMutex::new(None)),
         }
     }
@@ -155,11 +154,7 @@ where
             ))
         })?;
 
-        let session = self
-            .session_parser
-            .lock()
-            .expect("session parser mutex poisoned")
-            .parse(&yaml)
+        let session = SessionInfo::parse(&yaml)
             .map_err(|error| BroadcastError::FailedPrecondition(error.to_string()))?;
 
         *self
@@ -174,12 +169,12 @@ where
     }
 }
 
-const CONTROLLABLE_CAMERA_STATE: CameraState = CameraState::CAM_TOOL_ACTIVE
-    .union(CameraState::UI_HIDDEN)
+const CONTROLLABLE_CAMERA_STATE: CameraState = CameraState::CAMERA_TOOL_ACTIVE
+    .union(CameraState::USER_INTERFACE_HIDDEN)
     .union(CameraState::USE_AUTO_SHOT_SELECTION)
     .union(CameraState::USE_TEMPORARY_EDITS)
     .union(CameraState::USE_KEY_ACCELERATION)
-    .union(CameraState::USE_KEY_10X_ACCELERATION)
+    .union(CameraState::USE_KEY_TEN_TIMES_ACCELERATION)
     .union(CameraState::USE_MOUSE_AIM_MODE);
 
 fn camera_state_matches_expectation(
@@ -687,7 +682,7 @@ fn pit_service_snapshot_to_telemetry(
     snapshot: PitServiceSnapshot,
 ) -> Result<PitServiceTelemetry, BroadcastError> {
     Ok(PitServiceTelemetry {
-        service_flags: iracing_sdk::PitServiceFlags::from_bits_retain(snapshot.service_flags),
+        service_flags: PitServiceFlags::from_bits_retain(snapshot.service_flags),
         fuel: snapshot.fuel,
         lf_pressure: snapshot.lf_pressure,
         rf_pressure: snapshot.rf_pressure,
@@ -739,7 +734,8 @@ mod tests {
     };
 
     use async_trait::async_trait;
-    use iracing_sdk::{CameraState, FramePacket, IRacingSDKError, VariableInfo, VariableType};
+    use iracing_sdk::types::irsdk::CameraState;
+    use iracing_sdk::{FramePacket, IRacingSDKError, VariableInfo, VariableType};
 
     use super::*;
 
@@ -841,20 +837,20 @@ mod tests {
 
     #[test]
     fn camera_state_matcher_accepts_superset_flags() {
-        let current = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+        let current = CameraState::IS_SESSION_SCREEN.union(CameraState::CAMERA_TOOL_ACTIVE);
 
         assert!(camera_state_matches_expectation(
             current,
-            camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+            camera_state_expectation(CameraState::CAMERA_TOOL_ACTIVE),
         ));
     }
 
     #[test]
     fn camera_state_matcher_requires_all_expected_flags() {
-        let expected = CameraState::CAM_TOOL_ACTIVE.union(CameraState::UI_HIDDEN);
+        let expected = CameraState::CAMERA_TOOL_ACTIVE.union(CameraState::USER_INTERFACE_HIDDEN);
 
         assert!(!camera_state_matches_expectation(
-            CameraState::CAM_TOOL_ACTIVE,
+            CameraState::CAMERA_TOOL_ACTIVE,
             camera_state_expectation(expected),
         ));
         assert!(camera_state_matches_expectation(
@@ -870,7 +866,7 @@ mod tests {
             camera_state_expectation(CameraState::empty()),
         ));
         assert!(!camera_state_matches_expectation(
-            CameraState::IS_SESSION_SCREEN.union(CameraState::UI_HIDDEN),
+            CameraState::IS_SESSION_SCREEN.union(CameraState::USER_INTERFACE_HIDDEN),
             camera_state_expectation(CameraState::empty()),
         ));
     }
@@ -879,12 +875,12 @@ mod tests {
     async fn camera_state_wait_returns_previous_when_already_satisfied() {
         let observation =
             IracingObservation::from_provider(FakeProvider::new([]), camera_state_schema());
-        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::CAMERA_TOOL_ACTIVE);
 
         let actual = observation
             .wait_for_state(
                 camera_state_snapshot(previous),
-                camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+                camera_state_expectation(CameraState::CAMERA_TOOL_ACTIVE),
                 Duration::from_millis(10),
             )
             .await
@@ -896,7 +892,7 @@ mod tests {
     #[tokio::test]
     async fn camera_state_wait_accepts_changed_superset_state() {
         let schema = camera_state_schema();
-        let observed = CameraState::IS_SESSION_SCREEN.union(CameraState::CAM_TOOL_ACTIVE);
+        let observed = CameraState::IS_SESSION_SCREEN.union(CameraState::CAMERA_TOOL_ACTIVE);
         let observation = IracingObservation::from_provider(
             FakeProvider::new([camera_state_packet(Arc::clone(&schema), 1, observed)]),
             schema,
@@ -905,7 +901,7 @@ mod tests {
         let actual = observation
             .wait_for_state(
                 camera_state_snapshot(CameraState::empty()),
-                camera_state_expectation(CameraState::CAM_TOOL_ACTIVE),
+                camera_state_expectation(CameraState::CAMERA_TOOL_ACTIVE),
                 Duration::from_millis(100),
             )
             .await
@@ -917,7 +913,7 @@ mod tests {
     #[tokio::test]
     async fn camera_state_wait_accepts_zero_when_controllable_flags_clear() {
         let schema = camera_state_schema();
-        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::UI_HIDDEN);
+        let previous = CameraState::IS_SESSION_SCREEN.union(CameraState::USER_INTERFACE_HIDDEN);
         let observed = CameraState::IS_SESSION_SCREEN;
         let observation = IracingObservation::from_provider(
             FakeProvider::new([camera_state_packet(Arc::clone(&schema), 1, observed)]),
