@@ -57,6 +57,7 @@ mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
 mod schema;
+pub mod session;
 mod telemetry_value;
 mod update_rate;
 mod var_data;
@@ -74,21 +75,13 @@ pub use frame::FramePacket;
 pub use ibt_header::IbtHeader;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
-pub(crate) use irsdk::VariableHeadersBuffer;
 pub use irsdk::{
     DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
-    VariableBuffer, VariableHeader, VariableType, WireType, status_is_connected,
-};
-pub use irsdk_bitflags::{
-    CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
-};
-pub use irsdk_enums::{
-    BroadcastMessage, CameraSwitchFocus, CarLeftRight, ChatCommandMode, FfbCommandMode, PaceMode,
-    PitCommandMode, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, SessionState, StatusField, TelemetryCommandMode, TrackLocation, TrackSurface,
-    TrackWetness, VideoCaptureMode,
+    VariableBuffer, VariableHeader, VariableHeadersBuffer, VariableType, WireType,
+    status_is_connected,
 };
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema, VariablesHashMap};
+pub use session::SessionInfo;
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;

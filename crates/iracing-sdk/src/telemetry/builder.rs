@@ -4,7 +4,7 @@ use tokio::sync::watch;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{FramePacket, provider::Provider, schema::SessionInfo};
+use crate::{FramePacket, provider::Provider, types::SessionInfo};
 
 use super::{
     Telemetry, TelemetryChannels,

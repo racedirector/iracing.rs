@@ -1,57 +1,13 @@
-//! # Session Information Parsing
+//! Typed representations of iRacing session information.
 //!
-//! This module handles parsing of iRacing's session information from shared memory YAML data.
-//! The session info contains metadata about the current racing session including track details,
-//! weather conditions, participant information, and session timing.
+//! [`SessionInfo`] and its submodules model the cleaned YAML published by live
+//! telemetry and embedded in IBT recordings. Acquisition, byte decoding, YAML
+//! cleanup, version tracking, and publication policy live outside this module;
+//! callers should preprocess raw text with [`crate::yaml_utils`] before calling
+//! [`SessionInfo::parse`].
 //!
-//! ## Key Features
-//!
-//! - **YAML Compatibility**: Handles iRacing's invalid YAML with unescaped characters
-//! - **Performance Caching**: Version-based caching prevents unnecessary re-parsing
-//! - **Memory Safety**: Safe extraction from Windows shared memory with bounds checking
-//! - **Type Safety**: Full serde integration with comprehensive Rust type mapping
-//! - **Error Resilience**: Graceful handling of malformed YAML and missing session data
-//!
-//! ## iRacing YAML Compatibility
-//!
-//! iRacing outputs invalid YAML containing unescaped characters in driver names and file paths
-//! that break standard YAML parsers. This module includes preprocessing to fix these issues:
-//!
-//! ```text
-//! // Problematic iRacing YAML:
-//! UserName: O'Connor, Mike
-//! TeamName: "Fast & Furious" Racing
-//!
-//! // After preprocessing:
-//! UserName: 'O''Connor, Mike'
-//! TeamName: '"Fast & Furious" Racing'
-//! ```
-//!
-//! See: [iRacing Forum Discussion](https://forums.iracing.com/discussion/comment/374646#Comment_374646)
-//!
-//! ## Performance Characteristics
-//!
-//! - **YAML Preprocessing**: ~30μs (well under 1ms target)
-//! - **Complete Parsing**: ~56μs (well under 10ms target)
-//! - **Caching**: Version-based caching eliminates parsing when session unchanged
-//! - **Memory Usage**: Single-pass preprocessing with minimal allocations
-//!
-//! ## Architecture
-//!
-//! ```text
-//! ┌─────────────────────────────────────────────┐
-//! │           Session Info Pipeline             │
-//! │                                             │
-//! │  Shared Memory  ──► YAML Extract ──► Cache. │
-//! │       │                   │            │    │
-//! │       │                   ▼            ▼    │
-//! │       │            Preprocess ──► Parse     │
-//! │       │                   │            │    │
-//! │       │                   ▼            ▼    │
-//! │       └────────── Validate ──► SessionInfo  │
-//! │                                             │
-//! └─────────────────────────────────────────────┘
-//! ```
+//! The `schema-discovery` feature retains unknown fields so schema-generation
+//! tools can report simulator additions without weakening the typed model.
 
 use serde::{Deserialize, Serialize};
 
@@ -59,7 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Submodules
-pub mod cache;
 pub mod camera;
 pub mod car_setup;
 #[cfg(feature = "schema-discovery")]
@@ -70,8 +25,7 @@ pub mod session_data;
 pub mod timing;
 pub mod weekend;
 
-// Re-exports for backward compatibility
-pub use cache::{SessionInfoCache, SessionInfoParser};
+// Typed session model exports.
 pub use camera::{Camera, CameraGroup, CameraInfo};
 pub use car_setup::CarSetup;
 #[cfg(feature = "schema-discovery")]
@@ -336,25 +290,14 @@ mod tests {
     }
 
     #[test]
-    fn session_info_cache_validity() {
-        let session_info = create_test_session_info();
-        let cache = SessionInfoCache::new(session_info, 42);
-
-        assert!(cache.is_valid(42));
-        assert!(!cache.is_valid(43));
-    }
-
-    #[test]
     fn yaml_preprocessing_fixes_problematic_characters() {
-        let parser = SessionInfoParser::new();
-
         let problematic_yaml = r#"
 UserName: O'Connor, Mike
 TeamName: "Fast & Furious" Racing
 AbbrevName: O'Con
 "#;
 
-        let result = parser.preprocess_iracing_yaml(problematic_yaml).unwrap();
+        let result = crate::yaml_utils::preprocess_iracing_yaml(problematic_yaml).unwrap();
         println!("Original: {}", problematic_yaml);
         println!("Processed: {}", result);
 
@@ -366,52 +309,13 @@ AbbrevName: O'Con
         assert!(result.contains("TeamName: \"Fast & Furious\" Racing"));
     }
 
-    #[test]
-    fn extract_yaml_from_memory_validates_bounds() {
-        let parser = SessionInfoParser::new();
-        let memory = vec![0u8; 100];
-
-        // Invalid offset
-        let result = parser.extract_yaml_from_memory(&memory, -1, 10);
-        assert!(result.is_err());
-
-        // Invalid length
-        let result = parser.extract_yaml_from_memory(&memory, 10, -1);
-        assert!(result.is_err());
-
-        // Out of bounds
-        let result = parser.extract_yaml_from_memory(&memory, 50, 60);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn session_validation_catches_missing_required_fields() {
-        let parser = SessionInfoParser::new();
-
-        // Missing track name
-        let mut session_info = create_test_session_info();
-        session_info.weekend_info.track_name.clear();
-        assert!(parser.validate_session_info(&session_info).is_err());
-
-        // Missing track display name
-        let mut session_info = create_test_session_info();
-        session_info.weekend_info.track_display_name.clear();
-        assert!(parser.validate_session_info(&session_info).is_err());
-
-        // No sessions
-        let mut session_info = create_test_session_info();
-        session_info.session_info.sessions.clear();
-        assert!(parser.validate_session_info(&session_info).is_err());
-    }
-
     // Property tests for comprehensive validation
     proptest! {
         #[test]
         fn prop_yaml_preprocessing_preserves_structure(
             yaml_content in r"[a-zA-Z0-9: \n\-\._]+",
         ) {
-            let parser = SessionInfoParser::new();
-            let result = parser.preprocess_iracing_yaml(&yaml_content);
+            let result = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content);
 
             // Should not fail on well-formed content
             prop_assert!(result.is_ok());
@@ -423,25 +327,6 @@ AbbrevName: O'Con
             prop_assert!(len_diff >= -2, "Processed length: {}, Original length: {}, Diff: {}", processed.len(), yaml_content.len(), len_diff);
         }
 
-        #[test]
-        fn prop_memory_extraction_handles_various_inputs(
-            offset in 0..1000i32,
-            length in 1..1000i32,
-            memory_size in 1000..10000usize,
-        ) {
-            let parser = SessionInfoParser::new();
-            let memory = vec![65u8; memory_size]; // Fill with 'A' characters
-
-            let result = parser.extract_yaml_from_memory(&memory, offset, length);
-
-            if (offset as usize + length as usize) <= memory_size {
-                // Should succeed if within bounds
-                prop_assert!(result.is_ok());
-            } else {
-                // Should fail if out of bounds
-                prop_assert!(result.is_err());
-            }
-        }
     }
 
     #[test]
@@ -459,10 +344,7 @@ AbbrevName: O'Con
             yaml_content.len()
         );
 
-        // Parse with our SessionInfoParser
-        let parser = SessionInfoParser::new();
-        let preprocessed = parser
-            .preprocess_iracing_yaml(&yaml_content)
+        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content)
             .expect("Failed to preprocess YAML");
 
         let session_info: SessionInfo = serde_yaml_ng::from_str(&preprocessed)
@@ -510,6 +392,7 @@ AbbrevName: O'Con
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn create_test_session_info() -> SessionInfo {
         SessionInfo {
             weekend_info: WeekendInfo {
@@ -591,8 +474,6 @@ AbbrevName: O'Con
     fn benchmark_session_info_parsing_performance() {
         use std::time::Instant;
 
-        let parser = SessionInfoParser::new();
-
         // Create realistic test YAML with problematic characters
         let test_yaml = r#"
  DriverInfo:
@@ -632,7 +513,7 @@ SessionState: Racing
 
         // Warm up
         for _ in 0..10 {
-            let _ = parser.preprocess_iracing_yaml(test_yaml);
+            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml);
         }
 
         // Benchmark YAML preprocessing
@@ -640,7 +521,7 @@ SessionState: Racing
         let start = Instant::now();
 
         for _ in 0..NUM_ITERATIONS {
-            let _ = parser.preprocess_iracing_yaml(test_yaml).unwrap();
+            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
         }
 
         let elapsed = start.elapsed();
@@ -660,12 +541,12 @@ SessionState: Racing
         );
 
         // Benchmark complete parsing pipeline
-        let preprocessed = parser.preprocess_iracing_yaml(test_yaml).unwrap();
+        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
         let start = Instant::now();
 
         for _ in 0..100 {
             // Fewer iterations for full parsing
-            let _ = parser.parse(&preprocessed);
+            let _ = SessionInfo::parse(&preprocessed);
         }
 
         let elapsed = start.elapsed();
@@ -718,7 +599,6 @@ SessionState: Racing
         );
 
         // Get and parse session info
-        let parser = SessionInfoParser::new();
         let session_buffer = connection
             .session_info_buffer()
             .expect("Failed to get session info from iRacing");
@@ -727,13 +607,11 @@ SessionState: Racing
             .expect("Failed to decode session info from iRacing");
 
         // Preprocess the YAML to handle control characters
-        let preprocessed_yaml = parser
-            .preprocess_iracing_yaml(&raw_yaml)
+        let preprocessed_yaml = crate::yaml_utils::preprocess_iracing_yaml(&raw_yaml)
             .expect("Failed to preprocess YAML");
 
-        let session_info = parser
-            .parse(&preprocessed_yaml)
-            .expect("Failed to parse live session info");
+        let session_info =
+            SessionInfo::parse(&preprocessed_yaml).expect("Failed to parse live session info");
 
         // Validate session info content
         println!("\nLive session info parsed successfully:");
@@ -783,20 +661,18 @@ SessionState: Racing
             "Should have at least one session"
         );
 
-        // Test caching behavior - second parse should use cache
-        let cached_session_info = parser
-            .parse(&preprocessed_yaml)
-            .expect("Failed to parse cached session info");
+        let reparsed_session_info =
+            SessionInfo::parse(&preprocessed_yaml).expect("Failed to reparse session info");
 
         assert_eq!(
             session_info.weekend_info.track_name,
-            cached_session_info.weekend_info.track_name
+            reparsed_session_info.weekend_info.track_name
         );
         assert_eq!(
             session_info.session_info.sessions.len(),
-            cached_session_info.session_info.sessions.len()
+            reparsed_session_info.session_info.sessions.len()
         );
-        println!("  ✅ Session info caching working correctly");
+        println!("  ✅ Session info reparsing is deterministic");
 
         // Test some drivers if available
         if let Some(driver_info) = &session_info.driver_info

@@ -19,8 +19,8 @@
 //!   - [`reader`] for checked random access, header-directed snapshots, and
 //!     borrowed mapped-memory access
 //! - Session data path:
-//!   - [`schema::SessionInfo`], [`schema::SessionInfoParser`]
-//!   - [`yaml_utils`] for iRacing YAML cleanup
+//!   - [`SessionInfo`] for the typed model
+//!   - [`yaml_utils`] for cleanup before parsing raw iRacing YAML
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`
@@ -88,9 +88,6 @@ pub mod telemetry;
 #[cfg(feature = "benchmark")]
 #[doc(hidden)]
 pub mod benchmarking;
-
-// Data model modules
-pub mod schema;
 
 // Core exports
 pub use adapters::*;

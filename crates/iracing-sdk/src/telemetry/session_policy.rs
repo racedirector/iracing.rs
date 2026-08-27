@@ -7,7 +7,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::{FramePacket, provider::Provider, schema::SessionInfo};
+use crate::{FramePacket, provider::Provider, types::SessionInfo};
 
 /// Controls how session information is discovered and published for a telemetry source.
 ///

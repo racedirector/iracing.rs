@@ -26,36 +26,31 @@ memory; the resulting schema and frame types remain platform-neutral.
 ## Session YAML path
 
 iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
-that standard parsers do not accept directly. The code has two cleanup surfaces:
+that standard parsers do not accept directly. The path has three explicit steps:
 
-- `yaml_utils` extracts bounded memory regions, decodes UTF-8 with a
-  Windows-1252 fallback, and performs low-level control-character cleanup;
-- `SessionInfoParser` includes a compatibility preprocessor for problematic
-  unquoted fields, deserializes `SessionInfo`, validates required high-level
-  content, and can cache by session version.
+- readers copy the advertised region into an owned `SessionInfoBuffer`;
+- converting that buffer to `String` stops at the first NUL and preserves
+  invalid UTF-8 bytes with a single-byte fallback;
+- `yaml_utils::preprocess_iracing_yaml` repairs problematic control characters
+  and unquoted fields before `SessionInfo::parse` deserializes the typed model.
 
-`SessionInfo::parse` is the lighter path for YAML that a provider has already
-cleaned. Provider and caller contracts must make preprocessing ownership clear;
-do not stack ad hoc cleaners at each call site.
+Provider and caller contracts must make preprocessing ownership clear; do not
+stack ad hoc cleaners at each call site.
 
 ## Caching and publication
 
-`SessionInfoParser::parse_from_memory` caches a cloned `SessionInfo` keyed by the
-numeric session version. Repeated calls at the same version reuse the cache.
-
-The telemetry task does not use that cache directly. It has source-specific
-session policies:
+The telemetry task has source-specific session policies:
 
 - live: detect version transitions, immediately own the current YAML, and parse
   queued snapshots sequentially on a background FIFO worker before publishing;
 - IBT: fetch and parse immutable session YAML once before frames.
 
-Architecture changes must distinguish parser caching from telemetry publication.
-They solve different problems.
+Session parsing itself is stateless. Version tracking, ordering, retry, and
+publication remain telemetry-policy responsibilities.
 
 ## Typed session model
 
-`schema/session` decomposes `SessionInfo` into weekend, timing, driver, radio,
+`types/session` decomposes `SessionInfo` into weekend, timing, driver, radio,
 camera, car setup, and session-data modules. Serde uses iRacing's PascalCase
 field naming.
 
@@ -69,7 +64,7 @@ fields.
 `docs/reference/*.yml` contains checked-in output from schema binaries:
 
 - baseline session, variable, and primitive schemas;
-- disk-derived variable schema;
+- disk-derived session and variable schemas;
 - live-derived variable and session schemas.
 
 These files are generated artifacts. Change the Rust model or generator first,

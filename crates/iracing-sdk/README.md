@@ -6,7 +6,7 @@ This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
 - Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
-- Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
+- Typed session YAML parsing via `SessionInfo` after cleanup with `yaml_utils`
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
 
@@ -15,7 +15,7 @@ This crate provides:
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
 2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
 3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
-4. For session YAML parsing and caching, rely on `SessionInfoParser`.
+4. For session YAML, decode an owned session snapshot, clean it with `yaml_utils`, then parse `SessionInfo`.
 5. On Windows, use `WindowsConnection` for live telemetry.
 
 ## Install
@@ -72,7 +72,7 @@ fn main() -> iracing_sdk::Result<()> {
 ### Session YAML Parsing
 
 ```rust,no_run
-use iracing_sdk::{reader::ibt::IbtReader, schema::SessionInfo, yaml_utils};
+use iracing_sdk::{SessionInfo, reader::ibt::IbtReader, yaml_utils};
 
 fn main() -> iracing_sdk::Result<()> {
     let reader = IbtReader::open("telemetry.ibt")?;
@@ -157,7 +157,7 @@ impl FrameAdapter for Row {
 | Capability | Linux/macOS | Windows |
 |---|---|---|
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
-| Session parsing (`SessionInfoParser`) | Yes | Yes |
+| Typed session parsing (`SessionInfo`) | Yes | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
 | `live-position` example / `live-session-parser`, `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
