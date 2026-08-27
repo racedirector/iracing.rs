@@ -5,7 +5,19 @@ use type_layout::TypeLayout;
 
 /// `irsdk_StatusField`, stored in `irsdk_header::status` as an `int`.
 #[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, TypeLayout)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    TypeLayout,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 pub struct StatusField {
     bits: i32,
 }
@@ -116,7 +128,10 @@ sdk_bitmask! {
 
 /// `irsdk_IncidentFlags` is two packed fields, not a set of independent flags.
 #[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 pub struct IncidentFlags(u32);
 
 impl IncidentFlags {

@@ -210,7 +210,8 @@ impl Header {
 
         if self.variable_count > Self::MAX_LIVE_VARIABLES {
             return Err(header_validation_error(format!(
-                "Number of variables exceeds live limit of {{Self::MAX_LIVE_VARIABLES}}"
+                "Number of variables exceeds live limit of {}",
+                Self::MAX_LIVE_VARIABLES
             )));
         }
 
@@ -221,10 +222,11 @@ impl Header {
             )));
         }
 
-        if self.buffer_length <= 0 || self.buffer_length > Self::MAX_LIVE_BUFFER_LENGTH as i32 {
+        if self.buffer_length <= 0 || self.buffer_length > Self::MAX_LIVE_BUFFER_LENGTH {
             return Err(header_validation_error(format!(
-                "Expected buffer length in 1..={{Self::MAX_LIVE_BUFFER_LENGTH}}, found {}",
-                self.buffer_length
+                "Expected buffer length in 1..={}, found {}",
+                Self::MAX_LIVE_BUFFER_LENGTH,
+                self.buffer_length,
             )));
         }
 

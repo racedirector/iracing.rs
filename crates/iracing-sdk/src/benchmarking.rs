@@ -213,7 +213,7 @@ impl Drop for OnDemandPipeline {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::atomic::AtomicUsize};
+    use std::sync::atomic::AtomicUsize;
 
     use futures::{StreamExt, future::join_all};
 

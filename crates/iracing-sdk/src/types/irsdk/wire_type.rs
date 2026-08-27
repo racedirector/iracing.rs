@@ -50,8 +50,7 @@ pub unsafe trait WireType: Copy + Sized {
             return Err(IRacingSDKError::WireSize {
                 expected: Self::WIRE_SIZE,
                 actual: bytes.len(),
-            }
-            .into());
+            });
         }
 
         // SAFETY:

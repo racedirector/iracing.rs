@@ -16,6 +16,7 @@ macro_rules! define_irsdk_enum {
         }
     ) => {
         $(#[$meta])*
+        #[allow(clippy::enum_variant_names)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
         $vis enum $name {
             $(
