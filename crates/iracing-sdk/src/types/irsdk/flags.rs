@@ -191,6 +191,18 @@ impl IncidentFlags {
     }
 }
 
+impl From<crate::BitField> for IncidentFlags {
+    fn from(value: crate::BitField) -> Self {
+        Self::from_bits(value.value())
+    }
+}
+
+impl crate::VarData for IncidentFlags {
+    fn from_bytes(data: &[u8], info: &crate::VariableInfo) -> crate::Result<Self> {
+        <crate::BitField as crate::VarData>::from_bytes(data, info).map(Self::from)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -43,6 +43,25 @@ macro_rules! sdk_enum {
             }
         }
 
+        impl $crate::VarData for $name {
+            fn from_bytes(
+                data: &[u8],
+                info: &$crate::VariableInfo,
+            ) -> $crate::Result<Self> {
+                let raw = <i32 as $crate::VarData>::from_bytes(data, info)?;
+                Self::try_from(raw).map_err(|raw| $crate::IRacingSDKError::Parse {
+                    context: concat!("unknown ", stringify!($name), " value").to_owned(),
+                    details: raw.to_string(),
+                })
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::try_from(0).expect(concat!(stringify!($name), " must define value 0"))
+            }
+        }
+
         #[cfg(feature = "codegen")]
         impl $name {
             /// Named variants and their SDK values for schema generation.
