@@ -57,6 +57,27 @@ sdk_bitmask! {
     }
 }
 
+impl EngineWarnings {
+    /// Repair warnings from the engine bitfield.
+    pub const REPAIR_WARNINGS: Self =
+        Self::MANDATORY_REPAIR_NEEDED.union(Self::OPTIONAL_REPAIR_NEEDED);
+
+    /// If the engine has repairs
+    pub fn has_repairs(&self) -> bool {
+        self.intersects(Self::REPAIR_WARNINGS)
+    }
+
+    /// If the engine has required repairs
+    pub fn has_required_repairs(&self) -> bool {
+        self.contains(Self::MANDATORY_REPAIR_NEEDED)
+    }
+
+    /// If the engine has optional repairs
+    pub fn has_optional_repairs(&self) -> bool {
+        self.contains(Self::OPTIONAL_REPAIR_NEEDED)
+    }
+}
+
 sdk_bitmask! {
     /// `irsdk_Flags`.
     pub struct SessionFlags {
@@ -89,6 +110,79 @@ sdk_bitmask! {
     }
 }
 
+impl SessionFlags {
+    /// Bitfield representing penalty flags
+    pub const PENALTY_FLAGS: Self = Self::BLACK
+        .union(Self::DISQUALIFY)
+        .union(Self::FURLED)
+        .union(Self::DISQUALIFICATION_SCORING_INVALID);
+
+    /// Bitfield representing start control being shown.
+    /// Excludes `START_HIDDEN`.
+    pub const START_CONTROL_FLAGS: Self = Self::START_READY
+        .union(Self::START_SET)
+        .union(Self::START_GO);
+
+    /// Bitfield representing any race control flag being shown.
+    pub const RACE_CONTROL_FLAGS: Self = Self::CHECKERED
+        .union(Self::WHITE)
+        .union(Self::GREEN)
+        .union(Self::GREEN_HELD)
+        .union(Self::ONE_LAP_TO_GREEN)
+        .union(Self::YELLOW)
+        .union(Self::YELLOW_WAVING)
+        .union(Self::CAUTION)
+        .union(Self::CAUTION_WAVING)
+        .union(Self::DEBRIS)
+        .union(Self::CROSSED)
+        .union(Self::FURLED)
+        .union(Self::BLACK)
+        .union(Self::RED)
+        .union(Self::BLUE);
+
+    /// Bitfield representing any caution being shown.
+    pub const CAUTION_FLAGS: Self = Self::CAUTION.union(Self::CAUTION_WAVING);
+
+    /// Bitfield representing any yellow being shown.
+    pub const YELLOW_FLAGS: Self = Self::YELLOW.union(Self::YELLOW_WAVING);
+
+    /// Flags tht are shown over a range
+    pub const RANGE_FLAGS: Self = Self::YELLOW_FLAGS
+        .union(Self::BLUE)
+        .union(Self::DEBRIS)
+        .union(Self::CROSSED)
+        .union(Self::CAUTION_FLAGS)
+        .union(Self::BLACK)
+        .union(Self::SERVICE_ALLOWED)
+        .union(Self::FURLED)
+        .union(Self::REPAIR);
+
+    /// Indicates start control being shown.
+    pub fn has_start_control(&self) -> bool {
+        self.intersects(Self::START_CONTROL_FLAGS)
+    }
+
+    /// Indicates whether the session is under caution.
+    pub fn has_caution(&self) -> bool {
+        self.intersects(Self::CAUTION_FLAGS)
+    }
+
+    /// Indicates whether the session is yellow.
+    pub fn has_yellow(&self) -> bool {
+        self.intersects(Self::YELLOW_FLAGS)
+    }
+
+    /// Indicates whether the car has a penalty
+    pub fn has_penalty(&self) -> bool {
+        self.intersects(Self::PENALTY_FLAGS)
+    }
+
+    /// Indicates whether scoring has been invalidated.
+    pub fn has_dq_scoring_invalid(&self) -> bool {
+        self.contains(Self::DISQUALIFICATION_SCORING_INVALID)
+    }
+}
+
 sdk_bitmask! {
     /// `irsdk_CameraState`.
     pub struct CameraState {
@@ -114,6 +208,48 @@ sdk_bitmask! {
         FUEL_FILL = 0x0010,
         WINDSHIELD_TEAROFF = 0x0020,
         FAST_REPAIR = 0x0040,
+    }
+}
+
+impl PitServiceFlags {
+    /// Any tire service flag
+    pub const TIRE_SERVICE: Self = Self::LEFT_FRONT_TIRE_CHANGE
+        .union(Self::RIGHT_FRONT_TIRE_CHANGE)
+        .union(Self::LEFT_REAR_TIRE_CHANGE)
+        .union(Self::RIGHT_REAR_TIRE_CHANGE);
+
+    /// Whether the service request incldues any tire service.
+    pub fn has_tire_service(&self) -> bool {
+        self.intersects(Self::TIRE_SERVICE)
+    }
+
+    /// Whether the service request includes front tire changes.
+    pub fn has_front_tire_service(&self) -> bool {
+        self.intersects(Self::LEFT_FRONT_TIRE_CHANGE.union(Self::RIGHT_FRONT_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes rear tire changes.
+    pub fn has_rear_tire_service(&self) -> bool {
+        self.intersects(Self::LEFT_REAR_TIRE_CHANGE.union(Self::RIGHT_REAR_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes left side tire changes.
+    pub fn has_left_side_tire_service(&self) -> bool {
+        self.intersects(Self::LEFT_FRONT_TIRE_CHANGE.union(Self::LEFT_REAR_TIRE_CHANGE))
+    }
+
+    /// Whether the service request includes right side tire changes.
+    pub fn has_right_side_tire_service(&self) -> bool {
+        self.intersects(Self::RIGHT_FRONT_TIRE_CHANGE.union(Self::RIGHT_REAR_TIRE_CHANGE))
+    }
+
+    /// If the next stop is full service. Full service is all 4 tires, fuel, and a tearoff.
+    pub fn has_full_service(&self) -> bool {
+        self.intersects(
+            Self::TIRE_SERVICE
+                .union(Self::FUEL_FILL)
+                .union(Self::WINDSHIELD_TEAROFF),
+        )
     }
 }
 
@@ -194,6 +330,12 @@ impl IncidentFlags {
 impl From<crate::BitField> for IncidentFlags {
     fn from(value: crate::BitField) -> Self {
         Self::from_bits(value.value())
+    }
+}
+
+impl From<IncidentFlags> for crate::BitField {
+    fn from(value: IncidentFlags) -> Self {
+        Self::new(value.bits())
     }
 }
 

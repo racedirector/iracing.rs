@@ -49,10 +49,10 @@ macro_rules! sdk_enum {
                 info: &$crate::VariableInfo,
             ) -> $crate::Result<Self> {
                 let raw = <i32 as $crate::VarData>::from_bytes(data, info)?;
-                Self::try_from(raw).map_err(|raw| $crate::IRacingSDKError::Parse {
-                    context: concat!("unknown ", stringify!($name), " value").to_owned(),
-                    details: raw.to_string(),
-                })
+                Self::try_from(raw).map_err(|raw| $crate::IRacingSDKError::parse_error(
+                    concat!("unknown ", stringify!($name), " value").to_owned(),
+                    raw.to_string(),
+                ))
             }
         }
 

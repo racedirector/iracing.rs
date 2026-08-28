@@ -51,11 +51,7 @@ mod codegen;
 mod dynamic_frame;
 mod frame;
 mod ibt_header;
-mod incident;
 pub mod irsdk;
-mod irsdk_bitflags;
-mod irsdk_enums;
-pub mod irsdk_flags;
 mod schema;
 pub mod session;
 mod telemetry_value;
@@ -73,8 +69,6 @@ pub use broadcast::PitCommand;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub use ibt_header::IbtHeader;
-pub use incident::encode_incident;
-pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
 pub use irsdk::{
     DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
     VariableBuffer, VariableHeader, VariableHeadersBuffer, VariableType, WireType,
@@ -347,34 +341,40 @@ mod tests {
 
     #[test]
     fn test_incident_decoding_rep_only() {
-        use crate::irsdk_flags::incident as inc;
-        let bits = BitField::new(inc::REP_CONTACT_WITH_WORLD as u32);
-        let decoded = decode_incident(bits);
-        assert!(matches!(decoded.report, IncidentReport::ContactWithWorld));
-        assert!(matches!(decoded.penalty, IncidentPenalty::None));
+        use crate::types::irsdk::flags::IncidentFlags;
+
+        let bits = BitField::from(IncidentFlags::REPORT_CONTACT_WITH_WORLD);
+        let decoded = IncidentFlags::from(bits);
+
+        assert_eq!(decoded.report_bits(), 0x04);
+        assert_eq!(decoded.penalty_bits(), 0x00);
     }
 
     #[test]
     fn test_incident_decoding_pen_only() {
-        use crate::irsdk_flags::incident as inc;
-        let bits = BitField::new(((inc::PEN_0X as u32) << 8) & inc::PEN_MASK);
-        let decoded = decode_incident(bits);
-        assert!(matches!(decoded.report, IncidentReport::NoReport));
-        assert!(matches!(decoded.penalty, IncidentPenalty::ZeroX));
+        use crate::types::irsdk::flags::IncidentFlags;
+
+        let bits = BitField::from(IncidentFlags::PENALTY_ZERO_X);
+        let decoded = IncidentFlags::from(bits);
+
+        assert_eq!(decoded.report_bits(), 0x00);
+        assert_eq!(decoded.penalty_bits(), 0x01);
     }
 
     #[test]
     fn test_engine_warnings_new_bits_present() {
-        use crate::irsdk_flags::engine_warnings as ew;
-        let flags = BitField::new(ew::MAND_REP_NEEDED | ew::OPT_REP_NEEDED);
-        assert!(flags.has_flag(ew::MAND_REP_NEEDED));
-        assert!(flags.has_flag(ew::OPT_REP_NEEDED));
+        use crate::types::irsdk::flags::EngineWarnings as ew;
+        let flags = ew::MANDATORY_REPAIR_NEEDED | ew::OPTIONAL_REPAIR_NEEDED;
+
+        assert!(flags.contains(ew::MANDATORY_REPAIR_NEEDED));
+        assert!(flags.contains(ew::OPTIONAL_REPAIR_NEEDED));
     }
 
     #[test]
     fn test_engine_repair_helpers() {
-        use crate::irsdk_flags::engine_warnings as ew;
-        let flags = BitField::new(ew::MAND_REP_NEEDED | ew::OPT_REP_NEEDED);
+        use crate::types::irsdk::flags::EngineWarnings as ew;
+
+        let flags = BitField::from(ew::MANDATORY_REPAIR_NEEDED | ew::OPTIONAL_REPAIR_NEEDED);
         assert!(engine_mandatory_repair_needed(flags));
         assert!(engine_optional_repair_needed(flags));
         assert!(engine_repairs_needed(flags));
@@ -386,8 +386,9 @@ mod tests {
 
     #[test]
     fn test_session_dq_scoring_invalid_helper() {
-        use crate::irsdk_flags::session_flags as sf;
-        let flags = BitField::new(sf::DQ_SCORING_INVALID);
+        use crate::types::irsdk::flags::SessionFlags as sf;
+
+        let flags = BitField::from(sf::DISQUALIFICATION_SCORING_INVALID);
         assert!(session_dq_scoring_invalid(flags));
         let none = BitField::new(0);
         assert!(!session_dq_scoring_invalid(none));
@@ -395,24 +396,24 @@ mod tests {
 
     #[test]
     fn test_session_control_and_caution_helpers() {
-        use crate::irsdk_flags::flags as f;
+        use crate::types::irsdk::flags::SessionFlags as f;
 
         let none = BitField::new(0);
         assert!(!session_start_control_shown(none));
         assert!(!session_under_caution(none));
         assert!(!session_under_yellow(none));
 
-        let start = BitField::new(f::START_READY);
+        let start = BitField::from(f::START_READY);
         assert!(session_start_control_shown(start));
         assert!(!session_under_caution(start));
         assert!(!session_under_yellow(start));
 
-        let caution = BitField::new(f::CAUTION_WAVING);
+        let caution = BitField::from(f::CAUTION_WAVING);
         assert!(!session_start_control_shown(caution));
         assert!(session_under_caution(caution));
         assert!(!session_under_yellow(caution));
 
-        let yellow = BitField::new(f::YELLOW_WAVING);
+        let yellow = BitField::from(f::YELLOW_WAVING);
         assert!(!session_start_control_shown(yellow));
         assert!(!session_under_caution(yellow));
         assert!(session_under_yellow(yellow));
@@ -420,19 +421,20 @@ mod tests {
 
     #[test]
     fn test_pit_service_helpers() {
-        use crate::irsdk_flags::pit_sv_flags as p;
+        use crate::types::irsdk::flags::PitServiceFlags as p;
 
         let none = BitField::new(0);
         assert!(!pit_service_has_tire_service(none));
         assert!(!pit_service_has_full_service(none));
 
-        let tire_only = BitField::new(p::RR_TIRE_CHANGE);
+        let tire_only = BitField::from(p::RIGHT_REAR_TIRE_CHANGE);
         assert!(pit_service_has_tire_service(tire_only));
 
-        let fuel_only = BitField::new(p::FUEL_FILL);
+        let fuel_only = BitField::from(p::FUEL_FILL);
         assert!(!pit_service_has_tire_service(fuel_only));
 
-        let mixed = BitField::new(p::LF_TIRE_CHANGE | p::FUEL_FILL | p::WINDSHIELD_TEAROFF);
+        let mixed =
+            BitField::from(p::LEFT_FRONT_TIRE_CHANGE | p::FUEL_FILL | p::WINDSHIELD_TEAROFF);
         assert!(pit_service_has_tire_service(mixed));
         assert!(pit_service_has_full_service(mixed));
     }

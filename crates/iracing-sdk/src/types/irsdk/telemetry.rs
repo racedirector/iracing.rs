@@ -114,6 +114,29 @@ sdk_enum! {
     }
 }
 
+impl TrackWetness {
+    /// If the track is considered dry.
+    pub fn is_dry(self) -> bool {
+        self == Self::Dry
+    }
+
+    /// If the track conditions are mixed; could be dry in some areas, wet in others.
+    pub fn is_mixed(self) -> bool {
+        matches!(
+            self,
+            Self::MostlyDry | Self::VeryLightlyWet | Self::LightlyWet
+        )
+    }
+
+    /// If the track conditions indicate it's wet. Very likely wet tires only!
+    pub fn is_wet(self) -> bool {
+        matches!(
+            self,
+            Self::ModeratelyWet | Self::VeryWet | Self::ExtremelyWet
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
