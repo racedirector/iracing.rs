@@ -19,14 +19,14 @@ car-setup-observer = [
   "--",
 ]
 
-car-setup-schema = [
+car-setup = [
   "run",
   "-p",
   "iracing-sdk",
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "car-setup-schema",
+  "car-setup",
   "--",
 ]
 
@@ -37,8 +37,9 @@ disk-session-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "disk-session-schema",
+  "session-schema",
   "--",
+  "ibt",
 ]
 
 disk-variable-schema = [
@@ -48,8 +49,9 @@ disk-variable-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "disk-variable-schema",
+  "variable-schema",
   "--",
+  "ibt",
 ]
 
 headers = ["run", "-p", "iracing-sdk", "--bin", "headers", "--"]
@@ -59,8 +61,9 @@ ibt-session-parser = [
   "-p",
   "iracing-sdk",
   "--bin",
-  "ibt-session-parser",
+  "session",
   "--",
+  "ibt",
 ]
 
 ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
@@ -92,8 +95,9 @@ live-session-parser = [
   "-p",
   "iracing-sdk",
   "--bin",
-  "live-session-parser",
+  "session",
   "--",
+  "live",
 ]
 
 live-session-schema = [
@@ -103,8 +107,9 @@ live-session-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "live-session-schema",
+  "session-schema",
   "--",
+  "live",
 ]
 
 live-to-csv = ["run", "-p", "iracing-sdk", "--bin", "live-to-csv", "--"]
@@ -127,7 +132,19 @@ live-variable-schema = [
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "live-variable-schema",
+  "variable-schema",
+  "--",
+  "live",
+]
+
+session = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--features",
+  "codegen,schema-discovery",
+  "--bin",
+  "session",
   "--",
 ]
 
@@ -148,6 +165,17 @@ session-update-observer = [
   "iracing-sdk",
   "--example",
   "session-update-observer",
+  "--",
+]
+
+telemetry = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--features",
+  "codegen,schema-discovery",
+  "--bin",
+  "telemetry",
   "--",
 ]
 

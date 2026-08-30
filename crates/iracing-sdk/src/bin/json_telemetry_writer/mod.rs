@@ -190,7 +190,7 @@ mod tests {
     fn variable(name: &str) -> VariableInfo {
         VariableInfo {
             name: name.to_string(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,
@@ -335,7 +335,7 @@ mod tests {
         let value = variable("Value");
         let variables = vec![value.clone()];
         let schema = VariableSchema {
-            variables: HashMap::from([(value.name.clone(), value)]),
+            variables: HashMap::from([(value.name.clone(), value)]).into(),
             frame_size: 4,
         };
         let packet = FramePacket::new(42i32.to_le_bytes().to_vec(), 1, 0, Arc::new(schema));

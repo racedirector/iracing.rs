@@ -35,6 +35,15 @@ use crate::{
     },
 };
 
+/// Sanitize raw iRacing session YAML using the production preprocessing path.
+///
+/// This is exposed only with the `benchmark` feature so Criterion targets can
+/// measure the crate-private wire representation without making it part of the
+/// normal SDK API.
+pub fn preprocess_session_yaml(yaml: &str) -> Result<String> {
+    crate::irsdk::IRacingSessionString::try_from(yaml).map(Into::into)
+}
+
 /// A session policy that keeps session parsing out of delivery benchmarks.
 struct NoSessions<P>(PhantomData<fn() -> P>);
 
@@ -213,12 +222,12 @@ impl Drop for OnDemandPipeline {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::atomic::AtomicUsize};
+    use std::sync::atomic::AtomicUsize;
 
     use futures::{StreamExt, future::join_all};
 
     use super::*;
-    use crate::DynamicFrame;
+    use crate::{DynamicFrame, VariablesHashMap};
 
     struct ControlledProvider {
         credits: mpsc::UnboundedReceiver<()>,
@@ -261,8 +270,10 @@ mod tests {
     ) {
         let (credits, receiver) = mpsc::unbounded_channel();
         let reads = Arc::new(AtomicUsize::new(0));
-        let schema =
-            Arc::new(VariableSchema::new(HashMap::new(), 0).expect("empty schema should validate"));
+        let schema = Arc::new(
+            VariableSchema::new(VariablesHashMap::default(), 0)
+                .expect("empty schema should validate"),
+        );
         (
             ControlledProvider {
                 credits: receiver,

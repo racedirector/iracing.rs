@@ -6,9 +6,9 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo, VariableSchema,
+    FramePacket, Result, SchemaProvider, TelemetryValue, TelemetryValueProvider, VarData,
+    VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
-    types::variable_type::TelemetryValueProvider,
 };
 use std::sync::Arc;
 
@@ -38,11 +38,6 @@ impl DynamicFrame {
         self.get(name)
     }
 
-    /// Look up a variable as `u32`, or `None` if missing or the wrong type.
-    pub fn u32(&self, name: &str) -> Option<u32> {
-        self.get(name)
-    }
-
     /// Look up a variable as `f64`, or `None` if missing or the wrong type.
     pub fn f64(&self, name: &str) -> Option<f64> {
         self.get(name)
@@ -59,7 +54,7 @@ impl DynamicFrame {
     }
 
     /// Retrieves the variable from the frame by name.
-    pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
+    pub fn value(&self, name: &str) -> Result<Option<TelemetryValue>> {
         let Some(info) = self.variable(name) else {
             return Ok(None);
         };
@@ -75,7 +70,7 @@ impl SchemaProvider for DynamicFrame {
 }
 
 impl TelemetryValueProvider for DynamicFrame {
-    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
+    fn telemetry_value(&self, info: &VariableInfo) -> Result<TelemetryValue> {
         TelemetryValue::decode(self.data.as_ref(), info)
     }
 }
@@ -104,12 +99,12 @@ mod tests {
     #[test]
     fn dynamic_frame_basic_lookup() {
         // Build minimal schema
-        let mut vars = HashMap::new();
+        let mut vars = HashMap::with_capacity(3);
         vars.insert(
             "RPM".to_string(),
             VariableInfo {
                 name: "RPM".into(),
-                data_type: VariableType::Int32,
+                data_type: VariableType::Integer,
                 offset: 0,
                 count: 1,
                 count_as_time: false,
@@ -121,7 +116,7 @@ mod tests {
             "Speed".to_string(),
             VariableInfo {
                 name: "Speed".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 4,
                 count: 1,
                 count_as_time: false,
@@ -133,7 +128,7 @@ mod tests {
             "CarIdxLapDistPct".to_string(),
             VariableInfo {
                 name: "CarIdxLapDistPct".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 8,
                 count: 4,
                 count_as_time: false,
@@ -142,7 +137,7 @@ mod tests {
             },
         );
         let schema = VariableSchema {
-            variables: vars,
+            variables: vars.into(),
             frame_size: 24,
         };
 
@@ -175,6 +170,5 @@ mod tests {
         assert!(df.f32("Speed").unwrap() - 42.5 < 1e-5);
         let lap_dist_values: Vec<f32> = df.get("CarIdxLapDistPct").unwrap();
         assert_eq!(lap_dist_values, lap_dist);
-        assert_eq!(df.u32("Missing"), None);
     }
 }

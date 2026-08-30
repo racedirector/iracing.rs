@@ -3,32 +3,31 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::headers::{Header, VariableBuffer, VariableHeader, status_is_connected};
-use crate::{IRacingSDKError, Result, VariableInfo};
-use std::collections::HashMap;
+use super::utils::wide_string;
+use crate::{
+    IRacingSDKError, Result,
+    irsdk::{
+        FrameBuffer, Header, SessionInfoBuffer, StatusField, VariableBuffer, VariableHeader,
+        VariableHeadersBuffer, WireType,
+        constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
+    },
+};
 use std::mem::{MaybeUninit, size_of};
 use std::ptr::NonNull;
 use std::time::Duration;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
-use windows::Win32::System::Memory::{
-    FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
-    OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
+use windows::{
+    Win32::{
+        Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT},
+        System::{
+            Memory::{
+                FILE_MAP_READ, MEMORY_BASIC_INFORMATION, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
+                OpenFileMappingW, UnmapViewOfFile, VirtualQuery,
+            },
+            Threading::{OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject},
+        },
+    },
+    core::PCWSTR,
 };
-use windows::Win32::System::Threading::{
-    OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject,
-};
-use windows::core::PCWSTR;
-
-/// iRacing shared memory file name
-const IRSDK_MEMMAPFILENAME: &str = "Local\\IRSDKMemMapFileName";
-/// iRacing data valid event name
-const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
-/// Expected SDK version
-#[cfg(test)]
-const IRSDK_VER: i32 = 2;
-/// Connection status flag used by Windows-only tests.
-#[cfg(test)]
-const IRSDK_ST_CONNECTED: i32 = 1;
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,82 +36,6 @@ pub enum WaitResult {
     Signaled,
     /// Wait time elapsed.
     Timeout,
-}
-
-/// Owned snapshot of a live telemetry frame.
-#[derive(Debug, Clone)]
-pub struct FrameBuffer(Vec<u8>);
-
-impl From<FrameBuffer> for Vec<u8> {
-    fn from(buffer: FrameBuffer) -> Self {
-        buffer.0
-    }
-}
-
-/// Owned snapshot of the live session YAML region.
-#[derive(Debug, Clone)]
-pub struct SessionInfoBuffer(Vec<u8>);
-
-impl TryFrom<SessionInfoBuffer> for String {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: SessionInfoBuffer) -> Result<Self> {
-        let length = i32::try_from(buffer.0.len()).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "SessionInfoBuffer",
-                "Session YAML length cannot be represented by the SDK header",
-            )
-        })?;
-
-        crate::yaml_utils::extract_yaml_from_memory(&buffer.0, 0, length)
-    }
-}
-
-/// Owned snapshot of the live variable header region.
-#[derive(Debug, Clone)]
-pub struct VariableInfoBuffer {
-    bytes: Vec<u8>,
-    count: usize,
-}
-
-impl From<VariableInfoBuffer> for Vec<VariableHeader> {
-    fn from(buffer: VariableInfoBuffer) -> Self {
-        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
-
-        buffer
-            .bytes
-            .chunks_exact(VariableHeader::SIZE)
-            .map(VariableHeader::read_from_bytes)
-            .collect()
-    }
-}
-
-impl TryFrom<VariableInfoBuffer> for Vec<VariableInfo> {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
-        debug_assert_eq!(buffer.bytes.len(), buffer.count * VariableHeader::SIZE);
-
-        buffer
-            .bytes
-            .chunks_exact(VariableHeader::SIZE)
-            .map(|bytes| VariableHeader::read_from_bytes(bytes).try_into())
-            .collect()
-    }
-}
-
-impl TryFrom<VariableInfoBuffer> for HashMap<String, VariableInfo> {
-    type Error = IRacingSDKError;
-
-    fn try_from(buffer: VariableInfoBuffer) -> Result<Self> {
-        let variables: Vec<VariableInfo> = buffer.try_into()?;
-        let mut variable_map = HashMap::with_capacity(variables.len());
-        for info in variables {
-            variable_map.insert(info.name.clone(), info);
-        }
-
-        Ok(variable_map)
-    }
 }
 
 /// Direct connection to iRacing shared memory
@@ -156,7 +79,7 @@ impl Connection {
 
         // Open the memory mapping
         let mapping = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_MEMMAPFILENAME);
+            let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
             OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
                 .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
         };
@@ -172,7 +95,7 @@ impl Connection {
 
         // Open the data valid event
         let event = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_DATAVALIDEVENTNAME);
+            let wide_name = wide_string(IRSDK_DATAVALIDEVENTNAME);
             OpenEventW(
                 SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000),
                 false,
@@ -192,7 +115,7 @@ impl Connection {
         };
 
         connection.mapped_length = connection.query_mapped_length()?;
-        connection.validate_mapped_range(0, Header::SIZE)?;
+        connection.validate_mapped_range(0, Header::WIRE_SIZE)?;
 
         // Validate the connection
         connection.validate_connection()?;
@@ -203,9 +126,9 @@ impl Connection {
     /// Get a snapshot of the header
     #[inline]
     pub fn header_snapshot(&self) -> Header {
-        let bytes = unsafe { &*self.base.as_ptr().cast::<[u8; Header::SIZE]>() };
+        let bytes = unsafe { &*self.base.as_ptr().cast::<[u8; Header::WIRE_SIZE]>() };
 
-        Header::read_from_bytes(bytes)
+        Header::read_from_bytes(bytes).expect("Could not parse header from live connection")
     }
 
     /// Wait for new telemetry data (synchronous - blocks thread)
@@ -285,7 +208,7 @@ impl Connection {
                 frame.len()
             );
 
-            return Some(FrameBuffer(frame));
+            return Some(FrameBuffer::from_snapshot(frame));
         }
 
         tracing::warn!("Failed consistency checks, no data returned");
@@ -341,7 +264,7 @@ impl Connection {
         let variable_count = usize::try_from(header.variable_count)
             .map_err(|_| IRacingSDKError::memory_access_error(variable_offset))?;
         let variable_length = variable_count
-            .checked_mul(VariableHeader::SIZE)
+            .checked_mul(VariableHeader::WIRE_SIZE)
             .ok_or_else(|| IRacingSDKError::memory_access_error(variable_offset))?;
         self.validate_mapped_range(variable_offset, variable_length)?;
 
@@ -377,7 +300,7 @@ impl Connection {
         debug_assert!(
             offset
                 .checked_add(std::mem::size_of::<T>())
-                .is_some_and(|end| end <= Header::SIZE)
+                .is_some_and(|end| end <= Header::WIRE_SIZE)
         );
 
         unsafe {
@@ -413,17 +336,18 @@ impl Connection {
         debug_assert!(index < Header::MAX_BUFFERS);
 
         // Get the offset to the buffer at `index`
-        let offset = std::mem::offset_of!(Header, buffers) + index * VariableBuffer::SIZE;
+        let offset = std::mem::offset_of!(Header, buffers) + index * VariableBuffer::WIRE_SIZE;
 
         let bytes = unsafe {
             &*self
                 .base
                 .as_ptr()
                 .add(offset)
-                .cast::<[u8; VariableBuffer::SIZE]>()
+                .cast::<[u8; VariableBuffer::WIRE_SIZE]>()
         };
 
         VariableBuffer::read_from_bytes(bytes)
+            .expect("Could not parse valid buffer from connection")
     }
 
     #[inline]
@@ -471,11 +395,12 @@ impl Connection {
             return None;
         }
 
-        Some(SessionInfoBuffer(self.snapshot_region(offset, length)?))
+        self.snapshot_region(offset, length)
+            .map(SessionInfoBuffer::from_snapshot)
     }
 
     /// Reads an available variables snapshot out of the pointer
-    pub fn variable_info_buffer(&self) -> Option<VariableInfoBuffer> {
+    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header_snapshot();
 
         let offset = usize::try_from(header.variable_header_offset).ok()?;
@@ -485,12 +410,10 @@ impl Connection {
             return None;
         }
 
-        let length = count.checked_mul(VariableHeader::SIZE)?;
+        let length = count.checked_mul(VariableHeader::WIRE_SIZE)?;
 
-        Some(VariableInfoBuffer {
-            bytes: self.snapshot_region(offset, length)?,
-            count,
-        })
+        self.snapshot_region(offset, length)
+            .map(VariableHeadersBuffer::from_snapshot)
     }
 
     /// The latest buffer's tick count
@@ -505,21 +428,25 @@ impl Connection {
         unsafe { self.read_header_at::<u8>(std::mem::offset_of!(Header, current_buffer)) }
     }
 
-    fn buffer_count(&self) -> usize {
+    /// The current buffer count.
+    pub fn buffer_count(&self) -> usize {
         unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, buffer_count)) }
             .try_into()
             .unwrap_or(0)
     }
 
     /// The status bit from the header.
-    pub fn connection_status(&self) -> i32 {
-        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, status)) }
+    pub fn connection_status(&self) -> StatusField {
+        unsafe {
+            let status = self.read_header_at::<i32>(std::mem::offset_of!(Header, status));
+            StatusField::from_bits(status)
+        }
     }
 
     /// Check if iRacing is connected
     pub fn is_connected(&self) -> bool {
         let status = self.connection_status();
-        status_is_connected(status)
+        status.is_connected()
     }
 }
 
@@ -543,11 +470,12 @@ unsafe impl Sync for Connection {}
 
 #[cfg(all(test, windows))]
 mod tests {
-    use crate::{VariableInfo, headers::VariableBuffer};
+    use crate::{IRSDK_VERSION, VariableBuffer, VariableSchema, types::irsdk::StatusField};
 
     use super::*;
     use std::mem::ManuallyDrop;
 
+    #[allow(dead_code)]
     fn test_connection() -> ManuallyDrop<Connection> {
         ManuallyDrop::new(Connection {
             mapping: HANDLE::default(),
@@ -558,10 +486,11 @@ mod tests {
         })
     }
 
+    #[allow(dead_code)]
     fn test_header(buffer_count: i32) -> Header {
         Header::new(
-            IRSDK_VER,
-            IRSDK_ST_CONNECTED,
+            IRSDK_VERSION,
+            StatusField::CONNECTED,
             60,
             0,
             0,
@@ -582,22 +511,19 @@ mod tests {
     }
 
     #[test]
-    fn constants_match_iracing_sdk() {
-        assert_eq!(IRSDK_MEMMAPFILENAME, "Local\\IRSDKMemMapFileName");
-        assert_eq!(IRSDK_DATAVALIDEVENTNAME, "Local\\IRSDKDataValidEvent");
-        assert_eq!(IRSDK_VER, 2);
-        assert_eq!(IRSDK_ST_CONNECTED, 1);
-    }
-
-    #[test]
     #[ignore = "iracing_required"]
     fn test_read_rpm_variable() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
         let buffer = connection
-            .variable_info_buffer()
+            .variable_headers_buffer()
             .expect("Could not get VariableInfo from connection");
 
-        let variables: Vec<VariableInfo> = buffer.try_into().expect("Could not get VariableInfo");
+        let headers: Vec<VariableHeader> = buffer.into();
+        assert!(!headers.is_empty(), "Buffer should have some variables");
+
+        let variables = VariableSchema::from_connection(&connection)
+            .expect("Could not get variable schema")
+            .variables();
 
         // Look for exact "RPM" match to verify variable schema
         let exact_rpm = variables.iter().find(|v| v.name == "RPM");
@@ -623,7 +549,7 @@ mod tests {
         );
         assert!(header.tick_rate > 0, "Tick rate should be positive");
 
-        assert_eq!(header.version, IRSDK_VER);
+        assert_eq!(header.version, IRSDK_VERSION);
         assert!(header.variable_count > 0);
         assert!(header.buffer_count >= 3);
         assert!(header.buffer_count > 0);

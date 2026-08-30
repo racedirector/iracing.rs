@@ -48,8 +48,10 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = "0.1.85"
+chrono = "0.4.45"
 clap = { workspace = true }
 csv = { workspace = true }
+dirs = "6.0.0"
 encoding_rs = "0.8.35"
 futures = "0.3"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
@@ -140,13 +142,19 @@ harness = false
 required-features = ["benchmark"]
 
 [[bench]]
+name = "live_reader_acquisition"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
 name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
-[[example]]
-name = "car-setup-observer"
-path = "examples/car_setup_observer.rs"
+[[bench]]
+name = "session_parsing"
+harness = false
+required-features = ["benchmark"]
 
 [[example]]
 name = "disk-position"
@@ -191,37 +199,13 @@ name = "broadcast-cli"
 path = "src/bin/broadcast_cli.rs"
 
 [[bin]]
-name = "car-setup-schema"
-path = "src/bin/car_setup_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
-name = "disk-session-schema"
-path = "src/bin/disk_session_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
-name = "disk-variable-schema"
-path = "src/bin/disk_variable_schema.rs"
+name = "car-setup"
+path = "src/bin/car_setup.rs"
 required-features = ["codegen"]
 
 [[bin]]
 name = "headers"
 path = "src/bin/headers.rs"
-
-[[bin]]
-name = "ibt-session-parser"
-path = "src/bin/ibt_session_parser.rs"
-
-[[bin]]
-name = "live-session-schema"
-path = "src/bin/live_session_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
-name = "live-variable-schema"
-path = "src/bin/live_variable_schema.rs"
-required-features = ["codegen"]
 
 [[bin]]
 name = "primitives-schema"
@@ -241,10 +225,6 @@ name = "ibt-to-json"
 path = "src/bin/ibt_to_json.rs"
 
 [[bin]]
-name = "live-session-parser"
-path = "src/bin/live_session_parser.rs"
-
-[[bin]]
 name = "live-to-csv"
 path = "src/bin/live_to_csv.rs"
 
@@ -257,8 +237,12 @@ name = "live-to-jsonl"
 path = "src/bin/live_to_jsonl.rs"
 
 [[bin]]
-name = "session-schema"
-path = "src/bin/session_schema.rs"
+name = "session"
+path = "src/bin/session.rs"
+
+[[bin]]
+name = "telemetry"
+path = "src/bin/telemetry.rs"
 required-features = ["codegen"]
 
 [[bin]]

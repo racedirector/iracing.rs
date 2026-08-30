@@ -2,6 +2,8 @@ use anyhow::Result;
 #[cfg(windows)]
 use clap::Parser;
 #[cfg(windows)]
+use iracing_sdk::types::irsdk as sdk;
+#[cfg(windows)]
 use iracing_sdk::{
     AdapterValidation, FieldExtraction, FrameAdapter, SchemaProvider, providers::live::LiveProvider,
 };
@@ -19,10 +21,10 @@ struct Args {
 #[cfg(windows)]
 #[derive(Debug)]
 struct TelemetryRow {
-    session_state: iracing_sdk::SessionState,
-    session_flags: iracing_sdk::SessionFlags,
-    track_surface: iracing_sdk::TrackSurface,
-    engine_warnings: iracing_sdk::EngineWarnings,
+    session_state: sdk::SessionState,
+    session_flags: sdk::SessionFlags,
+    track_surface: sdk::TrackSurface,
+    engine_warnings: sdk::EngineWarnings,
 }
 
 #[cfg(windows)]
@@ -72,10 +74,12 @@ impl FrameAdapter for TelemetryRow {
         let engine_warnings_raw = fetch_bitfield("EngineWarnings");
 
         Self {
-            session_state: iracing_sdk::SessionState::from_raw(session_state_raw),
-            session_flags: iracing_sdk::SessionFlags::from(session_flags_raw),
-            track_surface: iracing_sdk::TrackSurface::from_raw(track_surface_raw),
-            engine_warnings: iracing_sdk::EngineWarnings::from(engine_warnings_raw),
+            session_state: sdk::SessionState::try_from(session_state_raw)
+                .unwrap_or(sdk::SessionState::Invalid),
+            session_flags: sdk::SessionFlags::from(session_flags_raw),
+            track_surface: sdk::TrackSurface::try_from(track_surface_raw)
+                .unwrap_or(sdk::TrackSurface::SurfaceNotInWorld),
+            engine_warnings: sdk::EngineWarnings::from(engine_warnings_raw),
         }
     }
 }
@@ -110,10 +114,9 @@ async fn main() -> Result<()> {
                 packet.tick,
                 row.session_state,
                 row.track_surface,
-                row.session_flags
-                    .contains(iracing_sdk::SessionFlags::CAUTION),
+                row.session_flags.contains(sdk::SessionFlags::CAUTION),
                 row.engine_warnings
-                    .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
+                    .contains(sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
             );
 
             seen += 1;

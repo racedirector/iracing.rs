@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 #[cfg(windows)]
-use iracing_sdk::windows::{Broadcast, BroadcastCommand, PitCommand};
-#[cfg(windows)]
-use iracing_sdk::{
+use iracing_sdk::types::irsdk::{
     CameraState, ChatCommandMode, ReplayPositionMode, ReplaySearchMode, ReplayStateMode,
     TelemetryCommandMode, VideoCaptureMode,
 };
+#[cfg(windows)]
+use iracing_sdk::windows::{Broadcast, BroadcastCommand, PitCommand};
 #[cfg(windows)]
 use std::io::{self, Write};
 
@@ -359,7 +359,7 @@ fn command_to_messages(command: SendCommand) -> Result<Vec<BroadcastCommand>> {
         SendCommand::Video { command } => match command {
             VideoCommand::Screenshot => {
                 vec![BroadcastCommand::VideoCapture(
-                    VideoCaptureMode::TriggerScreenShot,
+                    VideoCaptureMode::TriggerScreenshot,
                 )]
             }
             VideoCommand::Start => {
@@ -418,12 +418,12 @@ fn build_camera_state(args: CameraStateArgs) -> Result<CameraState> {
 #[cfg(windows)]
 fn camera_state_flag(flag: CameraStateFlag) -> CameraState {
     match flag {
-        CameraStateFlag::CamToolActive => CameraState::CAM_TOOL_ACTIVE,
-        CameraStateFlag::UiHidden => CameraState::UI_HIDDEN,
+        CameraStateFlag::CamToolActive => CameraState::CAMERA_TOOL_ACTIVE,
+        CameraStateFlag::UiHidden => CameraState::USER_INTERFACE_HIDDEN,
         CameraStateFlag::UseAutoShotSelection => CameraState::USE_AUTO_SHOT_SELECTION,
         CameraStateFlag::UseTemporaryEdits => CameraState::USE_TEMPORARY_EDITS,
         CameraStateFlag::UseKeyAcceleration => CameraState::USE_KEY_ACCELERATION,
-        CameraStateFlag::UseKey10xAcceleration => CameraState::USE_KEY_10X_ACCELERATION,
+        CameraStateFlag::UseKey10xAcceleration => CameraState::USE_KEY_TEN_TIMES_ACCELERATION,
         CameraStateFlag::UseMouseAimMode => CameraState::USE_MOUSE_AIM_MODE,
     }
 }
@@ -708,12 +708,12 @@ fn interactive_action_for_key<P: PromptInput>(
             let state_bits = if state.camera_state_enabled {
                 CameraState::empty()
             } else {
-                CameraState::CAM_TOOL_ACTIVE
-                    .union(CameraState::UI_HIDDEN)
+                CameraState::CAMERA_TOOL_ACTIVE
+                    .union(CameraState::USER_INTERFACE_HIDDEN)
                     .union(CameraState::USE_AUTO_SHOT_SELECTION)
                     .union(CameraState::USE_TEMPORARY_EDITS)
                     .union(CameraState::USE_KEY_ACCELERATION)
-                    .union(CameraState::USE_KEY_10X_ACCELERATION)
+                    .union(CameraState::USE_KEY_TEN_TIMES_ACCELERATION)
                     .union(CameraState::USE_MOUSE_AIM_MODE)
             };
             state.camera_state_enabled = !state.camera_state_enabled;
@@ -817,7 +817,7 @@ fn interactive_action_for_key<P: PromptInput>(
         )]),
         'E' => InteractiveAction::Send(vec![BroadcastCommand::PitCommand(PitCommand::ClearFuel)]),
         'F' => InteractiveAction::Send(vec![BroadcastCommand::VideoCapture(
-            VideoCaptureMode::TriggerScreenShot,
+            VideoCaptureMode::TriggerScreenshot,
         )]),
         'G' => InteractiveAction::Send(vec![BroadcastCommand::VideoCapture(
             VideoCaptureMode::StartVideoCapture,

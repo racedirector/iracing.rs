@@ -1,0 +1,4394 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+type: object
+properties:
+  CameraInfo:
+    type:
+    - object
+    - 'null'
+    properties:
+      Groups:
+        type:
+        - array
+        - 'null'
+        items:
+          anyOf:
+          - type: object
+            properties:
+              Cameras:
+                type:
+                - array
+                - 'null'
+                items:
+                  type: object
+                  properties:
+                    CameraName:
+                      type:
+                      - string
+                      - 'null'
+                    CameraNum:
+                      type:
+                      - integer
+                      - 'null'
+              GroupName:
+                type:
+                - string
+                - 'null'
+              GroupNum:
+                type:
+                - integer
+                - 'null'
+              IsScenic: true
+          - type: object
+            properties:
+              Cameras:
+                type:
+                - array
+                - 'null'
+                items:
+                  type: object
+                  properties:
+                    CameraName:
+                      type:
+                      - string
+                      - 'null'
+                    CameraNum:
+                      type:
+                      - integer
+                      - 'null'
+              GroupName:
+                type:
+                - string
+                - 'null'
+              GroupNum:
+                type:
+                - integer
+                - 'null'
+              IsScenic:
+                type:
+                - boolean
+                - 'null'
+  CarSetup:
+    type:
+    - object
+    - 'null'
+    properties:
+      Chassis:
+        type: object
+        properties:
+          Front:
+            type: object
+            properties:
+              BallastForward:
+                type: string
+              CrossWeight:
+                type: string
+              FrontBrakeBias:
+                type: string
+              NoseWeight:
+                type: string
+              SteeringOffset:
+                type: string
+              SteeringRatio:
+                type: string
+              TapeConfiguration:
+                type: string
+          FrontArb:
+            type: object
+            properties:
+              ArmAsymmetry:
+                type: integer
+              Attach:
+                type: integer
+              Diameter:
+                type: string
+              LinkSlack:
+                type: string
+              Preload:
+                type: string
+          LeftFront:
+            type: object
+            properties:
+              Camber:
+                type: string
+              Caster:
+                type: string
+              CornerWeight:
+                type: string
+              HsCompSlope:
+                type: string
+              HsCompression:
+                type: string
+              HsReboundSlope:
+                type: string
+              LsCompression:
+                type: string
+              LsRebound:
+                type: string
+              Packer:
+                type: string
+              RideHeight:
+                type: string
+              ShockSpringRate:
+                type: string
+              SpringPerchOffset:
+                type: string
+              ToeIn:
+                type: string
+          LeftRear:
+            type: object
+            properties:
+              Camber:
+                type: string
+              CornerWeight:
+                type: string
+              HsCompSlope:
+                type: string
+              HsCompression:
+                type: string
+              HsReboundSlope:
+                type: string
+              LsCompression:
+                type: string
+              LsRebound:
+                type: string
+              RideHeight:
+                type: string
+              SpringPerchOffset:
+                type: string
+              SpringRate:
+                type: string
+              ToeIn:
+                type: string
+              TrackBarHeight:
+                type: string
+              TruckArmMount:
+                type: string
+          Rear:
+            type: object
+            properties:
+              RearEndRatio:
+                type: number
+          RightFront:
+            type: object
+            properties:
+              Camber:
+                type: string
+              Caster:
+                type: string
+              CornerWeight:
+                type: string
+              HsCompSlope:
+                type: string
+              HsCompression:
+                type: string
+              HsReboundSlope:
+                type: string
+              LsCompression:
+                type: string
+              LsRebound:
+                type: string
+              Packer:
+                type: string
+              RideHeight:
+                type: string
+              ShockSpringRate:
+                type: string
+              SpringPerchOffset:
+                type: string
+              ToeIn:
+                type: string
+          RightRear:
+            type: object
+            properties:
+              Camber:
+                type: string
+              CornerWeight:
+                type: string
+              HsCompSlope:
+                type: string
+              HsCompression:
+                type: string
+              HsReboundSlope:
+                type: string
+              LsCompression:
+                type: string
+              LsRebound:
+                type: string
+              RideHeight:
+                type: string
+              SpringPerchOffset:
+                type: string
+              SpringRate:
+                type: string
+              ToeIn:
+                type: string
+              TrackBarHeight:
+                type: string
+              TravelToCoilBind:
+                type: string
+              TruckArmMount:
+                type: string
+              TruckArmPreload:
+                type: string
+      Tires:
+        type: object
+        properties:
+          LeftFront:
+            type: object
+            properties:
+              ColdPressure:
+                type: string
+              LastHotPressure:
+                type: string
+              LastTempsOMI:
+                type: string
+              TreadRemaining:
+                type: string
+          LeftRear:
+            type: object
+            properties:
+              ColdPressure:
+                type: string
+              LastHotPressure:
+                type: string
+              LastTempsOMI:
+                type: string
+              TreadRemaining:
+                type: string
+          RightFront:
+            type: object
+            properties:
+              ColdPressure:
+                type: string
+              LastHotPressure:
+                type: string
+              LastTempsIMO:
+                type: string
+              TreadRemaining:
+                type: string
+          RightRear:
+            type: object
+            properties:
+              ColdPressure:
+                type: string
+              LastHotPressure:
+                type: string
+              LastTempsIMO:
+                type: string
+              TreadRemaining:
+                type: string
+      UpdateCount:
+        type: integer
+  DriverInfo:
+    type:
+    - object
+    - 'null'
+    properties:
+      DriverBrakeCurvingFactor:
+        type:
+        - number
+        - 'null'
+      DriverCarEngCylinderCount:
+        type:
+        - integer
+        - 'null'
+      DriverCarEstLapTime:
+        type:
+        - number
+        - 'null'
+      DriverCarFuelKgPerLtr:
+        type:
+        - number
+        - 'null'
+      DriverCarFuelMaxLtr:
+        type:
+        - number
+        - 'null'
+      DriverCarGearNeutral:
+        type:
+        - integer
+        - 'null'
+      DriverCarGearNumForward:
+        type:
+        - integer
+        - 'null'
+      DriverCarGearReverse:
+        type:
+        - integer
+        - 'null'
+      DriverCarIdleRPM:
+        type:
+        - number
+        - 'null'
+      DriverCarIdx:
+        type:
+        - integer
+        - 'null'
+      DriverCarIsElectric:
+        type:
+        - integer
+        - 'null'
+      DriverCarMaxFuelPct:
+        type:
+        - number
+        - 'null'
+      DriverCarRedLine:
+        type:
+        - number
+        - 'null'
+      DriverCarSLBlinkRPM:
+        type:
+        - number
+        - 'null'
+      DriverCarSLFirstRPM:
+        type:
+        - number
+        - 'null'
+      DriverCarSLLastRPM:
+        type:
+        - number
+        - 'null'
+      DriverCarSLShiftRPM:
+        type:
+        - number
+        - 'null'
+      DriverCarShiftAid:
+        type:
+        - string
+        - 'null'
+      DriverCarVersion:
+        type:
+        - string
+        - 'null'
+      DriverGearboxControlType:
+        type:
+        - string
+        - 'null'
+      DriverGearboxType:
+        type:
+        - string
+        - 'null'
+      DriverHeadPosX:
+        type:
+        - number
+        - 'null'
+      DriverHeadPosY:
+        type:
+        - number
+        - 'null'
+      DriverHeadPosZ:
+        type:
+        - number
+        - 'null'
+      DriverIncidentCount:
+        type:
+        - integer
+        - 'null'
+      DriverIsAdmin:
+        type:
+        - integer
+        - 'null'
+      DriverPitTrkPct:
+        type:
+        - number
+        - 'null'
+      DriverSetupIsModified:
+        type:
+        - integer
+        - 'null'
+      DriverSetupLoadTypeName:
+        type:
+        - string
+        - 'null'
+      DriverSetupName:
+        type:
+        - string
+        - 'null'
+      DriverSetupPassedTech:
+        type:
+        - integer
+        - 'null'
+      DriverTires:
+        type:
+        - array
+        - 'null'
+        items:
+          type: object
+          properties:
+            TireCompoundType:
+              type:
+              - string
+              - 'null'
+            TireIndex:
+              type:
+              - integer
+              - 'null'
+      DriverUserID:
+        type:
+        - integer
+        - 'null'
+      Drivers:
+        type:
+        - array
+        - 'null'
+        items:
+          anyOf:
+          - type: object
+            properties:
+              AbbrevName: true
+              BodyType:
+                type:
+                - integer
+                - 'null'
+              CarCfg:
+                type:
+                - integer
+                - 'null'
+              CarCfgCustomPaintExt: true
+              CarCfgName: true
+              CarClassColor:
+                type:
+                - string
+                - 'null'
+              CarClassDryTireSetLimit:
+                type:
+                - string
+                - 'null'
+              CarClassEstLapTime:
+                type:
+                - number
+                - 'null'
+              CarClassID:
+                type:
+                - integer
+                - 'null'
+              CarClassLicenseLevel:
+                type:
+                - integer
+                - 'null'
+              CarClassMaxFuelPct:
+                type:
+                - string
+                - 'null'
+              CarClassPowerAdjust:
+                type:
+                - string
+                - 'null'
+              CarClassRelSpeed:
+                type:
+                - integer
+                - 'null'
+              CarClassShortName: true
+              CarClassWeightPenalty:
+                type:
+                - string
+                - 'null'
+              CarDesignStr:
+                type:
+                - string
+                - 'null'
+              CarID:
+                type:
+                - integer
+                - 'null'
+              CarIdx:
+                type: integer
+              CarIsAI:
+                type:
+                - integer
+                - 'null'
+              CarIsElectric:
+                type:
+                - integer
+                - 'null'
+              CarIsPaceCar:
+                type:
+                - integer
+                - 'null'
+              CarNumber:
+                type:
+                - string
+                - 'null'
+              CarNumberDesignStr:
+                type:
+                - string
+                - 'null'
+              CarNumberRaw:
+                type:
+                - integer
+                - 'null'
+              CarPath:
+                type:
+                - string
+                - 'null'
+              CarScreenName:
+                type:
+                - string
+                - 'null'
+              CarScreenNameShort:
+                type:
+                - string
+                - 'null'
+              CarSponsor_1:
+                type:
+                - integer
+                - 'null'
+              CarSponsor_2:
+                type:
+                - integer
+                - 'null'
+              ClubID:
+                type:
+                - integer
+                - 'null'
+              ClubName:
+                type:
+                - string
+                - 'null'
+              CurDriverIncidentCount:
+                type:
+                - integer
+                - 'null'
+              DivisionID:
+                type:
+                - integer
+                - 'null'
+              DivisionName:
+                type:
+                - string
+                - 'null'
+              FaceType:
+                type:
+                - integer
+                - 'null'
+              FlairID:
+                type:
+                - integer
+                - 'null'
+              FlairName:
+                type:
+                - string
+                - 'null'
+              HelmetDesignStr:
+                type:
+                - string
+                - 'null'
+              HelmetType:
+                type:
+                - integer
+                - 'null'
+              IRating:
+                type:
+                - integer
+                - 'null'
+              Initials: true
+              IsSpectator:
+                type:
+                - integer
+                - 'null'
+              LicColor:
+                type:
+                - string
+                - 'null'
+              LicLevel:
+                type:
+                - integer
+                - 'null'
+              LicString:
+                type:
+                - string
+                - 'null'
+              LicSubLevel:
+                type:
+                - integer
+                - 'null'
+              SuitDesignStr:
+                type:
+                - string
+                - 'null'
+              TeamID:
+                type:
+                - integer
+                - 'null'
+              TeamIncidentCount:
+                type:
+                - integer
+                - 'null'
+              TeamName:
+                type:
+                - string
+                - 'null'
+              UserID:
+                type:
+                - integer
+                - 'null'
+              UserName:
+                type: string
+          - type: object
+            properties:
+              AbbrevName:
+                type:
+                - string
+                - 'null'
+              BodyType:
+                type:
+                - integer
+                - 'null'
+              CarCfg:
+                type:
+                - integer
+                - 'null'
+              CarCfgCustomPaintExt: true
+              CarCfgName: true
+              CarClassColor:
+                type:
+                - string
+                - 'null'
+              CarClassDryTireSetLimit:
+                type:
+                - string
+                - 'null'
+              CarClassEstLapTime:
+                type:
+                - number
+                - 'null'
+              CarClassID:
+                type:
+                - integer
+                - 'null'
+              CarClassLicenseLevel:
+                type:
+                - integer
+                - 'null'
+              CarClassMaxFuelPct:
+                type:
+                - string
+                - 'null'
+              CarClassPowerAdjust:
+                type:
+                - string
+                - 'null'
+              CarClassRelSpeed:
+                type:
+                - integer
+                - 'null'
+              CarClassShortName:
+                type:
+                - string
+                - 'null'
+              CarClassWeightPenalty:
+                type:
+                - string
+                - 'null'
+              CarDesignStr:
+                type:
+                - string
+                - 'null'
+              CarID:
+                type:
+                - integer
+                - 'null'
+              CarIdx:
+                type: integer
+              CarIsAI:
+                type:
+                - integer
+                - 'null'
+              CarIsElectric:
+                type:
+                - integer
+                - 'null'
+              CarIsPaceCar:
+                type:
+                - integer
+                - 'null'
+              CarNumber:
+                type:
+                - string
+                - 'null'
+              CarNumberDesignStr:
+                type:
+                - string
+                - 'null'
+              CarNumberRaw:
+                type:
+                - integer
+                - 'null'
+              CarPath:
+                type:
+                - string
+                - 'null'
+              CarScreenName:
+                type:
+                - string
+                - 'null'
+              CarScreenNameShort:
+                type:
+                - string
+                - 'null'
+              CarSponsor_1:
+                type:
+                - integer
+                - 'null'
+              CarSponsor_2:
+                type:
+                - integer
+                - 'null'
+              ClubID:
+                type:
+                - integer
+                - 'null'
+              ClubName:
+                type:
+                - string
+                - 'null'
+              CurDriverIncidentCount:
+                type:
+                - integer
+                - 'null'
+              DivisionID:
+                type:
+                - integer
+                - 'null'
+              DivisionName:
+                type:
+                - string
+                - 'null'
+              FaceType:
+                type:
+                - integer
+                - 'null'
+              FlairID:
+                type:
+                - integer
+                - 'null'
+              FlairName:
+                type:
+                - string
+                - 'null'
+              HelmetDesignStr:
+                type:
+                - string
+                - 'null'
+              HelmetType:
+                type:
+                - integer
+                - 'null'
+              IRating:
+                type:
+                - integer
+                - 'null'
+              Initials:
+                type:
+                - string
+                - 'null'
+              IsSpectator:
+                type:
+                - integer
+                - 'null'
+              LicColor:
+                type:
+                - string
+                - 'null'
+              LicLevel:
+                type:
+                - integer
+                - 'null'
+              LicString:
+                type:
+                - string
+                - 'null'
+              LicSubLevel:
+                type:
+                - integer
+                - 'null'
+              SuitDesignStr:
+                type:
+                - string
+                - 'null'
+              TeamID:
+                type:
+                - integer
+                - 'null'
+              TeamIncidentCount:
+                type:
+                - integer
+                - 'null'
+              TeamName:
+                type:
+                - string
+                - 'null'
+              UserID:
+                type:
+                - integer
+                - 'null'
+              UserName:
+                type: string
+      PaceCarIdx:
+        type:
+        - integer
+        - 'null'
+  QualifyResultsInfo:
+    type:
+    - object
+    - 'null'
+    properties:
+      Results:
+        type:
+        - array
+        - 'null'
+        items:
+          type: object
+          properties:
+            CarIdx:
+              type:
+              - integer
+              - 'null'
+            ClassPosition:
+              type:
+              - integer
+              - 'null'
+            FastestLap:
+              type:
+              - integer
+              - 'null'
+            FastestTime:
+              type:
+              - number
+              - 'null'
+            Position:
+              type:
+              - integer
+              - 'null'
+  RadioInfo:
+    type:
+    - object
+    - 'null'
+    properties:
+      Radios:
+        type:
+        - array
+        - 'null'
+        items:
+          type: object
+          properties:
+            Frequencies:
+              type:
+              - array
+              - 'null'
+              items:
+                type: object
+                properties:
+                  CanScan:
+                    type:
+                    - integer
+                    - 'null'
+                  CanSquawk:
+                    type:
+                    - integer
+                    - 'null'
+                  CarIdx:
+                    type:
+                    - integer
+                    - 'null'
+                  ClubID:
+                    type:
+                    - integer
+                    - 'null'
+                  EntryIdx:
+                    type:
+                    - integer
+                    - 'null'
+                  FrequencyName:
+                    type:
+                    - string
+                    - 'null'
+                  FrequencyNum:
+                    type:
+                    - integer
+                    - 'null'
+                  IsDeletable:
+                    type:
+                    - integer
+                    - 'null'
+                  IsMutable:
+                    type:
+                    - integer
+                    - 'null'
+                  Muted:
+                    type:
+                    - integer
+                    - 'null'
+                  Priority:
+                    type:
+                    - integer
+                    - 'null'
+            HopCount:
+              type:
+              - integer
+              - 'null'
+            NumFrequencies:
+              type:
+              - integer
+              - 'null'
+            RadioNum:
+              type:
+              - integer
+              - 'null'
+            ScanningIsOn:
+              type:
+              - integer
+              - 'null'
+            TunedToFrequencyNum:
+              type:
+              - integer
+              - 'null'
+      SelectedRadioNum:
+        type:
+        - integer
+        - 'null'
+  SessionInfo:
+    type: object
+    properties:
+      CurrentSessionNum:
+        type: integer
+      Sessions:
+        type: array
+        items:
+          anyOf:
+          - type: object
+            properties:
+              ResultsAverageLapTime:
+                type:
+                - number
+                - 'null'
+              ResultsFastestLap:
+                type:
+                - array
+                - 'null'
+                items:
+                  type: object
+                  properties:
+                    CarIdx:
+                      type: integer
+                    FastestLap:
+                      type: integer
+                    FastestTime:
+                      type: number
+              ResultsLapsComplete:
+                type:
+                - integer
+                - 'null'
+              ResultsNumCautionFlags:
+                type:
+                - integer
+                - 'null'
+              ResultsNumCautionLaps:
+                type:
+                - integer
+                - 'null'
+              ResultsNumLeadChanges:
+                type:
+                - integer
+                - 'null'
+              ResultsOfficial:
+                type:
+                - integer
+                - 'null'
+              ResultsPositions:
+                type:
+                - array
+                - 'null'
+                items:
+                  type: object
+                  properties:
+                    CarIdx:
+                      type: integer
+                    ClassPosition:
+                      type: integer
+                    FastestLap:
+                      type: integer
+                    FastestTime:
+                      type: number
+                    Incidents:
+                      type: integer
+                    JokerLapsComplete:
+                      type: integer
+                    Lap:
+                      type: integer
+                    LapsComplete:
+                      type: integer
+                    LapsDriven:
+                      type: number
+                    LapsLed:
+                      type: integer
+                    LastTime:
+                      type: number
+                    Position:
+                      type: integer
+                    ReasonOutId:
+                      type: integer
+                    ReasonOutStr:
+                      type: string
+                    Time:
+                      type: number
+              SessionEnforceTireCompoundChange:
+                type:
+                - integer
+                - 'null'
+              SessionLaps:
+                type: string
+              SessionName:
+                type:
+                - string
+                - 'null'
+              SessionNum:
+                type: integer
+              SessionNumLapsToAvg:
+                type:
+                - integer
+                - 'null'
+              SessionRunGroupsUsed:
+                type:
+                - integer
+                - 'null'
+              SessionSkipped:
+                type:
+                - integer
+                - 'null'
+              SessionSubType: true
+              SessionTime:
+                type: string
+              SessionTrackRubberState:
+                type:
+                - string
+                - 'null'
+              SessionType:
+                type: string
+          - type: object
+            properties:
+              ResultsAverageLapTime:
+                type:
+                - number
+                - 'null'
+              ResultsFastestLap:
+                type:
+                - array
+                - 'null'
+                items:
+                  type: object
+                  properties:
+                    CarIdx:
+                      type: integer
+                    FastestLap:
+                      type: integer
+                    FastestTime:
+                      type: number
+              ResultsLapsComplete:
+                type:
+                - integer
+                - 'null'
+              ResultsNumCautionFlags:
+                type:
+                - integer
+                - 'null'
+              ResultsNumCautionLaps:
+                type:
+                - integer
+                - 'null'
+              ResultsNumLeadChanges:
+                type:
+                - integer
+                - 'null'
+              ResultsOfficial:
+                type:
+                - integer
+                - 'null'
+              ResultsPositions: true
+              SessionEnforceTireCompoundChange:
+                type:
+                - integer
+                - 'null'
+              SessionLaps:
+                type: string
+              SessionName:
+                type:
+                - string
+                - 'null'
+              SessionNum:
+                type: integer
+              SessionNumLapsToAvg:
+                type:
+                - integer
+                - 'null'
+              SessionRunGroupsUsed:
+                type:
+                - integer
+                - 'null'
+              SessionSkipped:
+                type:
+                - integer
+                - 'null'
+              SessionSubType: true
+              SessionTime:
+                type: string
+              SessionTrackRubberState:
+                type:
+                - string
+                - 'null'
+              SessionType:
+                type: string
+  SplitTimeInfo:
+    type:
+    - object
+    - 'null'
+    properties:
+      Sectors:
+        type:
+        - array
+        - 'null'
+        items:
+          type: object
+          properties:
+            SectorNum:
+              type:
+              - integer
+              - 'null'
+            SectorStartPct:
+              type:
+              - number
+              - 'null'
+  WeekendInfo:
+    type: object
+    properties:
+      BuildTarget:
+        type:
+        - string
+        - 'null'
+      BuildType:
+        type:
+        - string
+        - 'null'
+      BuildVersion:
+        type:
+        - string
+        - 'null'
+      Category:
+        type:
+        - string
+        - 'null'
+      DCRuleSet:
+        type:
+        - string
+        - 'null'
+      Encoding: true
+      EventType:
+        type:
+        - string
+        - 'null'
+      HeatRacing:
+        type:
+        - integer
+        - 'null'
+      LeagueID:
+        type:
+        - integer
+        - 'null'
+      MaxDrivers:
+        type:
+        - integer
+        - 'null'
+      MinDrivers:
+        type:
+        - integer
+        - 'null'
+      NumCarClasses:
+        type:
+        - integer
+        - 'null'
+      NumCarTypes:
+        type:
+        - integer
+        - 'null'
+      Official:
+        type:
+        - integer
+        - 'null'
+      QualifierMustStartRace:
+        type:
+        - integer
+        - 'null'
+      RaceFarm:
+        type:
+        - string
+        - 'null'
+      RaceWeek:
+        type:
+        - integer
+        - 'null'
+      SeasonID:
+        type:
+        - integer
+        - 'null'
+      SeriesID:
+        type:
+        - integer
+        - 'null'
+      SessionID:
+        type:
+        - integer
+        - 'null'
+      SimMode:
+        type:
+        - string
+        - 'null'
+      SubSessionID:
+        type:
+        - integer
+        - 'null'
+      TeamRacing:
+        type:
+        - integer
+        - 'null'
+      TelemetryOptions:
+        type:
+        - object
+        - 'null'
+        properties:
+          TelemetryDiskFile:
+            type:
+            - string
+            - 'null'
+      TrackAirDensity:
+        type:
+        - string
+        - 'null'
+      TrackAirPressure:
+        type:
+        - string
+        - 'null'
+      TrackAirTemp:
+        type:
+        - string
+        - 'null'
+      TrackAltitude:
+        type:
+        - string
+        - 'null'
+      TrackCity:
+        type:
+        - string
+        - 'null'
+      TrackCleanup:
+        type:
+        - integer
+        - 'null'
+      TrackConfigName:
+        type:
+        - string
+        - 'null'
+      TrackCountry:
+        type:
+        - string
+        - 'null'
+      TrackDirection:
+        type:
+        - string
+        - 'null'
+      TrackDisplayName:
+        type: string
+      TrackDisplayShortName:
+        type:
+        - string
+        - 'null'
+      TrackDynamicTrack:
+        type:
+        - integer
+        - 'null'
+      TrackFogLevel:
+        type:
+        - string
+        - 'null'
+      TrackID:
+        type:
+        - integer
+        - 'null'
+      TrackLatitude:
+        type:
+        - string
+        - 'null'
+      TrackLength:
+        type: string
+      TrackLengthOfficial:
+        type:
+        - string
+        - 'null'
+      TrackLongitude:
+        type:
+        - string
+        - 'null'
+      TrackName:
+        type: string
+      TrackNorthOffset:
+        type:
+        - string
+        - 'null'
+      TrackNumPitStalls:
+        type:
+        - integer
+        - 'null'
+      TrackNumTurns:
+        type:
+        - integer
+        - 'null'
+      TrackPaceSpeed:
+        type:
+        - string
+        - 'null'
+      TrackPitSpeedLimit:
+        type:
+        - string
+        - 'null'
+      TrackPrecipitation:
+        type:
+        - string
+        - 'null'
+      TrackRelativeHumidity:
+        type:
+        - string
+        - 'null'
+      TrackSkies:
+        type:
+        - string
+        - 'null'
+      TrackState:
+        type:
+        - string
+        - 'null'
+      TrackSurfaceTemp:
+        type:
+        - string
+        - 'null'
+      TrackSurfaceTempCrew:
+        type:
+        - string
+        - 'null'
+      TrackType:
+        type:
+        - string
+        - 'null'
+      TrackVersion:
+        type:
+        - string
+        - 'null'
+      TrackWeatherType:
+        type:
+        - string
+        - 'null'
+      TrackWindDir:
+        type:
+        - string
+        - 'null'
+      TrackWindVel:
+        type:
+        - string
+        - 'null'
+      WeekendOptions:
+        type:
+        - object
+        - 'null'
+        properties:
+          CommercialMode:
+            type:
+            - string
+            - 'null'
+          CourseCautions:
+            type:
+            - string
+            - 'null'
+          Date:
+            type:
+            - string
+            - 'null'
+          EarthRotationSpeedupFactor:
+            type:
+            - integer
+            - 'null'
+          FastRepairsLimit:
+            type:
+            - string
+            - 'null'
+          FogLevel:
+            type:
+            - string
+            - 'null'
+          GreenWhiteCheckeredLimit:
+            type:
+            - integer
+            - 'null'
+          HardcoreLevel:
+            type:
+            - integer
+            - 'null'
+          HasOpenRegistration:
+            type:
+            - integer
+            - 'null'
+          IncidentLimit:
+            type:
+            - string
+            - 'null'
+          IncidentWarningInitialLimit:
+            type:
+            - string
+            - 'null'
+          IncidentWarningSubsequentLimit:
+            type:
+            - string
+            - 'null'
+          IsFixedSetup:
+            type:
+            - integer
+            - 'null'
+          NightMode:
+            type:
+            - string
+            - 'null'
+          NumJokerLaps:
+            type:
+            - integer
+            - 'null'
+          NumStarters:
+            type:
+            - integer
+            - 'null'
+          QualifyScoring:
+            type:
+            - string
+            - 'null'
+          RelativeHumidity:
+            type:
+            - string
+            - 'null'
+          Restarts:
+            type:
+            - string
+            - 'null'
+          ShortParadeLap:
+            type:
+            - integer
+            - 'null'
+          Skies:
+            type:
+            - string
+            - 'null'
+          StandingStart:
+            type:
+            - integer
+            - 'null'
+          StartingGrid:
+            type:
+            - string
+            - 'null'
+          StrictLapsChecking:
+            type:
+            - string
+            - 'null'
+          TimeOfDay:
+            type:
+            - string
+            - 'null'
+          Unofficial:
+            type:
+            - integer
+            - 'null'
+          WeatherTemp:
+            type:
+            - string
+            - 'null'
+          WeatherType:
+            type:
+            - string
+            - 'null'
+          WindDirection:
+            type:
+            - string
+            - 'null'
+          WindSpeed:
+            type:
+            - string
+            - 'null'
+examples:
+- CameraInfo:
+    Groups:
+    - Cameras:
+      - CameraName: CamNose
+        CameraNum: 1
+      GroupName: Nose
+      GroupNum: 1
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamGearbox
+        CameraNum: 1
+      GroupName: Gearbox
+      GroupNum: 2
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamRoll Bar
+        CameraNum: 1
+      GroupName: Roll Bar
+      GroupNum: 3
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamLF Susp
+        CameraNum: 1
+      GroupName: LF Susp
+      GroupNum: 4
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamLR Susp
+        CameraNum: 1
+      GroupName: LR Susp
+      GroupNum: 5
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamGyro
+        CameraNum: 1
+      GroupName: Gyro
+      GroupNum: 6
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamRF Susp
+        CameraNum: 1
+      GroupName: RF Susp
+      GroupNum: 7
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamRR Susp
+        CameraNum: 1
+      GroupName: RR Susp
+      GroupNum: 8
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamCockpit
+        CameraNum: 1
+      GroupName: Cockpit
+      GroupNum: 9
+      IsScenic: null
+    - Cameras:
+      - CameraName: Scenic_00
+        CameraNum: 1
+      - CameraName: Scenic_10
+        CameraNum: 2
+      - CameraName: Scenic_08
+        CameraNum: 3
+      - CameraName: Scenic_09
+        CameraNum: 4
+      - CameraName: Scenic_07
+        CameraNum: 5
+      - CameraName: Scenic_06
+        CameraNum: 6
+      - CameraName: Scenic_01
+        CameraNum: 7
+      - CameraName: Scenic_02
+        CameraNum: 8
+      - CameraName: Scenic_03
+        CameraNum: 9
+      - CameraName: Scenic_04
+        CameraNum: 10
+      - CameraName: Scenic_05
+        CameraNum: 11
+      GroupName: Scenic
+      GroupNum: 10
+      IsScenic: true
+    - Cameras:
+      - CameraName: CamTV1_00
+        CameraNum: 1
+      - CameraName: CamTV1_01
+        CameraNum: 2
+      GroupName: TV1
+      GroupNum: 11
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamTV2_00
+        CameraNum: 1
+      - CameraName: CamTV2_01
+        CameraNum: 2
+      GroupName: TV2
+      GroupNum: 12
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamTV3_00
+        CameraNum: 1
+      GroupName: TV3
+      GroupNum: 13
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamStatic_00
+        CameraNum: 1
+      - CameraName: CamStatic_01
+        CameraNum: 2
+      - CameraName: CamStatic_02
+        CameraNum: 3
+      - CameraName: CamStatic_03
+        CameraNum: 4
+      - CameraName: CamStatic_04
+        CameraNum: 5
+      GroupName: TV Static
+      GroupNum: 14
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamStatic_03
+        CameraNum: 1
+      - CameraName: CamStatic_00
+        CameraNum: 2
+      - CameraName: CamStatic_01
+        CameraNum: 3
+      - CameraName: CamStatic_02
+        CameraNum: 4
+      - CameraName: CamStatic_04
+        CameraNum: 5
+      - CameraName: CamTV1_00
+        CameraNum: 6
+      - CameraName: CamTV1_01
+        CameraNum: 7
+      - CameraName: CamTV2_00
+        CameraNum: 8
+      - CameraName: CamTV2_01
+        CameraNum: 9
+      - CameraName: CamTV3_00
+        CameraNum: 10
+      - CameraName: CamBlimp0
+        CameraNum: 11
+      - CameraName: CamGearbox
+        CameraNum: 12
+      - CameraName: CamNose
+        CameraNum: 13
+      GroupName: TV Mixed
+      GroupNum: 15
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamPit Lane
+        CameraNum: 1
+      GroupName: Pit Lane
+      GroupNum: 16
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamPit Lane 2
+        CameraNum: 1
+      GroupName: Pit Lane 2
+      GroupNum: 17
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamChopper
+        CameraNum: 1
+      GroupName: Chopper
+      GroupNum: 18
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamBlimp
+        CameraNum: 1
+      GroupName: Blimp
+      GroupNum: 19
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamChase
+        CameraNum: 1
+      GroupName: Chase
+      GroupNum: 20
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamFar Chase
+        CameraNum: 1
+      GroupName: Far Chase
+      GroupNum: 21
+      IsScenic: null
+    - Cameras:
+      - CameraName: CamRear Chase
+        CameraNum: 1
+      GroupName: Rear Chase
+      GroupNum: 22
+      IsScenic: null
+  CarSetup:
+    Chassis:
+      Front:
+        BallastForward: 1651 mm
+        CrossWeight: 53.8%
+        FrontBrakeBias: 65.0%
+        NoseWeight: 52.6%
+        SteeringOffset: +6 deg
+        SteeringRatio: 12:1
+        TapeConfiguration: Race
+      FrontArb:
+        ArmAsymmetry: 4
+        Attach: 1
+        Diameter: 48 mm
+        LinkSlack: -0 mm
+        Preload: -6.9 Nm
+      LeftFront:
+        Camber: +4.7 deg
+        Caster: +11.5 deg
+        CornerWeight: 3963 N
+        HsCompSlope: 7 clicks
+        HsCompression: 3 clicks
+        HsReboundSlope: 4 clicks
+        LsCompression: 3 clicks
+        LsRebound: 8 clicks
+        Packer: 42.9 mm shim
+        RideHeight: 119 mm
+        ShockSpringRate: 788 N/mm
+        SpringPerchOffset: -100 mm
+        ToeIn: -1 mm
+      LeftRear:
+        Camber: +1.9 deg
+        CornerWeight: 4156 N
+        HsCompSlope: 3 clicks
+        HsCompression: 6 clicks
+        HsReboundSlope: 6 clicks
+        LsCompression: 7 clicks
+        LsRebound: 7 clicks
+        RideHeight: 154 mm
+        SpringPerchOffset: -79 mm
+        SpringRate: 70 N/mm
+        ToeIn: +4 mm
+        TrackBarHeight: +254 mm
+        TruckArmMount: bottom
+      Rear:
+        RearEndRatio: 5.14
+      RightFront:
+        Camber: -4.9 deg
+        Caster: +13.2 deg
+        CornerWeight: 4448 N
+        HsCompSlope: 7 clicks
+        HsCompression: 5 clicks
+        HsReboundSlope: 4 clicks
+        LsCompression: 7 clicks
+        LsRebound: 7 clicks
+        Packer: 49.2 mm shim
+        RideHeight: 127 mm
+        ShockSpringRate: 962 N/mm
+        SpringPerchOffset: -113 mm
+        ToeIn: -1 mm
+      RightRear:
+        Camber: -1.9 deg
+        CornerWeight: 3436 N
+        HsCompSlope: 3 clicks
+        HsCompression: 6 clicks
+        HsReboundSlope: 3 clicks
+        LsCompression: 5 clicks
+        LsRebound: 8 clicks
+        RideHeight: 161 mm
+        SpringPerchOffset: -154 mm
+        SpringRate: 315 N/mm
+        ToeIn: -4 mm
+        TrackBarHeight: +279 mm
+        TravelToCoilBind: OFF
+        TruckArmMount: bottom
+        TruckArmPreload: -0.1 Nm
+    Tires:
+      LeftFront:
+        ColdPressure: 152 kPa
+        LastHotPressure: 152 kPa
+        LastTempsOMI: 26C, 26C, 26C
+        TreadRemaining: 100%, 100%, 100%
+      LeftRear:
+        ColdPressure: 152 kPa
+        LastHotPressure: 152 kPa
+        LastTempsOMI: 26C, 26C, 26C
+        TreadRemaining: 100%, 100%, 100%
+      RightFront:
+        ColdPressure: 310 kPa
+        LastHotPressure: 310 kPa
+        LastTempsIMO: 26C, 26C, 26C
+        TreadRemaining: 100%, 100%, 100%
+      RightRear:
+        ColdPressure: 310 kPa
+        LastHotPressure: 310 kPa
+        LastTempsIMO: 26C, 26C, 26C
+        TreadRemaining: 100%, 100%, 100%
+    UpdateCount: 6
+  DriverInfo:
+    DriverBrakeCurvingFactor: 0.001
+    DriverCarEngCylinderCount: 8
+    DriverCarEstLapTime: 14.5241
+    DriverCarFuelKgPerLtr: 0.75
+    DriverCarFuelMaxLtr: 70.753
+    DriverCarGearNeutral: 1
+    DriverCarGearNumForward: 4
+    DriverCarGearReverse: 1
+    DriverCarIdleRPM: 2000.0
+    DriverCarIdx: 9
+    DriverCarIsElectric: 0
+    DriverCarMaxFuelPct: 1.0
+    DriverCarRedLine: 9100.0
+    DriverCarSLBlinkRPM: 9000.0
+    DriverCarSLFirstRPM: 7500.0
+    DriverCarSLLastRPM: 8300.0
+    DriverCarSLShiftRPM: 8300.0
+    DriverCarShiftAid: Antistall
+    DriverCarVersion: 2026.02.27.01
+    DriverGearboxControlType: Sequential
+    DriverGearboxType: H-Pattern
+    DriverHeadPosX: -0.106
+    DriverHeadPosY: 0.418
+    DriverHeadPosZ: 0.578
+    DriverIncidentCount: 0
+    DriverIsAdmin: 0
+    DriverPitTrkPct: 0.892693
+    DriverSetupIsModified: 0
+    DriverSetupLoadTypeName: fixed
+    DriverSetupName: bristol.sto
+    DriverSetupPassedTech: 1
+    DriverTires:
+    - TireCompoundType: Hard
+      TireIndex: 0
+    DriverUserID: 378767
+    Drivers:
+    - AbbrevName: null
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 0 %
+      CarClassEstLapTime: 14.6614
+      CarClassID: 11
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 0
+      CarClassShortName: null
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 0,ffffff,ffffff,ffffff
+      CarID: 136
+      CarIdx: 0
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 1
+      CarNumber: '0'
+      CarNumberDesignStr: 0,0,ffffff,ffffff,ffffff
+      CarNumberRaw: 0
+      CarPath: safety pcsedan
+      CarScreenName: safety pcsedan
+      CarScreenNameShort: safety pcsedan
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 0
+      FlairID: 0
+      FlairName: -none-
+      HelmetDesignStr: 0,ffffff,ffffff,ffffff
+      HelmetType: 0
+      IRating: 0
+      Initials: null
+      IsSpectator: 0
+      LicColor: '0xffffff'
+      LicLevel: 1
+      LicString: R 0.00
+      LicSubLevel: 0
+      SuitDesignStr: 0,ffffff,ffffff,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Pace Car
+      UserID: -1
+      UserName: Pace Car
+    - AbbrevName: Rush, C
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 9,ffffff,111111,0ada00
+      CarID: 116
+      CarIdx: 1
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '1'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 1
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 4
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 1,ffffff,111111,0ada00
+      HelmetType: 0
+      IRating: 7132
+      Initials: CR
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 19
+      LicString: A 3.90
+      LicSubLevel: 390
+      SuitDesignStr: 1,ffffff,111111,0ada00
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Cayden Rush
+      UserID: 354657
+      UserName: Cayden Rush
+    - AbbrevName: Burroughs, A
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 13,000000,ff4797,38b5e6,000000
+      CarID: 115
+      CarIdx: 2
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '2'
+      CarNumberDesignStr: 54,4,ffffff,000000,ffffff
+      CarNumberRaw: 2
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 2
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 19,000000,00d2fa,7b00cc
+      HelmetType: 0
+      IRating: 6360
+      Initials: AB
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.68
+      LicSubLevel: 468
+      SuitDesignStr: 22,000000,00e8f5,f74dff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Anthony Burroughs
+      UserID: 205783
+      UserName: Anthony Burroughs
+    - AbbrevName: Warner, W
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 12,000000,ffffff,ff0012,000000
+      CarID: 115
+      CarIdx: 3
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '3'
+      CarNumberDesignStr: 48,4,ffffff,000000,000000
+      CarNumberRaw: 3
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 0
+      DivisionName: Division 1
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 44,000000,000000,ffffff
+      HelmetType: 0
+      IRating: 6099
+      Initials: WW
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.96
+      LicSubLevel: 496
+      SuitDesignStr: 0,000000,000000,000000
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Wyatt Warner
+      UserID: 193423
+      UserName: Wyatt Warner
+    - AbbrevName: Browder, J
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 21,ffffff,9f1add,3300ff
+      CarID: 114
+      CarIdx: 4
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '4'
+      CarNumberDesignStr: 40,3,ffffff,000000,ff0000
+      CarNumberRaw: 4
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 1
+      DivisionName: Division 2
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 25,a6ff00,221f1f,a6ff00
+      HelmetType: 0
+      IRating: 3978
+      Initials: JB
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.50
+      LicSubLevel: 250
+      SuitDesignStr: 8,a6ff00,191818,a6ff00
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Jayden Browder
+      UserID: 1306497
+      UserName: Jayden Browder
+    - AbbrevName: Cogar, L
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 4,000c82,c8202f,ee3442
+      CarID: 114
+      CarIdx: 5
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '5'
+      CarNumberDesignStr: 3,2,ffffff,00092f,ea0000
+      CarNumberRaw: 5
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 1
+      DivisionName: Division 2
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 4,ed2129,447ac0,ee3442
+      HelmetType: 0
+      IRating: 3474
+      Initials: LC
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.64
+      LicSubLevel: 264
+      SuitDesignStr: 13,808699,447ac0,ee3442
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Logan Cogar
+      UserID: 242479
+      UserName: Logan Cogar
+    - AbbrevName: Cote2, N
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 0,ff0000,f79c1d,fc0706;000000
+      CarID: 116
+      CarIdx: 6
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '6'
+      CarNumberDesignStr: 24,2,ffffff,000000,000000
+      CarNumberRaw: 6
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 1
+      DivisionName: Division 2
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 19,2a3795,f79c1d,fc0706
+      HelmetType: 0
+      IRating: 3210
+      Initials: NC
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 15
+      LicString: B 3.44
+      LicSubLevel: 344
+      SuitDesignStr: 24,2a3795,ed2129,000000
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Nicholas Cote2
+      UserID: 395717
+      UserName: Nicholas Cote2
+    - AbbrevName: Lothian, B
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 6,ff0000,ffffff,000ce9
+      CarID: 116
+      CarIdx: 7
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '7'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 7
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 1
+      DivisionName: Division 2
+      FaceType: 2
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 35,ff0000,ffffff,000ce9
+      HelmetType: 0
+      IRating: 2981
+      Initials: BL
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 19
+      LicString: A 3.06
+      LicSubLevel: 306
+      SuitDesignStr: 2,ffffff,fc0706,0f00ff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Blake Lothian
+      UserID: 392483
+      UserName: Blake Lothian
+    - AbbrevName: Jones, T
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 12,111111,ffffff,000000
+      CarID: 116
+      CarIdx: 8
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '8'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 8
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 60,111111,ffffff,000000
+      HelmetType: 0
+      IRating: 2906
+      Initials: TJ
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 13
+      LicString: B 1.91
+      LicSubLevel: 191
+      SuitDesignStr: 35,111111,fcfcfc,000000
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Trent Jones
+      UserID: 923146
+      UserName: Trent Jones
+    - AbbrevName: Makaila, J
+      BodyType: 1
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 1,ffffff,095f54,085a2f,a52121
+      CarID: 115
+      CarIdx: 9
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '9'
+      CarNumberDesignStr: 0,0,ffffff,002675,bdab04
+      CarNumberRaw: 9
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 2
+      CarSponsor_2: 98
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: 0
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 52,347315,72e756,a0ff02
+      HelmetType: 0
+      IRating: 2695
+      Initials: JM
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 19
+      LicString: A 3.21
+      LicSubLevel: 321
+      SuitDesignStr: 1,ffffff,000000,ae0101
+      TeamID: 0
+      TeamIncidentCount: 0
+      TeamName: Justin Makaila
+      UserID: 378767
+      UserName: Justin Makaila
+    - AbbrevName: Heimrath, L
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 18,733f02,ffdf0a,ff7a00
+      CarID: 116
+      CarIdx: 10
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '10'
+      CarNumberDesignStr: 39,0,ff5e0f,6e2e00,f7ca2a
+      CarNumberRaw: 10
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 0
+      FlairID: 77
+      FlairName: Germany
+      HelmetDesignStr: 28,3b3838,b40545,000000
+      HelmetType: 0
+      IRating: 2675
+      Initials: LH
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.16
+      LicSubLevel: 216
+      SuitDesignStr: 32,000000,6d6969,c20a25
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Luke Heimrath
+      UserID: 660595
+      UserName: Luke Heimrath
+    - AbbrevName: Hurst2, D
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 19,111111,e0e5ef,efe3e4
+      CarID: 115
+      CarIdx: 11
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '11'
+      CarNumberDesignStr: 25,4,00abe0,ffffff,ffffff
+      CarNumberRaw: 11
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 1
+      DivisionName: Division 2
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 3,111111,e0e5ef,efe3e4
+      HelmetType: 0
+      IRating: 2562
+      Initials: DH
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.38
+      LicSubLevel: 438
+      SuitDesignStr: 30,ffffff,f7f7f7,b82f37
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: David Hurst2
+      UserID: 777477
+      UserName: David Hurst2
+    - AbbrevName: Oquendo, A
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 3,000000,ff0000,000000;000000
+      CarID: 116
+      CarIdx: 12
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '12'
+      CarNumberDesignStr: 30,2,ffffff,1432b0,bd0000
+      CarNumberRaw: 12
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 5
+      DivisionName: Division 6
+      FaceType: 8
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 24,000000,ff0000,000000
+      HelmetType: 0
+      IRating: 2473
+      Initials: AO
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 15
+      LicString: B 3.55
+      LicSubLevel: 355
+      SuitDesignStr: 14,ff0000,000000,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Anthony Oquendo
+      UserID: 1334720
+      UserName: Anthony Oquendo
+    - AbbrevName: Wagner3, H
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 1,262626,000000,73fff2,000000
+      CarID: 114
+      CarIdx: 13
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '13'
+      CarNumberDesignStr: 11,2,000000,ffffff,ffffff
+      CarNumberRaw: 13
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 382
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 20,2d9dff,00ff95,050505
+      HelmetType: 0
+      IRating: 2464
+      Initials: HW
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.76
+      LicSubLevel: 276
+      SuitDesignStr: 13,000000,000000,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Hunter Wagner3
+      UserID: 1329756
+      UserName: Hunter Wagner3
+    - AbbrevName: Hauck, B
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 19,05754d,debc09,fffffc,0e0e0e
+      CarID: 114
+      CarIdx: 14
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '14'
+      CarNumberDesignStr: 50,2,030303,000000,9bf409
+      CarNumberRaw: 14
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 204
+      CarSponsor_2: 435
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 4
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 32,051df7,fdfdfd,b91919
+      HelmetType: 0
+      IRating: 2167
+      Initials: BH
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 20
+      LicString: A 4.57
+      LicSubLevel: 457
+      SuitDesignStr: 32,f3f3f3,494949,f50227
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Bradley Hauck
+      UserID: 833220
+      UserName: Bradley Hauck
+    - AbbrevName: Caron, T
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 1,000000,6d6e71,000000
+      CarID: 116
+      CarIdx: 15
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '15'
+      CarNumberDesignStr: 48,0,ffffff,f3f3f3,000000
+      CarNumberRaw: 15
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 1
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 1,000000,6d6e71,000000
+      HelmetType: 0
+      IRating: 2122
+      Initials: TC
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.39
+      LicSubLevel: 239
+      SuitDesignStr: 2,000000,6d6e71,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Tony Caron
+      UserID: 448609
+      UserName: Tony Caron
+    - AbbrevName: Gainey, J
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 13,010000,fa0b0b,555454,000000
+      CarID: 116
+      CarIdx: 16
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '16'
+      CarNumberDesignStr: 54,2,777777,ed1010,000000
+      CarNumberRaw: 16
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 186
+      CarSponsor_2: 130
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 3
+      DivisionName: Division 4
+      FaceType: 8
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 2,010000,fa0b0b,555454
+      HelmetType: 0
+      IRating: 2082
+      Initials: JG
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.52
+      LicSubLevel: 252
+      SuitDesignStr: 33,e00909,433e3e,0b0000
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Jeremy Gainey
+      UserID: 827407
+      UserName: Jeremy Gainey
+    - AbbrevName: Young4, R
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 18,701f1f,cfb030,ffffff
+      CarID: 114
+      CarIdx: 17
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '17'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 17
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 2
+      DivisionName: Division 3
+      FaceType: 0
+      FlairID: 217
+      FlairName: Turks and Caicos Islands
+      HelmetDesignStr: 2,000000,999b9b,1bd2c7
+      HelmetType: 0
+      IRating: 2064
+      Initials: RY
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.39
+      LicSubLevel: 239
+      SuitDesignStr: 27,000000,1bd2c7,1bd2c7
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Robert Young4
+      UserID: 442802
+      UserName: Robert Young4
+    - AbbrevName: Giberson, S
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 8,000000,fb1818,dbb206,000000
+      CarID: 115
+      CarIdx: 18
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '18'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 18
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 4
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 55,000000,fb1818,dbb206
+      HelmetType: 0
+      IRating: 1975
+      Initials: SG
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 19
+      LicString: A 3.15
+      LicSubLevel: 315
+      SuitDesignStr: 7,000000,fac80a,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Steve Giberson
+      UserID: 457981
+      UserName: Steve Giberson
+    - AbbrevName: Love4, D
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 21,000000,7500f4,9200c7;7500e4
+      CarID: 116
+      CarIdx: 19
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '19'
+      CarNumberDesignStr: 53,0,7500f4,7500f4,ffffff
+      CarNumberRaw: 19
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 446
+      CarSponsor_2: 2
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 19,000000,4e06a9,ffffff
+      HelmetType: 0
+      IRating: 1950
+      Initials: DL
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 19
+      LicString: A 3.69
+      LicSubLevel: 369
+      SuitDesignStr: 30,000000,7100ff,620ed1
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Dan Love4
+      UserID: 1440460
+      UserName: Dan Love4
+    - AbbrevName: Hammound, A
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 6,ffffff,111111,ffee47
+      CarID: 116
+      CarIdx: 20
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '20'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 20
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 169
+      CarSponsor_2: 120
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 3
+      DivisionName: Division 4
+      FaceType: 4
+      FlairID: 34
+      FlairName: Bulgaria
+      HelmetDesignStr: 24,ffffff,31784b,fc0f0f
+      HelmetType: 0
+      IRating: 1943
+      Initials: AH
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.14
+      LicSubLevel: 214
+      SuitDesignStr: 21,000000,9b510e,353326
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Amer Hammound
+      UserID: 443701
+      UserName: Amer Hammound
+    - AbbrevName: Munn, B
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 1,ffffff,db22f2,ef0c0c
+      CarID: 116
+      CarIdx: 21
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '21'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 21
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 221
+      CarSponsor_2: 2
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 9
+      DivisionName: Division 10
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 1,0a0a0a,f26522,00aeef
+      HelmetType: 0
+      IRating: 1881
+      Initials: BM
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.31
+      LicSubLevel: 231
+      SuitDesignStr: 1,0a0a0a,f26522,00aeef
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Beckham Munn
+      UserID: 924575
+      UserName: Beckham Munn
+    - AbbrevName: Larson, J
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 15,ffffff,ffffff,ff0000
+      CarID: 114
+      CarIdx: 22
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '22'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 22
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 0
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 57,ffffff,ffffff,ff0000
+      HelmetType: 0
+      IRating: 1832
+      Initials: JL
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 14
+      LicString: B 2.62
+      LicSubLevel: 262
+      SuitDesignStr: 13,ffffff,ffffff,eeeeee
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Jace Larson
+      UserID: 1142042
+      UserName: Jace Larson
+    - AbbrevName: Viñals, F
+      BodyType: 1
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 21,000000,070707,0a0a09;da0e0e
+      CarID: 114
+      CarIdx: 23
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '23'
+      CarNumberDesignStr: 32,3,b80909,0e0404,020202
+      CarNumberRaw: 23
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 0
+      FlairID: 198
+      FlairName: Spain
+      HelmetDesignStr: 65,cfe534,d01144,000000
+      HelmetType: 0
+      IRating: 1827
+      Initials: FV
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 14
+      LicString: B 2.14
+      LicSubLevel: 214
+      SuitDesignStr: 1,4f56e3,e52e2e,19292e
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Fernando Lopez Viñals
+      UserID: 337319
+      UserName: Fernando Lopez Viñals
+    - AbbrevName: Alonso, E
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 1,44a944,170909,c99898
+      CarID: 116
+      CarIdx: 24
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '24'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 24
+      CarPath: stockcars2 supra2019
+      CarScreenName: Toyota Supra Class B
+      CarScreenNameShort: Toyota Supra Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 0
+      FlairID: 198
+      FlairName: Spain
+      HelmetDesignStr: 59,333a5d,f0a500,b62424
+      HelmetType: 0
+      IRating: 1782
+      Initials: EA
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 14
+      LicString: B 2.64
+      LicSubLevel: 264
+      SuitDesignStr: 22,ffffff,000000,cd1313
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Eric Alonso
+      UserID: 586550
+      UserName: Eric Alonso
+    - AbbrevName: Gervasi, R
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 22,e82424,e5edf3,2d20f2
+      CarID: 114
+      CarIdx: 25
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '25'
+      CarNumberDesignStr: 0,0,ffffff,777777,000000
+      CarNumberRaw: 25
+      CarPath: stockcars2 camaro2019
+      CarScreenName: Chevrolet Camaro Class B
+      CarScreenNameShort: Chevrolet Camaro Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 4
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 3,e82424,e5edf3,2d20f2
+      HelmetType: 0
+      IRating: 1646
+      Initials: RG
+      IsSpectator: 0
+      LicColor: '0x00c702'
+      LicLevel: 13
+      LicString: B 1.83
+      LicSubLevel: 183
+      SuitDesignStr: 1,e0a31b,8ef316,eda514
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Ricky Gervasi
+      UserID: 1220792
+      UserName: Ricky Gervasi
+    - AbbrevName: Lipinski, J
+      BodyType: 0
+      CarCfg: -1
+      CarCfgCustomPaintExt: null
+      CarCfgName: null
+      CarClassColor: '0xffffff'
+      CarClassDryTireSetLimit: 3 %
+      CarClassEstLapTime: 14.5241
+      CarClassID: 1455
+      CarClassLicenseLevel: 0
+      CarClassMaxFuelPct: 1.000 %
+      CarClassPowerAdjust: 0.000 %
+      CarClassRelSpeed: 65
+      CarClassShortName: O Reilly Series
+      CarClassWeightPenalty: 0.000 kg
+      CarDesignStr: 21,ff0000,000000,ffffff,ff0000
+      CarID: 115
+      CarIdx: 26
+      CarIsAI: 0
+      CarIsElectric: 0
+      CarIsPaceCar: 0
+      CarNumber: '26'
+      CarNumberDesignStr: 0,3,000000,ff0000,ffffff
+      CarNumberRaw: 26
+      CarPath: stockcars2 mustang2019
+      CarScreenName: Ford Mustang Class B
+      CarScreenNameShort: Ford Mustang Class B
+      CarSponsor_1: 0
+      CarSponsor_2: 0
+      ClubID: 0
+      ClubName: None
+      CurDriverIncidentCount: -1
+      DivisionID: 4
+      DivisionName: Division 5
+      FaceType: 4
+      FlairID: 223
+      FlairName: United States
+      HelmetDesignStr: 9,ff0000,000000,ffffff
+      HelmetType: 0
+      IRating: 1589
+      Initials: JL
+      IsSpectator: 0
+      LicColor: '0x0153db'
+      LicLevel: 18
+      LicString: A 2.22
+      LicSubLevel: 222
+      SuitDesignStr: 13,000000,ff2001,ffffff
+      TeamID: 0
+      TeamIncidentCount: -1
+      TeamName: Joe Lipinski
+      UserID: 1161278
+      UserName: Joe Lipinski
+    PaceCarIdx: 0
+  QualifyResultsInfo:
+    Results:
+    - CarIdx: 2
+      ClassPosition: 0
+      FastestLap: 2
+      FastestTime: 15.2705
+      Position: 0
+    - CarIdx: 4
+      ClassPosition: 1
+      FastestLap: 2
+      FastestTime: 15.2959
+      Position: 1
+    - CarIdx: 1
+      ClassPosition: 2
+      FastestLap: 1
+      FastestTime: 15.3227
+      Position: 2
+    - CarIdx: 8
+      ClassPosition: 3
+      FastestLap: 2
+      FastestTime: 15.3689
+      Position: 3
+    - CarIdx: 6
+      ClassPosition: 4
+      FastestLap: 2
+      FastestTime: 15.3747
+      Position: 4
+    - CarIdx: 7
+      ClassPosition: 5
+      FastestLap: 2
+      FastestTime: 15.4434
+      Position: 5
+    - CarIdx: 13
+      ClassPosition: 6
+      FastestLap: 2
+      FastestTime: 15.4752
+      Position: 6
+    - CarIdx: 19
+      ClassPosition: 7
+      FastestLap: 1
+      FastestTime: 15.494
+      Position: 7
+    - CarIdx: 5
+      ClassPosition: 8
+      FastestLap: 2
+      FastestTime: 15.5107
+      Position: 8
+    - CarIdx: 21
+      ClassPosition: 9
+      FastestLap: 2
+      FastestTime: 15.5865
+      Position: 9
+    - CarIdx: 25
+      ClassPosition: 10
+      FastestLap: 2
+      FastestTime: 15.6169
+      Position: 10
+    - CarIdx: 24
+      ClassPosition: 11
+      FastestLap: 1
+      FastestTime: 15.6542
+      Position: 11
+    - CarIdx: 22
+      ClassPosition: 12
+      FastestLap: 1
+      FastestTime: 15.6612
+      Position: 12
+    - CarIdx: 17
+      ClassPosition: 13
+      FastestLap: 2
+      FastestTime: 15.6614
+      Position: 13
+    - CarIdx: 12
+      ClassPosition: 14
+      FastestLap: 2
+      FastestTime: 15.7682
+      Position: 14
+    - CarIdx: 26
+      ClassPosition: 15
+      FastestLap: 2
+      FastestTime: 15.8716
+      Position: 15
+    - CarIdx: 16
+      ClassPosition: 16
+      FastestLap: 1
+      FastestTime: 15.8744
+      Position: 16
+    - CarIdx: 10
+      ClassPosition: 17
+      FastestLap: 2
+      FastestTime: 16.1512
+      Position: 17
+    - CarIdx: 15
+      ClassPosition: 18
+      FastestLap: 2
+      FastestTime: 16.1911
+      Position: 18
+    - CarIdx: 3
+      ClassPosition: 19
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 19
+    - CarIdx: 9
+      ClassPosition: 20
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 20
+    - CarIdx: 11
+      ClassPosition: 21
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 21
+    - CarIdx: 14
+      ClassPosition: 22
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 22
+    - CarIdx: 18
+      ClassPosition: 23
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 23
+    - CarIdx: 20
+      ClassPosition: 24
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 24
+    - CarIdx: 23
+      ClassPosition: 25
+      FastestLap: 0
+      FastestTime: -1.0
+      Position: 25
+  RadioInfo:
+    Radios:
+    - Frequencies:
+      - CanScan: 1
+        CanSquawk: 1
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@ALLTEAMS'
+        FrequencyNum: 0
+        IsDeletable: 0
+        IsMutable: 1
+        Muted: 0
+        Priority: 12
+      - CanScan: 1
+        CanSquawk: 0
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@DRIVERS'
+        FrequencyNum: 1
+        IsDeletable: 0
+        IsMutable: 1
+        Muted: 0
+        Priority: 15
+      - CanScan: 1
+        CanSquawk: 1
+        CarIdx: 9
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@TEAM'
+        FrequencyNum: 2
+        IsDeletable: 0
+        IsMutable: 0
+        Muted: 0
+        Priority: 60
+      - CanScan: 1
+        CanSquawk: 0
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: -1
+        FrequencyName: '@RACECONTROL'
+        FrequencyNum: 3
+        IsDeletable: 0
+        IsMutable: 0
+        Muted: 0
+        Priority: 80
+      - CanScan: 1
+        CanSquawk: 1
+        CarIdx: -1
+        ClubID: 0
+        EntryIdx: 9
+        FrequencyName: '@PRIVATE'
+        FrequencyNum: 4
+        IsDeletable: 0
+        IsMutable: 0
+        Muted: 0
+        Priority: 70
+      HopCount: 2
+      NumFrequencies: 5
+      RadioNum: 0
+      ScanningIsOn: 1
+      TunedToFrequencyNum: 4
+    SelectedRadioNum: 0
+  SessionInfo:
+    CurrentSessionNum: 2
+    Sessions:
+    - ResultsAverageLapTime: -1.0
+      ResultsFastestLap:
+      - CarIdx: 19
+        FastestLap: 5
+        FastestTime: 15.5098
+      ResultsLapsComplete: -1
+      ResultsNumCautionFlags: 0
+      ResultsNumCautionLaps: 0
+      ResultsNumLeadChanges: 0
+      ResultsOfficial: 1
+      ResultsPositions:
+      - CarIdx: 19
+        ClassPosition: 0
+        FastestLap: 5
+        FastestTime: 15.5098
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 5
+        LapsComplete: 5
+        LapsDriven: 5.562
+        LapsLed: 0
+        LastTime: 15.5098
+        Position: 1
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.5098
+      - CarIdx: 21
+        ClassPosition: 1
+        FastestLap: 2
+        FastestTime: 15.7169
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 3
+        LapsDriven: 3.085
+        LapsLed: 0
+        LastTime: 16.5685
+        Position: 2
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.7169
+      - CarIdx: 20
+        ClassPosition: 2
+        FastestLap: 3
+        FastestTime: 15.7936
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 3
+        LapsComplete: 5
+        LapsDriven: 5.491
+        LapsLed: 0
+        LastTime: 16.3373
+        Position: 3
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.7936
+      - CarIdx: 14
+        ClassPosition: 3
+        FastestLap: 4
+        FastestTime: 16.2745
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 4
+        LapsComplete: 6
+        LapsDriven: 6.542
+        LapsLed: 0
+        LastTime: 17.0904
+        Position: 4
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 16.2745
+      - CarIdx: 18
+        ClassPosition: 4
+        FastestLap: 2
+        FastestTime: 16.5418
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 2.302
+        LapsLed: 0
+        LastTime: 16.5418
+        Position: 5
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 16.5418
+      - CarIdx: 17
+        ClassPosition: 5
+        FastestLap: 2
+        FastestTime: 18.0362
+        Incidents: 4
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 2.145
+        LapsLed: 0
+        LastTime: 18.0362
+        Position: 6
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 18.0362
+      - CarIdx: 16
+        ClassPosition: 6
+        FastestLap: 2
+        FastestTime: 18.2333
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 2.031
+        LapsLed: 0
+        LastTime: 18.2333
+        Position: 7
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 18.2333
+      - CarIdx: 1
+        ClassPosition: 7
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 8
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 2
+        ClassPosition: 8
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 9
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 3
+        ClassPosition: 9
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 10
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 4
+        ClassPosition: 10
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 11
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 5
+        ClassPosition: 11
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 12
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 6
+        ClassPosition: 12
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 13
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 7
+        ClassPosition: 13
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 14
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 8
+        ClassPosition: 14
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 15
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 9
+        ClassPosition: 15
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 16
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 10
+        ClassPosition: 16
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 17
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 11
+        ClassPosition: 17
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 18
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 12
+        ClassPosition: 18
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 1
+        LapsDriven: 1.99
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 19
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 13
+        ClassPosition: 19
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.983
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 20
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 15
+        ClassPosition: 20
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 1
+        LapsDriven: 1.239
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 21
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 22
+        ClassPosition: 21
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.005
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 22
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 23
+        ClassPosition: 22
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 23
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 24
+        ClassPosition: 23
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 24
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 25
+        ClassPosition: 24
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 2
+        LapsDriven: 2.954
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 25
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 26
+        ClassPosition: 25
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 4
+        LapsDriven: 4.416
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 26
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      SessionEnforceTireCompoundChange: 0
+      SessionLaps: unlimited
+      SessionName: PRACTICE
+      SessionNum: 0
+      SessionNumLapsToAvg: 0
+      SessionRunGroupsUsed: 0
+      SessionSkipped: 0
+      SessionSubType: null
+      SessionTime: 180.0000 sec
+      SessionTrackRubberState: slight usage
+      SessionType: Practice
+    - ResultsAverageLapTime: -1.0
+      ResultsFastestLap:
+      - CarIdx: 2
+        FastestLap: 2
+        FastestTime: 15.2705
+      ResultsLapsComplete: -1
+      ResultsNumCautionFlags: 0
+      ResultsNumCautionLaps: 0
+      ResultsNumLeadChanges: 0
+      ResultsOfficial: 1
+      ResultsPositions:
+      - CarIdx: 2
+        ClassPosition: 0
+        FastestLap: 2
+        FastestTime: 15.2705
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 4.157
+        LapsLed: 0
+        LastTime: 15.2705
+        Position: 1
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.2705
+      - CarIdx: 4
+        ClassPosition: 1
+        FastestLap: 2
+        FastestTime: 15.2959
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 4.265
+        LapsLed: 0
+        LastTime: 15.2959
+        Position: 2
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.2959
+      - CarIdx: 1
+        ClassPosition: 2
+        FastestLap: 1
+        FastestTime: 15.3227
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 1
+        LapsComplete: 2
+        LapsDriven: 4.869
+        LapsLed: 0
+        LastTime: 15.346
+        Position: 3
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.3227
+      - CarIdx: 8
+        ClassPosition: 3
+        FastestLap: 2
+        FastestTime: 15.3689
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.446
+        LapsLed: 0
+        LastTime: 15.3689
+        Position: 4
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.3689
+      - CarIdx: 6
+        ClassPosition: 4
+        FastestLap: 2
+        FastestTime: 15.3747
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.888
+        LapsLed: 0
+        LastTime: 15.3747
+        Position: 5
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.3747
+      - CarIdx: 7
+        ClassPosition: 5
+        FastestLap: 2
+        FastestTime: 15.4434
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.322
+        LapsLed: 0
+        LastTime: 15.4434
+        Position: 6
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.4434
+      - CarIdx: 13
+        ClassPosition: 6
+        FastestLap: 2
+        FastestTime: 15.4752
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.903
+        LapsLed: 0
+        LastTime: 15.4752
+        Position: 7
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.4752
+      - CarIdx: 19
+        ClassPosition: 7
+        FastestLap: 1
+        FastestTime: 15.494
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 1
+        LapsComplete: 2
+        LapsDriven: 3.359
+        LapsLed: 0
+        LastTime: 15.7478
+        Position: 8
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.494
+      - CarIdx: 5
+        ClassPosition: 8
+        FastestLap: 2
+        FastestTime: 15.5107
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.112
+        LapsLed: 0
+        LastTime: 15.5107
+        Position: 9
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.5107
+      - CarIdx: 21
+        ClassPosition: 9
+        FastestLap: 2
+        FastestTime: 15.5865
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.612
+        LapsLed: 0
+        LastTime: 15.5865
+        Position: 10
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.5865
+      - CarIdx: 25
+        ClassPosition: 10
+        FastestLap: 2
+        FastestTime: 15.6169
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.38
+        LapsLed: 0
+        LastTime: 15.6169
+        Position: 11
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.6169
+      - CarIdx: 24
+        ClassPosition: 11
+        FastestLap: 1
+        FastestTime: 15.6542
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 1
+        LapsComplete: 2
+        LapsDriven: 9.716
+        LapsLed: 0
+        LastTime: 16.5949
+        Position: 12
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.6542
+      - CarIdx: 22
+        ClassPosition: 12
+        FastestLap: 1
+        FastestTime: 15.6612
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 1
+        LapsComplete: 1
+        LapsDriven: 2.77
+        LapsLed: 0
+        LastTime: 15.6612
+        Position: 13
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.6612
+      - CarIdx: 17
+        ClassPosition: 13
+        FastestLap: 2
+        FastestTime: 15.6614
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.526
+        LapsLed: 0
+        LastTime: 15.6614
+        Position: 14
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.6614
+      - CarIdx: 12
+        ClassPosition: 14
+        FastestLap: 2
+        FastestTime: 15.7682
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.874
+        LapsLed: 0
+        LastTime: 15.7682
+        Position: 15
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.7682
+      - CarIdx: 26
+        ClassPosition: 15
+        FastestLap: 2
+        FastestTime: 15.8716
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.221
+        LapsLed: 0
+        LastTime: 15.8716
+        Position: 16
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.8716
+      - CarIdx: 16
+        ClassPosition: 16
+        FastestLap: 1
+        FastestTime: 15.8744
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 1
+        LapsComplete: 1
+        LapsDriven: 3.207
+        LapsLed: 0
+        LastTime: 15.8744
+        Position: 17
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 15.8744
+      - CarIdx: 10
+        ClassPosition: 17
+        FastestLap: 2
+        FastestTime: 16.1512
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.399
+        LapsLed: 0
+        LastTime: 16.1512
+        Position: 18
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 16.1512
+      - CarIdx: 15
+        ClassPosition: 18
+        FastestLap: 2
+        FastestTime: 16.1911
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 2
+        LapsComplete: 2
+        LapsDriven: 3.21
+        LapsLed: 0
+        LastTime: 16.1911
+        Position: 19
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: 16.1911
+      - CarIdx: 3
+        ClassPosition: 19
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 20
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 9
+        ClassPosition: 20
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 2
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 2
+        LapsDriven: 11.972
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 21
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 11
+        ClassPosition: 21
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 22
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 14
+        ClassPosition: 22
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 23
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 18
+        ClassPosition: 23
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 24
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 20
+        ClassPosition: 24
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 25
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      - CarIdx: 23
+        ClassPosition: 25
+        FastestLap: -1
+        FastestTime: -1.0
+        Incidents: 0
+        JokerLapsComplete: 0
+        Lap: 0
+        LapsComplete: 0
+        LapsDriven: 0.0
+        LapsLed: 0
+        LastTime: -1.0
+        Position: 26
+        ReasonOutId: 0
+        ReasonOutStr: Running
+        Time: -1.0
+      SessionEnforceTireCompoundChange: 0
+      SessionLaps: '2'
+      SessionName: QUALIFY
+      SessionNum: 1
+      SessionNumLapsToAvg: 0
+      SessionRunGroupsUsed: 0
+      SessionSkipped: 0
+      SessionSubType: null
+      SessionTime: 300.0000 sec
+      SessionTrackRubberState: carry over
+      SessionType: Lone Qualify
+    - ResultsAverageLapTime: -1.0
+      ResultsFastestLap:
+      - CarIdx: 255
+        FastestLap: 0
+        FastestTime: -1.0
+      ResultsLapsComplete: -1
+      ResultsNumCautionFlags: 0
+      ResultsNumCautionLaps: 0
+      ResultsNumLeadChanges: 0
+      ResultsOfficial: 0
+      ResultsPositions: null
+      SessionEnforceTireCompoundChange: 0
+      SessionLaps: '80'
+      SessionName: RACE
+      SessionNum: 2
+      SessionNumLapsToAvg: 0
+      SessionRunGroupsUsed: 0
+      SessionSkipped: 0
+      SessionSubType: null
+      SessionTime: unlimited
+      SessionTrackRubberState: carry over
+      SessionType: Race
+  SplitTimeInfo:
+    Sectors:
+    - SectorNum: 0
+      SectorStartPct: 0.0
+    - SectorNum: 1
+      SectorStartPct: 0.5
+  WeekendInfo:
+    BuildTarget: Members
+    BuildType: Release
+    BuildVersion: 2026.04.06.02
+    Category: Oval
+    DCRuleSet: None
+    Encoding: null
+    EventType: Race
+    HeatRacing: 0
+    LeagueID: 0
+    MaxDrivers: 1
+    MinDrivers: 0
+    NumCarClasses: 1
+    NumCarTypes: 4
+    Official: 1
+    QualifierMustStartRace: 0
+    RaceFarm: US-East-OH
+    RaceWeek: 3
+    SeasonID: 6175
+    SeriesID: 103
+    SessionID: 305764180
+    SimMode: full
+    SubSessionID: 84821966
+    TeamRacing: 0
+    TelemetryOptions:
+      TelemetryDiskFile: ''
+    TrackAirDensity: 1.14 kg/m^3
+    TrackAirPressure: 28.36 Hg
+    TrackAirTemp: 19.99 C
+    TrackAltitude: 448.54 m
+    TrackCity: Bristol
+    TrackCleanup: 1
+    TrackConfigName: Single Pit Road
+    TrackCountry: USA
+    TrackDirection: left
+    TrackDisplayName: Bristol Motor Speedway
+    TrackDisplayShortName: Bristol
+    TrackDynamicTrack: 1
+    TrackFogLevel: 0 %
+    TrackID: 365
+    TrackLatitude: 36.515979 m
+    TrackLength: 0.8282 km
+    TrackLengthOfficial: 0.80 km
+    TrackLongitude: -82.256144 m
+    TrackName: bristol fullpit
+    TrackNorthOffset: 5.7643 rad
+    TrackNumPitStalls: 43
+    TrackNumTurns: 4
+    TrackPaceSpeed: 17.77 kph
+    TrackPitSpeedLimit: 55.98 kph
+    TrackPrecipitation: 0 %
+    TrackRelativeHumidity: 54 %
+    TrackSkies: Dynamic
+    TrackState: TN
+    TrackSurfaceTemp: 25.99 C
+    TrackSurfaceTempCrew: 32.22 C
+    TrackType: short oval
+    TrackVersion: 2026.02.26.04
+    TrackWeatherType: Realistic
+    TrackWindDir: 4.33 rad
+    TrackWindVel: 5.02 m/s
+    WeekendOptions:
+      CommercialMode: consumer
+      CourseCautions: full
+      Date: 2026-04-11
+      EarthRotationSpeedupFactor: 1
+      FastRepairsLimit: '0'
+      FogLevel: 0 %
+      GreenWhiteCheckeredLimit: 1
+      HardcoreLevel: 0
+      HasOpenRegistration: 0
+      IncidentLimit: '25'
+      IncidentWarningInitialLimit: '17'
+      IncidentWarningSubsequentLimit: '17'
+      IsFixedSetup: 1
+      NightMode: variable
+      NumJokerLaps: 0
+      NumStarters: 26
+      QualifyScoring: best lap
+      RelativeHumidity: 45 %
+      Restarts: double file lapped cars behind
+      ShortParadeLap: 0
+      Skies: Dynamic
+      StandingStart: 0
+      StartingGrid: 2x2 inline pole on left
+      StrictLapsChecking: default
+      TimeOfDay: 2:35 pm
+      Unofficial: 0
+      WeatherTemp: 25.56 C
+      WeatherType: Realistic
+      WindDirection: N
+      WindSpeed: 3.22 km/h

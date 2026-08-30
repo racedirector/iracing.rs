@@ -3,7 +3,8 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, Result, SchemaProvider, VariableSchema, ibt::IbtReader, provider::Provider,
+    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    irsdk::IRacingSessionString, provider::Provider, reader::ibt::IbtReader,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
@@ -16,18 +17,18 @@ pub struct IbtProvider {
 impl IbtProvider {
     /// Open an `.ibt` file as a replay provider.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Ok(Self::from_reader(IbtReader::open(path)?))
+        Self::from_reader(IbtReader::open(path)?)
     }
 
     /// Create a replay provider from an already-opened reader.
-    pub fn from_reader(reader: IbtReader) -> Self {
+    pub fn from_reader(reader: IbtReader) -> Result<Self> {
         let tick_rate = reader.tick_rate();
-        let schema = Arc::new(reader.schema().clone());
-        Self {
+        let schema = VariableSchema::from_reader(&reader).map(Arc::new)?;
+        Ok(Self {
             reader,
             schema,
             tick_rate,
-        }
+        })
     }
 
     /// Seek to a specific frame
@@ -76,13 +77,33 @@ impl Provider for IbtProvider {
             return Ok(None);
         }
 
-        let (frame_data, tick, session_version) = match self.reader.read_next_frame()? {
-            Some(data) => data,
+        let frame = match self.reader.read_next_frame()? {
+            Some(frame) => frame,
             None => {
                 tracing::debug!("No more frames from reader");
                 return Ok(None);
             }
         };
+        let tick = u32::try_from(frame.index()).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT provider",
+                format!(
+                    "Frame index {} cannot be represented as a tick",
+                    frame.index()
+                ),
+            )
+        })?;
+        let session_version =
+            u32::try_from(self.reader.header().session_info_update).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "IBT provider",
+                    format!(
+                        "Session version cannot be negative: {}",
+                        self.reader.header().session_info_update
+                    ),
+                )
+            })?;
+        let frame_data: Vec<u8> = frame.into_buffer().into();
 
         let packet = FramePacket::new(frame_data, tick, session_version, self.shared_schema());
 
@@ -98,7 +119,13 @@ impl Provider for IbtProvider {
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        self.reader.session_yaml()
+        let Some(buffer) = self.reader.session_info_buffer()? else {
+            return Ok(None);
+        };
+
+        let session = IRacingSessionString::try_from(buffer)?;
+
+        Ok(Some(session.into()))
     }
 
     fn tick_rate(&self) -> f64 {
@@ -131,7 +158,7 @@ mod tests {
         let mut reader = IbtReader::open(path)?;
         reader.seek_to_frame(1)?;
 
-        let provider = IbtProvider::from_reader(reader);
+        let provider = IbtProvider::from_reader(reader)?;
 
         assert_eq!(provider.current_frame(), 1);
         assert!(provider.total_frames() > 1);
@@ -144,7 +171,7 @@ mod tests {
             .expect("generated IBT fixture should be available for provider tests");
 
         let from_path = IbtProvider::open(&path)?;
-        let with_reader = IbtProvider::from_reader(IbtReader::open(path)?);
+        let with_reader = IbtProvider::from_reader(IbtReader::open(path)?)?;
 
         assert_eq!(from_path.current_frame(), with_reader.current_frame());
         assert_eq!(from_path.total_frames(), with_reader.total_frames());

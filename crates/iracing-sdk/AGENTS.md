@@ -9,10 +9,10 @@
 
 ## Key APIs & Layout
 
-- `ibt/`: `IbtReader` iterates `.ibt` telemetry; rely on `VariableSchema` and `VariableInfo` metadata instead of re-parsing frame bytes.
+- `reader/`: source-neutral positioned access and header-directed snapshots; `reader::ibt::IbtRecording` owns validated `.ibt` layout while `IbtReader` adds cursor semantics.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
-- `schema/session/`: `SessionInfoParser` caches YAML; only re-parse when `session_version` changes.
-- `types/headers.rs`: shared live/IBT wire headers and source-specific validation; `schema/variables.rs`: Windows-only legacy variable-schema discovery.
+- `types/session/`: typed session YAML model. Readers return owned raw snapshots; providers and tools clean YAML with `yaml_utils` before `SessionInfo::parse`.
+- `types/irsdk/`: literal shared live/IBT wire definitions; `types/schema.rs`: source-neutral variable metadata and schema construction.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
 - `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. `IbtConnection` coordinates one shared cursor across acknowledged subscribers; `LiveConnection` exposes watch-backed latest snapshots.
 - `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.
@@ -30,6 +30,18 @@
 - Recorded and live sources have different delivery semantics. IBT replay is explicitly started and advances one shared cursor only after every active subscription asks for its next item; live delivery remains latest-wins.
 - Tokio is a target-specific internal dependency: native targets use full Tokio, while `wasm32` builds are limited to Tokio's WASM-safe subset.
 - Only gate APIs that require incompatible Tokio runtime behavior; `tokio::sync` usage can stay in shared code.
+
+## Refactoring and Failure Visibility
+
+- During structural refactors, do not introduce compatibility aliases, re-exports, adapters, or other build-preserving abstractions unless the user explicitly requests them.
+- Treat compiler failures as useful architectural evidence: perform the requested move or duplication, compile, categorize the exposed dependency breakages, and bring decisions about those boundaries back to the user before resolving them.
+- Do not assume a green build is the correct intermediate result. Preserve intentional refactor-point failures when the user is reviewing ownership, public API boundaries, or dependency direction.
+- Keep literal SDK wire definitions in `types/irsdk/` meaningful and internally explicit; do not conceal dependencies on their previous locations through compatibility names.
+
+## Naming
+
+- Prefer complete, descriptive Rust identifiers over abbreviations, including when the upstream SDK uses abbreviated C names. For example, use `ReplayPositionMode`, `TrackLocation`, and `PitServiceFlags`, and document their mappings to `irsdk_RpyPosMode`, `irsdk_TrkLoc`, and `irsdk_PitSvFlags`.
+- Do not shorten public names to save typing; IDE completion handles long identifiers, while abbreviated names make discovery and review more ambiguous.
 
 ## Examples & Binaries
 

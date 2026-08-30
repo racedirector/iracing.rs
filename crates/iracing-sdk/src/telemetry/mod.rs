@@ -11,11 +11,11 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     FramePacket,
     provider::Provider,
-    schema::SessionInfo,
     telemetry::{
         delivery_policy::{DeliveryPolicy, OnDemandDelivery, ReplayDemand},
         session_policy::{IbtSessionPolicy, SessionPolicy},
     },
+    types::SessionInfo,
 };
 
 pub(crate) use self::builder::TelemetryBuilder;

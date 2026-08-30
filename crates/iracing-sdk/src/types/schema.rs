@@ -3,13 +3,18 @@
 #[cfg(feature = "codegen")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
 
-use crate::IRacingSDKError;
 #[cfg(windows)]
-use crate::{Result, WindowsConnection};
+use crate::WindowsConnection;
+use crate::{
+    IRacingSDKError, Result, parse_utils, reader::ibt::IbtReader, types::VariableHeadersBuffer,
+};
 
-use super::VariableType;
+use super::{VariableType, irsdk::VariableHeader};
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -43,33 +48,126 @@ pub struct VariableInfo {
     pub description: String,
 }
 
+impl TryFrom<VariableHeader> for VariableInfo {
+    type Error = IRacingSDKError;
+
+    /// Convert the wire-format VariableHeader into library type `VariableInfo`.
+    fn try_from(value: VariableHeader) -> Result<Self> {
+        value.validate()?;
+
+        Ok(VariableInfo {
+            name: parse_utils::c_string_to_string(&value.name),
+            description: parse_utils::c_string_to_string(&value.description),
+            units: parse_utils::c_string_to_string(&value.unit),
+            data_type: value.variable_type()?,
+            offset: usize::try_from(value.offset).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "TryFrom<VariableHeader> for VariableInfo",
+                    format!("Could not convert {} to usize", value.offset),
+                )
+            })?,
+            count: usize::try_from(value.count).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "TryFrom<VariableHeader> for VariableInfo",
+                    format!("Could not convert {} to usize", value.count,),
+                )
+            })?,
+            count_as_time: value.count_as_time != 0,
+        })
+    }
+}
+
+impl TryFrom<VariableHeadersBuffer> for Vec<VariableInfo> {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: VariableHeadersBuffer) -> Result<Self> {
+        let variables = value
+            .iter_headers()
+            .map(VariableInfo::try_from)
+            .collect::<Result<Vec<VariableInfo>>>()?;
+
+        Ok(variables)
+    }
+}
+
+#[cfg_attr(feature = "codegen", derive(JsonSchema))]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// Owned variable metadata keyed by its wire-format name.
+pub struct VariablesHashMap(HashMap<String, VariableInfo>);
+
+impl Deref for VariablesHashMap {
+    type Target = HashMap<String, VariableInfo>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for VariablesHashMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<HashMap<String, VariableInfo>> for VariablesHashMap {
+    fn from(value: HashMap<String, VariableInfo>) -> Self {
+        Self(value)
+    }
+}
+
+impl TryFrom<VariableHeadersBuffer> for VariablesHashMap {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: VariableHeadersBuffer) -> Result<Self> {
+        let variables = value
+            .iter_headers()
+            .map(VariableInfo::try_from)
+            .map(|result| {
+                let info = result?;
+                Ok((info.name.clone(), info))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        Ok(Self(variables))
+    }
+}
+
 /// # Variable schema
 /// Schema describing the structure and metadata of telemetry variables.
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct VariableSchema {
     /// # Variables map
     /// Map of variable names to their metadata (provides O(1) lookup)
-    pub variables: HashMap<String, VariableInfo>,
+    pub variables: VariablesHashMap,
     /// # Frame size
     /// Total size of a telemetry frame in bytes
     pub frame_size: usize,
 }
 
 impl VariableSchema {
+    /// Builds a validated schema from an owned variable-header snapshot.
+    pub fn from_variable_headers(
+        variable_headers: VariableHeadersBuffer,
+        frame_size: usize,
+    ) -> Result<Self> {
+        Self::new(VariablesHashMap::try_from(variable_headers)?, frame_size)
+    }
+
     /// Create a new VariableSchema with validation.
-    pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> crate::Result<Self> {
+    pub fn new(variables: impl Into<VariablesHashMap>, frame_size: usize) -> Result<Self> {
         let schema = Self {
-            variables,
+            variables: variables.into(),
             frame_size,
         };
+
         schema.validate()?;
         Ok(schema)
     }
 
     /// Validate the schema for consistency.
-    pub fn validate(&self) -> crate::Result<()> {
-        for (name, var_info) in &self.variables {
+    pub fn validate(&self) -> Result<()> {
+        for (name, var_info) in &self.variables.0 {
             // Validate variable count
             if var_info.count == 0 {
                 return Err(schema_validation_error(format!(
@@ -87,7 +185,13 @@ impl VariableSchema {
             }
 
             // Validate that variable fits within frame
-            let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
+            let element_size = var_info.data_type.byte_size().ok_or_else(|| {
+                schema_validation_error(format!(
+                    "Variable '{}' uses the non-storage ElementTypeCount sentinel",
+                    name
+                ))
+            })?;
+            let end_offset = var_info.offset + (element_size * var_info.count);
             if end_offset > self.frame_size {
                 return Err(IRacingSDKError::memory_access_error(var_info.offset));
             }
@@ -125,17 +229,18 @@ impl VariableSchema {
 #[cfg(windows)]
 impl VariableSchema {
     /// Creates a VariableSchema from components of a WindowsConnection.
-    pub fn from_connection(connection: &WindowsConnection) -> Result<VariableSchema> {
+    pub fn from_connection(connection: &WindowsConnection) -> Result<Self> {
         let header = connection.header_snapshot();
+        let variable_headers =
+            connection
+                .variable_headers_buffer()
+                .ok_or(IRacingSDKError::parse_error(
+                    "VariableSchema",
+                    "Could not find variable headers from connection",
+                ))?;
 
-        let variable_map = if let Some(v) = connection.variable_info_buffer() {
-            v.try_into()?
-        } else {
-            HashMap::new()
-        };
-
-        Ok(VariableSchema {
-            variables: variable_map,
+        Ok(Self {
+            variables: variable_headers.try_into()?,
             frame_size: usize::try_from(header.buffer_length).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "VariableSchema",
@@ -143,6 +248,21 @@ impl VariableSchema {
                 )
             })?,
         })
+    }
+}
+
+impl VariableSchema {
+    /// Creates a VariableSchema from components of an `IbtReader`.
+    pub fn from_reader(reader: &IbtReader) -> Result<Self> {
+        let variable_headers =
+            reader
+                .variable_headers_buffer()?
+                .ok_or(IRacingSDKError::parse_error(
+                    "VariableSchema",
+                    "Could not find variable headers from IbtReader",
+                ))?;
+
+        VariableSchema::from_variable_headers(variable_headers, reader.recording().frame_length())
     }
 }
 
@@ -198,7 +318,7 @@ mod tests {
     fn schema_provider_basic_usage() {
         let speed = VariableInfo {
             name: "Speed".to_string(),
-            data_type: VariableType::Float32,
+            data_type: VariableType::Float,
             offset: 0,
             count: 1,
             count_as_time: false,

@@ -127,7 +127,8 @@ pub fn verify_full_frame(packet: &FramePacket, variables: &[&VariableInfo]) {
     for info in variables {
         let byte_len = info
             .data_type
-            .size()
+            .byte_size()
+            .expect("benchmark schemas only contain telemetry storage types")
             .checked_mul(info.count)
             .unwrap_or_else(|| {
                 panic!(
@@ -187,53 +188,47 @@ fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
     let integer = (index as u32).wrapping_add(1);
 
     match data_type {
-        VariableType::Char => TelemetryValue::Char(integer as u8),
-        VariableType::Int8 => TelemetryValue::Int8(integer as i8),
-        VariableType::UInt8 => TelemetryValue::UInt8(integer as u8),
-        VariableType::Int16 => TelemetryValue::Int16(integer as i16),
-        VariableType::UInt16 => TelemetryValue::UInt16(integer as u16),
-        VariableType::Int32 => TelemetryValue::Int32(integer as i32),
-        VariableType::UInt32 => TelemetryValue::UInt32(integer),
-        VariableType::Float32 => TelemetryValue::Float32(index as f32 + 0.5),
-        VariableType::Float64 => TelemetryValue::Float64(index as f64 + 0.5),
-        VariableType::Bool => TelemetryValue::Bool(index.is_multiple_of(2)),
+        VariableType::Character => TelemetryValue::Char(integer as u8),
+        VariableType::Integer => TelemetryValue::Int32(integer as i32),
+        VariableType::Float => TelemetryValue::Float32(index as f32 + 0.5),
+        VariableType::Double => TelemetryValue::Float64(index as f64 + 0.5),
+        VariableType::Boolean => TelemetryValue::Bool(index.is_multiple_of(2)),
         VariableType::BitField => {
             TelemetryValue::BitField(BitField::new(1_u32 << (index % u32::BITS as usize)))
         }
+        VariableType::ElementTypeCount => unreachable!("sentinel is not a storage type"),
     }
 }
 
 fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
     for info in ordered_variables(schema) {
         for index in 0..info.count {
-            let offset = info.offset + index * info.data_type.size();
+            let offset = info.offset
+                + index
+                    * info
+                        .data_type
+                        .byte_size()
+                        .expect("benchmark schemas only contain telemetry storage types");
             let value = (index as u32).wrapping_add(1);
 
             match info.data_type {
-                VariableType::Char | VariableType::UInt8 => data[offset] = value as u8,
-                VariableType::Int8 => data[offset] = (value as i8).to_le_bytes()[0],
-                VariableType::Int16 => {
-                    data[offset..offset + 2].copy_from_slice(&(value as i16).to_le_bytes());
-                }
-                VariableType::UInt16 => {
-                    data[offset..offset + 2].copy_from_slice(&(value as u16).to_le_bytes());
-                }
-                VariableType::Int32 => {
+                VariableType::Character => data[offset] = value as u8,
+                VariableType::Integer => {
                     data[offset..offset + 4].copy_from_slice(&(value as i32).to_le_bytes());
                 }
-                VariableType::UInt32 => {
-                    data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-                }
-                VariableType::Float32 => {
+                VariableType::Float => {
                     data[offset..offset + 4].copy_from_slice(&((index as f32) + 0.5).to_le_bytes());
                 }
-                VariableType::Float64 => {
+                VariableType::Double => {
                     data[offset..offset + 8].copy_from_slice(&((index as f64) + 0.5).to_le_bytes());
                 }
-                VariableType::Bool => data[offset] = u8::from(index % 2 == 0),
+                VariableType::Boolean => data[offset] = u8::from(index % 2 == 0),
                 VariableType::BitField => {
                     let bit = 1_u32 << (index % u32::BITS as usize);
                     data[offset..offset + 4].copy_from_slice(&bit.to_le_bytes());
+                }
+                VariableType::ElementTypeCount => {
+                    unreachable!("sentinel is not a storage type")
                 }
             }
         }

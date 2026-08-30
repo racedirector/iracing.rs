@@ -2,10 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{
-    SchemaProvider, TelemetryValue, VariableInfo, VariableSchema,
-    types::variable_type::TelemetryValueProvider,
-};
+use crate::{SchemaProvider, TelemetryValue, TelemetryValueProvider, VariableInfo, VariableSchema};
 
 /// Raw telemetry frame packet for the stream-based architecture
 ///
@@ -45,10 +42,7 @@ impl FramePacket {
 
 impl FramePacket {
     /// Retrieves the variable from the frame by name.
-    pub fn value(
-        &self,
-        name: &str,
-    ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
+    pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
         let Some(info) = self.variable(name) else {
             return Ok(None);
         };
@@ -79,7 +73,7 @@ mod tests {
     fn frame_packet_provides_schema_and_telemetry_values() {
         let rpm_info = VariableInfo {
             name: "RPM".into(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,
@@ -87,7 +81,7 @@ mod tests {
             description: "Engine RPM".into(),
         };
         let schema = Arc::new(VariableSchema {
-            variables: HashMap::from([("RPM".to_string(), rpm_info)]),
+            variables: HashMap::from([("RPM".to_string(), rpm_info)]).into(),
             frame_size: 4,
         });
         let packet = FramePacket::new(1234i32.to_le_bytes().to_vec(), 10, 2, Arc::clone(&schema));

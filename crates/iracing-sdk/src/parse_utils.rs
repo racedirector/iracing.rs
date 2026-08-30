@@ -43,8 +43,12 @@ pub(crate) fn decode_bytes_for_variable_info<const SIZE: usize, T>(
 macro_rules! decode_variable_type {
     ($data:expr, $info:expr, $variant:ident, $decode:expr $(,)?) => {{
         const EXPECTED: $crate::VariableType = $crate::VariableType::$variant;
+        const EXPECTED_SIZE: usize = match EXPECTED.byte_size() {
+            Some(size) => size,
+            None => panic!("telemetry storage type must have a byte size"),
+        };
 
-        $crate::parse_utils::decode_bytes_for_variable_info::<{ EXPECTED.size() }, _>(
+        $crate::parse_utils::decode_bytes_for_variable_info::<EXPECTED_SIZE, _>(
             $data, $info, EXPECTED, $decode,
         )
     }};

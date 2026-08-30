@@ -51,7 +51,7 @@
 //!
 //!     #[bitfield(
 //!         name = "SessionFlags",
-//!         has = "iracing_sdk::SessionFlags::GREEN.bits()"
+//!         has = "iracing_sdk::types::irsdk::SessionFlags::GREEN.bits()"
 //!     )]
 //!     is_green: bool,
 //!

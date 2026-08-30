@@ -1,4 +1,4 @@
-use iracing_sdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
+use iracing_sdk::types::irsdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
 use iracing_sdk_derive::IRacingTelemetryFrame;
 use serde::Serialize;
 
@@ -160,11 +160,14 @@ pub struct DriverInput {
 
     #[bitfield(
         name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::DEBRIS.bits()"
+        has = "iracing_sdk::types::irsdk::SessionFlags::DEBRIS.bits()"
     )]
     pub is_debris: bool,
 
-    #[bitfield(name = "SessionFlags", has = "iracing_sdk::SessionFlags::BLUE.bits()")]
+    #[bitfield(
+        name = "SessionFlags",
+        has = "iracing_sdk::types::irsdk::SessionFlags::BLUE.bits()"
+    )]
     pub is_faster_car_approaching: bool,
 
     #[bitfield_map(
@@ -175,7 +178,7 @@ pub struct DriverInput {
 
     #[bitfield(
         name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::SERVICIBLE.bits()"
+        has = "iracing_sdk::types::irsdk::SessionFlags::SERVICE_ALLOWED.bits()"
     )]
     pub is_servicible: bool,
 

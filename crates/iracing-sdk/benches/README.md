@@ -10,8 +10,10 @@ different targets are not interchangeable measurements of “frame latency.”
 | `frame_construction` | Byte-buffer ownership, `FramePacket` construction, `Arc` cloning, and tick operations | Telemetry decoding or acquisition |
 | `adapter_performance` | Dynamic lookup and typed adapter construction from a prepared packet | Provider, connection, or subscription work |
 | `aggregate_frame_parsing` | Fresh owned outputs for all variables, a representative consumer, and all scalars | Frame acquisition or end-to-end delivery |
+| `session_parsing` | Session YAML sanitization and typed deserialization from a checked-in live snapshot | Acquisition, shared-memory reads, or update publication |
 | `telemetry_delivery_e2e` | Deterministic in-process provider-to-adapted-subscriber delivery | IBT I/O, Windows shared memory, or simulator pacing |
 | `subscriber_fanout` | One shared SDK stream with service-side fan-out versus one SDK stream per client, using heterogeneous requested-field projections | WS/gRPC serialization, sockets, client backpressure, or network I/O |
+| `live_reader_acquisition` | Deterministic direct-copy, unchanged-tick, stable acquisition, and forced-retry costs for an 8,586-byte live layout | Win32 mapping, event waits, simulator pacing, or delivery |
 | `live_frame_latency` | Manual live subscriptions with a running simulator | Stable, deterministic CI performance |
 
 Run all compile-safe targets with:
@@ -108,6 +110,22 @@ clients, and multi-threaded service scheduling are outside the measured
 boundary.
 
 ## Manual live benchmark
+
+`live_reader_acquisition` is portable and deterministic. It uses an in-memory
+`RandomAccessSource` with the 8,586-byte frame length from the checked-in live
+schema. Accepted-frame cases include allocation of the owned `FrameBuffer`;
+the unchanged-tick case proves and measures the path that performs no frame
+allocation or frame-region copy. Direct-copy and accepted cases report frame
+bytes per second, while unchanged reports observations per second. The forced
+retry changes the source immediately after the first frame copy and accepts the
+second attempt. It intentionally excludes shared-memory mapping, event waits,
+Tokio scheduling, provider conversion, and subscriber delivery.
+
+Run it with:
+
+```text
+cargo bench -p iracing-sdk --features benchmark --bench live_reader_acquisition
+```
 
 `live_frame_latency` is Windows-only and requires an active iRacing session.
 Several cases await source-paced frames, so results include simulator cadence,

@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use iracing_sdk::headers::{DiskSubHeader, Header, IbtHeader, VariableBuffer};
+use iracing_sdk::types::{DiskSubHeader, Header, IbtHeader, VariableBuffer};
 use std::{fs::File, io::BufReader, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 use type_layout::TypeLayout;
+
+#[cfg(windows)]
+use std::time::Duration;
 
 /// iRacing header utilities.
 #[derive(Parser)]
@@ -67,7 +70,7 @@ fn main() -> Result<()> {
             timeout_ms,
             poll_s,
         } => {
-            print_live_header(wait, timeout_ms, poll_s)?;
+            print_live_header(wait, timeout_ms, Duration::from_secs(poll_s))?;
         }
         Commands::Type => print_type_layout()?,
     }
@@ -76,19 +79,19 @@ fn main() -> Result<()> {
 }
 
 fn print_type_layout() -> Result<()> {
-    tracing::info!(
+    println!(
         "VariableBuffer type layout:\n{}",
         VariableBuffer::type_layout()
     );
 
-    tracing::info!("Header type layout:\n{}", Header::type_layout());
+    println!("Header type layout:\n{}", Header::type_layout());
 
-    tracing::info!(
+    println!(
         "DiskSubHeader type layout:\n{}",
         DiskSubHeader::type_layout()
     );
 
-    tracing::info!("IbtHeader type layout:\n{}", IbtHeader::type_layout());
+    println!("IbtHeader type layout:\n{}", IbtHeader::type_layout());
 
     Ok(())
 }
@@ -97,11 +100,9 @@ fn print_type_layout() -> Result<()> {
  * Attempts to acquire a windows connection, parse the header, and print it to stdout via tracing at level info.
  */
 #[cfg(windows)]
-fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result<()> {
+fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_interval: Duration) -> Result<()> {
     use iracing_sdk::WindowsConnection;
     use std::time::{Duration, Instant};
-
-    const POLL_INTERVAL: Duration = Duration::from_secs(poll_s);
 
     let connection = if wait {
         let deadline = timeout_ms.map(|ms| Instant::now() + Duration::from_millis(ms));
@@ -123,7 +124,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result
                 ));
             }
 
-            std::sleep(POLL_INTERVAL);
+            std::thread::sleep(poll_interval);
         }
     } else {
         WindowsConnection::try_connect().context("Could not connect to iRacing")?
@@ -131,7 +132,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_s: u64) -> Result
 
     let header = connection.header_snapshot();
 
-    tracing::info!(
+    println!(
         "Parsed live header:\nIs valid: {}\n{:#?}",
         header.validate_live().is_ok(),
         header
@@ -151,7 +152,7 @@ fn print_ibt_header(path: PathBuf) -> Result<()> {
     let ibt_header = IbtHeader::try_from_reader(&mut reader)
         .with_context(|| format!("Parsing IBT header from {}", path.display()))?;
 
-    tracing::info!(
+    println!(
         "Parsed IBT header:\nIs valid: {}\n{:#?}",
         ibt_header.is_valid(),
         ibt_header

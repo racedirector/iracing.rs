@@ -43,7 +43,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{SchemaProvider, ibt::IbtReader, types::VarData};
+use iracing_sdk::{VariableSchema, reader::ibt::IbtReader, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -125,8 +125,7 @@ fn main() -> Result<()> {
 
     tracing::info!("Resolving telemetry schema");
 
-    // Clone the schema once to avoid repeated lookups.
-    let schema = reader.schema().clone();
+    let schema = VariableSchema::from_reader(&reader)?;
 
     // ------------------------------------------------------------
     // Resolve required variable metadata
@@ -159,14 +158,14 @@ fn main() -> Result<()> {
     // Frame iteration
     // ------------------------------------------------------------
     //
-    // `read_next_frame()` returns:
-    //   Result<Option<(data, tick, session_version)>>
+    // `read_next_frame()` returns an indexed, owned frame snapshot.
     //
     // - Err(_)       => read failure
     // - Ok(None)     => end-of-stream
     // - Ok(Some(...))=> next frame
     //
-    while let Some((data, _tick, _session_version)) = reader.read_next_frame()? {
+    while let Some(frame) = reader.read_next_frame()? {
+        let data: Vec<u8> = frame.into_buffer().into();
         // Extract strongly-typed values from raw frame bytes.
         let lap_distance_meters = f32::from_bytes(&data, lap_distance_meters_info).unwrap();
 

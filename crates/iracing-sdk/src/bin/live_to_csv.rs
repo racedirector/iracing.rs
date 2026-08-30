@@ -27,7 +27,9 @@ use clap::Parser;
 #[cfg(windows)]
 use futures::StreamExt;
 #[cfg(windows)]
-use iracing_sdk::{DynamicFrame, LiveConnection, WindowsConnection, providers::live::LiveProvider};
+use iracing_sdk::{
+    DynamicFrame, LiveConnection, VariableSchema, WindowsConnection, providers::live::LiveProvider,
+};
 #[cfg(windows)]
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
@@ -65,10 +67,7 @@ async fn run() -> Result<()> {
     }
 
     // Sort the variables for extraction by the offset of each variable info
-    let variable_buffer = connection
-        .variable_info_buffer()
-        .ok_or_else(|| anyhow!("No telemetry variables were available from the live connection"))?;
-    let mut variables: Vec<iracing_sdk::VariableInfo> = variable_buffer.try_into()?;
+    let mut variables = VariableSchema::from_connection(&connection)?.variables();
     if variables.is_empty() {
         return Err(anyhow!(
             "No telemetry variables were available from the live connection"

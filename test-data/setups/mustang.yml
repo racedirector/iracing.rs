@@ -1,0 +1,97 @@
+UpdateCount: 6
+Tires:
+  LeftFront:
+    ColdPressure: 152 kPa
+    LastHotPressure: 152 kPa
+    LastTempsOMI: 26C, 26C, 26C
+    TreadRemaining: 100%, 100%, 100%
+  LeftRear:
+    ColdPressure: 152 kPa
+    LastHotPressure: 152 kPa
+    LastTempsOMI: 26C, 26C, 26C
+    TreadRemaining: 100%, 100%, 100%
+  RightFront:
+    ColdPressure: 310 kPa
+    LastHotPressure: 310 kPa
+    LastTempsIMO: 26C, 26C, 26C
+    TreadRemaining: 100%, 100%, 100%
+  RightRear:
+    ColdPressure: 310 kPa
+    LastHotPressure: 310 kPa
+    LastTempsIMO: 26C, 26C, 26C
+    TreadRemaining: 100%, 100%, 100%
+Chassis:
+  Front:
+    BallastForward: 1651 mm
+    NoseWeight: 52.6%
+    CrossWeight: 53.8%
+    SteeringRatio: 12:1
+    SteeringOffset: +6 deg
+    FrontBrakeBias: 65.0%
+    TapeConfiguration: Race
+  LeftFront:
+    CornerWeight: 3963 N
+    RideHeight: 119 mm
+    SpringPerchOffset: -100 mm
+    ShockSpringRate: 788 N/mm
+    Packer: 42.9 mm shim
+    LsCompression: 3 clicks
+    HsCompression: 3 clicks
+    HsCompSlope: 7 clicks
+    LsRebound: 8 clicks
+    HsReboundSlope: 4 clicks
+    Camber: +4.7 deg
+    Caster: +11.5 deg
+    ToeIn: -1 mm
+  LeftRear:
+    CornerWeight: 4156 N
+    RideHeight: 154 mm
+    SpringPerchOffset: -79 mm
+    SpringRate: 70 N/mm
+    LsCompression: 7 clicks
+    HsCompression: 6 clicks
+    HsCompSlope: 3 clicks
+    LsRebound: 7 clicks
+    HsReboundSlope: 6 clicks
+    Camber: +1.9 deg
+    ToeIn: +4 mm
+    TrackBarHeight: +254 mm
+    TruckArmMount: bottom
+  FrontArb:
+    Diameter: 48 mm
+    ArmAsymmetry: 4
+    LinkSlack: -0 mm
+    Preload: -6.9 Nm
+    Attach: 1
+  RightFront:
+    CornerWeight: 4448 N
+    RideHeight: 127 mm
+    SpringPerchOffset: -113 mm
+    ShockSpringRate: 962 N/mm
+    Packer: 49.2 mm shim
+    LsCompression: 7 clicks
+    HsCompression: 5 clicks
+    HsCompSlope: 7 clicks
+    LsRebound: 7 clicks
+    HsReboundSlope: 4 clicks
+    Camber: -4.9 deg
+    Caster: +13.2 deg
+    ToeIn: -1 mm
+  RightRear:
+    CornerWeight: 3436 N
+    RideHeight: 161 mm
+    SpringPerchOffset: -154 mm
+    SpringRate: 315 N/mm
+    TravelToCoilBind: OFF
+    LsCompression: 5 clicks
+    HsCompression: 6 clicks
+    HsCompSlope: 3 clicks
+    LsRebound: 8 clicks
+    HsReboundSlope: 3 clicks
+    Camber: -1.9 deg
+    ToeIn: -4 mm
+    TrackBarHeight: +279 mm
+    TruckArmMount: bottom
+    TruckArmPreload: -0.1 Nm
+  Rear:
+    RearEndRatio: 5.14
