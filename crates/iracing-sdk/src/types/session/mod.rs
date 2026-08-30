@@ -280,6 +280,17 @@ impl TryFrom<SessionInfoBuffer> for SessionInfo {
     }
 }
 
+impl TryFrom<SessionInfo> for String {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: SessionInfo) -> Result<Self> {
+        serde_yaml_ng::to_string(&value).map_err(|e| crate::IRacingSDKError::Parse {
+            context: "SessionInfo serialization".to_string(),
+            details: e.to_string(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,7 +338,8 @@ TeamName: "Fast & Furious" Racing
 AbbrevName: O'Con
 "#;
 
-        let result = crate::yaml_utils::preprocess_iracing_yaml(yaml).unwrap();
+        // Parse the string into a sanitized session string
+        let result: String = IRacingSessionString::try_from(yaml).unwrap().into();
 
         assert_eq!(result, yaml);
     }
@@ -338,15 +350,15 @@ AbbrevName: O'Con
         fn prop_yaml_preprocessing_preserves_structure(
             yaml_content in r"[a-zA-Z0-9: \n\-\._]+",
         ) {
-            let result = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content);
+            let result = IRacingSessionString::try_from(yaml_content.as_str());
 
             if yaml_content.trim().is_empty() {
                 prop_assert!(result.is_err());
             } else {
-                prop_assert_eq!(result.unwrap(), yaml_content);
+                let sanitized = result.unwrap();
+                prop_assert_eq!(sanitized.as_ref(), yaml_content.as_str());
             }
         }
-
     }
 
     #[test]
@@ -399,13 +411,9 @@ SessionInfo:
         ));
     }
 
-    #[cfg(windows)]
     #[test]
-    #[ignore = "Need to implement known test structures"]
-    fn parses_real_iracing_yaml_snapshot() -> Result<()> {
-        // Test with real YAML data captured from live iRacing
-
-        let snapshot_path = require_test_data_file("live_session_snapshot.yml")?;
+    fn parses_checked_in_live_session_snapshot() -> Result<()> {
+        let snapshot_path = require_test_data_file("live-session-snapshot.yml")?;
 
         let yaml_content = std::fs::read(&snapshot_path)
             .with_context(|| format!("Reading YAML snapshot from {}", snapshot_path.display()))?;
@@ -418,13 +426,10 @@ SessionInfo:
         let session_info = SessionInfo::try_from(SessionInfoBuffer::from_snapshot(yaml_content))
             .context("Failed to convert session buffer to SessionInfo")?;
 
-        // Validate the parsed structure matches what we expect from real data
-        assert_eq!(
-            session_info.weekend_info.track_name,
-            "watkinsglen 2021 fullcourse"
-        );
-        assert_eq!(session_info.weekend_info.track_display_name, "Watkins Glen");
-        assert_eq!(session_info.weekend_info.track_id, Some(434));
+        // Validate the parsed structure matches the checked-in capture.
+        assert_eq!(session_info.weekend_info.track_name, "roadamerica full");
+        assert_eq!(session_info.weekend_info.track_display_name, "Road America");
+        assert_eq!(session_info.weekend_info.track_id, Some(18));
         assert_eq!(session_info.session_info.current_session_num, 0);
         assert_eq!(session_info.session_info.sessions.len(), 1);
         assert_eq!(
@@ -438,16 +443,16 @@ SessionInfo:
             .as_ref()
             .expect("Should have driver info");
         assert_eq!(driver_info.driver_car_idx, Some(0));
-        assert_eq!(driver_info.driver_user_id, Some(932438));
+        assert_eq!(driver_info.driver_user_id, Some(378767));
 
         let drivers = driver_info
             .drivers
             .as_ref()
             .expect("Should have drivers list");
         assert_eq!(drivers.len(), 1);
-        assert_eq!(drivers[0].user_name, "Kevin A O Neill");
+        assert_eq!(drivers[0].user_name, "Justin Makaila");
         assert_eq!(drivers[0].car_idx, 0);
-        assert_eq!(drivers[0].car_number, Some("037".to_string()));
+        assert_eq!(drivers[0].car_number, Some("64".to_string()));
 
         println!("✅ Real YAML snapshot parsing test passed!");
         println!(
@@ -534,108 +539,6 @@ SessionInfo:
             qualify_results_info: None,
             #[cfg(feature = "schema-discovery")]
             unknown_fields: HashMap::new(),
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "benchmark")]
-    fn benchmark_session_info_parsing_performance() {
-        use std::time::Instant;
-
-        // Create realistic test YAML with problematic characters
-        let test_yaml = r#"
- DriverInfo:
-- CarIdx: 0
-  UserName: John O'Connor
-  AbbrevName: J O'Con
-  TeamName: "Fast & Furious" Racing Team
-  Initials: JO
-  CarNumber: "42"
-  CarClassShortName: GT3
-  CarIdxPosition: 1
-- CarIdx: 1
-  UserName: Sarah Mitchell
-  AbbrevName: S Mitch
-  TeamName: Lightning McQueen Racing
-  Initials: SM
-  CarNumber: "7"
-  CarClassShortName: GT3
-  CarIdxPosition: 2
-WeatherInfo:
-AirTemp: 25.0
-TrackTemp: 35.2
-Humidity: 65
-WeatherType: Clear
-TrackInfo:
-TrackName: Watkins Glen International
-TrackDisplayName: Watkins Glen
-TrackLength: 5.472 km
-TrackTurns: 11
-TrackSurface: Asphalt
-SessionInfo:
-SessionType: Race
-SessionLaps: 50
-SessionTime: 3600.0
-SessionState: Racing
-"#;
-
-        // Warm up
-        for _ in 0..10 {
-            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml);
-        }
-
-        // Benchmark YAML preprocessing
-        const NUM_ITERATIONS: usize = 1000;
-        let start = Instant::now();
-
-        for _ in 0..NUM_ITERATIONS {
-            let _ = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
-        }
-
-        let elapsed = start.elapsed();
-        let avg_duration_nanos = elapsed.as_nanos() as f64 / NUM_ITERATIONS as f64;
-        let avg_duration_micros = avg_duration_nanos / 1000.0;
-
-        println!(
-            "Session YAML preprocessing performance: avg {:.2}ns ({:.3}μs) per parse, {} iterations",
-            avg_duration_nanos, avg_duration_micros, NUM_ITERATIONS
-        );
-
-        // Target: <10ms total parse time (10,000μs) - should be much faster for preprocessing alone
-        assert!(
-            avg_duration_nanos < 1_000_000.0, // <1ms for preprocessing
-            "Session YAML preprocessing should be <1ms, got {:.2}ns",
-            avg_duration_nanos
-        );
-
-        // Benchmark complete parsing pipeline
-        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(test_yaml).unwrap();
-        let start = Instant::now();
-
-        for _ in 0..100 {
-            // Fewer iterations for full parsing
-            let _ = SessionInfo::try_from(preprocessed.as_str());
-        }
-
-        let elapsed = start.elapsed();
-        let avg_full_parse_micros = elapsed.as_micros() as f64 / 100.0;
-
-        println!(
-            "Complete session parsing performance: avg {:.2}μs per parse, 100 iterations",
-            avg_full_parse_micros
-        );
-
-        // Target: <10ms (10,000μs) total parse time including YAML deserialization
-        assert!(
-            avg_full_parse_micros < 10_000.0,
-            "Complete session parsing should be <10ms, got {:.2}μs",
-            avg_full_parse_micros
-        );
-
-        if avg_full_parse_micros < 1_000.0 {
-            println!("✅ Excellent performance: session parsing is <1ms");
-        } else {
-            println!("⚠️  Performance acceptable but could be optimized further");
         }
     }
 

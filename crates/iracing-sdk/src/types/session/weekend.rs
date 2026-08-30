@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "schema-discovery")]
 use std::collections::HashMap;
 
+fn default_encoding() -> Option<String> {
+    Some("ISO_8859_1".to_string())
+}
+
 /// Weekend and track information from iRacing
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
@@ -17,6 +21,7 @@ use std::collections::HashMap;
 #[serde(default)]
 pub struct WeekendInfo {
     /// Encoding used for the raw session string (for example, `UTF8` or `ISO_8859_1`)
+    #[serde(default = "default_encoding")]
     pub encoding: Option<String>,
     /// Track name
     pub track_name: String,

@@ -35,6 +35,15 @@ use crate::{
     },
 };
 
+/// Sanitize raw iRacing session YAML using the production preprocessing path.
+///
+/// This is exposed only with the `benchmark` feature so Criterion targets can
+/// measure the crate-private wire representation without making it part of the
+/// normal SDK API.
+pub fn preprocess_session_yaml(yaml: &str) -> Result<String> {
+    crate::irsdk::IRacingSessionString::try_from(yaml).map(Into::into)
+}
+
 /// A session policy that keeps session parsing out of delivery benchmarks.
 struct NoSessions<P>(PhantomData<fn() -> P>);
 

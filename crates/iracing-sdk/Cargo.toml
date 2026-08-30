@@ -144,6 +144,11 @@ name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
 
+[[bench]]
+name = "session_parsing"
+harness = false
+required-features = ["benchmark"]
+
 [[example]]
 name = "car-setup-observer"
 path = "examples/car_setup_observer.rs"
@@ -200,10 +205,6 @@ name = "headers"
 path = "src/bin/headers.rs"
 
 [[bin]]
-name = "ibt-session-parser"
-path = "src/bin/ibt_session_parser.rs"
-
-[[bin]]
 name = "primitives-schema"
 path = "src/bin/primitives_schema.rs"
 required-features = ["codegen"]
@@ -221,10 +222,6 @@ name = "ibt-to-json"
 path = "src/bin/ibt_to_json.rs"
 
 [[bin]]
-name = "live-session-parser"
-path = "src/bin/live_session_parser.rs"
-
-[[bin]]
 name = "live-to-csv"
 path = "src/bin/live_to_csv.rs"
 
@@ -235,6 +232,10 @@ path = "src/bin/live_json_snapshot.rs"
 [[bin]]
 name = "live-to-jsonl"
 path = "src/bin/live_to_jsonl.rs"
+
+[[bin]]
+name = "session"
+path = "src/bin/session.rs"
 
 [[bin]]
 name = "session-schema"

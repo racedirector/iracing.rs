@@ -3,6 +3,7 @@ use crate::{IRacingSDKError, Result};
 use std::ops::Deref;
 
 /// Represents a sanitized session string from the iRacing SDK.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct IRacingSessionString(String);
 
 impl AsRef<str> for IRacingSessionString {

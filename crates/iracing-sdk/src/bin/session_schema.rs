@@ -12,7 +12,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use iracing_sdk::{SessionInfo, reader::ibt::IbtReader, yaml_utils};
+use iracing_sdk::{SessionInfo, reader::ibt::IbtReader};
 use schemars::Schema;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 use tracing_subscriber::EnvFilter;
@@ -112,15 +112,16 @@ fn capture_live_session_schema(output_path: &PathBuf) -> Result<()> {
         Err(e) => return Err(anyhow::anyhow!(e)),
     };
 
-    let session_schema = connection
-        .session_info_buffer()
-        .map(TryInto::<String>::try_into)
-        .ok_or(anyhow::anyhow!(
-            "Could not convert `SessionInfoBuffer` to `String`"
-        ))?
-        .map(|session_yaml| yaml_utils::preprocess_iracing_yaml(&session_yaml))?
-        .map(|session_yaml| SessionInfo::parse(&session_yaml))?
-        .map(|i| schemars::schema_for_value!(i))?;
+    let session_info = match connection.session_info_buffer() {
+        Some(buffer) => SessionInfo::try_from(buffer)?,
+        None => {
+            return Err(anyhow::anyhow!(
+                "Could not get session info buffer from connection"
+            ));
+        }
+    };
+
+    let session_schema = schemars::schema_for_value!(session_info);
 
     write_schema_to_output(session_schema, output_path)?;
 

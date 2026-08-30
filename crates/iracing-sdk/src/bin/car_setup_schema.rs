@@ -17,7 +17,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use iracing_sdk::{SessionInfo, reader::ibt::IbtReader, yaml_utils};
+use iracing_sdk::{SessionInfo, reader::ibt::IbtReader};
 use tracing_subscriber::EnvFilter;
 
 /// CLI arguments for the car setup schema generator.
@@ -46,13 +46,11 @@ fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
 
     let reader = IbtReader::open(&ibt_path)?;
 
-    let raw_session_yaml: String = reader
+    let session_buffer = reader
         .session_info_buffer()?
-        .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?
-        .try_into()?;
-    let session_yaml = yaml_utils::preprocess_iracing_yaml(&raw_session_yaml)?;
+        .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?;
 
-    Ok(SessionInfo::parse(&session_yaml)?)
+    Ok(SessionInfo::try_from(session_buffer)?)
 }
 
 /// Connects to live iRacing shared memory and parses the current session info.
@@ -63,7 +61,6 @@ fn parse_live_session() -> Result<SessionInfo> {
     tracing::info!("Opening iRacing connection");
 
     let connection = WindowsConnection::try_connect()?;
-
     if !connection.is_connected() {
         return Err(anyhow!("iRacing is not connected."));
     }
@@ -71,10 +68,8 @@ fn parse_live_session() -> Result<SessionInfo> {
     let session_buffer = connection
         .session_info_buffer()
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
-    let raw_session_yaml: String = session_buffer.try_into()?;
 
-    let session_yaml = yaml_utils::preprocess_iracing_yaml(&raw_session_yaml)?;
-    Ok(SessionInfo::parse(&session_yaml)?)
+    Ok(SessionInfo::try_from(session_buffer)?)
 }
 
 /// Non-Windows stub — always returns an error directing the caller to use `--ibt-path`.

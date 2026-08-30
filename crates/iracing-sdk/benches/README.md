@@ -10,6 +10,7 @@ different targets are not interchangeable measurements of “frame latency.”
 | `frame_construction` | Byte-buffer ownership, `FramePacket` construction, `Arc` cloning, and tick operations | Telemetry decoding or acquisition |
 | `adapter_performance` | Dynamic lookup and typed adapter construction from a prepared packet | Provider, connection, or subscription work |
 | `aggregate_frame_parsing` | Fresh owned outputs for all variables, a representative consumer, and all scalars | Frame acquisition or end-to-end delivery |
+| `session_parsing` | Session YAML sanitization and typed deserialization from a checked-in live snapshot | Acquisition, shared-memory reads, or update publication |
 | `telemetry_delivery_e2e` | Deterministic in-process provider-to-adapted-subscriber delivery | IBT I/O, Windows shared memory, or simulator pacing |
 | `subscriber_fanout` | One shared SDK stream with service-side fan-out versus one SDK stream per client, using heterogeneous requested-field projections | WS/gRPC serialization, sockets, client backpressure, or network I/O |
 | `live_frame_latency` | Manual live subscriptions with a running simulator | Stable, deterministic CI performance |

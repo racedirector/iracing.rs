@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    provider::Provider, yaml_utils,
+    irsdk::IRacingSessionString, provider::Provider,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -169,31 +169,17 @@ impl LiveProvider {
     async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        if let Some(buffer) = self.connection.session_info_buffer()? else {
+        let Some(buffer) = self.connection.session_info_buffer() else {
+            tracing::debug!("No session info available");
             return Ok(None);
-        }
+        };
 
-        let session = IRacingSessionString::try_from(buffer);
+        let session = IRacingSessionString::try_from(buffer)?;
 
-        Ok(Some(session.into()))
+        let session_info: String = session.into();
+        tracing::info!("Extracted session YAML ({} bytes)", session_info.len());
 
-        // let buffer = match self.connection.session_info_buffer() {
-        //     Some(buffer) => buffer,
-        //     None => {
-        //         tracing::debug!("No session info available");
-        //         return Ok(None);
-        //     }
-        // };
-
-        // let raw_yaml: String = buffer.try_into()?;
-        // if raw_yaml.trim().is_empty() {
-        //     return Ok(None);
-        // }
-
-        // let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-        // tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-
-        // Ok(Some(cleaned_yaml))
+        Ok(Some(session_info))
     }
 }
 

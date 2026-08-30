@@ -154,7 +154,7 @@ where
             ))
         })?;
 
-        let session = SessionInfo::parse(&yaml)
+        let session = SessionInfo::try_from(yaml)
             .map_err(|error| BroadcastError::FailedPrecondition(error.to_string()))?;
 
         *self

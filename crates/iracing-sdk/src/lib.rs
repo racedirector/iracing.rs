@@ -76,7 +76,6 @@ mod parse_utils;
 pub mod reader;
 pub mod test_utils;
 pub mod types;
-pub mod yaml_utils;
 
 // Stream-based modules
 pub mod connections;
