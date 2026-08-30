@@ -241,8 +241,8 @@ name = "session"
 path = "src/bin/session.rs"
 
 [[bin]]
-name = "session-schema"
-path = "src/bin/session_schema.rs"
+name = "telemetry"
+path = "src/bin/telemetry.rs"
 required-features = ["codegen"]
 
 [[bin]]

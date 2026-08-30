@@ -168,6 +168,17 @@ session-update-observer = [
   "--",
 ]
 
+telemetry = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--features",
+  "codegen,schema-discovery",
+  "--bin",
+  "telemetry",
+  "--",
+]
+
 variable-schema = [
   "run",
   "-p",

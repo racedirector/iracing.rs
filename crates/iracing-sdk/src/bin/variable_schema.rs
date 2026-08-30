@@ -10,7 +10,9 @@
 //! variable-schema live --output-path <SCHEMA.yml>
 //! ```
 
-use std::{fs::File, io::BufWriter, path::PathBuf};
+mod schema_writer;
+
+use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -124,9 +126,7 @@ fn capture_disk_schema(ibt_path: &PathBuf, output_path: &PathBuf) -> Result<()> 
 }
 
 fn write_schema_to_output(schema: Schema, output_path: &PathBuf) -> Result<()> {
-    let output_file = File::create(output_path)?;
-    let writer = BufWriter::new(output_file);
-    serde_yaml_ng::to_writer(writer, &schema)?;
-
+    use schema_writer::{SchemaOutputEncoding, write_to_output};
+    write_to_output(&schema, output_path, SchemaOutputEncoding::Yaml)?;
     Ok(())
 }

@@ -1,3 +1,5 @@
+mod schema_writer;
+
 use std::{
     ffi::OsString,
     fs::File,
@@ -7,11 +9,11 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use chrono::Local;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use iracing_sdk::{LiveConnection, SessionInfo, reader::ibt::IbtReader};
 use tracing_subscriber::EnvFilter;
 
-use crate::SchemaOutputEncoding::{Json, JsonPretty, Yaml};
+use schema_writer::{SchemaOutputEncoding, write_to_output};
 
 /// CLI arguments for the car setup schema generator.
 ///
@@ -102,13 +104,6 @@ enum SnapshotOutputCommands {
         #[arg(short, long = "output-path")]
         output_path: PathBuf,
     },
-}
-
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-enum SchemaOutputEncoding {
-    Json,
-    JsonPretty,
-    Yaml,
 }
 
 /// Opens an `.ibt` file and parses session info from the embedded YAML.
@@ -290,6 +285,7 @@ fn resolve_output_dir(session: &SessionInfo, output_dir: &mut PathBuf) -> Result
         .ok_or_else(|| anyhow::anyhow!("Could not find car path on current driver"))?;
 
     output_dir.push(car_path);
+    output_dir.push("snapshots");
     output_dir.push(&session.weekend_info.track_name);
 
     Ok(())
@@ -332,26 +328,4 @@ fn with_suffix(path: &Path, index: i32) -> PathBuf {
     }
 
     path.with_file_name(name)
-}
-
-fn write_to_output<T>(value: &T, output_path: &PathBuf, format: SchemaOutputEncoding) -> Result<()>
-where
-    T: ?Sized + serde::Serialize,
-{
-    let output_file = File::create(output_path)?;
-    let writer = BufWriter::new(output_file);
-
-    match format {
-        Yaml => {
-            serde_yaml_ng::to_writer(writer, &value)?;
-        }
-        Json => {
-            serde_json::to_writer(writer, &value)?;
-        }
-        JsonPretty => {
-            serde_json::to_writer_pretty(writer, &value)?;
-        }
-    }
-
-    Ok(())
 }

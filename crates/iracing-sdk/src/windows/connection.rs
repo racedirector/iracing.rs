@@ -400,7 +400,7 @@ impl Connection {
     }
 
     /// Reads an available variables snapshot out of the pointer
-    pub(crate) fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
+    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header_snapshot();
 
         let offset = usize::try_from(header.variable_header_offset).ok()?;

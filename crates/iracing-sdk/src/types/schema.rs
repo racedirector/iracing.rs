@@ -77,6 +77,19 @@ impl TryFrom<VariableHeader> for VariableInfo {
     }
 }
 
+impl TryFrom<VariableHeadersBuffer> for Vec<VariableInfo> {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: VariableHeadersBuffer) -> Result<Self> {
+        let variables = value
+            .iter_headers()
+            .map(VariableInfo::try_from)
+            .collect::<Result<Vec<VariableInfo>>>()?;
+
+        Ok(variables)
+    }
+}
+
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 /// Owned variable metadata keyed by its wire-format name.
