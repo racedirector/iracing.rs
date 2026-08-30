@@ -86,17 +86,14 @@ fn main() -> anyhow::Result<()> {
 fn capture_disk_session_schema(ibt_path: &PathBuf, output_path: &PathBuf) -> Result<()> {
     let reader = IbtReader::open(ibt_path)?;
 
-    let session_schema = reader
+    let buffer = reader
         .session_info_buffer()?
-        .map(TryInto::<String>::try_into)
-        .ok_or(anyhow::anyhow!(
-            "Could not convert `SessionInfoBuffer` to `String`"
-        ))?
-        .map(|session_yaml| yaml_utils::preprocess_iracing_yaml(&session_yaml))?
-        .map(|session_yaml| SessionInfo::parse(&session_yaml))?
-        .map(|i| schemars::schema_for_value!(i))?;
+        .ok_or_else(|| anyhow::anyhow!("IBT contains no session information"))?;
 
-    write_schema_to_output(session_schema, output_path)?;
+    let session = SessionInfo::try_from(buffer)?;
+    let schema = schemars::schema_for_value!(session);
+
+    write_schema_to_output(schema, output_path)?;
 
     Ok(())
 }

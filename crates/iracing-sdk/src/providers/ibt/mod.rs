@@ -3,8 +3,8 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema, provider::Provider,
-    reader::ibt::IbtReader, yaml_utils,
+    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    irsdk::IRacingSessionString, provider::Provider, reader::ibt::IbtReader,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
@@ -122,12 +122,10 @@ impl Provider for IbtProvider {
         let Some(buffer) = self.reader.session_info_buffer()? else {
             return Ok(None);
         };
-        let raw_yaml: String = buffer.try_into()?;
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
 
-        yaml_utils::preprocess_iracing_yaml(&raw_yaml).map(Some)
+        let session = IRacingSessionString::try_from(buffer)?;
+
+        Ok(Some(session.into()))
     }
 
     fn tick_rate(&self) -> f64 {

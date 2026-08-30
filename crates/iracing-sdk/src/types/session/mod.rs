@@ -40,6 +40,8 @@ pub use session_data::{QualifyResult, QualifyResultsInfo, Session, SessionInfoDa
 pub use timing::{Sector, SplitTimeInfo};
 pub use weekend::{TelemetryOptions, WeekendInfo, WeekendOptions};
 
+use crate::{IRacingSDKError, Result, SessionInfoBuffer, irsdk::IRacingSessionString};
+
 /// Session information extracted and parsed from iRacing's YAML session data
 /// This matches the actual structure that iRacing outputs
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -81,17 +83,6 @@ pub struct SessionInfo {
 }
 
 impl SessionInfo {
-    /// Parse cleaned YAML into SessionInfo
-    ///
-    /// The YAML should already be preprocessed to fix iRacing's non-standard format.
-    /// This is a simple deserialization - preprocessing happens at lower levels.
-    pub fn parse(yaml: &str) -> crate::Result<Self> {
-        serde_yaml_ng::from_str(yaml).map_err(|e| crate::IRacingSDKError::Parse {
-            context: "SessionInfo deserialization".to_string(),
-            details: e.to_string(),
-        })
-    }
-
     /// Collect all unknown fields from all nested structures
     ///
     /// This recursively walks the session info tree and collects any fields
@@ -253,10 +244,49 @@ impl SessionInfo {
     }
 }
 
-#[cfg(all(test, windows))]
+impl TryFrom<&str> for SessionInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: &str) -> Result<Self> {
+        serde_yaml_ng::from_str(value).map_err(|e| crate::IRacingSDKError::Parse {
+            context: "SessionInfo deserialization".to_string(),
+            details: e.to_string(),
+        })
+    }
+}
+
+impl TryFrom<String> for SessionInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: String) -> Result<Self> {
+        SessionInfo::try_from(value.as_ref())
+    }
+}
+
+impl TryFrom<IRacingSessionString> for SessionInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: IRacingSessionString) -> Result<Self> {
+        SessionInfo::try_from(value.as_ref())
+    }
+}
+
+impl TryFrom<SessionInfoBuffer> for SessionInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: SessionInfoBuffer) -> Result<Self> {
+        let yaml = IRacingSessionString::try_from(value)?;
+        SessionInfo::try_from(yaml)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{find_git_repository_root, require_test_data_file};
+    use crate::test_utils::find_git_repository_root;
+    #[cfg(windows)]
+    use crate::test_utils::require_test_data_file;
+    #[cfg(windows)]
     use anyhow::{Context, Result};
     use proptest::prelude::*;
 
@@ -320,13 +350,64 @@ AbbrevName: O'Con
     }
 
     #[test]
+    fn session_info_buffer_conversion_decodes_sanitizes_and_parses() {
+        let mut bytes = vec![0x01];
+        bytes.extend_from_slice(
+            br#"WeekendInfo:
+  TrackName: test-track
+  TrackLength: 1.0 km
+  TrackDisplayName: Test Track
+SessionInfo:
+  CurrentSessionNum: 0
+  Sessions: []
+"#,
+        );
+        bytes.extend_from_slice(b"\0ignored padding");
+
+        let session_info = SessionInfo::try_from(SessionInfoBuffer::from_snapshot(bytes))
+            .expect("the SDK buffer should decode, sanitize, and deserialize");
+
+        assert_eq!(session_info.weekend_info.track_name, "test-track");
+        assert_eq!(session_info.weekend_info.track_display_name, "Test Track");
+        assert_eq!(session_info.session_info.current_session_num, 0);
+        assert!(session_info.session_info.sessions.is_empty());
+    }
+
+    #[test]
+    fn session_info_buffer_conversion_rejects_content_empty_after_sanitizing() {
+        let buffer = SessionInfoBuffer::from_snapshot(b"\x01\x02\x03\0padding".to_vec());
+
+        let error = SessionInfo::try_from(buffer)
+            .expect_err("control-character-only session data should be rejected");
+
+        assert!(matches!(
+            error,
+            IRacingSDKError::Parse { context, .. } if context == "YAML preprocessing"
+        ));
+    }
+
+    #[test]
+    fn session_info_buffer_conversion_reports_malformed_yaml() {
+        let buffer = SessionInfoBuffer::from_snapshot(b"WeekendInfo: [\0padding".to_vec());
+
+        let error =
+            SessionInfo::try_from(buffer).expect_err("malformed session YAML should be rejected");
+
+        assert!(matches!(
+            error,
+            IRacingSDKError::Parse { context, .. } if context == "SessionInfo deserialization"
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "Need to implement known test structures"]
     fn parses_real_iracing_yaml_snapshot() -> Result<()> {
         // Test with real YAML data captured from live iRacing
 
         let snapshot_path = require_test_data_file("live_session_snapshot.yml")?;
 
-        let yaml_content = std::fs::read_to_string(&snapshot_path)
+        let yaml_content = std::fs::read(&snapshot_path)
             .with_context(|| format!("Reading YAML snapshot from {}", snapshot_path.display()))?;
 
         println!(
@@ -334,11 +415,8 @@ AbbrevName: O'Con
             yaml_content.len()
         );
 
-        let preprocessed = crate::yaml_utils::preprocess_iracing_yaml(&yaml_content)
-            .expect("Failed to preprocess YAML");
-
-        let session_info: SessionInfo = serde_yaml_ng::from_str(&preprocessed)
-            .context("Failed to parse YAML to SessionInfo")?;
+        let session_info = SessionInfo::try_from(SessionInfoBuffer::from_snapshot(yaml_content))
+            .context("Failed to convert session buffer to SessionInfo")?;
 
         // Validate the parsed structure matches what we expect from real data
         assert_eq!(
@@ -536,7 +614,7 @@ SessionState: Racing
 
         for _ in 0..100 {
             // Fewer iterations for full parsing
-            let _ = SessionInfo::parse(&preprocessed);
+            let _ = SessionInfo::try_from(preprocessed.as_str());
         }
 
         let elapsed = start.elapsed();
@@ -592,16 +670,9 @@ SessionState: Racing
         let session_buffer = connection
             .session_info_buffer()
             .expect("Failed to get session info from iRacing");
-        let raw_yaml: String = session_buffer
-            .try_into()
-            .expect("Failed to decode session info from iRacing");
-
-        // Preprocess the YAML to handle control characters
-        let preprocessed_yaml = crate::yaml_utils::preprocess_iracing_yaml(&raw_yaml)
-            .expect("Failed to preprocess YAML");
-
-        let session_info =
-            SessionInfo::parse(&preprocessed_yaml).expect("Failed to parse live session info");
+        let reparsing_buffer = session_buffer.clone();
+        let session_info = SessionInfo::try_from(session_buffer)
+            .expect("Failed to convert live session buffer to SessionInfo");
 
         // Validate session info content
         println!("\nLive session info parsed successfully:");
@@ -651,8 +722,8 @@ SessionState: Racing
             "Should have at least one session"
         );
 
-        let reparsed_session_info =
-            SessionInfo::parse(&preprocessed_yaml).expect("Failed to reparse session info");
+        let reparsed_session_info = SessionInfo::try_from(reparsing_buffer)
+            .expect("Failed to reconvert live session buffer to SessionInfo");
 
         assert_eq!(
             session_info.weekend_info.track_name,

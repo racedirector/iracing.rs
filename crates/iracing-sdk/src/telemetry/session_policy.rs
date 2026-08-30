@@ -144,7 +144,7 @@ impl LiveSessionPolicy {
             // Await each blocking parse before receiving another task. Parsing
             // remains off the async runtime workers while FIFO completion is a
             // structural property of this single consumer.
-            match tokio::task::spawn_blocking(move || SessionInfo::parse(&yaml)).await {
+            match tokio::task::spawn_blocking(move || SessionInfo::try_from(yaml)).await {
                 Ok(Ok(session)) => {
                     tracing::debug!(
                         version = observed_version,
@@ -362,7 +362,7 @@ impl<P: Provider> SessionPolicy<P> for IbtSessionPolicy {
             Ok(Some(yaml)) => {
                 tracing::debug!("Fetched IBT session YAML ({} bytes)", yaml.len());
 
-                match SessionInfo::parse(&yaml) {
+                match SessionInfo::try_from(yaml) {
                     Ok(session) => {
                         tracing::debug!("Parsed IBT session info");
                         let _ = self.sessions.send(Some(Arc::new(session)));

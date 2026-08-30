@@ -381,7 +381,7 @@ mod tests {
         let session: String = reader
             .session_info_buffer()?
             .expect("session snapshot")
-            .try_into()?;
+            .into();
         let frame: Vec<u8> = reader.frame_at(156)?.into();
 
         assert_eq!(session, "yaml");

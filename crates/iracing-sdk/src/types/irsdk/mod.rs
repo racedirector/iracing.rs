@@ -24,6 +24,8 @@ pub mod variable_type;
 mod disk_sub_header;
 mod error;
 mod header;
+mod iracing_session_string;
+mod session_info_buffer;
 mod variable_buffer;
 mod variable_header;
 mod wire_type;
@@ -45,6 +47,8 @@ pub use flags::{
     CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
     StatusField,
 };
+pub(crate) use iracing_session_string::IRacingSessionString;
+pub use session_info_buffer::SessionInfoBuffer;
 pub use telemetry::{
     CarLeftRight, PaceMode, PitServiceStatus, SessionState, TrackLocation, TrackSurface,
     TrackWetness,
@@ -53,50 +57,6 @@ pub use variable_type::VariableType;
 
 // Crate-public API
 pub use variable_header::VariableHeadersBuffer;
-
-use crate::{IRacingSDKError, Result, parse_utils};
-
-/// Exact, owned bytes copied from an SDK session-information region.
-///
-/// The snapshot is source-neutral: live acquisition copies the current mapped
-/// region, while IBT acquisition copies the recording's immutable region. The
-/// type records ownership of a complete advertised region but does not claim
-/// that its contents are valid YAML or correspond atomically to another
-/// independently acquired snapshot.
-#[derive(Debug, Clone)]
-pub struct SessionInfoBuffer {
-    /// Complete bytes copied from the advertised session-information region.
-    bytes: Vec<u8>,
-}
-
-impl SessionInfoBuffer {
-    /// Wraps bytes after a reader has copied an advertised region in full.
-    ///
-    /// Construction is crate-private so source readers remain responsible for
-    /// bounds checking and exact-read semantics.
-    pub(crate) fn from_snapshot(bytes: Vec<u8>) -> Self {
-        Self { bytes }
-    }
-}
-
-impl TryFrom<SessionInfoBuffer> for String {
-    type Error = IRacingSDKError;
-
-    /// Decodes the snapshot up to its first NUL terminator.
-    ///
-    /// Valid UTF-8 is preserved. Invalid UTF-8 falls back to a byte-for-byte
-    /// single-byte character mapping so later iRacing YAML cleanup retains the
-    /// original byte values instead of replacing them.
-    fn try_from(buffer: SessionInfoBuffer) -> Result<Self> {
-        let yaml_candidate = parse_utils::nul_terminated_bytes(&buffer.bytes);
-
-        if let Ok(s) = std::str::from_utf8(yaml_candidate) {
-            Ok(s.to_owned())
-        } else {
-            Ok(yaml_candidate.iter().map(|&b| b as char).collect())
-        }
-    }
-}
 
 /// Exact, owned bytes for one telemetry frame.
 ///
