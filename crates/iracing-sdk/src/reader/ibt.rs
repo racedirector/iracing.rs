@@ -21,9 +21,8 @@ use std::{
 
 use crate::{
     IRacingSDKError, Result,
-    types::{
-        DiskSubHeader, FrameBuffer, Header, IbtHeader, SessionInfoBuffer, VariableHeadersBuffer,
-    },
+    irsdk::{DiskSubHeader, FrameBuffer, Header, SessionInfoBuffer, VariableHeadersBuffer},
+    types::IbtHeader,
 };
 
 use super::{

@@ -35,7 +35,7 @@
 
 use crate::{
     IRacingSDKError, Result,
-    types::{
+    irsdk::{
         FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
         VariableHeadersBuffer, WireType,
     },

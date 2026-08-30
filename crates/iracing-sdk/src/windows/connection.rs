@@ -5,11 +5,11 @@
 
 use super::utils::wide_string;
 use crate::{
-    IRacingSDKError, Result, parse_utils, status_is_connected,
-    types::{
-        FrameBuffer, Header, SessionInfoBuffer, VariableBuffer, VariableHeader,
+    IRacingSDKError, Result,
+    irsdk::{
+        FrameBuffer, Header, SessionInfoBuffer, StatusField, VariableBuffer, VariableHeader,
         VariableHeadersBuffer, WireType,
-        irsdk::constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
+        constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
 };
 use std::mem::{MaybeUninit, size_of};
@@ -395,10 +395,8 @@ impl Connection {
             return None;
         }
 
-        self.snapshot_region(offset, length).map(|region| {
-            let buffer = parse_utils::nul_terminated_bytes(&region);
-            SessionInfoBuffer::from_snapshot(buffer.to_vec())
-        })
+        self.snapshot_region(offset, length)
+            .map(SessionInfoBuffer::from_snapshot)
     }
 
     /// Reads an available variables snapshot out of the pointer
@@ -414,9 +412,8 @@ impl Connection {
 
         let length = count.checked_mul(VariableHeader::WIRE_SIZE)?;
 
-        Some(VariableHeadersBuffer::from_snapshot(
-            self.snapshot_region(offset, length)?,
-        ))
+        self.snapshot_region(offset, length)
+            .map(VariableHeadersBuffer::from_snapshot)
     }
 
     /// The latest buffer's tick count
@@ -439,14 +436,17 @@ impl Connection {
     }
 
     /// The status bit from the header.
-    pub fn connection_status(&self) -> i32 {
-        unsafe { self.read_header_at::<i32>(std::mem::offset_of!(Header, status)) }
+    pub fn connection_status(&self) -> StatusField {
+        unsafe {
+            let status = self.read_header_at::<i32>(std::mem::offset_of!(Header, status));
+            StatusField::from_bits(status)
+        }
     }
 
     /// Check if iRacing is connected
     pub fn is_connected(&self) -> bool {
         let status = self.connection_status();
-        status_is_connected(status)
+        status.is_connected()
     }
 }
 

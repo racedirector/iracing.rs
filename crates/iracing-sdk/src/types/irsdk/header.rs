@@ -34,11 +34,11 @@ pub struct Header {
     pub buffer_count: i32,
     /// Length of each telemetry buffer
     pub buffer_length: i32,
-    /// Cached tick count for the current buffer
+    /// Cached tick count for the current buffer (`irsdk_header::curBufTickCount`)
     pub current_buffer_tick_count: i32,
-    /// Index of most recently written buffer
+    /// Index of most recently written buffer (`irsdk_header::curBuf`)
     pub current_buffer: u8,
-    // /// Alignment padding
+    /// Alignment padding (`irsdk_header::pad1`)
     _pad: [u8; 3],
     /// Telemetry buffer descriptors
     pub buffers: [VariableBuffer; Self::MAX_BUFFERS],
@@ -392,11 +392,23 @@ mod tests {
 
     #[test]
     fn header_layout_matches_iracing_abi() {
-        assert_eq!(Header::WIRE_SIZE, 48 + 16 * Header::MAX_BUFFERS);
+        assert_eq!(Header::WIRE_SIZE, 112);
 
         assert_eq!(align_of::<Header>(), 4);
 
+        assert_eq!(offset_of!(Header, version), 0);
+        assert_eq!(offset_of!(Header, status), 4);
+        assert_eq!(offset_of!(Header, tick_rate), 8);
+        assert_eq!(offset_of!(Header, session_info_update), 12);
+        assert_eq!(offset_of!(Header, session_info_len), 16);
+        assert_eq!(offset_of!(Header, session_info_offset), 20);
+        assert_eq!(offset_of!(Header, variable_count), 24);
+        assert_eq!(offset_of!(Header, variable_header_offset), 28);
+        assert_eq!(offset_of!(Header, buffer_count), 32);
+        assert_eq!(offset_of!(Header, buffer_length), 36);
+        assert_eq!(offset_of!(Header, current_buffer_tick_count), 40);
         assert_eq!(offset_of!(Header, current_buffer), 44);
+        assert_eq!(offset_of!(Header, _pad), 45);
         assert_eq!(offset_of!(Header, buffers), 48);
     }
 }

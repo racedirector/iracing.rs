@@ -70,9 +70,8 @@ pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub use ibt_header::IbtHeader;
 pub use irsdk::{
-    DiskSubHeader, FrameBuffer, Header, IRSDK_STATUS_CONNECTED, IRSDK_VERSION, SessionInfoBuffer,
-    VariableBuffer, VariableHeader, VariableHeadersBuffer, VariableType, WireType,
-    status_is_connected,
+    DiskSubHeader, Header, IRSDK_VERSION, SessionInfoBuffer, VariableBuffer, VariableHeader,
+    VariableHeadersBuffer, VariableType, WireType,
 };
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema, VariablesHashMap};
 pub use session::SessionInfo;

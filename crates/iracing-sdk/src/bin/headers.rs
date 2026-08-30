@@ -79,19 +79,19 @@ fn main() -> Result<()> {
 }
 
 fn print_type_layout() -> Result<()> {
-    tracing::info!(
+    println!(
         "VariableBuffer type layout:\n{}",
         VariableBuffer::type_layout()
     );
 
-    tracing::info!("Header type layout:\n{}", Header::type_layout());
+    println!("Header type layout:\n{}", Header::type_layout());
 
-    tracing::info!(
+    println!(
         "DiskSubHeader type layout:\n{}",
         DiskSubHeader::type_layout()
     );
 
-    tracing::info!("IbtHeader type layout:\n{}", IbtHeader::type_layout());
+    println!("IbtHeader type layout:\n{}", IbtHeader::type_layout());
 
     Ok(())
 }
@@ -132,7 +132,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_interval: Duratio
 
     let header = connection.header_snapshot();
 
-    tracing::info!(
+    println!(
         "Parsed live header:\nIs valid: {}\n{:#?}",
         header.validate_live().is_ok(),
         header
@@ -152,7 +152,7 @@ fn print_ibt_header(path: PathBuf) -> Result<()> {
     let ibt_header = IbtHeader::try_from_reader(&mut reader)
         .with_context(|| format!("Parsing IBT header from {}", path.display()))?;
 
-    tracing::info!(
+    println!(
         "Parsed IBT header:\nIs valid: {}\n{:#?}",
         ibt_header.is_valid(),
         ibt_header

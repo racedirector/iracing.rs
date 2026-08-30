@@ -40,6 +40,11 @@ impl StatusField {
     pub const fn contains(self, other: Self) -> bool {
         self.bits & other.bits == other.bits
     }
+
+    /// Returns whether the SDK's connected status bit is set.
+    pub fn is_connected(self) -> bool {
+        self.contains(Self::CONNECTED)
+    }
 }
 
 sdk_bitmask! {

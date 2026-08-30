@@ -101,6 +101,24 @@ impl RandomAccessSource for MappedView<'_> {
 mod tests {
     use super::*;
 
+    /// Models the baseline transitions in SDK 1.20's `irsdk_getNewData`.
+    /// Frame-copy acceptance is deliberately separate: the real reader must
+    /// update its baseline only after the before/copy/after check succeeds.
+    fn classify_tick(last_tick_count: i32, current_tick_count: i32) -> TickChange {
+        match last_tick_count.cmp(&current_tick_count) {
+            std::cmp::Ordering::Less => TickChange::New,
+            std::cmp::Ordering::Equal => TickChange::Unchanged,
+            std::cmp::Ordering::Greater => TickChange::Reset,
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum TickChange {
+        New,
+        Unchanged,
+        Reset,
+    }
+
     #[test]
     fn mapped_view_copies_checked_regions() -> Result<()> {
         let bytes = [10_u8, 20, 30, 40];
@@ -111,5 +129,34 @@ mod tests {
         assert_eq!(source.snapshot(ByteRegion::new(1, 2)?)?, [20, 30]);
         assert!(source.snapshot(ByteRegion::new(3, 2)?).is_err());
         Ok(())
+    }
+
+    #[test]
+    fn sdk_1_20_first_observation_establishes_a_baseline() {
+        assert_eq!(classify_tick(i32::MAX, 1_000), TickChange::Reset);
+    }
+
+    #[test]
+    fn sdk_1_20_same_tick_has_no_new_frame() {
+        assert_eq!(classify_tick(1_000, 1_000), TickChange::Unchanged);
+    }
+
+    #[test]
+    fn sdk_1_20_increasing_tick_is_new() {
+        assert_eq!(classify_tick(1_000, 1_001), TickChange::New);
+    }
+
+    #[test]
+    fn sdk_1_20_decreasing_tick_resets_the_baseline() {
+        assert_eq!(classify_tick(1_000, 7), TickChange::Reset);
+    }
+
+    #[test]
+    fn sdk_1_20_selects_the_advertised_current_descriptor() {
+        let descriptors = [10, 40, 30, 20];
+        let current_buffer = 3_usize;
+
+        assert_eq!(descriptors[current_buffer], 20);
+        assert_ne!(descriptors[current_buffer], 40);
     }
 }

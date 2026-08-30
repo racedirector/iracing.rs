@@ -1,6 +1,6 @@
 # Live Reader Integration Plan
 
-Status: Proposed as of 2026-08-30
+Status: Implementation in progress as of 2026-08-30
 
 ## Problem Statement
 
@@ -58,36 +58,36 @@ Out of scope:
 
 ## Feasibility Assessment and Entry Gates
 
-The portable approach is feasible on macOS because `LiveReader` can be generic over
+The portable approach is feasible on non-Windows hosts because `LiveReader` can be generic over
 `RandomAccessSource`; a scripted in-memory source can reproduce writer advancement
-between reads without Win32 or iRacing. The current baseline passes all 14
-`reader::*` unit tests and `cargo check -p iracing-sdk --all-targets` on macOS. The
-existing Windows-only live code is also visible to a macOS-hosted MSVC-target
-`cargo check`, which currently exposes pre-existing compile errors in
-`providers/live/mod.rs`.
+between reads without Win32 or iRacing. The current reader unit tests pass. On
+Windows, the Phase 0 baseline passes
+`cargo check -p iracing-sdk --target x86_64-pc-windows-msvc --lib`.
 
 Implementation must not begin past Phase 0 until the following wire-format question
 is resolved:
 
-- The repository currently names bytes 40..48 of `Header` as a cached current tick
-  and buffer index, and bytes 8..12 of `VariableBuffer` as a begin tick.
-- The published SDK definitions describe both locations as padding, and the
-  published client scans all advertised buffers for the greatest `tickCount`, then
-  rereads that same descriptor after `memcpy`.
-- On Windows, compare the installed/current iRacing SDK `irsdk_defines.h` and
-  `irsdk_client.cpp` with a captured 112-byte live header. Record the SDK version,
-  field offsets, sizes, and observed padding values in a test fixture or audit note.
-- If the installed SDK still defines padding, rename those Rust fields back to
-  padding and implement max-tick selection. If it defines newer synchronization
-  fields, record the SDK version contract and implement that documented protocol.
-  Do not infer synchronization semantics from nonzero bytes alone.
+- The project-local SDK 1.20
+  [`irsdk_defines.h`](../../../irsdk_1_20/irsdk_defines.h) defines bytes 40..44 as
+  `curBufTickCount`, byte 44 as `curBuf`, and bytes 8..12 of `irsdk_varBuf` as
+  `tickCountBegin`; only bytes 45..48 of the header and 12..16 of a descriptor are
+  padding.
+- SDK 1.20 [`irsdk_utils.cpp`](../../../irsdk_1_20/irsdk_utils.cpp) selects the
+  descriptor named by `curBuf`, reads its `tickCount` before copying, and accepts
+  the copy only when that value equals `tickCountBegin` afterward. It retries the
+  copy at most twice.
+- On Windows, compare those project-local definitions with a captured 112-byte live
+  header. Record field offsets, sizes, and observed synchronization/padding values
+  in a test fixture or audit note. Do not infer additional synchronization semantics
+  from nonzero bytes alone.
 
-Reference material when rust-analyzer cannot establish OS or producer behavior:
+Reference material when Rust source alone cannot establish OS or producer behavior:
 
-- The [published iRacing SDK definitions](https://github.com/vipoo/irsdk/blob/master/irsdk_defines.h)
-  for wire layout.
-- The [published iRacing SDK client copy loop](https://github.com/vipoo/irsdk/blob/master/irsdk_utils.cpp)
-  for newest-buffer selection, reset behavior, and the two-copy-attempt protocol.
+- The project-local SDK 1.20
+  [`irsdk_defines.h`](../../../irsdk_1_20/irsdk_defines.h) for wire layout.
+- The project-local SDK 1.20
+  [`irsdk_utils.cpp`](../../../irsdk_1_20/irsdk_utils.cpp) for current-buffer
+  selection, reset behavior, and the two-copy-attempt protocol.
 - Microsoft documentation for
   [`MapViewOfFile`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile),
   [`VirtualQuery`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualquery),
@@ -106,8 +106,8 @@ Reference material when rust-analyzer cannot establish OS or producer behavior:
 | Snapshot ownership | Return owned `FrameBuffer`, `SessionInfoBuffer`, and variable-header buffers. Never return a slice or reference into mutable mapped memory. |
 | Frame result | Return `Result<Option<LiveFrameSnapshot>>`, where the snapshot contains frame bytes, source tick, and session-info version from one accepted attempt. `None` means connected but no new coherent frame; malformed layout and copy failures remain errors. |
 | First observation/reset | Match the ABI-confirmed SDK client: establish/reset the tick baseline without publishing stale data, then publish only a later tick. Lock this behavior with characterization tests before provider changes. |
-| Buffer selection | Use the protocol confirmed in Phase 0. The current published protocol scans `buffers[..buffer_count]` for the greatest tick; it does not read padding as a current-buffer cache. |
-| Consistency check | Copy from offsets interpreted from one validated header snapshot, then reread the selected descriptor/header fields needed to prove the tick and packet metadata did not change. Retry at most twice, matching the SDK client, and return `None` after contention exhaustion. |
+| Buffer selection | Match SDK 1.20: validate `curBuf` against `numBuf`, then select that advertised current descriptor. `curBufTickCount` is a documented cached fast-path field, not padding. |
+| Consistency check | Read the selected descriptor's `tickCount`, copy its complete frame region, then accept only if that value equals the descriptor's post-copy `tickCountBegin`. Retry at most twice, matching SDK 1.20, and return `None` after contention exhaustion. |
 | Session snapshots | Copy the advertised YAML region and accept it only when version, offset, and length are stable across the copy. Return the actual observed version with the owned buffer; do not claim historical lookup by version. |
 | Provider boundary | `LiveProvider` converts signed wire metadata, constructs `FramePacket`, and decodes `IRacingSessionString`; it does not reread the mapping to discover tick or session version. |
 | Unsafe boundary | `Connection` creates a lifetime-bound `MappedView` from its mapped base/extent for each reader call. All offset arithmetic and copies then go through `RandomAccessSource`. |
@@ -231,7 +231,7 @@ logic and its tests remain portable.
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| Current Rust wire structs use undocumented padding as synchronization fields | High | Make installed-SDK ABI comparison and a captured header mandatory before implementation; add size/offset tests derived from the confirmed header. |
+| Rust wire structs drift from the project-local SDK synchronization fields | Medium | Keep SDK 1.20 field-by-field size/offset tests and compare them with a captured live header before transport integration. |
 | A full header can change while it is copied | Medium | Validate before use and reread the minimal proof fields after copying the selected region; scripted tests mutate on exact read boundaries. |
 | Tick wraparound makes ordinary signed ordering ambiguous | Low | Confirm producer type/reset behavior in SDK source and document the comparison rule; add boundary tests near `i32::MAX`. |
 | Extra header reads or validation regress the 360 Hz hot path | Low | Benchmark the 8,586-byte captured layout, unchanged-tick fast path, accepted copy, and forced retry separately. |
@@ -264,8 +264,8 @@ logic and its tests remain portable.
 3. Every advertised region is checked against the mapped extent before copying.
 4. The unchanged-tick path allocates no frame buffer, and contention never publishes
    a mixed snapshot.
-5. ABI layout tests match the SDK installed for the Windows validation run and record
-   the source/version used.
+5. ABI layout tests match the project-local SDK 1.20 sources used for the Windows
+   validation run and record the source/version used.
 6. Portable tests cover stable, unchanged, new, reset, retry-success,
    retry-exhaustion, invalid-header, out-of-bounds, tick-boundary, and session-change
    cases.
@@ -326,7 +326,7 @@ cargo test -p iracing-sdk --lib -- --ignored --test-threads=1
 - macOS: run the scripted-source test that advances the chosen descriptor during
   the first frame copy and remains stable on the second. Observe exactly one accepted
   snapshot containing second-attempt bytes, tick, and session version.
-- Windows ABI: dump and inspect one live header, compare it to the installed SDK C
+- Windows ABI: dump and inspect one live header, compare it to the project-local SDK 1.20 C
   definitions, and verify every mapped range before enabling streaming.
 - Windows live: collect at least 10 minutes spanning garage-to-track and one session
   metadata update. Assert packet tick/`SessionTick` correlation, parse every captured
@@ -339,7 +339,7 @@ cargo test -p iracing-sdk --lib -- --ignored --test-threads=1
 
 | Phase | Goal | Key outputs |
 | --- | --- | --- |
-| 0 | Establish build and ABI truth | Windows cfg build repaired; installed SDK/header evidence; characterization decisions locked. |
+| 0 | Establish build and ABI truth | Windows cfg build repaired; local SDK 1.20/header evidence; characterization decisions locked. |
 | 1 | Implement portable live acquisition | `LiveReader`, owned snapshots, scripted/property tests, deterministic benchmark. |
 | 2 | Integrate the Windows transport | Ephemeral `MappedView`, fallible delegated connection reads, no duplicate pointer/range logic. |
 | 3 | Integrate provider and callers | One-pass packet metadata, stabilized session buffer, updated bins/examples/schema construction. |
@@ -347,21 +347,45 @@ cargo test -p iracing-sdk --lib -- --ignored --test-threads=1
 
 ### Phase 0 — Baseline and ABI Verification
 
-Status: Not started
+Status: Complete (2026-08-30)
 
-- [ ] `crates/iracing-sdk/src/providers/live/mod.rs` — criterion: the current branch
+- [x] `crates/iracing-sdk/src/providers/live/mod.rs` — criterion: the current branch
   passes `cargo check -p iracing-sdk --target x86_64-pc-windows-msvc --lib` before
   reader behavior is changed.
-- [ ] `crates/iracing-sdk/src/types/irsdk/header.rs` — criterion: each field name,
-  offset, and size is reconciled with the current installed iRacing SDK header; bytes
+- [x] `crates/iracing-sdk/src/types/irsdk/header.rs` — criterion: each field name,
+  offset, and size is reconciled with the project-local SDK 1.20 header; bytes
   documented as padding are not treated as synchronization state.
-- [ ] `crates/iracing-sdk/src/types/irsdk/variable_buffer.rs` — criterion: descriptor
+- [x] `crates/iracing-sdk/src/types/irsdk/variable_buffer.rs` — criterion: descriptor
   fields and padding match the same SDK version and have explicit layout tests.
-- [ ] `crates/iracing-sdk/src/reader/live.rs` — criterion: characterization tests lock
-  first observation, same tick, increasing tick, decreasing/reset tick, and newest
-  descriptor selection according to the confirmed SDK client behavior.
-- [ ] `docs/plans/live-reader-integration.md` — criterion: the ABI source/version and
+- [x] `crates/iracing-sdk/src/reader/live.rs` — criterion: characterization tests lock
+  first observation, same tick, increasing tick, decreasing/reset tick, and advertised
+  current-descriptor selection according to the confirmed SDK client behavior.
+- [x] `docs/plans/live-reader-integration.md` — criterion: the ABI source/version and
   final protocol choice are recorded before Phase 1 starts.
+
+#### Phase 0 ABI audit — 2026-08-30
+
+The authoritative comparison source is the project-local iRacing SDK 1.20:
+[`irsdk_defines.h`](../../../irsdk_1_20/irsdk_defines.h) and
+[`irsdk_utils.cpp`](../../../irsdk_1_20/irsdk_utils.cpp). The Rust layout is 112
+bytes: scalar fields occupy bytes 0..45, `pad1` occupies 45..48, and four 16-byte
+`irsdk_varBuf` descriptors occupy 48..112. Descriptor fields are `tickCount` at
+0, `bufOffset` at 4, `tickCountBegin` at 8, and padding at 12 relative to each
+descriptor. Field-by-field Rust layout tests record these offsets.
+
+`cargo run -p iracing-sdk --bin headers -- live --wait --timeout-ms 30000`
+captured a valid live API-version-2 header on Windows. The observation reported a
+60 Hz tick rate, three buffers, an 8,600-byte frame, `curBuf = 0`, and
+`curBufTickCount = 7908`. Descriptor 0 reported `tickCount = 7908` and
+`tickCountBegin = 7908`; the other active descriptors reported ticks 7906 and
+7907. Header and descriptor padding were zero. These values are observations, not
+additional protocol guarantees.
+
+The resulting protocol choice follows SDK 1.20 exactly: establish the initial
+`INT_MAX` baseline without publishing a frame, treat equal ticks as unchanged,
+reset the baseline without publishing when ticks regress, select the descriptor
+advertised by `curBuf`, and accept a copied frame only when its pre-copy
+`tickCount` equals its post-copy `tickCountBegin`, with at most two copy attempts.
 
 ### Phase 1 — Portable Live Reader
 

@@ -10,7 +10,7 @@ pub struct VariableBuffer {
     pub tick_count: i32,
     /// Offset from header to buffer start
     pub buffer_offset: i32,
-    /// Tick count begin
+    /// Tick count written before a frame write begins, used for torn-read detection
     pub tick_count_begin: i32,
     /// Padding to maintain alignment
     _pad: [i32; 1],
@@ -44,5 +44,6 @@ mod tests {
         assert_eq!(offset_of!(VariableBuffer, tick_count), 0);
         assert_eq!(offset_of!(VariableBuffer, buffer_offset), 4);
         assert_eq!(offset_of!(VariableBuffer, tick_count_begin), 8);
+        assert_eq!(offset_of!(VariableBuffer, _pad), 12);
     }
 }
