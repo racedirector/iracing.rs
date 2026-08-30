@@ -9,7 +9,7 @@
 
 ## Key APIs & Layout
 
-- `reader/`: source-neutral positioned access and header-directed snapshots; `reader::ibt::IbtRecording` owns validated `.ibt` layout while `IbtReader` adds cursor semantics.
+- `reader/`: two concrete parse-and-validate boundaries. `reader::ibt::IbtReader` directly owns immutable bytes, validated metadata/frame geometry, and one cursor; `reader::live::LiveReader` owns one mapping generation's validated static layout and ordered acquisition state.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
 - `types/session/`: typed session YAML model. Readers return owned raw snapshots; providers and tools clean YAML with `yaml_utils` before `SessionInfo::parse`.
 - `types/irsdk/`: literal shared live/IBT wire definitions; `types/schema.rs`: source-neutral variable metadata and schema construction.
@@ -53,4 +53,4 @@
 
 - Integration tests rely on `.ibt` fixtures from `test-data/ibt/`; use helpers in `test_utils` (`require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hard-coded paths.
 - For hand-built schemas, session data, frames, and benchmark inputs, start with the generated catalog in `../../docs/reference/README.md` instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult `primitives-schema.yml` for enum/bitflag domains.
-- Benchmarks require `cargo bench -p iracing-sdk --features benchmark`.
+- Benchmarks require `cargo bench -p iracing-sdk --features benchmark`. The live-reader benchmark uses the concrete `MappedView` path and a benchmark-only copy observer; do not restore a production generic source trait for testability.

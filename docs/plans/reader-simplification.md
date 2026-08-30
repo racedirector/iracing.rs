@@ -1,6 +1,40 @@
 # Reader Simplification Refactor Plan
 
-Status: Proposed as of 2026-08-30
+Status: Implemented on 2026-08-30; active-simulator smoke validation remains
+environment-dependent
+
+## Implementation Result
+
+The source-neutral layers were removed. `IbtReader` now directly owns immutable
+bytes, parsed headers, checked metadata/frame geometry, and one cursor.
+`LiveReader` is fallible, binds itself to one mapping base/extent, stores all
+static frame and variable-header regions, and keeps the normal frame path to
+volatile dynamic controls plus the SDK barrier/copy/barrier proof. The Windows
+connection owns one reader per mapping generation, and `LiveProvider` constructs
+packets from the accepted owned snapshot without rereading metadata.
+
+Same-machine Criterion medians from the Phase 0 and final runs:
+
+| Case | Phase 0 | Final | Absolute change |
+| --- | ---: | ---: | ---: |
+| Direct 8,586-byte copy | 206.38 ns | 116.62 ns | -43.5% |
+| Unchanged tick | 56.086 ns | 5.4142 ns | -90.3% |
+| Stable accepted frame | 1.7160 us | 1.8324 us | +6.8% |
+| One retry | 3.3755 us | 3.3311 us | -1.3% |
+
+Criterion's distribution comparison reported no statistically detectable change
+for the stable-frame case (`p = 0.99`, estimated change centered at -0.05%); its
+confidence interval crossed both improvement and regression. Inspection
+confirmed that the accepted hot path performs one output allocation/copy and no
+layout reconstruction. The unchanged path improved by about 10x and performs
+no frame copy or output allocation.
+
+Portable tests, Windows compilation, and the ignored packet/`SessionTick`
+correlation test are present. The ignored correlation test reached the local
+mapping but received no accepted frame during its 12-second probe, so a
+sustained active-session run covering frames, session replacement, disconnect,
+and reconnect could not be completed. The design and test were not weakened to
+simulate that final environment check.
 
 ## Objective
 
@@ -585,4 +619,3 @@ The refactor is complete when:
 | Simplification accidentally moves schema/YAML interpretation into acquisition. | Keep readers returning owned wire snapshots; providers and schema/session types retain interpretation responsibilities. |
 | Tests force a public abstraction back into production. | Use a private test seam, internal benchmark harness, or mapped test storage rather than exporting a generic source trait. |
 | IBT convenience behavior from the old reader is lost. | Characterize public behavior before deletion and migrate useful behavior directly into the concrete reader. |
-

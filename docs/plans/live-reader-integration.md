@@ -1,6 +1,17 @@
 # Live Reader Integration Plan
 
-Status: Implementation in progress as of 2026-08-30
+Status: Superseded by [`reader-simplification.md`](reader-simplification.md) as
+of 2026-08-30
+
+> This document is retained as integration history. Its source-neutral
+> `RandomAccessSource` and `HeaderSnapshotReader` decisions no longer describe
+> the implementation. The completed design has two concrete readers:
+> `reader::ibt::IbtReader` directly owns validated immutable bytes, while
+> `reader::live::LiveReader` stores one mapping generation's validated static
+> layout. `MappedView` contains the volatile control reads, compiler barriers,
+> and prevalidated copies; `WindowsConnection` reconstructs the reader for each
+> newly opened mapping and `LiveProvider` consumes one accepted owned snapshot
+> without rereading packet metadata.
 
 ## Problem Statement
 

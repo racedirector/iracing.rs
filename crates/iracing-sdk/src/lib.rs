@@ -15,9 +15,8 @@
 //! - Streaming adapter path:
 //!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
-//! - Source acquisition primitives:
-//!   - [`reader`] for checked random access, header-directed snapshots, and
-//!     borrowed mapped-memory access
+//! - Source acquisition boundaries:
+//!   - [`reader`] for concrete validated IBT and live mapped-memory readers
 //! - Session data path:
 //!   - [`SessionInfo`] for the typed model
 //!   - [`yaml_utils`] for cleanup before parsing raw iRacing YAML
@@ -41,7 +40,7 @@
 //!         ))?;
 //!     let schema = VariableSchema::from_variable_headers(
 //!         variable_headers,
-//!         reader.recording().frame_length(),
+//!         reader.frame_length(),
 //!     )?;
 //!     let speed_info = schema
 //!         .get_variable("Speed")

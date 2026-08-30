@@ -2,12 +2,12 @@
 //!
 //! This module provides direct access to iRacing's shared memory telemetry
 //! following the same patterns as the official C++ SDK. The implementation
-//! focuses on simplicity and performance over abstraction layers.
+//! keeps Win32 ownership separate from the validated concrete live reader.
 //!
 //! # Design Philosophy
 //!
-//! - **Direct Memory Access**: Map iRacing's shared memory directly without
-//!   unnecessary validation or abstraction layers
+//! - **Validated Mapping Generations**: Parse static layout once for each
+//!   opened mapping and reconstruct the reader when the mapping changes
 //! - **C++ SDK Alignment**: Use identical struct layouts and logic patterns
 //!   to the official iRacing C++ SDK
 //! - **Buffer Rotation**: Properly handle iRacing's 4-buffer rotation system
@@ -26,8 +26,9 @@
 //! // Wait for telemetry updates
 //! match connection.wait_for_update(Duration::from_millis(100))? {
 //!     WaitResult::Signaled => {
-//!         if let Some(data) = connection.get_new_data() {
-//!             // Process telemetry data
+//!         if let Some(snapshot) = connection.next_frame()? {
+//!             let data = snapshot.into_buffer();
+//!             // Process owned telemetry data
 //!         }
 //!     }
 //!     WaitResult::Timeout => {

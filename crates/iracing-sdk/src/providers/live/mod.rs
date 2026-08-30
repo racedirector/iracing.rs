@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::{
-    FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    irsdk::IRacingSessionString, provider::Provider,
+    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema, WaitResult,
+    WindowsConnection, irsdk::IRacingSessionString, provider::Provider,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -79,7 +79,45 @@ impl LiveProvider {
         // Loop until we get a frame
         // This matches the C++ SDK pattern of persistent checking
         loop {
-            // Check if still connected (like C++ SDK checks status)
+            // Acquire before waiting so the concrete reader observes both
+            // connected frames and disconnected baseline resets.
+            if let Some(snapshot) = self.connection.next_frame()? {
+                let tick = u32::try_from(snapshot.tick_count()).map_err(|_| {
+                    IRacingSDKError::parse_error(
+                        "live provider",
+                        format!(
+                            "Accepted tick cannot be negative: {}",
+                            snapshot.tick_count()
+                        ),
+                    )
+                })?;
+                let session_version =
+                    u32::try_from(snapshot.session_info_update()).map_err(|_| {
+                        IRacingSDKError::parse_error(
+                            "live provider",
+                            format!(
+                                "Session version cannot be negative: {}",
+                                snapshot.session_info_update()
+                            ),
+                        )
+                    })?;
+                let frame_data: Vec<u8> = snapshot.into_buffer().into();
+
+                tracing::trace!(
+                    "Frame: tick={}, session_version={}, size={}",
+                    tick,
+                    session_version,
+                    frame_data.len()
+                );
+
+                return Ok(Some(FramePacket::new(
+                    frame_data,
+                    tick,
+                    session_version,
+                    self.shared_schema(),
+                )));
+            }
+
             if !self.connection.is_connected() {
                 let now = Instant::now();
                 let first_observation = no_connection.observe(now);
@@ -116,33 +154,6 @@ impl LiveProvider {
                 tracing::info!("iRacing session detected, resuming telemetry");
             }
 
-            // Try to get data BEFORE waiting (C++ SDK pattern)
-            // This catches frames that arrived since our last check
-            if let Some(data) = self.connection.get_new_data() {
-                let frame_data: Vec<u8> = data.into();
-
-                // TODO: Refactor this bit to conform with the newest connection stuff... To be honest, it should
-                // probably come from `get_new_data` instead of being parsed separately here.
-                let header = self.connection.header_snapshot();
-                let latest_buf_idx = self.connection.current_buffer_index();
-                let tick = header.buffers[latest_buf_idx as usize].tick_count as u32;
-                let session_version = self.connection.session_info_update() as u32;
-
-                tracing::trace!(
-                    "Frame: tick={}, session_version={}, size={}",
-                    tick,
-                    session_version,
-                    frame_data.len()
-                );
-
-                return Ok(Some(FramePacket::new(
-                    frame_data,
-                    tick,
-                    session_version,
-                    self.shared_schema(),
-                )));
-            }
-
             // No data yet, wait for signal (cooperative async)
             match self
                 .connection
@@ -169,10 +180,11 @@ impl LiveProvider {
     async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        let Some(buffer) = self.connection.session_info_buffer() else {
+        let Some(snapshot) = self.connection.session_info_snapshot()? else {
             tracing::debug!("No session info available");
             return Ok(None);
         };
+        let buffer = snapshot.into_buffer();
 
         let session = IRacingSessionString::try_from(buffer)?;
 

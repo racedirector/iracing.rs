@@ -147,9 +147,11 @@ fn capture_live_schema() -> Result<Vec<VariableInfo>> {
         Err(e) => return Err(anyhow::anyhow!(e)),
     };
 
-    let variable_headers = connection.variable_headers_buffer().ok_or(anyhow::anyhow!(
-        "Live connection does not contain variable headers"
-    ))?;
+    let variable_headers = connection
+        .variable_headers_buffer()?
+        .ok_or(anyhow::anyhow!(
+            "Live connection does not contain variable headers"
+        ))?;
 
     Ok(variable_headers.try_into()?)
 }

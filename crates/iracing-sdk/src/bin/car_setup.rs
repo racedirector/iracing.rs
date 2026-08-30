@@ -132,10 +132,10 @@ fn parse_live_session() -> Result<SessionInfo> {
     }
 
     let session_buffer = connection
-        .session_info_buffer()
+        .session_info_snapshot()?
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
 
-    Ok(SessionInfo::try_from(session_buffer)?)
+    Ok(SessionInfo::try_from(session_buffer.into_buffer())?)
 }
 
 #[tokio::main(flavor = "current_thread")]

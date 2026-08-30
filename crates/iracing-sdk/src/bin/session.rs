@@ -178,8 +178,8 @@ fn capture_live_session_info() -> Result<SessionInfo> {
     };
 
     let buffer = connection
-        .session_info_buffer()
+        .session_info_snapshot()?
         .ok_or_else(|| anyhow::anyhow!("Live connection contains no session information"))?;
 
-    Ok(SessionInfo::try_from(buffer)?)
+    Ok(SessionInfo::try_from(buffer.into_buffer())?)
 }

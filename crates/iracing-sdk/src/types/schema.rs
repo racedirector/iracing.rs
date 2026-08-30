@@ -230,10 +230,9 @@ impl VariableSchema {
 impl VariableSchema {
     /// Creates a VariableSchema from components of a WindowsConnection.
     pub fn from_connection(connection: &WindowsConnection) -> Result<Self> {
-        let header = connection.header_snapshot();
         let variable_headers =
             connection
-                .variable_headers_buffer()
+                .variable_headers_buffer()?
                 .ok_or(IRacingSDKError::parse_error(
                     "VariableSchema",
                     "Could not find variable headers from connection",
@@ -241,12 +240,7 @@ impl VariableSchema {
 
         Ok(Self {
             variables: variable_headers.try_into()?,
-            frame_size: usize::try_from(header.buffer_length).map_err(|_| {
-                IRacingSDKError::parse_error(
-                    "VariableSchema",
-                    format!("Could not convert {} to usize", header.buffer_length),
-                )
-            })?,
+            frame_size: connection.frame_length(),
         })
     }
 }
@@ -262,7 +256,7 @@ impl VariableSchema {
                     "Could not find variable headers from IbtReader",
                 ))?;
 
-        VariableSchema::from_variable_headers(variable_headers, reader.recording().frame_length())
+        VariableSchema::from_variable_headers(variable_headers, reader.frame_length())
     }
 }
 
