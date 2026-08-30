@@ -26,6 +26,11 @@ impl StatusField {
     /// `irsdk_stConnected`.
     pub const CONNECTED: Self = Self { bits: 1 };
 
+    /// Represents the disconnected/empty state.
+    pub const fn empty() -> Self {
+        Self::from_bits(0)
+    }
+
     /// Constructs the status field without discarding unknown bits.
     pub const fn from_bits(bits: i32) -> Self {
         Self { bits }

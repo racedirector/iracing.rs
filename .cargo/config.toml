@@ -19,14 +19,14 @@ car-setup-observer = [
   "--",
 ]
 
-car-setup-schema = [
+car-setup = [
   "run",
   "-p",
   "iracing-sdk",
   "--features",
   "codegen,schema-discovery",
   "--bin",
-  "car-setup-schema",
+  "car-setup",
   "--",
 ]
 

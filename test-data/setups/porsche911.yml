@@ -1,0 +1,56 @@
+UpdateCount: 5
+Tires:
+  LeftFront:
+    StartingPressure: 141 kPa
+    LastHotPressure: 141 kPa
+    LastTempsOMI: 44C, 44C, 44C
+    TreadRemaining: 100%, 100%, 100%
+  LeftRear:
+    StartingPressure: 141 kPa
+    LastHotPressure: 141 kPa
+    LastTempsOMI: 44C, 44C, 44C
+    TreadRemaining: 100%, 100%, 100%
+  RightFront:
+    StartingPressure: 141 kPa
+    LastHotPressure: 141 kPa
+    LastTempsIMO: 44C, 44C, 44C
+    TreadRemaining: 100%, 100%, 100%
+  RightRear:
+    StartingPressure: 141 kPa
+    LastHotPressure: 141 kPa
+    LastTempsIMO: 44C, 44C, 44C
+    TreadRemaining: 100%, 100%, 100%
+Chassis:
+  Front:
+    ArbBlades: 4
+    ToeIn: -3.0 mm
+    FuelLevel: 50.0 L
+    FuelLowWarning: 10.0 L
+  LeftFront:
+    CornerWeight: 2682 N
+    RideHeight: 78.3 mm
+    SpringPerchOffset: 70.0 mm
+    Camber: -4.9 deg
+  LeftRear:
+    CornerWeight: 3904 N
+    RideHeight: 119.7 mm
+    SpringPerchOffset: 49.5 mm
+    Camber: -3.9 deg
+    ToeIn: +0.5 mm
+  InCarDials:
+    BrakePressureBias: 49.0%
+    CrossWeight: 50.0%
+  RightFront:
+    CornerWeight: 2682 N
+    RideHeight: 78.3 mm
+    SpringPerchOffset: 70.0 mm
+    Camber: -4.9 deg
+  RightRear:
+    CornerWeight: 3904 N
+    RideHeight: 119.7 mm
+    SpringPerchOffset: 49.5 mm
+    Camber: -3.9 deg
+    ToeIn: +0.5 mm
+  Rear:
+    ArbBlades: 6
+    WingSetting: 9 degrees

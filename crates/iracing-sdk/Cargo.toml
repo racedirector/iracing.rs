@@ -48,8 +48,10 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = "0.1.85"
+chrono = "0.4.45"
 clap = { workspace = true }
 csv = { workspace = true }
+dirs = "6.0.0"
 encoding_rs = "0.8.35"
 futures = "0.3"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
@@ -140,6 +142,11 @@ harness = false
 required-features = ["benchmark"]
 
 [[bench]]
+name = "live_reader_acquisition"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
 name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
@@ -148,10 +155,6 @@ required-features = ["benchmark"]
 name = "session_parsing"
 harness = false
 required-features = ["benchmark"]
-
-[[example]]
-name = "car-setup-observer"
-path = "examples/car_setup_observer.rs"
 
 [[example]]
 name = "disk-position"
@@ -196,8 +199,8 @@ name = "broadcast-cli"
 path = "src/bin/broadcast_cli.rs"
 
 [[bin]]
-name = "car-setup-schema"
-path = "src/bin/car_setup_schema.rs"
+name = "car-setup"
+path = "src/bin/car_setup.rs"
 required-features = ["codegen"]
 
 [[bin]]
