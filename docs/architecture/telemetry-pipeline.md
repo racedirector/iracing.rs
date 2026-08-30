@@ -22,12 +22,18 @@ same.
 
 ## Wire and schema layer
 
-`reader::ibt::IbtRecording` parses and validates the fixed header, disk
-sub-header, metadata regions, and fixed-size frame layout from immutable `.ibt`
-data. It supports indexed frame snapshots without mutable position.
-`reader::ibt::IbtReader` adds a cursor over that recording. Live
-`WindowsConnection` interprets the related shared-memory header and rotating
-buffers through the same positioned-access and header-region representations.
+`reader::ibt::IbtReader` directly owns immutable `.ibt` bytes, the parsed common
+and disk headers, checked metadata regions, fixed frame geometry, and one frame
+cursor. Construction validates the complete layout once; indexed and sequential
+reads then perform only frame-index checks and owned slice copies.
+
+`reader::live::LiveReader` is the corresponding concrete boundary for one live
+mapping generation. Construction validates the static mapping extent, frame
+regions, descriptor control offsets, and variable-header region. Normal reads
+retain only dynamic status/index/tick checks and the SDK consistency protocol.
+`WindowsConnection` owns the Win32 handles and reconstructs the reader whenever
+a mapping is opened or replaced; it does not duplicate pointer arithmetic or
+buffer-selection policy.
 
 `VariableSchema` maps names to `VariableInfo` and records the frame size. A
 `VariableInfo` carries type, byte offset, element count, time-count marker,
@@ -78,26 +84,24 @@ The SDK does not expose a history of session YAML regions: a consumer must copy
 the current region before another update replaces it if it needs every
 observable intermediate state.
 
-The current live read path is:
+The live read path is:
 
-1. `WindowsConnection::get_new_data` selects the telemetry buffer with the
-   highest tick count. It checks that buffer's tick before and after creating a
-   borrowed byte slice and returns the slice when the two reads agree.
-2. `LiveProvider::next_frame_impl` immediately copies that slice into an owned
-   `Vec<u8>`. It then reads the shared-memory header again, selects the latest
-   telemetry buffer again, and takes both the packet tick and
-   `session_info_update` from that later header view.
-3. The provider returns an owned `FramePacket` containing the frame bytes, tick,
-   and observed session version. `Telemetry::read_task` passes the packet to
-   `LiveSessionPolicy::observe` before publishing the frame.
-4. When the packet's session version differs from the last observed version,
-   the policy immediately calls `Provider::session_yaml`. For `LiveProvider`,
-   this calls `WindowsConnection::session_info`, which reads the offset and
-   length from the current header and copies/extracts the one current YAML
-   region into an owned `String`.
-5. `LiveProvider` performs iRacing YAML preprocessing on that owned string.
-   Typed `SessionInfo` deserialization is then dispatched away from the frame
-   task.
+1. `WindowsConnection::next_frame` creates an ephemeral `MappedView` for its
+   still-owned mapping and delegates to the generation-bound `LiveReader`.
+2. `LiveReader` reads connection status, validates the dynamic current-buffer
+   index, and reads that descriptor's completed tick with a volatile load.
+   Unchanged or reset ticks return before allocation.
+3. For a new tick, the reader executes the SDK 1.20 sequence directly: read
+   barrier, one owned copy of the prevalidated frame region, read barrier, then
+   a volatile `tickCountBegin` read from the same descriptor. Equality accepts
+   the frame; contention retries once without advancing the baseline.
+4. The accepted `LiveFrameSnapshot` owns the bytes, descriptor tick, and session
+   update observed by that attempt. `LiveProvider` converts those values into a
+   `FramePacket` without rereading the header or selecting a buffer again.
+5. When the packet version changes, session acquisition reads update/offset/
+   length, checks and copies the dynamic YAML region, applies the ordering
+   boundary, and accepts only if the complete proof is unchanged afterward.
+   `LiveProvider` then performs YAML preprocessing and dispatches typed parsing.
 
 This ordering intentionally keeps shared-memory acquisition ahead of typed
 deserialization. Deferring the YAML copy itself to a background parser would
@@ -107,18 +111,12 @@ hold the frame task, but once the policy owns the string, parsing can proceed
 without delaying acquisition of the next telemetry frame and its possible next
 session version.
 
-The current implementation has several consistency limits that matter when
-reasoning about session ordering:
+The remaining consistency limits are producer constraints rather than split
+reader ownership:
 
-- `get_new_data` returns a borrowed slice; its tick consistency check finishes
-  before `LiveProvider` copies the bytes. The provider also selects the latest
-  buffer again for packet metadata, so the owned bytes and later tick/version
-  reads are not one atomic snapshot.
-- The `Provider::session_yaml` version argument is only a change trigger for
-  `LiveProvider`; it is intentionally ignored rather than treated as a lookup
-  key. `WindowsConnection::session_info` copies whichever YAML occupies the
-  single current session region at that moment. That copy does not compare
-  `session_info_update` before and after reading the region.
+- The `Provider::session_yaml` version argument is a change trigger rather than
+  a historical lookup key. Shared memory exposes only the one current YAML
+  region, so acquisition returns the actual stable version copied at that time.
 - The data-valid event can signal a session-only change, but
   `next_frame_impl` returns only after `get_new_data` finds a new telemetry
   tick. Session version discovery is therefore associated with the next frame

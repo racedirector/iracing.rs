@@ -96,8 +96,12 @@ fn main() -> iracing_sdk::Result<()> {
     let mut connection = WindowsConnection::try_connect()?;
     match connection.wait_for_update(Duration::from_millis(100))? {
         WaitResult::Signaled => {
-            if let Some(frame) = connection.get_new_data() {
-                println!("Received {} bytes", frame.len());
+            if let Some(snapshot) = connection.next_frame()? {
+                println!(
+                    "Received tick {} ({} bytes)",
+                    snapshot.tick_count(),
+                    snapshot.buffer().len(),
+                );
             }
         }
         WaitResult::Timeout => {}
@@ -201,4 +205,4 @@ impl FrameAdapter for Row {
 - `live-*` tools fail on non-Windows:
   - Live shared memory APIs are Windows-only.
 - No session YAML written by parser tools:
-  - `session_info_buffer()` can legitimately return no content if unavailable.
+  - `session_info_snapshot()` can legitimately return no content if unavailable.

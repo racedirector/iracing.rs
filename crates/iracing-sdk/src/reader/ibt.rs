@@ -1,177 +1,30 @@
-//! Immutable IBT storage, checked frame layout, and cursor policy.
+//! Concrete immutable reader for recorded iRacing telemetry.
 //!
-//! [`IbtRecording`] parses and validates the immutable portions of an IBT once:
-//! the common header, disk sub-header, advertised metadata regions, first frame
-//! offset, frame length, and record count. It owns no mutable cursor and offers
-//! checked random frame access.
-//!
-//! [`IbtReader`] layers one sequential cursor over a recording. Seeking changes
-//! only the next frame index; byte offsets are derived when a frame is read, so
-//! there is no second position counter that can drift out of sync.
-//!
-//! This module returns wire snapshots. Schema construction, YAML preprocessing,
-//! synthetic tick assignment, and provider delivery policy remain outside the
-//! reader.
+//! Construction materializes the complete source and validates the common and
+//! disk headers, metadata regions, frame geometry, and record count. A
+//! successfully constructed [`IbtReader`] therefore carries every structural
+//! invariant needed by later reads; frame methods perform only index/cursor
+//! checks and owned slice copies.
 
 use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use crate::{
     IRacingSDKError, Result,
-    irsdk::{DiskSubHeader, FrameBuffer, Header, SessionInfoBuffer, VariableHeadersBuffer},
+    irsdk::{
+        DiskSubHeader, FrameBuffer, Header, SessionInfoBuffer, VariableHeader,
+        VariableHeadersBuffer, WireType,
+    },
     types::IbtHeader,
 };
 
-use super::{
-    access_source::{ByteRegion, OwnedBytes, RandomAccessSource},
-    header::{HeaderRegions, HeaderSnapshotReader},
-};
+use super::CheckedRegion;
 
-/// Immutable parsed structure of one complete IBT source.
-#[derive(Debug, Clone)]
-pub struct IbtRecording<S = OwnedBytes> {
-    source: S,
-    header: IbtHeader,
-    regions: HeaderRegions,
-    frame_data_start: usize,
-    total_frames: usize,
-}
-
-impl IbtRecording<OwnedBytes> {
-    /// Parses owned IBT bytes into an immutable recording.
-    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Result<Self> {
-        Self::from_source(OwnedBytes::from(bytes.into()))
-    }
-
-    /// Materializes and parses a sequential IBT source.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_source(OwnedBytes::from_reader(reader)?)
-    }
-
-    /// Opens, materializes, and parses an IBT file.
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        let mut file = File::open(&path).map_err(|source| IRacingSDKError::File {
-            path: path.clone(),
-            source,
-        })?;
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)
-            .map_err(|source| IRacingSDKError::File {
-                path: path.clone(),
-                source,
-            })?;
-
-        Self::from_bytes(bytes)
-    }
-}
-
-impl<S: RandomAccessSource> IbtRecording<S> {
-    /// Parses an arbitrary finite random-access source.
-    pub fn from_source(source: S) -> Result<Self> {
-        let header_bytes = source.snapshot(ByteRegion::new(0, IbtHeader::SIZE)?)?;
-        let header_buffer: &[u8; IbtHeader::SIZE] =
-            header_bytes.as_slice().try_into().map_err(|_| {
-                IRacingSDKError::parse_error(
-                    "IBT header",
-                    format!("Expected exactly {} header bytes", IbtHeader::SIZE),
-                )
-            })?;
-        let header = IbtHeader::try_from_buffer(header_buffer)?;
-        header.validate()?;
-
-        let regions = HeaderRegions::from_header(&header.header)?;
-        validate_metadata_regions(&source, regions)?;
-        let frame_data_start = frame_data_start(regions);
-        let total_frames = validate_frame_layout(
-            source.len(),
-            frame_data_start,
-            regions.frame_length(),
-            header.record_count(),
-        )?;
-
-        Ok(Self {
-            source,
-            header,
-            regions,
-            frame_data_start,
-            total_frames,
-        })
-    }
-
-    /// Returns the parsed common and disk headers.
-    pub fn ibt_header(&self) -> &IbtHeader {
-        &self.header
-    }
-
-    /// Returns the common SDK header.
-    pub fn header(&self) -> &Header {
-        &self.header.header
-    }
-
-    /// Returns the IBT-specific disk sub-header.
-    pub fn disk_header(&self) -> &DiskSubHeader {
-        &self.header.sub_header
-    }
-
-    /// Returns the interpreted common-header regions.
-    pub fn regions(&self) -> HeaderRegions {
-        self.regions
-    }
-
-    /// Returns the absolute offset of the first telemetry frame.
-    pub fn frame_data_start(&self) -> usize {
-        self.frame_data_start
-    }
-
-    /// Returns the exact byte length of each telemetry frame.
-    pub fn frame_length(&self) -> usize {
-        self.regions.frame_length()
-    }
-
-    /// Returns the validated number of complete telemetry frames.
-    pub fn total_frames(&self) -> usize {
-        self.total_frames
-    }
-
-    /// Copies the immutable session-information region.
-    pub fn session_info_buffer(&self) -> Result<Option<SessionInfoBuffer>> {
-        HeaderSnapshotReader::new(&self.source, self.header())?.session_info_buffer()
-    }
-
-    /// Copies the immutable variable-header array.
-    pub fn variable_headers_buffer(&self) -> Result<Option<VariableHeadersBuffer>> {
-        HeaderSnapshotReader::new(&self.source, self.header())?.variable_headers_buffer()
-    }
-
-    /// Copies a frame by zero-based index.
-    ///
-    /// Returns `Ok(None)` when `frame_index` is outside the recording.
-    pub fn frame(&self, frame_index: usize) -> Result<Option<IbtFrame>> {
-        if frame_index >= self.total_frames {
-            return Ok(None);
-        }
-
-        let frame_offset = frame_index
-            .checked_mul(self.frame_length())
-            .and_then(|relative| self.frame_data_start.checked_add(relative))
-            .ok_or_else(|| {
-                IRacingSDKError::parse_error("IBT frame", "Frame byte offset overflowed")
-            })?;
-        let buffer =
-            HeaderSnapshotReader::new(&self.source, self.header())?.frame_at(frame_offset)?;
-
-        Ok(Some(IbtFrame {
-            index: frame_index,
-            buffer,
-        }))
-    }
-}
-
-/// One indexed frame copied from an immutable IBT recording.
+/// One indexed frame copied from an immutable IBT source.
 #[derive(Debug, Clone)]
 pub struct IbtFrame {
     index: usize,
@@ -195,50 +48,167 @@ impl IbtFrame {
     }
 }
 
-/// Sequential cursor over an immutable [`IbtRecording`].
+/// Parsed, validated, and cursor-positioned access to one immutable IBT source.
 #[derive(Debug, Clone)]
-pub struct IbtReader<S = OwnedBytes> {
-    recording: IbtRecording<S>,
+pub struct IbtReader {
+    bytes: Arc<[u8]>,
+    header: IbtHeader,
+    session_region: Option<CheckedRegion>,
+    variable_headers_region: Option<CheckedRegion>,
+    frame_data_start: usize,
+    frame_length: usize,
+    total_frames: usize,
     next_frame: usize,
     path: Option<PathBuf>,
 }
 
-impl IbtReader<OwnedBytes> {
-    /// Opens an IBT file with filesystem-origin metadata.
+impl IbtReader {
+    /// Opens, materializes, parses, and validates an IBT file.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let recording = IbtRecording::open(&path)?;
+        let mut file = File::open(&path).map_err(|source| IRacingSDKError::File {
+            path: path.clone(),
+            source,
+        })?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
+            .map_err(|source| IRacingSDKError::File {
+                path: path.clone(),
+                source,
+            })?;
+
+        Self::from_materialized(bytes.into(), Some(path))
+    }
+
+    /// Parses and validates owned in-memory IBT bytes.
+    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Result<Self> {
+        Self::from_materialized(bytes.into().into(), None)
+    }
+
+    /// Materializes, parses, and validates a sequential IBT source.
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
+        let mut bytes = Vec::new();
+        reader
+            .read_to_end(&mut bytes)
+            .map_err(|source| IRacingSDKError::Buffer {
+                context: "materializing IBT source".to_owned(),
+                buffer_index: None,
+                source: Some(Box::new(source)),
+            })?;
+
+        Self::from_materialized(bytes.into(), None)
+    }
+
+    fn from_materialized(bytes: Arc<[u8]>, path: Option<PathBuf>) -> Result<Self> {
+        let header_bytes = bytes.get(..IbtHeader::SIZE).ok_or_else(|| {
+            IRacingSDKError::parse_error(
+                "IBT header",
+                format!(
+                    "Expected at least {} header bytes, found {}",
+                    IbtHeader::SIZE,
+                    bytes.len()
+                ),
+            )
+        })?;
+        let header_buffer: &[u8; IbtHeader::SIZE] = header_bytes.try_into().map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT header",
+                format!("Expected exactly {} header bytes", IbtHeader::SIZE),
+            )
+        })?;
+        let header = IbtHeader::try_from_buffer(header_buffer)?;
+        header.validate()?;
+
+        let session_region = optional_metadata_region(
+            "session info",
+            header.header.session_info_offset,
+            header.header.session_info_len,
+            bytes.len(),
+        )?;
+
+        let variable_count = usize::try_from(header.header.variable_count).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT layout",
+                format!(
+                    "Variable count cannot be negative: {}",
+                    header.header.variable_count
+                ),
+            )
+        })?;
+        let variable_headers_length = variable_count
+            .checked_mul(VariableHeader::WIRE_SIZE)
+            .ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "IBT layout",
+                    "Variable-header region length overflowed",
+                )
+            })?;
+        let variable_headers_region = optional_metadata_region_usize(
+            "variable headers",
+            header.header.variable_header_offset,
+            variable_headers_length,
+            bytes.len(),
+        )?;
+
+        if session_region
+            .zip(variable_headers_region)
+            .is_some_and(|(session, variables)| session.overlaps(variables))
+        {
+            return Err(IRacingSDKError::parse_error(
+                "IBT layout",
+                "Session-info and variable-header regions overlap",
+            ));
+        }
+
+        let frame_length = usize::try_from(header.header.buffer_length).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT layout",
+                format!(
+                    "Frame length cannot be negative: {}",
+                    header.header.buffer_length
+                ),
+            )
+        })?;
+        let frame_data_start = [session_region, variable_headers_region]
+            .into_iter()
+            .flatten()
+            .map(CheckedRegion::end)
+            .max()
+            .unwrap_or(IbtHeader::SIZE)
+            .max(IbtHeader::SIZE);
+        let total_frames = validate_frame_layout(
+            bytes.len(),
+            frame_data_start,
+            frame_length,
+            header.record_count(),
+        )?;
+
         Ok(Self {
-            recording,
+            bytes,
+            header,
+            session_region,
+            variable_headers_region,
+            frame_data_start,
+            frame_length,
+            total_frames,
             next_frame: 0,
-            path: Some(path),
+            path,
         })
     }
 
-    /// Parses owned in-memory IBT bytes.
-    pub fn from_bytes<B: Into<Vec<u8>>>(bytes: B) -> Result<Self> {
-        Ok(Self::from_recording(IbtRecording::from_bytes(bytes)?))
+    /// Returns the parsed common and disk headers.
+    pub fn ibt_header(&self) -> &IbtHeader {
+        &self.header
     }
 
-    /// Materializes and parses a sequential IBT source.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Ok(Self::from_recording(IbtRecording::from_reader(reader)?))
-    }
-}
-
-impl<S: RandomAccessSource> IbtReader<S> {
-    /// Creates a cursor positioned at the first frame of a recording.
-    pub fn from_recording(recording: IbtRecording<S>) -> Self {
-        Self {
-            recording,
-            next_frame: 0,
-            path: None,
-        }
+    /// Returns the common SDK header.
+    pub fn header(&self) -> &Header {
+        &self.header.header
     }
 
-    /// Returns the immutable recording behind this cursor.
-    pub fn recording(&self) -> &IbtRecording<S> {
-        &self.recording
+    /// Returns the IBT-specific disk sub-header.
+    pub fn disk_header(&self) -> &DiskSubHeader {
+        &self.header.sub_header
     }
 
     /// Returns the filesystem path used by [`Self::open`], when available.
@@ -251,54 +221,78 @@ impl<S: RandomAccessSource> IbtReader<S> {
         self.next_frame
     }
 
-    /// Returns the validated number of frames in the recording.
+    /// Returns the validated number of complete frames in the recording.
     pub fn total_frames(&self) -> usize {
-        self.recording.total_frames()
+        self.total_frames
     }
 
-    /// Returns the common SDK header.
-    pub fn header(&self) -> &Header {
-        self.recording.header()
+    /// Returns the exact byte length of each telemetry frame.
+    pub fn frame_length(&self) -> usize {
+        self.frame_length
     }
 
-    /// Returns the IBT-specific disk sub-header.
-    pub fn disk_header(&self) -> &DiskSubHeader {
-        self.recording.disk_header()
+    /// Returns the absolute byte offset of the first telemetry frame.
+    pub fn frame_data_start(&self) -> usize {
+        self.frame_data_start
     }
 
     /// Returns the recording frequency in ticks per second.
     pub fn tick_rate(&self) -> f64 {
-        self.header().tick_rate as f64
+        self.header.header.tick_rate as f64
     }
 
     /// Returns the playback position represented by the cursor.
     pub fn current_time(&self) -> f64 {
-        self.current_frame() as f64 / self.tick_rate()
+        self.next_frame as f64 / self.tick_rate()
     }
 
     /// Returns the duration represented by all validated frames.
     pub fn duration(&self) -> f64 {
-        self.total_frames() as f64 / self.tick_rate()
+        self.total_frames as f64 / self.tick_rate()
     }
 
     /// Copies the immutable session-information region.
     pub fn session_info_buffer(&self) -> Result<Option<SessionInfoBuffer>> {
-        self.recording.session_info_buffer()
+        Ok(self
+            .session_region
+            .map(|region| SessionInfoBuffer::from_snapshot(self.copy_region(region))))
     }
 
     /// Copies the immutable variable-header array.
     pub fn variable_headers_buffer(&self) -> Result<Option<VariableHeadersBuffer>> {
-        self.recording.variable_headers_buffer()
+        Ok(self
+            .variable_headers_region
+            .map(|region| VariableHeadersBuffer::from_snapshot(self.copy_region(region))))
+    }
+
+    /// Copies a frame by zero-based index without changing the sequential cursor.
+    ///
+    /// Returns `Ok(None)` when `frame_index` is outside the recording.
+    pub fn frame(&self, frame_index: usize) -> Result<Option<IbtFrame>> {
+        if frame_index >= self.total_frames {
+            return Ok(None);
+        }
+
+        // Construction proves that every index below `total_frames` produces a
+        // complete in-bounds frame and that these operations cannot overflow.
+        let offset = self.frame_data_start + frame_index * self.frame_length;
+        let end = offset + self.frame_length;
+        let buffer = FrameBuffer::from_snapshot(self.bytes[offset..end].to_vec());
+
+        Ok(Some(IbtFrame {
+            index: frame_index,
+            buffer,
+        }))
     }
 
     /// Sets the next frame to read.
     ///
     /// Seeking to `total_frames` is allowed and positions the cursor at EOF.
     pub fn seek_to_frame(&mut self, frame_index: usize) -> Result<()> {
-        if frame_index > self.total_frames() {
+        if frame_index > self.total_frames {
             return Err(IRacingSDKError::parse_error(
                 "IBT frame seek",
-                format!("Frame {frame_index} is outside 0..={}", self.total_frames()),
+                format!("Frame {frame_index} is outside 0..={}", self.total_frames),
             ));
         }
 
@@ -308,51 +302,62 @@ impl<S: RandomAccessSource> IbtReader<S> {
 
     /// Copies and advances past the next frame.
     pub fn read_next_frame(&mut self) -> Result<Option<IbtFrame>> {
-        let Some(frame) = self.recording.frame(self.next_frame)? else {
+        let Some(frame) = self.frame(self.next_frame)? else {
             return Ok(None);
         };
 
-        self.next_frame = self
-            .next_frame
-            .checked_add(1)
-            .ok_or_else(|| IRacingSDKError::parse_error("IBT cursor", "Frame index overflowed"))?;
+        // A successful read proves `next_frame < total_frames`, so incrementing
+        // cannot overflow independently of the validated source extent.
+        self.next_frame += 1;
         Ok(Some(frame))
     }
+
+    fn copy_region(&self, region: CheckedRegion) -> Vec<u8> {
+        self.bytes[region.offset()..region.end()].to_vec()
+    }
 }
 
-fn validate_metadata_regions<S: RandomAccessSource>(
-    source: &S,
-    regions: HeaderRegions,
-) -> Result<()> {
-    for region in [regions.variable_headers(), regions.session_info()]
-        .into_iter()
-        .flatten()
-    {
-        if region.offset() < IbtHeader::SIZE {
-            return Err(IRacingSDKError::parse_error(
-                "IBT layout",
-                format!(
-                    "Metadata region at {} overlaps the {}-byte IBT header",
-                    region.offset(),
-                    IbtHeader::SIZE
-                ),
-            ));
-        }
-        source.validate_region(region)?;
+fn optional_metadata_region(
+    context: &str,
+    offset: i32,
+    length: i32,
+    source_length: usize,
+) -> Result<Option<CheckedRegion>> {
+    let length = usize::try_from(length).map_err(|_| {
+        IRacingSDKError::parse_error(
+            "IBT layout",
+            format!("{context} length cannot be negative: {length}"),
+        )
+    })?;
+    optional_metadata_region_usize(context, offset, length, source_length)
+}
+
+fn optional_metadata_region_usize(
+    context: &str,
+    offset: i32,
+    length: usize,
+    source_length: usize,
+) -> Result<Option<CheckedRegion>> {
+    let offset = usize::try_from(offset).map_err(|_| {
+        IRacingSDKError::parse_error(
+            "IBT layout",
+            format!("{context} offset cannot be negative: {offset}"),
+        )
+    })?;
+    if length == 0 {
+        return Ok(None);
+    }
+    if offset < IbtHeader::SIZE {
+        return Err(IRacingSDKError::parse_error(
+            "IBT layout",
+            format!(
+                "{context} region at {offset} overlaps the {}-byte IBT header",
+                IbtHeader::SIZE
+            ),
+        ));
     }
 
-    Ok(())
-}
-
-fn frame_data_start(regions: HeaderRegions) -> usize {
-    let metadata_end = [regions.variable_headers(), regions.session_info()]
-        .into_iter()
-        .flatten()
-        .map(ByteRegion::end)
-        .max()
-        .unwrap_or(IbtHeader::SIZE);
-
-    metadata_end.max(IbtHeader::SIZE)
+    CheckedRegion::new(offset, length, source_length).map(Some)
 }
 
 fn validate_frame_layout(
@@ -417,7 +422,7 @@ fn validate_frame_layout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_utils::require_smallest_ibt_fixture, types::WireType};
+    use crate::test_utils::require_smallest_ibt_fixture;
     use anyhow::Result;
 
     fn fixture_bytes() -> Result<Vec<u8>> {
@@ -426,28 +431,33 @@ mod tests {
     }
 
     #[test]
-    fn recording_parses_fixture_regions_and_frames() -> Result<()> {
-        let recording = IbtRecording::from_bytes(fixture_bytes()?)?;
+    fn reader_parses_fixture_regions_and_frames() -> Result<()> {
+        let reader = IbtReader::from_bytes(fixture_bytes()?)?;
 
-        assert_eq!(recording.total_frames(), 12);
-        assert_eq!(recording.frame_length(), 48);
-        assert!(recording.session_info_buffer()?.is_some());
-        assert!(recording.variable_headers_buffer()?.is_some());
+        assert_eq!(reader.total_frames(), 12);
+        assert_eq!(reader.frame_length(), 48);
+        assert!(reader.session_info_buffer()?.is_some());
+        assert!(reader.variable_headers_buffer()?.is_some());
 
-        let first = recording.frame(0)?.expect("first frame");
+        let first = reader.frame(0)?.expect("first frame");
         let bytes: Vec<u8> = first.into_buffer().into();
-        assert_eq!(bytes.len(), recording.frame_length());
-        assert!(recording.frame(recording.total_frames())?.is_none());
+        assert_eq!(bytes.len(), reader.frame_length());
+        assert!(reader.frame(reader.total_frames())?.is_none());
         Ok(())
     }
 
     #[test]
-    fn cursor_derives_position_only_from_frame_index() -> Result<()> {
+    fn cursor_and_random_access_share_validated_frame_geometry() -> Result<()> {
         let mut reader = IbtReader::from_bytes(fixture_bytes()?)?;
 
+        let random = reader.frame(5)?.expect("frame five");
+        let random_bytes: Vec<u8> = random.into_buffer().into();
+        assert_eq!(reader.current_frame(), 0);
         reader.seek_to_frame(5)?;
-        let frame = reader.read_next_frame()?.expect("frame five");
-        assert_eq!(frame.index(), 5);
+        let sequential = reader.read_next_frame()?.expect("frame five");
+        let sequential_bytes: Vec<u8> = sequential.buffer().clone().into();
+        assert_eq!(random_bytes, sequential_bytes);
+        assert_eq!(sequential.index(), 5);
         assert_eq!(reader.current_frame(), 6);
 
         reader.seek_to_frame(reader.total_frames())?;
@@ -468,23 +478,36 @@ mod tests {
     }
 
     #[test]
-    fn recording_rejects_partial_final_frame() -> Result<()> {
+    fn construction_rejects_short_header_and_partial_final_frame() -> Result<()> {
+        assert!(IbtReader::from_bytes(vec![0; IbtHeader::SIZE - 1]).is_err());
+
         let mut bytes = fixture_bytes()?;
         bytes.pop();
-
-        let error = IbtRecording::from_bytes(bytes).expect_err("partial frame must fail");
+        let error = IbtReader::from_bytes(bytes).expect_err("partial frame must fail");
         assert!(error.to_string().contains("partial frame"));
         Ok(())
     }
 
     #[test]
-    fn recording_rejects_record_count_mismatch() -> Result<()> {
+    fn construction_rejects_record_count_mismatch() -> Result<()> {
         let mut bytes = fixture_bytes()?;
         let record_count_offset = Header::WIRE_SIZE + 28;
         bytes[record_count_offset..record_count_offset + 4].copy_from_slice(&11_i32.to_le_bytes());
 
-        let error = IbtRecording::from_bytes(bytes).expect_err("record mismatch must fail");
+        let error = IbtReader::from_bytes(bytes).expect_err("record mismatch must fail");
         assert!(error.to_string().contains("advertises 11 records"));
+        Ok(())
+    }
+
+    #[test]
+    fn construction_rejects_overlapping_metadata() -> Result<()> {
+        let mut bytes = fixture_bytes()?;
+        let variable_offset = i32::from_le_bytes(bytes[28..32].try_into().unwrap());
+        bytes[16..20].copy_from_slice(&1_i32.to_le_bytes());
+        bytes[20..24].copy_from_slice(&variable_offset.to_le_bytes());
+
+        let error = IbtReader::from_bytes(bytes).expect_err("metadata overlap must fail");
+        assert!(error.to_string().contains("overlap"));
         Ok(())
     }
 }

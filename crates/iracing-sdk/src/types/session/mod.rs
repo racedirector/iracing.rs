@@ -552,7 +552,9 @@ SessionInfo:
         let connection = Connection::try_connect()
             .expect("Failed to connect to iRacing - ensure iRacing is running and in a session");
 
-        let header = connection.header_snapshot();
+        let header = connection
+            .header_snapshot()
+            .expect("Failed to copy live header");
 
         println!("Live iRacing header info:");
         println!("  Session info length: {} bytes", header.session_info_len);
@@ -571,8 +573,10 @@ SessionInfo:
 
         // Get and parse session info
         let session_buffer = connection
-            .session_info_buffer()
+            .session_info_snapshot()
+            .expect("Failed to acquire stable session info")
             .expect("Failed to get session info from iRacing");
+        let session_buffer = session_buffer.into_buffer();
         let reparsing_buffer = session_buffer.clone();
         let session_info = SessionInfo::try_from(session_buffer)
             .expect("Failed to convert live session buffer to SessionInfo");

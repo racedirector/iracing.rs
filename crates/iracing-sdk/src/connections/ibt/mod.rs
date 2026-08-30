@@ -178,7 +178,7 @@ mod tests {
         assert!(frame_count <= reader.total_frames());
 
         let frames_to_remove = reader.total_frames() - frame_count;
-        data.truncate(data.len() - frames_to_remove * reader.recording().frame_length());
+        data.truncate(data.len() - frames_to_remove * reader.frame_length());
         let record_count_offset = IbtHeader::SIZE - std::mem::size_of::<i32>();
         let record_count = i32::try_from(frame_count).expect("test frame count fits in i32");
         data[record_count_offset..IbtHeader::SIZE].copy_from_slice(&record_count.to_le_bytes());

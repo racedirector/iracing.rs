@@ -130,7 +130,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_interval: Duratio
         WindowsConnection::try_connect().context("Could not connect to iRacing")?
     };
 
-    let header = connection.header_snapshot();
+    let header = connection.header_snapshot()?;
 
     println!(
         "Parsed live header:\nIs valid: {}\n{:#?}",

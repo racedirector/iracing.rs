@@ -121,7 +121,8 @@ fn run() -> Result<()> {
             was_connected = true;
         }
 
-        if let Some(raw_data) = connection.get_new_data() {
+        if let Some(snapshot) = connection.next_frame()? {
+            let raw_data = snapshot.into_buffer();
             let data: Vec<u8> = raw_data.into();
 
             // Extract strongly-typed values from raw frame bytes.

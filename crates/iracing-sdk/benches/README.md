@@ -111,15 +111,16 @@ boundary.
 
 ## Manual live benchmark
 
-`live_reader_acquisition` is portable and deterministic. It uses an in-memory
-`RandomAccessSource` with the 8,586-byte frame length from the checked-in live
-schema. Accepted-frame cases include allocation of the owned `FrameBuffer`;
-the unchanged-tick case proves and measures the path that performs no frame
-allocation or frame-region copy. Direct-copy and accepted cases report frame
-bytes per second, while unchanged reports observations per second. The forced
-retry changes the source immediately after the first frame copy and accepts the
-second attempt. It intentionally excludes shared-memory mapping, event waits,
-Tokio scheduling, provider conversion, and subscriber delivery.
+`live_reader_acquisition` is portable and deterministic. It uses the concrete
+`LiveReader` and `MappedView` over stable in-process storage with the 8,586-byte
+frame length from the checked-in live schema. Accepted-frame cases include the
+single owned `FrameBuffer` allocation; the unchanged-tick case proves and
+measures the path that performs no frame allocation or frame-region copy.
+Direct-copy and accepted cases report frame bytes per second, while unchanged
+reports observations per second. A benchmark-only copy observer advances the
+mapping immediately after the first frame copy for the forced-retry case. It
+intentionally excludes Win32 mapping calls, event waits, Tokio scheduling,
+provider conversion, and subscriber delivery.
 
 Run it with:
 
