@@ -86,7 +86,7 @@ pub fn main() -> anyhow::Result<()> {
             variable_map.insert(var_info.name.clone(), var_info);
         }
 
-        let frame_size = connection.header().buf_len as usize;
+        let frame_size = connection.header().buffer_length as usize;
         let variable_schema = VariableSchema::new(variable_map, frame_size)?;
         let schema = schemars::schema_for_value!(variable_schema);
 

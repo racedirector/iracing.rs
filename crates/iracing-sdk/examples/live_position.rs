@@ -70,7 +70,7 @@ fn run() -> Result<()> {
         variable_map.insert(var_info.name.clone(), var_info);
     }
 
-    let frame_size = connection.header().buf_len as usize;
+    let frame_size = connection.header().buffer_length as usize;
     let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
 
     // ------------------------------------------------------------

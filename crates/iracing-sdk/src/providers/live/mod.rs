@@ -66,7 +66,7 @@ impl LiveProvider {
             variable_map.insert(var_info.name.clone(), var_info);
         }
 
-        let frame_size = header.buf_len as usize;
+        let frame_size = header.buffer_length as usize;
         let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
 
         Ok(Self {
@@ -131,7 +131,7 @@ impl LiveProvider {
                 let frame_data = data.to_vec();
                 let header = self.connection.header();
                 let latest_buf_idx = self.connection.find_latest_buffer(header);
-                let tick = header.var_buf[latest_buf_idx].tick_count as u32;
+                let tick = header.buffers[latest_buf_idx].tick_count as u32;
                 let session_version = header.session_info_update as u32;
 
                 tracing::trace!(

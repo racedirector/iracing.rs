@@ -11,7 +11,7 @@
 //! # Behavior
 //! - Attempts to connect via `WindowsConnection::try_connect()`
 //! - Reads the live header bytes from shared memory
-//! - Parses the header using `IRSDKHeader::parse_from_memory()`
+//! - Parses the header using the shared `Header` wire type
 //! - Prints the structure using pretty `Debug` formatting
 //!
 //! # Logging
@@ -36,7 +36,7 @@ use anyhow::Result;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 #[cfg(windows)]
-use iracing_sdk::schema::header::IRSDKHeader;
+use iracing_sdk::types::irsdk::{Header, WireType};
 
 fn main() -> Result<()> {
     // ------------------------------------------------------------
@@ -60,14 +60,15 @@ fn main() -> Result<()> {
         let connection = WindowsConnection::try_connect().expect("Failed to connect to iRacing");
 
         tracing::info!("Reading live header bytes");
-        let header_ptr = connection.header() as *const IRSDKHeader as *const u8;
+        let header_ptr = connection.header() as *const Header as *const u8;
         let header_bytes =
-            unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<IRSDKHeader>()) };
+            unsafe { std::slice::from_raw_parts(header_ptr, std::mem::size_of::<Header>()) };
 
         tracing::info!("Parsing live header");
-        let header = IRSDKHeader::parse_from_memory(header_bytes)?;
+        let header = Header::read_from_bytes(header_bytes)?;
+        header.validate_live()?;
 
-        println!("IRSDKHeader:\n{:#?}", header);
+        println!("Header:\n{:#?}", header);
 
         Ok(())
     }

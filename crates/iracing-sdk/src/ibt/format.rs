@@ -20,7 +20,10 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
+use crate::{
+    IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType,
+    types::irsdk::{Header, VariableHeader, WireType},
+};
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -28,10 +31,7 @@ use std::io::{Read, Seek, SeekFrom};
 const IRSDK_HEADER_SIZE: usize = 144;
 const IRSDK_DISK_SUBHEADER_SIZE: usize = 32;
 /// Size in bytes of a single variable header entry (`irsdk_varHeader`).
-pub const IRSDK_VAR_HEADER_SIZE: usize = 144;
-const IRSDK_VAR_NAME_SIZE: usize = 32;
-const IRSDK_VAR_DESC_SIZE: usize = 64;
-const IRSDK_VAR_UNIT_SIZE: usize = 32;
+pub const IRSDK_VAR_HEADER_SIZE: usize = VariableHeader::WIRE_SIZE;
 
 fn header_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Header validation", details)
@@ -62,24 +62,8 @@ pub struct IbtHeader {
     pub buf_len: i32,
 }
 
-/// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
-///
-/// Stored just before the variable header array (at
-/// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
-/// metadata specific to `.ibt` replay files.
-#[derive(Debug, Clone)]
-pub struct IbtDiskSubHeader {
-    /// Unix timestamp (`time_t`) of the session start date.
-    pub start_date: i64,
-    /// Session start time in seconds since session midnight.
-    pub start_time: f64,
-    /// Session end time in seconds since session midnight.
-    pub end_time: f64,
-    /// Number of laps completed during the recorded session.
-    pub lap_count: i32,
-    /// Total number of telemetry frames (records) in the file.
-    pub record_count: i32,
-}
+/// Existing name for the shared IBT disk sub-header wire type.
+pub use crate::types::irsdk::DiskSubHeader as IbtDiskSubHeader;
 
 impl IbtHeader {
     /// Size of the irsdk_header structure in bytes
@@ -96,32 +80,18 @@ impl IbtHeader {
                 details: format!("Failed to read {} header bytes: {}", IRSDK_HEADER_SIZE, e),
             })?;
 
-        // Parse header fields according to irsdk_header structure (little-endian format)
-        // struct irsdk_header {
-        //   int ver;                    // offset 0
-        //   int status;                 // offset 4
-        //   int tickRate;               // offset 8
-        //   int sessionInfoUpdate;     // offset 12
-        //   int sessionInfoLen;        // offset 16
-        //   int sessionInfoOffset;     // offset 20
-        //   int numVars;               // offset 24
-        //   int varHeaderOffset;       // offset 28
-        //   int numBuf;                // offset 32
-        //   int bufLen;                // offset 36
-        //   int pad1[2];               // offset 40, padding for 16-byte alignment
-        //   irsdk_varBuf varBuf[IRSDK_MAX_BUFS]; // offset 48, array of buffers
-        // }
+        let wire_header = Header::read_from_bytes(&header_data[..Header::WIRE_SIZE])?;
 
-        let version = parse_i32_le(&header_data, 0)?;
-        let status = parse_i32_le(&header_data, 4)?;
-        let tick_rate = parse_i32_le(&header_data, 8)?;
-        let session_info_update = parse_i32_le(&header_data, 12)?;
-        let session_info_len = parse_i32_le(&header_data, 16)?;
-        let session_info_offset = parse_i32_le(&header_data, 20)?;
-        let num_vars = parse_i32_le(&header_data, 24)?;
-        let var_header_offset = parse_i32_le(&header_data, 28)?;
-        let num_buf = parse_i32_le(&header_data, 32)?;
-        let buf_len = parse_i32_le(&header_data, 36)?;
+        let version = wire_header.version;
+        let status = wire_header.status.bits();
+        let tick_rate = wire_header.tick_rate;
+        let session_info_update = wire_header.session_info_update;
+        let session_info_len = wire_header.session_info_len;
+        let session_info_offset = wire_header.session_info_offset;
+        let num_vars = wire_header.variable_count;
+        let var_header_offset = wire_header.variable_header_offset;
+        let num_buf = wire_header.buffer_count;
+        let buf_len = wire_header.buffer_length;
 
         tracing::debug!(
             "Parsed IBT header: version={}, status={}, tick_rate={}, session_info_update={}, session_info_len={}, session_info_offset={}, num_vars={}, var_header_offset={}, num_buf={} buf_len={}",
@@ -227,20 +197,7 @@ impl IbtDiskSubHeader {
                 ),
             })?;
 
-        // Parse disk sub-header fields (little-endian format)
-        let start_date = parse_i64_le(&disk_header_data, 0)?;
-        let start_time = parse_f64_le(&disk_header_data, 8)?;
-        let end_time = parse_f64_le(&disk_header_data, 16)?;
-        let lap_count = parse_i32_le(&disk_header_data, 24)?;
-        let record_count = parse_i32_le(&disk_header_data, 28)?;
-
-        Ok(Self {
-            start_date,
-            start_time,
-            end_time,
-            lap_count,
-            record_count,
-        })
+        Self::read_from_bytes(&disk_header_data)
     }
 
     /// Parses an [`IbtDiskSubHeader`] using the offset implied by `header`.
@@ -324,25 +281,18 @@ pub fn extract_variable_schema<R: Read + Seek>(
                 details: format!("Failed to read variable header {}: {}", i, e),
             })?;
 
-        // Parse variable header fields
-        let var_type = parse_i32_le(&var_header_bytes, 0)?;
-        let offset = parse_i32_le(&var_header_bytes, 4)?;
-        let count = parse_i32_le(&var_header_bytes, 8)?;
-
-        // Extract null-terminated strings using constants for offsets
-        let name = extract_null_terminated_string(&var_header_bytes[16..16 + IRSDK_VAR_NAME_SIZE]);
-        let desc = extract_null_terminated_string(&var_header_bytes[48..48 + IRSDK_VAR_DESC_SIZE]);
-        let unit =
-            extract_null_terminated_string(&var_header_bytes[112..112 + IRSDK_VAR_UNIT_SIZE]);
-        let count_as_time = var_header_bytes[12] != 0;
+        let wire_header = VariableHeader::read_from_bytes(&var_header_bytes)?;
+        let name = extract_null_terminated_string(&wire_header.name);
+        let desc = extract_null_terminated_string(&wire_header.description);
+        let unit = extract_null_terminated_string(&wire_header.unit);
 
         // Skip empty or invalid variables
-        if name.is_empty() || offset < 0 || count <= 0 {
+        if name.is_empty() || wire_header.offset < 0 || wire_header.count <= 0 {
             continue;
         }
 
         // Convert iRacing var type to our VariableType
-        let data_type = match var_type {
+        let data_type = match wire_header.variable_type {
             0 => VariableType::Char,     // char
             1 => VariableType::Bool,     // bool
             2 => VariableType::Int32,    // int
@@ -354,7 +304,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
                 tracing::debug!(
                     "Skipping variable '{}' with unknown type {}",
                     name,
-                    var_type
+                    wire_header.variable_type
                 );
                 continue;
             }
@@ -365,9 +315,9 @@ pub fn extract_variable_schema<R: Read + Seek>(
             VariableInfo {
                 name,
                 data_type,
-                offset: offset as usize,
-                count: count as usize,
-                count_as_time,
+                offset: wire_header.offset as usize,
+                count: wire_header.count as usize,
+                count_as_time: wire_header.count_as_time != 0,
                 units: unit,
                 description: desc,
             },
@@ -403,72 +353,6 @@ pub fn verify_min_length(file_len: u64, header: &IbtHeader, disk: &IbtDiskSubHea
         });
     }
     Ok(())
-}
-
-/// Safe byte parsing helpers with bounds checking
-fn parse_i32_le(data: &[u8], offset: usize) -> Result<i32> {
-    if offset + 4 > data.len() {
-        return Err(IRacingSDKError::Parse {
-            context: "Integer parsing".to_string(),
-            details: format!(
-                "Insufficient data for i32 at offset {} (need 4 bytes, have {})",
-                offset,
-                data.len() - offset
-            ),
-        });
-    }
-    Ok(i32::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-    ]))
-}
-
-fn parse_i64_le(data: &[u8], offset: usize) -> Result<i64> {
-    if offset + 8 > data.len() {
-        return Err(IRacingSDKError::Parse {
-            context: "Long integer parsing".to_string(),
-            details: format!(
-                "Insufficient data for i64 at offset {} (need 8 bytes, have {})",
-                offset,
-                data.len() - offset
-            ),
-        });
-    }
-    Ok(i64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
-    ]))
-}
-
-fn parse_f64_le(data: &[u8], offset: usize) -> Result<f64> {
-    if offset + 8 > data.len() {
-        return Err(IRacingSDKError::Parse {
-            context: "Double precision float parsing".to_string(),
-            details: format!(
-                "Insufficient data for f64 at offset {} (need 8 bytes, have {})",
-                offset,
-                data.len() - offset
-            ),
-        });
-    }
-    Ok(f64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
-    ]))
 }
 
 /// Extract null-terminated string from byte slice

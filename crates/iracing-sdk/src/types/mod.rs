@@ -51,6 +51,8 @@ mod codegen;
 mod dynamic_frame;
 mod frame;
 mod incident;
+#[allow(dead_code, unused_imports)]
+pub mod irsdk;
 mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
