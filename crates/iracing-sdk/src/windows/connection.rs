@@ -43,6 +43,9 @@ pub struct Connection {
     base: NonNull<u8>,
     event: HANDLE,
     last_tick_count: i32,
+    /// Reusable destination for [`Self::get_new_data`]'s copy of the latest
+    /// telemetry buffer; the returned slice borrows from here.
+    frame_buffer: Vec<u8>,
 }
 
 impl Connection {
@@ -108,6 +111,7 @@ impl Connection {
             base,
             event,
             last_tick_count: i32::MAX,
+            frame_buffer: Vec::new(),
         };
 
         // Validate the connection
@@ -170,6 +174,11 @@ impl Connection {
     }
 
     /// Get latest telemetry data if available
+    ///
+    /// Returns a copy of the most recent telemetry buffer, taken while the
+    /// buffer's tick count read unchanged on both sides of the copy. The
+    /// returned slice borrows the connection's internal buffer and stays
+    /// valid until the next call.
     pub fn get_new_data(&mut self) -> Option<&[u8]> {
         if !self.is_connected() {
             tracing::debug!("Not connected to iRacing");
@@ -177,62 +186,90 @@ impl Connection {
             return None;
         }
 
-        let header = self.header();
-
-        // Find the buffer with the highest tick count (most recent)
-        let latest_buf_idx = self.find_latest_buffer(header);
-        let latest_buf = &header.var_buf[latest_buf_idx];
+        // The sim process writes the tick counts, so they are always read
+        // volatile; a plain read through a shared reference lets the compiler
+        // assume the value never changes between reads.
+        let (latest_tick, latest_buf_idx) = {
+            let header = self.header();
+            let idx = self.find_latest_buffer(header);
+            let tick = unsafe {
+                std::ptr::read_volatile(std::ptr::addr_of!(header.var_buf[idx].tick_count))
+            };
+            (tick, idx)
+        };
 
         tracing::trace!(
             "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
             self.last_tick_count,
-            latest_buf.tick_count,
+            latest_tick,
             latest_buf_idx
         );
 
         // Check if we have new data
-        if self.last_tick_count == latest_buf.tick_count {
+        if self.last_tick_count == latest_tick {
             tracing::trace!("No new data (same tick count)");
             return None;
         }
 
         // Handle potential tick count reset or wraparound
-        if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
+        if self.last_tick_count > latest_tick && self.last_tick_count != i32::MAX {
             tracing::trace!(
                 "Tick count reset detected: {} -> {}",
                 self.last_tick_count,
-                latest_buf.tick_count
+                latest_tick
             );
         }
 
-        // Double-read pattern to ensure data consistency
+        // Double-read pattern to ensure data consistency: copy the buffer out
+        // of shared memory *between* two volatile reads of its tick count, and
+        // discard the copy if they differ. The copy has to happen between the
+        // two reads - a borrowed slice into shared memory would check nothing,
+        // because the caller reads the bytes after the check, and a concurrent
+        // write from the sim could hand it a torn frame.
         for attempt in 0..2 {
-            let tick_before = latest_buf.tick_count;
-            let data_ptr = unsafe { self.base.as_ptr().add(latest_buf.buf_offset as usize) };
-            let data_slice =
-                unsafe { std::slice::from_raw_parts(data_ptr, header.buf_len as usize) };
-            let tick_after = latest_buf.tick_count;
+            let (tick_ptr, data_ptr, buf_len) = {
+                let header = self.header();
+                let idx = self.find_latest_buffer(header);
+                let buf = &header.var_buf[idx];
+                (
+                    std::ptr::addr_of!(buf.tick_count),
+                    unsafe { self.base.as_ptr().add(buf.buf_offset as usize) as *const u8 },
+                    header.buf_len as usize,
+                )
+            };
+
+            let tick_before = unsafe { std::ptr::read_volatile(tick_ptr) };
+            self.frame_buffer.resize(buf_len, 0);
+            unsafe {
+                std::ptr::copy_nonoverlapping(data_ptr, self.frame_buffer.as_mut_ptr(), buf_len);
+            }
+            let tick_after = unsafe { std::ptr::read_volatile(tick_ptr) };
 
             if tick_before == tick_after {
                 self.last_tick_count = tick_before;
                 tracing::trace!(
                     "Returning new data: tick={}, size={} bytes",
                     tick_before,
-                    data_slice.len()
+                    buf_len
                 );
-                return Some(data_slice);
-            } else {
-                tracing::trace!(
-                    "Data consistency check failed on attempt {}: before={}, after={}",
-                    attempt + 1,
-                    tick_before,
-                    tick_after
-                );
+                return Some(&self.frame_buffer);
             }
+
+            tracing::trace!(
+                "Data consistency check failed on attempt {}: before={}, after={}",
+                attempt + 1,
+                tick_before,
+                tick_after
+            );
         }
 
         tracing::warn!("Failed consistency checks, no data returned");
         None
+    }
+
+    /// Tick count of the frame most recently returned by [`Self::get_new_data`].
+    pub fn last_tick_count(&self) -> i32 {
+        self.last_tick_count
     }
 
     /// Get session info YAML string
@@ -345,6 +382,7 @@ mod tests {
             base: NonNull::dangling(),
             event: HANDLE::default(),
             last_tick_count: i32::MAX,
+            frame_buffer: Vec::new(),
         })
     }
 

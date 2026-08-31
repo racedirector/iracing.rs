@@ -129,10 +129,26 @@ impl LiveProvider {
             // This catches frames that arrived since our last check
             if let Some(data) = self.connection.get_new_data() {
                 let frame_data = data.to_vec();
-                let header = self.connection.header();
-                let latest_buf_idx = self.connection.find_latest_buffer(header);
-                let tick = header.var_buf[latest_buf_idx].tick_count as u32;
-                let session_version = header.session_info_update as u32;
+                // Use the tick of the buffer that was actually copied;
+                // re-deriving the latest buffer here could race a newer frame.
+                let tick = self.connection.last_tick_count() as u32;
+                let session_version = self.connection.header().session_info_update as u32;
+
+                // The schema (variable offsets and frame size) was captured at
+                // connection time. If the sim re-initialized shared memory
+                // since - a session or car change can rewrite the variable
+                // layout and buffer length - decoding this frame against the
+                // stale schema would misread fields or run past the end of
+                // the buffer. End the stream so the caller reconnects and
+                // picks up a fresh schema.
+                if frame_data.len() != self.schema.frame_size {
+                    tracing::warn!(
+                        frame_len = frame_data.len(),
+                        schema_frame_size = self.schema.frame_size,
+                        "Telemetry buffer length no longer matches the connection-time schema; ending stream"
+                    );
+                    return Ok(None);
+                }
 
                 tracing::trace!(
                     "Frame: tick={}, session_version={}, size={}",
