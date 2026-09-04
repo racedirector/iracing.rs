@@ -1,8 +1,8 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use iracing_sdk::{
-    BitField, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, VariableInfo,
-    VariableSchema, VariableType,
+    BitField, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, IncidentFlags,
+    VariableInfo, VariableSchema, VariableType,
 };
 use iracing_sdk_derive::IRacingTelemetryFrame;
 
@@ -156,6 +156,12 @@ struct CriticalBitfieldRow {
     flag: bool,
 }
 
+#[derive(IRacingTelemetryFrame, Debug, PartialEq)]
+struct IncidentRow {
+    #[field_name = "PlayerIncidents"]
+    incidents: IncidentFlags,
+}
+
 #[test]
 fn derive_supports_generic_structs() {
     let schema = Arc::new(make_schema(&[("Speed", VariableType::Float32, 0)], 4));
@@ -257,5 +263,23 @@ fn validate_schema_rejects_incompatible_required_bitfields() {
             assert!(details.contains("Expected BitField, got Int32"));
         }
         other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn incident_flags_validate_and_adapt_from_bitfield_or_int32_storage() {
+    const RAW: u32 = 0x8000_0408;
+
+    for data_type in [VariableType::BitField, VariableType::Int32] {
+        let schema = Arc::new(make_schema(&[("PlayerIncidents", data_type, 0)], 4));
+        let packet = make_packet(Arc::clone(&schema), RAW.to_le_bytes().to_vec());
+
+        let validation = IncidentRow::validate_schema(&schema)
+            .expect("IncidentFlags storage type should validate");
+        let row = IncidentRow::adapt(&packet, &validation);
+
+        assert_eq!(row.incidents.bits(), RAW);
+        assert_eq!(row.incidents.report_bits(), 8);
+        assert_eq!(row.incidents.penalty_bits(), 4);
     }
 }

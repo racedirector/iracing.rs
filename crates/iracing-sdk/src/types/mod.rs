@@ -51,6 +51,7 @@ mod codegen;
 mod dynamic_frame;
 mod frame;
 mod incident;
+mod irsdk;
 mod irsdk_bitflags;
 mod irsdk_enums;
 pub mod irsdk_flags;
@@ -66,19 +67,25 @@ pub use bitfield::{
     session_penalty_shown, session_start_control_shown, session_under_caution,
     session_under_yellow, tick_after_u32,
 };
-pub use broadcast::PitCommand;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub use incident::encode_incident;
 pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
-pub use irsdk_bitflags::{
-    CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
-};
-pub use irsdk_enums::{
-    BroadcastMessage, CameraSwitchFocus, CarLeftRight, ChatCommandMode, FfbCommandMode, PaceMode,
-    PitCommandMode, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, SessionState, StatusField, TelemetryCommandMode, TrackLocation, TrackSurface,
-    TrackWetness, VideoCaptureMode,
+pub use irsdk::{
+    broadcast::{
+        BroadcastMessage, CameraSwitchFocusMode as CameraSwitchFocus, ChatCommandMode,
+        ForceFeedbackCommandMode as FfbCommandMode, PitCommandMode, ReloadTexturesMode,
+        ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode,
+        VideoCaptureMode,
+    },
+    flags::{
+        CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
+        StatusField,
+    },
+    telemetry::{
+        CarLeftRight, PaceMode, PitServiceStatus, SessionState, TrackLocation, TrackSurface,
+        TrackWetness,
+    },
 };
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;
