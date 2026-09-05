@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_by": "scripts/generate_test_fixtures.py",
+  "generated_by": "cargo test-fixtures",
   "layout": {
     "live_header_prefix_size": 112,
     "ibt_header_size": 144,
@@ -31,7 +31,7 @@
         "lap_count": 1,
         "record_count": 12
       },
-      "sha256": "5c329b3e5e2563e3aa99fe8b5f583718c3290ea6c6d8d77df2b5d7755aeeb12c",
+      "sha256": "c0ce28dd236e9f8abbe7b7139201af49aaac321fdec0536c56c6c3f50ca3a5a2",
       "required_variables": [
         {
           "name": "SessionTime",
@@ -113,7 +113,7 @@
         "lap_count": 3,
         "record_count": 24
       },
-      "sha256": "31f832f7fb8dc2c36c40003173fa652fe3177f9a0d5c20baa76332c1e97b26ef",
+      "sha256": "d7e751dd0b08a444a97a53cecead3dc8a450823ae4636598d88a4a133521046e",
       "required_variables": [
         {
           "name": "SessionTime",
@@ -209,7 +209,7 @@
         "lap_count": 8,
         "record_count": 48
       },
-      "sha256": "1d64ef18c5d9fa3c07fa610832df815a1934c5ea1efb4d96d5beeeff69e03171",
+      "sha256": "1eb6b5c6c971b034e0193ad510cb6c93b86643416e7dca9091a433f6812e4d1d",
       "required_variables": [
         {
           "name": "SessionTime",

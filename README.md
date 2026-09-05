@@ -17,6 +17,7 @@ Rust workspace for working with iRacing telemetry and simulation state:
 - [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
 - [`crates/iracing-sdk`](crates/iracing-sdk) — also contains the schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, `live-session-schema`, `live-variable-schema`, …).
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
+- [`crates/test-fixtures`](crates/test-fixtures) — unpublished Rust tooling for deterministic `.ibt` fixture generation, verification, and drift checks.
 
 ## Generated schema artifacts
 
@@ -45,7 +46,7 @@ git clone https://github.com/racedirector/iracing.rs
 cd iracing.rs
 
 # Regenerate and verify deterministic telemetry fixtures when needed
-python3 scripts/check_test_fixtures.py
+cargo test-fixtures
 
 # Build everything
 cargo build --workspace
@@ -64,6 +65,7 @@ Defined in `.cargo/config.toml` for convenience:
 
 | Alias | Command | Purpose |
 | --- | --- | --- |
+| `cargo test-fixtures` | `cargo run -p test-fixtures --` | Generate, verify, and drift-check deterministic fixtures. |
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo ibt-session-parser` | `cargo run -p iracing-sdk --bin ibt-session-parser --` | Extract session YAML from `.ibt`. |
 | `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
@@ -81,14 +83,14 @@ Defined in `.cargo/config.toml` for convenience:
 - **Session parsing**: `SessionInfoParser` caches YAML, so reuse it rather than reparsing on every frame.
 - **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
 - **Schema discovery**: When new fields appear, run the appropriate codegen bin with `--discover` and incorporate the results back into `iracing-sdk` to improve typings.
-- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). Run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
+- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). Run `cargo test-fixtures` after changing fixture profiles.
 
 ## Testing
 
 - `cargo test -p iracing-sdk --doc` and `RUSTDOCFLAGS="-D warnings" cargo doc -p iracing-sdk --no-deps` duplicate the `Docs` CI job (doctests, docs, `cargo check` for examples/bins when run manually).
 - Use crate-specific invocations like `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` to target individual tests.
 - Benchmarks (`criterion`) require enabling the `benchmark` feature on the relevant crate, e.g. `cargo bench -p iracing-sdk --features benchmark`.
-- Integration tests that rely on telemetry fixtures will fail fast with actionable messaging if generated fixtures are missing. Regenerate with `python3 scripts/check_test_fixtures.py`.
+- Integration tests that rely on telemetry fixtures will fail fast with actionable messaging if generated fixtures are missing. Regenerate with `cargo test-fixtures generate`.
 
 ## Release Workflow
 
