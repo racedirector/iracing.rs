@@ -411,4 +411,22 @@ mod tests {
         assert_eq!(offset_of!(Header, _pad), 45);
         assert_eq!(offset_of!(Header, buffers), 48);
     }
+
+    #[test]
+    fn header_wire_round_trip() {
+        let header = valid_live_header();
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).unwrap();
+        let decoded = Header::read_from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.version, header.version);
+        assert_eq!(decoded.status, header.status);
+        assert_eq!(
+            decoded.variable_header_offset,
+            header.variable_header_offset
+        );
+        assert_eq!(
+            decoded.buffers[1].buffer_offset,
+            header.buffers[1].buffer_offset
+        );
+    }
 }

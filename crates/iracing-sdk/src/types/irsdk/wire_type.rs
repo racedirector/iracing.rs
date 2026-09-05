@@ -5,6 +5,8 @@
 //! copy from a byte slice; it does not deserialize individual fields or perform
 //! semantic validation.
 
+use std::io::Write;
+
 use crate::{IRacingSDKError, Result};
 
 /// A fixed-size type that can be copied directly from its iRacing wire representation.
@@ -25,6 +27,8 @@ use crate::{IRacingSDKError, Result};
 ///   requirements, `bool`, `char`, or enums with invalid discriminants.
 /// - Interpreting the SDK's little-endian bytes as the target's native representation
 ///   produces the intended field values.
+/// - Every byte in the representation, including padding, is initialized. Constructors
+///   for wire types must explicitly initialize ABI padding before values are written.
 ///
 /// Violating these requirements can make the safe
 /// [`read_from_bytes`](Self::read_from_bytes) method cause undefined behavior.
@@ -72,5 +76,18 @@ pub unsafe trait WireType: Copy + Sized {
         // SAFETY: The caller guarantees sufficient readable bytes, and the
         // `WireType` contract guarantees that the representation is valid.
         unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>()) }
+    }
+
+    /// Writes this value's exact fixed-size wire representation.
+    ///
+    /// No byte-order conversion is performed. Like decoding, encoding is therefore
+    /// supported only on little-endian targets.
+    fn write_to<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // SAFETY: The `WireType` contract guarantees the complete object
+        // representation is initialized and exactly `WIRE_SIZE` bytes long.
+        let bytes = unsafe {
+            std::slice::from_raw_parts((self as *const Self).cast::<u8>(), Self::WIRE_SIZE)
+        };
+        writer.write_all(bytes)
     }
 }

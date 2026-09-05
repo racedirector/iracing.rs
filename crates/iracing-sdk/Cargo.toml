@@ -202,8 +202,8 @@ path = "src/bin/disk_variable_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
-name = "ibt-headers"
-path = "src/bin/ibt_headers.rs"
+name = "headers"
+path = "src/bin/headers.rs"
 
 [[bin]]
 name = "ibt-session-parser"

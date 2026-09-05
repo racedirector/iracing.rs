@@ -30,8 +30,12 @@
 //! - Frame reading is allocation-minimal except for the returned frame bytes
 //! - Seeking operations are O(1) as they only update internal position counters
 
-use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{IRacingSDKError, Result, SchemaProvider, VariableSchema, yaml_utils};
+use super::format::{IbtHeader, extract_variable_schema};
+use crate::{
+    IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    irsdk::{DiskSubHeader, VariableHeader, WireType},
+    yaml_utils,
+};
 use std::{
     fs::File,
     io::Read,
@@ -44,7 +48,7 @@ pub struct IbtReader {
     current_position: usize,
     path: Option<PathBuf>,
     header: IbtHeader,
-    disk_header: IbtDiskSubHeader,
+    disk_header: DiskSubHeader,
     variable_schema: VariableSchema,
     current_frame: usize,
     total_frames: usize,
@@ -84,7 +88,7 @@ impl IbtReader {
         header.validate()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
-        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut cursor, &header)?;
+        let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
 
         // Extract variable schema
         let variable_schema = extract_variable_schema(&mut cursor, &header)?;
@@ -94,7 +98,7 @@ impl IbtReader {
         // 1. Variable headers are at header.var_header_offset and each is IRSDK_VAR_HEADER_SIZE bytes
         let var_headers_size = header
             .num_vars
-            .checked_mul(IRSDK_VAR_HEADER_SIZE as i32)
+            .checked_mul(VariableHeader::WIRE_SIZE as i32)
             .ok_or_else(|| IRacingSDKError::Parse {
                 context: "Frame data calculation".to_string(),
                 details: "Variable headers size calculation overflowed".to_string(),
@@ -233,7 +237,7 @@ impl IbtReader {
     }
 
     /// Get disk metadata from the disk sub-header
-    pub fn disk_header(&self) -> &IbtDiskSubHeader {
+    pub fn disk_header(&self) -> &DiskSubHeader {
         &self.disk_header
     }
 

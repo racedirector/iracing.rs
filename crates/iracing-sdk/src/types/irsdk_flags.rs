@@ -180,7 +180,7 @@ pub mod track_wetness {
 /// `enum irsdk_IncidentFlags` — packed report/penalty word.
 ///
 /// The low byte holds the report code; the second byte holds the penalty code.
-/// Use [`super::irsdk_bitflags::IncidentFlags`] or the `incident` module for typed access.
+/// Use [`crate::IncidentFlags`] or the `incident` module for typed access.
 pub mod incident {
     /// Mask covering the incident report code (low byte).
     pub const REP_MASK: u32 = 0x0000_00FF;

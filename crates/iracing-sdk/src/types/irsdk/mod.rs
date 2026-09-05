@@ -21,11 +21,12 @@ mod variable_buffer;
 mod variable_header;
 mod wire_type;
 
-// Existing public API
-// pub use disk_sub_header::DiskSubHeader;
-// pub use header::Header;
-// pub use variable_buffer::VariableBuffer;
-// pub use variable_header::VariableHeader;
+// Wire-format API
+pub use disk_sub_header::DiskSubHeader;
+pub use flags::StatusField;
+pub use header::Header;
+pub use variable_buffer::VariableBuffer;
+pub use variable_header::VariableHeader;
 pub use wire_type::WireType;
 
 // SDK definition API
