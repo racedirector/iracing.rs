@@ -8,7 +8,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - `cargo build --workspace` for workspace sanity; release builds defer to cargo-dist.
 - `cargo test --workspace --all-targets` hits every crate; scope with `cargo test -p <crate>` or `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` when debugging.
-- `python scripts/check_test_fixtures.py` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. Use `--no-drift-check` only when intentionally updating fixtures.
+- `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. Use `--no-drift-check` only when intentionally updating fixtures.
 - `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings` are the formatting/lint gates.
 - For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p <crate> --examples --bins`.
 - Codegen binaries require `cargo build -p iracing-sdk --features codegen,schema-discovery` when you need schema outputs.
@@ -21,7 +21,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## Test Data
 
-- Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; run `python3 scripts/check_test_fixtures.py` after changing fixture profiles.
+- Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; run `cargo test-fixtures` after changing fixture profiles.
 - Use helpers from `iracing_sdk::test_utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
 - Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` and the generated schemas it indexes. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use the session and primitive schemas for object shapes and legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
 
@@ -30,6 +30,7 @@ on commands, boundaries, and easy-to-miss constraints.
 - `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
+- `crates/test-fixtures`: unpublished Rust generator, verifier, and drift checker for deterministic `.ibt` fixtures.
 - `crates/iracing-broadcast-grpc-service`: generated cross-platform protobuf/tonic surface plus a Windows-only, layered command-and-observation service.
 - `examples/*`: publish-disabled workspace applications that exercise the crates as downstream users would.
 
