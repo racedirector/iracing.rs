@@ -18,6 +18,7 @@ impl SessionInfoBuffer {
     ///
     /// Construction is crate-private so source readers remain responsible for
     /// bounds checking and exact-read semantics.
+    #[cfg(test)]
     pub(crate) fn from_snapshot(bytes: Vec<u8>) -> Self {
         // ???: Should we do the nul check here?
         Self { bytes }
@@ -51,17 +52,8 @@ impl From<SessionInfoBuffer> for String {
 mod tests {
     use super::*;
 
-    fn enable_trace_logging() {
-        let _ = tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::TRACE)
-            .with_test_writer()
-            .try_init();
-    }
-
     #[test]
     fn test_session_info_buffer_with_null_terminator() {
-        enable_trace_logging();
-
         let bytes = b"SessionInfo:\n  TrackName: test\0padding".to_vec();
         let buffer = SessionInfoBuffer::from_snapshot(bytes);
 
@@ -71,8 +63,6 @@ mod tests {
 
     #[test]
     fn test_session_info_buffer_without_null_terminator() {
-        enable_trace_logging();
-
         let bytes = b"SessionInfo:\n  TrackName: test".to_vec();
         let buffer = SessionInfoBuffer::from_snapshot(bytes);
 
@@ -82,8 +72,6 @@ mod tests {
 
     #[test]
     fn test_decode_yaml_from_utf8_with_special_characters() {
-        enable_trace_logging();
-
         let input = "DriverInfo:\n  UserName: \"José 🚗\"\n  CarScreenName: \"Mazda MX-5 – Cup\"";
         let bytes = input.as_bytes().to_vec();
         let buffer = SessionInfoBuffer::from_snapshot(bytes);
@@ -94,8 +82,6 @@ mod tests {
 
     #[test]
     fn test_decode_yaml_from_iso_8859_1() {
-        enable_trace_logging();
-
         let bytes = [
             b'D', b'r', b'i', b'v', b'e', b'r', b'I', b'n', b'f', b'o', b':', b'\n', b' ', b' ',
             b'U', b's', b'e', b'r', b'N', b'a', b'm', b'e', b':', b' ', b'"', b'J', b'o', b's',

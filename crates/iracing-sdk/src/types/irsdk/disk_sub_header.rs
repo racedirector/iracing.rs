@@ -24,6 +24,23 @@ pub struct DiskSubHeader {
 }
 
 impl DiskSubHeader {
+    /// Constructs disk metadata for an IBT recording.
+    pub const fn new(
+        start_date: i64,
+        start_time: f64,
+        end_time: f64,
+        lap_count: i32,
+        record_count: i32,
+    ) -> Self {
+        Self {
+            start_date,
+            start_time,
+            end_time,
+            lap_count,
+            record_count,
+        }
+    }
+
     /// Attempts to read a buffer of `Self::WIRE_SIZE` from the reader and uses
     /// `WireType::read_from_bytes` to construct `DiskSubHeader`.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
@@ -57,5 +74,18 @@ mod tests {
         assert_eq!(offset_of!(DiskSubHeader, end_time), 16);
         assert_eq!(offset_of!(DiskSubHeader, lap_count), 24);
         assert_eq!(offset_of!(DiskSubHeader, record_count), 28);
+    }
+
+    #[test]
+    fn disk_sub_header_wire_round_trip() {
+        let header = DiskSubHeader::new(123, 1.5, 2.5, 3, 4);
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).unwrap();
+        let decoded = DiskSubHeader::read_from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.start_date, 123);
+        assert_eq!(decoded.start_time, 1.5);
+        assert_eq!(decoded.end_time, 2.5);
+        assert_eq!(decoded.lap_count, 3);
+        assert_eq!(decoded.record_count, 4);
     }
 }

@@ -127,6 +127,9 @@ sdk_bitmask! {
 }
 
 impl SessionFlags {
+    /// Backward-compatible spelling of the SDK's `irsdk_servicible` flag.
+    pub const SERVICIBLE: Self = Self::SERVICE_ALLOWED;
+
     /// Bitfield representing penalty flags
     pub const PENALTY_FLAGS: Self = Self::BLACK
         .union(Self::DISQUALIFY)

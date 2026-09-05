@@ -46,4 +46,15 @@ mod tests {
         assert_eq!(offset_of!(VariableBuffer, tick_count_begin), 8);
         assert_eq!(offset_of!(VariableBuffer, _pad), 12);
     }
+
+    #[test]
+    fn variable_buffer_wire_round_trip() {
+        let buffer = VariableBuffer::new(10, 20, 9);
+        let mut bytes = Vec::new();
+        buffer.write_to(&mut bytes).unwrap();
+        let decoded = VariableBuffer::read_from_bytes(&bytes).unwrap();
+        assert_eq!(decoded.tick_count, 10);
+        assert_eq!(decoded.buffer_offset, 20);
+        assert_eq!(decoded.tick_count_begin, 9);
+    }
 }

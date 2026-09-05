@@ -20,18 +20,13 @@
 //! - Minimal memory allocations during header parsing
 //! - O(1) schema validation after parsing
 
-use crate::{IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType};
+use crate::{
+    IRacingSDKError, Result, VariableInfo, VariableSchema, VariableType,
+    irsdk::constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING},
+    irsdk::{DiskSubHeader, Header, VariableHeader, WireType},
+};
 use std::collections::HashMap;
-use std::io::{Read, Seek, SeekFrom};
-
-// Size constants for IBT format structures
-const IRSDK_HEADER_SIZE: usize = 144;
-const IRSDK_DISK_SUBHEADER_SIZE: usize = 32;
-/// Size in bytes of a single variable header entry (`irsdk_varHeader`).
-pub const IRSDK_VAR_HEADER_SIZE: usize = 144;
-const IRSDK_VAR_NAME_SIZE: usize = 32;
-const IRSDK_VAR_DESC_SIZE: usize = 64;
-const IRSDK_VAR_UNIT_SIZE: usize = 32;
+use std::io::{Read, Seek};
 
 fn header_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Header validation", details)
@@ -62,38 +57,19 @@ pub struct IbtHeader {
     pub buf_len: i32,
 }
 
-/// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
-///
-/// Stored just before the variable header array (at
-/// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
-/// metadata specific to `.ibt` replay files.
-#[derive(Debug, Clone)]
-pub struct IbtDiskSubHeader {
-    /// Unix timestamp (`time_t`) of the session start date.
-    pub start_date: i64,
-    /// Session start time in seconds since session midnight.
-    pub start_time: f64,
-    /// Session end time in seconds since session midnight.
-    pub end_time: f64,
-    /// Number of laps completed during the recorded session.
-    pub lap_count: i32,
-    /// Total number of telemetry frames (records) in the file.
-    pub record_count: i32,
-}
-
 impl IbtHeader {
     /// Size of the irsdk_header structure in bytes
-    pub const HEADER_SIZE: usize = IRSDK_HEADER_SIZE;
+    pub const HEADER_SIZE: usize = Header::WIRE_SIZE;
 
     /// Parses an [`IbtHeader`] from the current position of `reader`.
     pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        tracing::trace!("Reading IBT header ({} bytes)", IRSDK_HEADER_SIZE);
-        let mut header_data = [0u8; IRSDK_HEADER_SIZE];
+        tracing::trace!("Reading IBT header ({} bytes)", Self::HEADER_SIZE);
+        let mut header_data = [0u8; Self::HEADER_SIZE];
         reader
             .read_exact(&mut header_data)
             .map_err(|e| IRacingSDKError::Parse {
                 context: "IBT header reading".to_string(),
-                details: format!("Failed to read {} header bytes: {}", IRSDK_HEADER_SIZE, e),
+                details: format!("Failed to read {} header bytes: {}", Self::HEADER_SIZE, e),
             })?;
 
         // Parse header fields according to irsdk_header structure (little-endian format)
@@ -210,72 +186,6 @@ impl IbtHeader {
     }
 }
 
-impl IbtDiskSubHeader {
-    /// Size of the disk sub-header structure in bytes
-    pub const DISK_HEADER_SIZE: usize = IRSDK_DISK_SUBHEADER_SIZE;
-
-    /// Parses an [`IbtDiskSubHeader`] from the current position of `reader`.
-    pub fn parse_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        let mut disk_header_data = [0u8; IRSDK_DISK_SUBHEADER_SIZE];
-        reader
-            .read_exact(&mut disk_header_data)
-            .map_err(|e| IRacingSDKError::Parse {
-                context: "IBT disk sub-header reading".to_string(),
-                details: format!(
-                    "Failed to read {} disk sub-header bytes: {}",
-                    IRSDK_DISK_SUBHEADER_SIZE, e
-                ),
-            })?;
-
-        // Parse disk sub-header fields (little-endian format)
-        let start_date = parse_i64_le(&disk_header_data, 0)?;
-        let start_time = parse_f64_le(&disk_header_data, 8)?;
-        let end_time = parse_f64_le(&disk_header_data, 16)?;
-        let lap_count = parse_i32_le(&disk_header_data, 24)?;
-        let record_count = parse_i32_le(&disk_header_data, 28)?;
-
-        Ok(Self {
-            start_date,
-            start_time,
-            end_time,
-            lap_count,
-            record_count,
-        })
-    }
-
-    /// Parses an [`IbtDiskSubHeader`] using the offset implied by `header`.
-    ///
-    /// IBT files place the disk sub-header immediately before the variable headers.
-    pub fn parse_from_reader_with_header<R: Read + Seek>(
-        reader: &mut R,
-        header: &IbtHeader,
-    ) -> Result<Self> {
-        let disk_header_offset = header
-            .var_header_offset
-            .checked_sub(Self::DISK_HEADER_SIZE as i32)
-            .ok_or_else(|| IRacingSDKError::Parse {
-                context: "IBT disk sub-header seek".to_string(),
-                details: format!(
-                    "Disk sub-header offset underflow (var_header_offset={}, disk_header_size={})",
-                    header.var_header_offset,
-                    Self::DISK_HEADER_SIZE
-                ),
-            })?;
-
-        reader
-            .seek(SeekFrom::Start(disk_header_offset as u64))
-            .map_err(|e| IRacingSDKError::Parse {
-                context: "IBT disk sub-header seek".to_string(),
-                details: format!(
-                    "Failed to seek to disk sub-header at offset {}: {}",
-                    disk_header_offset, e
-                ),
-            })?;
-
-        Self::parse_from_reader(reader)
-    }
-}
-
 /// Extract variable schema from IBT file headers
 pub fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
@@ -316,7 +226,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
 
     // Parse each variable header
     for i in 0..num_vars_usize {
-        let mut var_header_bytes = [0u8; IRSDK_VAR_HEADER_SIZE];
+        let mut var_header_bytes = [0u8; VariableHeader::WIRE_SIZE];
         reader
             .read_exact(&mut var_header_bytes)
             .map_err(|e| IRacingSDKError::Parse {
@@ -330,10 +240,9 @@ pub fn extract_variable_schema<R: Read + Seek>(
         let count = parse_i32_le(&var_header_bytes, 8)?;
 
         // Extract null-terminated strings using constants for offsets
-        let name = extract_null_terminated_string(&var_header_bytes[16..16 + IRSDK_VAR_NAME_SIZE]);
-        let desc = extract_null_terminated_string(&var_header_bytes[48..48 + IRSDK_VAR_DESC_SIZE]);
-        let unit =
-            extract_null_terminated_string(&var_header_bytes[112..112 + IRSDK_VAR_UNIT_SIZE]);
+        let name = extract_null_terminated_string(&var_header_bytes[16..16 + IRSDK_MAX_STRING]);
+        let desc = extract_null_terminated_string(&var_header_bytes[48..48 + IRSDK_MAX_DESC]);
+        let unit = extract_null_terminated_string(&var_header_bytes[112..112 + IRSDK_MAX_STRING]);
         let count_as_time = var_header_bytes[12] != 0;
 
         // Skip empty or invalid variables
@@ -384,9 +293,9 @@ pub fn extract_variable_schema<R: Read + Seek>(
 
 /// Verify that the IBT file length is at least large enough to contain headers and all records
 /// This is a conservative lower bound based on header values; it does not validate exact layout
-pub fn verify_min_length(file_len: u64, header: &IbtHeader, disk: &IbtDiskSubHeader) -> Result<()> {
+pub fn verify_min_length(file_len: u64, header: &IbtHeader, disk: &DiskSubHeader) -> Result<()> {
     // Basic lower bound: var headers + frames
-    let var_headers_len = (header.num_vars as u64).saturating_mul(IRSDK_VAR_HEADER_SIZE as u64);
+    let var_headers_len = (header.num_vars as u64).saturating_mul(VariableHeader::WIRE_SIZE as u64);
     let frames_len = (disk.record_count as u64).saturating_mul(header.buf_len as u64);
     // Start position is var_header_offset; add var headers and frames
     let min_end = (header.var_header_offset as u64)
@@ -422,52 +331,6 @@ fn parse_i32_le(data: &[u8], offset: usize) -> Result<i32> {
         data[offset + 1],
         data[offset + 2],
         data[offset + 3],
-    ]))
-}
-
-fn parse_i64_le(data: &[u8], offset: usize) -> Result<i64> {
-    if offset + 8 > data.len() {
-        return Err(IRacingSDKError::Parse {
-            context: "Long integer parsing".to_string(),
-            details: format!(
-                "Insufficient data for i64 at offset {} (need 8 bytes, have {})",
-                offset,
-                data.len() - offset
-            ),
-        });
-    }
-    Ok(i64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
-    ]))
-}
-
-fn parse_f64_le(data: &[u8], offset: usize) -> Result<f64> {
-    if offset + 8 > data.len() {
-        return Err(IRacingSDKError::Parse {
-            context: "Double precision float parsing".to_string(),
-            details: format!(
-                "Insufficient data for f64 at offset {} (need 8 bytes, have {})",
-                offset,
-                data.len() - offset
-            ),
-        });
-    }
-    Ok(f64::from_le_bytes([
-        data[offset],
-        data[offset + 1],
-        data[offset + 2],
-        data[offset + 3],
-        data[offset + 4],
-        data[offset + 5],
-        data[offset + 6],
-        data[offset + 7],
     ]))
 }
 
@@ -513,15 +376,16 @@ mod tests {
         assert_eq!(actual.units, expected.units);
     }
 
-    fn parse_fixture(
-        fixture: &IbtFixture,
-    ) -> Result<(IbtHeader, IbtDiskSubHeader, VariableSchema)> {
+    fn parse_fixture(fixture: &IbtFixture) -> Result<(IbtHeader, DiskSubHeader, VariableSchema)> {
         let file_path = fixture.fixture_path()?;
         let mut reader = open_buf_reader(&file_path)?;
+
         let header = IbtHeader::parse_from_reader(&mut reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
+
+        let disk_header = DiskSubHeader::try_from_reader(&mut reader)
             .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
+
         let schema = extract_variable_schema(&mut reader, &header)
             .with_context(|| format!("Extracting variable schema from {}", file_path.display()))?;
         Ok((header, disk_header, schema))
@@ -530,13 +394,22 @@ mod tests {
     #[test]
     fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         let manifest = load_fixture_manifest()?;
-        assert_eq!(manifest.layout.live_header_prefix_size, 112);
-        assert_eq!(manifest.layout.ibt_header_size, IbtHeader::HEADER_SIZE);
+        assert_eq!(
+            manifest.layout.live_header_prefix_size,
+            IbtHeader::HEADER_SIZE
+        );
+        assert_eq!(
+            manifest.layout.ibt_header_size,
+            IbtHeader::HEADER_SIZE + DiskSubHeader::WIRE_SIZE
+        );
         assert_eq!(
             manifest.layout.disk_sub_header_size,
-            IbtDiskSubHeader::DISK_HEADER_SIZE
+            DiskSubHeader::WIRE_SIZE
         );
-        assert_eq!(manifest.layout.variable_header_size, IRSDK_VAR_HEADER_SIZE);
+        assert_eq!(
+            manifest.layout.variable_header_size,
+            VariableHeader::WIRE_SIZE
+        );
 
         for fixture in &manifest.fixtures {
             let (header, disk_header, _) = parse_fixture(fixture)?;
@@ -555,7 +428,7 @@ mod tests {
 
             assert_eq!(
                 fixture.disk_sub_header_offset,
-                header.var_header_offset - IbtDiskSubHeader::DISK_HEADER_SIZE as i32
+                header.var_header_offset - DiskSubHeader::WIRE_SIZE as i32
             );
             assert_eq!(disk_header.start_date, fixture.disk_header.start_date);
             assert!((disk_header.start_time - fixture.disk_header.start_time).abs() < f64::EPSILON);
@@ -691,8 +564,10 @@ mod tests {
         let mut reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut reader)
             .with_context(|| format!("Parsing header from {}", file_path.display()))?;
-        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)
+
+        let disk = DiskSubHeader::try_from_reader(&mut reader)
             .with_context(|| format!("Parsing disk sub-header from {}", file_path.display()))?;
+
         super::verify_min_length(file_len, &header, &disk)?;
         Ok(())
     }
@@ -702,7 +577,7 @@ mod tests {
         let file_path = require_smallest_ibt_fixture()?;
         let mut reader = open_buf_reader(&file_path)?;
         let header = IbtHeader::parse_from_reader(&mut reader)?;
-        let disk = IbtDiskSubHeader::parse_from_reader_with_header(&mut reader, &header)?;
+        let disk = DiskSubHeader::try_from_reader(&mut reader)?;
         let result = super::verify_min_length(0, &header, &disk);
         assert!(result.is_err());
         Ok(())
