@@ -6,6 +6,8 @@
 //! corresponding methods on each bitmask test for any matching bit, while
 //! `has_all` tests for every bit in a mask.
 
+use crate::{BitField, IRacingSDKError, VarData, VariableInfo, VariableType};
+
 use super::macros::sdk_bitmask;
 use type_layout::TypeLayout;
 
@@ -415,15 +417,14 @@ impl From<IncidentFlags> for crate::BitField {
     }
 }
 
-impl crate::VarData for IncidentFlags {
-    fn from_bytes(data: &[u8], info: &crate::VariableInfo) -> crate::Result<Self> {
+impl VarData for IncidentFlags {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         match info.data_type {
-            crate::VariableType::BitField => {
-                <crate::BitField as crate::VarData>::from_bytes(data, info).map(Self::from)
+            VariableType::BitField => <BitField as VarData>::from_bytes(data, info).map(Self::from),
+            VariableType::Int32 => {
+                <i32 as VarData>::from_bytes(data, info).map(|value| Self::from(value as u32))
             }
-            crate::VariableType::Int32 => <i32 as crate::VarData>::from_bytes(data, info)
-                .map(|value| Self::from(value as u32)),
-            actual => Err(crate::IRacingSDKError::type_conversion(
+            actual => Err(IRacingSDKError::type_conversion(
                 "BitField or Int32",
                 actual,
             )),
