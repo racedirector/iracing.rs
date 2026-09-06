@@ -1,4 +1,6 @@
 [alias]
+test-fixtures = ["run", "-p", "test-fixtures", "--"]
+
 broadcast-cli = ["run", "-p", "iracing-sdk", "--bin", "broadcast-cli", "--"]
 
 broadcast-grpc-server = [
@@ -52,7 +54,7 @@ disk-variable-schema = [
   "--",
 ]
 
-ibt-headers = ["run", "-p", "iracing-sdk", "--bin", "ibt-headers", "--"]
+headers = ["run", "-p", "iracing-sdk", "--bin", "headers", "--"]
 
 ibt-session-parser = [
   "run",

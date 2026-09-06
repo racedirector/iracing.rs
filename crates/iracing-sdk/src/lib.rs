@@ -21,7 +21,7 @@
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`
-//!   - [`PitCommand`] is cross-platform typed data for pit-service broadcast commands.
+//!   - Typed broadcast command data remains available independently of the Win32 transport.
 //!
 //! # Quick start
 //!
@@ -59,6 +59,7 @@
 //!
 pub mod adapters;
 mod error;
+mod parse_utils;
 pub mod test_utils;
 pub mod types;
 pub mod yaml_utils;
