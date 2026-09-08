@@ -15,8 +15,6 @@ pub mod variable_type;
 mod disk_sub_header;
 mod error;
 mod header;
-mod iracing_session_string;
-mod session_info_buffer;
 mod variable_buffer;
 mod variable_header;
 mod wire_type;

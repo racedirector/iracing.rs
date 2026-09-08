@@ -14,6 +14,12 @@ pub struct SessionInfoBuffer {
 }
 
 impl SessionInfoBuffer {
+    pub(crate) fn from_checked_region(bytes: &[u8]) -> Self {
+        Self {
+            bytes: bytes.to_vec(),
+        }
+    }
+
     /// Wraps bytes after a reader has copied an advertised region in full.
     ///
     /// Construction is crate-private so source readers remain responsible for

@@ -9,25 +9,6 @@ use super::{
     wire_type::WireType,
 };
 
-/// Exact, owned snapshot of a variable-header region advertised by an SDK header.
-///
-/// Construction is restricted to crate-internal source adapters after they have
-/// checked the advertised region and copied or read it in full. Semantic
-/// validation of individual headers belongs to later wire-to-domain conversion.
-#[derive(Debug, Clone)]
-pub struct VariableHeadersBuffer {
-    bytes: Vec<u8>,
-}
-
-impl VariableHeadersBuffer {
-    /// Iterates over the wire headers represented by this exact snapshot.
-    pub fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
-        self.bytes
-            .chunks_exact(VariableHeader::WIRE_SIZE)
-            .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })
-    }
-}
-
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
 #[derive(Debug, Clone, Copy, TypeLayout)]
@@ -159,12 +140,6 @@ fn fixed_ascii<const N: usize>(field: &'static str, value: &str) -> Result<[u8; 
 }
 
 unsafe impl WireType for VariableHeader {}
-
-impl From<VariableHeadersBuffer> for Vec<VariableHeader> {
-    fn from(buffer: VariableHeadersBuffer) -> Self {
-        buffer.iter_headers().collect()
-    }
-}
 
 #[cfg(test)]
 mod tests {

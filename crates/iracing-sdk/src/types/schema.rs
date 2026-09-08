@@ -10,7 +10,7 @@ use crate::{
     types::irsdk::VariableType as IRSDKVariableType,
 };
 
-use super::VariableType;
+use super::{VariableType, variable_headers_buffer::VariableHeadersBuffer};
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -99,6 +99,14 @@ pub struct VariableSchema {
 }
 
 impl VariableSchema {
+    /// Returns an empty schema.
+    pub fn empty() -> Self {
+        Self {
+            variables: HashMap::new(),
+            frame_size: 0,
+        }
+    }
+
     /// Create a new VariableSchema with validation.
     pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> crate::Result<Self> {
         let schema = Self {
@@ -107,6 +115,18 @@ impl VariableSchema {
         };
         schema.validate()?;
         Ok(schema)
+    }
+
+    /// Constructs a schema from an exact snapshot of SDK variable headers.
+    pub fn from_headers(headers: &VariableHeadersBuffer, frame_size: usize) -> crate::Result<Self> {
+        let mut variables = HashMap::with_capacity(headers.iter_headers().len());
+
+        for header in headers.iter_headers() {
+            let variable = VariableInfo::try_from(header)?;
+            variables.insert(variable.name.clone(), variable);
+        }
+
+        Self::new(variables, frame_size)
     }
 
     /// Validate the schema for consistency.
@@ -201,6 +221,7 @@ pub trait SchemaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{irsdk::WireType, types::irsdk::VariableType as IRSDKVariableType};
 
     struct TestProvider {
         schema: VariableSchema,
@@ -231,5 +252,29 @@ mod tests {
         assert!(!provider.has_variable("InvalidField"));
         assert!(provider.variable("Speed").is_some());
         assert_eq!(provider.variable_names(), vec!["Speed".to_string()]);
+    }
+
+    #[test]
+    fn constructs_schema_from_variable_headers_buffer() {
+        let header = VariableHeader::new(
+            IRSDKVariableType::Float,
+            4,
+            1,
+            false,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+        let mut bytes = Vec::new();
+        header.write_to(&mut bytes).unwrap();
+        let headers = VariableHeadersBuffer::from_checked_region(&bytes);
+
+        let schema = VariableSchema::from_headers(&headers, 8).unwrap();
+
+        let speed = schema.get_variable("Speed").unwrap();
+        assert_eq!(speed.offset, 4);
+        assert_eq!(speed.count, 1);
+        assert_eq!(schema.frame_size, 8);
     }
 }

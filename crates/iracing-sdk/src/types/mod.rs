@@ -49,10 +49,14 @@ mod bitfield;
 mod codegen;
 mod dynamic_frame;
 mod frame;
+mod iracing_session_string;
 pub mod irsdk;
+mod regions;
 mod schema;
+mod session_info_buffer;
 mod update_rate;
 mod var_data;
+mod variable_headers_buffer;
 mod variable_type;
 
 // Re-export all public types
@@ -81,9 +85,11 @@ pub use irsdk::{
         TrackWetness,
     },
 };
+pub use regions::VariableHeaderRegion;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
+pub use variable_headers_buffer::VariableHeadersBuffer;
 pub use variable_type::{TelemetryValue, TelemetryValueProvider, VariableType};
 
 #[cfg(test)]
