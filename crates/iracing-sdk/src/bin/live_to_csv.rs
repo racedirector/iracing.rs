@@ -65,7 +65,7 @@ async fn run() -> Result<()> {
     }
 
     // Sort the variables for extraction by the offset of each variable info
-    let mut variables = connection.get_variables();
+    let mut variables = connection.get_variables()?;
     if variables.is_empty() {
         return Err(anyhow!(
             "No telemetry variables were available from the live connection"

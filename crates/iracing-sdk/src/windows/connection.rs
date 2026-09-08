@@ -3,9 +3,15 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::schema::header::IRSDKHeader;
-use crate::schema::variables::IRSDKVarHeader;
-use crate::{IRacingSDKError, Result, yaml_utils};
+use crate::{
+    IRacingSDKError, Result, VariableInfo,
+    types::irsdk::{
+        Header, VariableHeader,
+        constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
+    },
+    windows::wide_string,
+    yaml_utils,
+};
 use std::ptr::NonNull;
 use std::time::Duration;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
@@ -16,16 +22,6 @@ use windows::Win32::System::Threading::{
     OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject,
 };
 use windows::core::PCWSTR;
-
-/// iRacing shared memory file name
-const IRSDK_MEMMAPFILENAME: &str = "Local\\IRSDKMemMapFileName";
-/// iRacing data valid event name
-const IRSDK_DATAVALIDEVENTNAME: &str = "Local\\IRSDKDataValidEvent";
-/// Expected SDK version
-#[cfg(test)]
-const IRSDK_VER: i32 = 2;
-/// Connection status flag
-const IRSDK_ST_CONNECTED: i32 = 1;
 
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,7 +72,7 @@ impl Connection {
 
         // Open the memory mapping
         let mapping = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_MEMMAPFILENAME);
+            let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
             OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
                 .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
         };
@@ -92,7 +88,7 @@ impl Connection {
 
         // Open the data valid event
         let event = unsafe {
-            let wide_name = crate::windows::wide_string(IRSDK_DATAVALIDEVENTNAME);
+            let wide_name = wide_string(IRSDK_DATAVALIDEVENTNAME);
             OpenEventW(
                 SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000),
                 false,
@@ -120,14 +116,13 @@ impl Connection {
     }
 
     /// Get direct access to the header
-    pub fn header(&self) -> &IRSDKHeader {
-        unsafe { &*(self.base.as_ptr() as *const IRSDKHeader) }
+    pub fn header(&self) -> &Header {
+        unsafe { &*(self.base.as_ptr() as *const Header) }
     }
 
     /// Check if iRacing is connected
     pub fn is_connected(&self) -> bool {
-        let header = self.header();
-        header.status & IRSDK_ST_CONNECTED != 0
+        self.header().status.is_connected()
     }
 
     /// Wait for new telemetry data (synchronous - blocks thread)
@@ -181,7 +176,7 @@ impl Connection {
 
         // Find the buffer with the highest tick count (most recent)
         let latest_buf_idx = self.find_latest_buffer(header);
-        let latest_buf = &header.var_buf[latest_buf_idx];
+        let latest_buf = &header.buffers[latest_buf_idx];
 
         tracing::trace!(
             "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
@@ -208,9 +203,9 @@ impl Connection {
         // Double-read pattern to ensure data consistency
         for attempt in 0..2 {
             let tick_before = latest_buf.tick_count;
-            let data_ptr = unsafe { self.base.as_ptr().add(latest_buf.buf_offset as usize) };
+            let data_ptr = unsafe { self.base.as_ptr().add(latest_buf.buffer_offset as usize) };
             let data_slice =
-                unsafe { std::slice::from_raw_parts(data_ptr, header.buf_len as usize) };
+                unsafe { std::slice::from_raw_parts(data_ptr, header.buffer_length as usize) };
             let tick_after = latest_buf.tick_count;
 
             if tick_before == tick_after {
@@ -261,30 +256,33 @@ impl Connection {
     }
 
     /// Get all variable definitions from the header
-    pub fn get_variables(&self) -> Vec<crate::VariableInfo> {
+    pub fn get_variables(&self) -> Result<Vec<VariableInfo>> {
         let header = self.header();
-        if header.num_vars <= 0 || header.var_header_offset <= 0 {
-            return Vec::new();
+        if header.variable_count <= 0 || header.variable_header_offset <= 0 {
+            return Ok(Vec::new());
         }
 
         let mut variables = Vec::new();
 
         unsafe {
-            let var_header_ptr = self.base.as_ptr().add(header.var_header_offset as usize);
+            let var_header_ptr = self
+                .base
+                .as_ptr()
+                .add(header.variable_header_offset as usize);
 
-            for i in 0..header.num_vars {
+            for i in 0..header.variable_count {
                 let var_ptr =
-                    var_header_ptr.add(i as usize * std::mem::size_of::<IRSDKVarHeader>());
-                let var_header = &*(var_ptr as *const IRSDKVarHeader);
+                    var_header_ptr.add(i as usize * std::mem::size_of::<VariableHeader>());
+                let var_header = &*(var_ptr as *const VariableHeader);
 
                 // Convert to our VariableInfo format
-                let var_info = var_header.to_variable_info();
+                let var_info = VariableInfo::try_from(var_header)?;
 
                 variables.push(var_info);
             }
         }
 
-        variables
+        Ok(variables)
     }
 
     /// Validate initial connection
@@ -293,9 +291,9 @@ impl Connection {
         header.validate()?;
 
         tracing::debug!(
-            ver = header.ver,
-            num_vars = header.num_vars,
-            num_buf = header.num_buf,
+            ver = header.version,
+            num_vars = header.variable_count,
+            num_buf = header.buffer_count,
             "Validated iRacing header"
         );
 
@@ -303,11 +301,11 @@ impl Connection {
     }
 
     /// Find the buffer with the highest tick count
-    pub fn find_latest_buffer(&self, header: &IRSDKHeader) -> usize {
+    pub fn find_latest_buffer(&self, header: &Header) -> usize {
         let mut latest = 0;
-        let num_buf = std::cmp::min(header.num_buf, 4) as usize;
+        let num_buf = std::cmp::min(header.buffer_count, 4) as usize;
         for i in 1..num_buf {
-            if header.var_buf[latest].tick_count < header.var_buf[i].tick_count {
+            if header.buffers[latest].tick_count < header.buffers[i].tick_count {
                 latest = i;
             }
         }
@@ -336,7 +334,7 @@ unsafe impl Sync for Connection {}
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
-    use crate::schema::header::IRSDKVarBuf;
+    use crate::{StatusField, VariableBuffer, types::irsdk::constants::IRSDK_VER};
     use std::mem::ManuallyDrop;
 
     fn test_connection() -> ManuallyDrop<Connection> {
@@ -348,61 +346,27 @@ mod tests {
         })
     }
 
-    fn test_header(num_buf: i32) -> IRSDKHeader {
-        IRSDKHeader {
-            ver: IRSDK_VER,
-            status: IRSDK_ST_CONNECTED,
-            tick_rate: 60,
-            session_info_update: 0,
-            session_info_len: 0,
-            session_info_offset: 0,
-            num_vars: 1,
-            var_header_offset: 112,
+    fn test_header(num_buf: i32) -> Header {
+        Header::new(
+            IRSDK_VER,
+            StatusField::CONNECTED,
+            60,
+            0,
+            0,
+            0,
+            1,
+            112,
             num_buf,
-            buf_len: 4,
-            pad1: [0; 2],
-            var_buf: [
-                IRSDKVarBuf {
-                    tick_count: 1,
-                    buf_offset: 256,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 4,
-                    buf_offset: 260,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 3,
-                    buf_offset: 264,
-                    pad: [0; 2],
-                },
-                IRSDKVarBuf {
-                    tick_count: 2,
-                    buf_offset: 268,
-                    pad: [0; 2],
-                },
+            4,
+            4,
+            2,
+            [
+                VariableBuffer::new(1, 256, 1),
+                VariableBuffer::new(4, 260, 4),
+                VariableBuffer::new(3, 264, 3),
+                VariableBuffer::new(2, 268, 2),
             ],
-        }
-    }
-
-    #[test]
-    fn constants_match_iracing_sdk() {
-        assert_eq!(IRSDK_MEMMAPFILENAME, "Local\\IRSDKMemMapFileName");
-        assert_eq!(IRSDK_DATAVALIDEVENTNAME, "Local\\IRSDKDataValidEvent");
-        assert_eq!(IRSDK_VER, 2);
-        assert_eq!(IRSDK_ST_CONNECTED, 1);
-    }
-
-    #[test]
-    fn header_struct_layout() {
-        // Verify the header struct matches expected C layout
-        assert_eq!(std::mem::size_of::<IRSDKHeader>(), 112); // Expected size
-        assert_eq!(std::mem::align_of::<IRSDKHeader>(), 4);
-
-        // Check VarBuf size and alignment
-        assert_eq!(std::mem::size_of::<IRSDKVarBuf>(), 16);
-        assert_eq!(std::mem::align_of::<IRSDKVarBuf>(), 4);
+        )
     }
 
     #[test]
@@ -428,7 +392,9 @@ mod tests {
     #[ignore = "iracing_required"]
     fn test_read_rpm_variable() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
-        let variables = connection.get_variables();
+        let variables = connection
+            .get_variables()
+            .expect("Could not get variables from connection");
 
         // Look for exact "RPM" match to verify variable schema
         let exact_rpm = variables.iter().find(|v| v.name == "RPM");
@@ -448,16 +414,16 @@ mod tests {
 
         // Validate header structure sizes match expected C SDK layout
         assert_eq!(
-            std::mem::size_of::<IRSDKHeader>(),
+            std::mem::size_of::<Header>(),
             112,
             "Header size must match C SDK"
         );
         assert!(header.tick_rate > 0, "Tick rate should be positive");
 
-        assert_eq!(header.ver, IRSDK_VER);
-        assert!(header.num_vars > 0);
-        assert!(header.num_buf >= 3);
-        assert!(header.buf_len > 0);
+        assert_eq!(header.version, IRSDK_VER);
+        assert!(header.variable_count > 0);
+        assert!(header.buffer_count >= 3);
+        assert!(header.buffer_length > 0);
     }
 
     #[test]

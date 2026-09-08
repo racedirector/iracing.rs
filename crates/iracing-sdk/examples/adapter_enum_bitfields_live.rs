@@ -72,10 +72,14 @@ impl FrameAdapter for TelemetryRow {
         let engine_warnings_raw = fetch_bitfield("EngineWarnings");
 
         Self {
-            session_state: iracing_sdk::SessionState::from_raw(session_state_raw),
-            session_flags: iracing_sdk::SessionFlags::from(session_flags_raw),
-            track_surface: iracing_sdk::TrackSurface::from_raw(track_surface_raw),
-            engine_warnings: iracing_sdk::EngineWarnings::from(engine_warnings_raw),
+            session_state: iracing_sdk::SessionState::try_from(session_state_raw)
+                .unwrap_or_default(),
+            session_flags: iracing_sdk::SessionFlags::try_from(session_flags_raw)
+                .unwrap_or_default(),
+            track_surface: iracing_sdk::TrackSurface::try_from(track_surface_raw)
+                .unwrap_or_default(),
+            engine_warnings: iracing_sdk::EngineWarnings::try_from(engine_warnings_raw)
+                .unwrap_or_default(),
         }
     }
 }

@@ -44,9 +44,9 @@
 
 use crate::{
     BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, FfbCommandMode,
-    IRacingSDKError, PitCommand, PitCommandMode, ReloadTexturesMode, ReplayPositionMode,
-    ReplaySearchMode, ReplayStateMode, Result, TelemetryCommandMode, VideoCaptureMode,
-    windows::utils::pad_car_number,
+    IRacingSDKError, PitCommandMode, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
+    ReplayStateMode, Result, TelemetryCommandMode, VideoCaptureMode,
+    types::irsdk::constants::IRSDK_BROADCASTMSGNAME, windows::utils::pad_car_number,
 };
 use {
     windows::Win32::{
@@ -56,25 +56,52 @@ use {
     windows::core::PCWSTR,
 };
 
-const BROADCAST_MESSAGE_NAME: &str = r"IRSDK_BROADCASTMSG";
+/// Commands that adjust pit service behavior for the player's car.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PitCommand {
+    /// Clear all pending pit service selections.
+    Clear,
+    /// Request a windshield tearoff.
+    Tearoff,
+    /// Set fuel amount in gallons.
+    Fuel(u16),
+    /// Set left-front tire pressure in PSI.
+    LF(u16),
+    /// Set right-front tire pressure in PSI.
+    RF(u16),
+    /// Set left-rear tire pressure in PSI.
+    LR(u16),
+    /// Set right-rear tire pressure in PSI.
+    RR(u16),
+    /// Clear all tire pressure changes.
+    ClearTires,
+    /// Request fast repair.
+    FastRepair,
+    /// Clear windshield tearoff request.
+    ClearTearoff,
+    /// Clear fast repair request.
+    ClearFastRepair,
+    /// Clear fuel request.
+    ClearFuel,
+}
 
 impl PitCommand {
     fn encode(self) -> (u16, u16) {
         use PitCommandMode as Id;
 
         match self {
-            PitCommand::Clear => (Id::Clear.into(), 0),
-            PitCommand::Tearoff => (Id::Ws.into(), 0),
-            PitCommand::Fuel(gal) => (Id::Fuel.into(), gal),
-            PitCommand::LF(pressure) => (Id::Lf.into(), pressure),
-            PitCommand::RF(pressure) => (Id::Rf.into(), pressure),
-            PitCommand::LR(pressure) => (Id::Lr.into(), pressure),
-            PitCommand::RR(pressure) => (Id::Rr.into(), pressure),
-            PitCommand::ClearTires => (Id::ClearTires.into(), 0),
-            PitCommand::FastRepair => (Id::Fr.into(), 0),
-            PitCommand::ClearTearoff => (Id::ClearWs.into(), 0),
-            PitCommand::ClearFastRepair => (Id::ClearFr.into(), 0),
-            PitCommand::ClearFuel => (Id::ClearFuel.into(), 0),
+            PitCommand::Clear => (encode_mode(Id::Clear), 0),
+            PitCommand::Tearoff => (encode_mode(Id::WindshieldTearoff), 0),
+            PitCommand::Fuel(gal) => (encode_mode(Id::Fuel), gal),
+            PitCommand::LF(pressure) => (encode_mode(Id::LeftFrontTire), pressure),
+            PitCommand::RF(pressure) => (encode_mode(Id::RightFrontTire), pressure),
+            PitCommand::LR(pressure) => (encode_mode(Id::LeftRearTire), pressure),
+            PitCommand::RR(pressure) => (encode_mode(Id::RightRearTire), pressure),
+            PitCommand::ClearTires => (encode_mode(Id::ClearTires), 0),
+            PitCommand::FastRepair => (encode_mode(Id::FastRepair), 0),
+            PitCommand::ClearTearoff => (encode_mode(Id::ClearWindshieldTearoff), 0),
+            PitCommand::ClearFastRepair => (encode_mode(Id::ClearFastRepair), 0),
+            PitCommand::ClearFuel => (encode_mode(Id::ClearFuel), 0),
         }
     }
 }
@@ -141,22 +168,29 @@ fn split_u32_words(value: u32) -> (u16, u16) {
     ((value & 0xFFFF) as u16, ((value >> 16) & 0xFFFF) as u16)
 }
 
+fn encode_mode<T: Into<i32>>(mode: T) -> u16 {
+    u16::try_from(mode.into()).expect("broadcast modes must fit in u16")
+}
+
 impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
     type Error = IRacingSDKError;
 
     fn try_from(command: BroadcastCommand) -> std::result::Result<Self, Self::Error> {
         let message = match command {
-            BroadcastCommand::CameraSwitchPosition(position, group, camera) => {
-                (RawBroadcastMessage::CamSwitchPos, position, group, camera)
-            }
+            BroadcastCommand::CameraSwitchPosition(position, group, camera) => (
+                RawBroadcastMessage::CameraSwitchPosition,
+                position,
+                group,
+                camera,
+            ),
             BroadcastCommand::CameraSwitchNumber(car_number, group, camera) => (
-                RawBroadcastMessage::CamSwitchNum,
+                RawBroadcastMessage::CameraSwitchNumber,
                 pad_car_number(&car_number),
                 group,
                 camera,
             ),
             BroadcastCommand::CameraSetState(camera_state) => (
-                RawBroadcastMessage::CamSetState,
+                RawBroadcastMessage::CameraSetState,
                 camera_state.bits() as u16,
                 0,
                 0,
@@ -171,31 +205,31 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
                 let (low, high) = split_u32_words(frame_number);
                 (
                     RawBroadcastMessage::ReplaySetPlayPosition,
-                    mode.into(),
+                    encode_mode(mode),
                     low,
                     high,
                 )
             }
             BroadcastCommand::ReplaySearch(mode) => {
-                (RawBroadcastMessage::ReplaySearch, mode.into(), 0, 0)
+                (RawBroadcastMessage::ReplaySearch, encode_mode(mode), 0, 0)
             }
             BroadcastCommand::ReplaySetState(mode) => {
-                (RawBroadcastMessage::ReplaySetState, mode.into(), 0, 0)
+                (RawBroadcastMessage::ReplaySetState, encode_mode(mode), 0, 0)
             }
             BroadcastCommand::ReloadAllTextures => (
                 RawBroadcastMessage::ReloadTextures,
-                ReloadTexturesMode::All.into(),
+                encode_mode(ReloadTexturesMode::All),
                 0,
                 0,
             ),
             BroadcastCommand::ReloadTextures(car_index) => (
                 RawBroadcastMessage::ReloadTextures,
-                ReloadTexturesMode::CarIdx.into(),
+                encode_mode(ReloadTexturesMode::CarIndex),
                 car_index,
                 0,
             ),
             BroadcastCommand::ChatCommand(mode) => {
-                (RawBroadcastMessage::ChatCommand, mode.into(), 0, 0)
+                (RawBroadcastMessage::ChatCommand, encode_mode(mode), 0, 0)
             }
             BroadcastCommand::ChatCommandMacro(macro_number) => {
                 if !(1..=15).contains(&macro_number) {
@@ -207,7 +241,7 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
 
                 (
                     RawBroadcastMessage::ChatCommand,
-                    ChatCommandMode::Macro.into(),
+                    encode_mode(ChatCommandMode::Macro),
                     macro_number,
                     0,
                 )
@@ -216,15 +250,18 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
                 let (var1, var2) = BroadcastCommand::encode_pit(pit_command_mode);
                 (RawBroadcastMessage::PitCommand, var1, var2, 0)
             }
-            BroadcastCommand::TelemetryCommand(mode) => {
-                (RawBroadcastMessage::TelemCommand, mode.into(), 0, 0)
-            }
+            BroadcastCommand::TelemetryCommand(mode) => (
+                RawBroadcastMessage::TelemetryCommand,
+                encode_mode(mode),
+                0,
+                0,
+            ),
             BroadcastCommand::FFBCommand(value) => {
                 let bits = value.to_bits();
                 let (low, high) = split_u32_words(bits);
                 (
-                    RawBroadcastMessage::FfbCommand,
-                    FfbCommandMode::MaxForce.into(),
+                    RawBroadcastMessage::ForceFeedbackCommand,
+                    encode_mode(FfbCommandMode::MaxForce),
                     low,
                     high,
                 )
@@ -239,7 +276,7 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
                 )
             }
             BroadcastCommand::VideoCapture(mode) => {
-                (RawBroadcastMessage::VideoCapture, mode.into(), 0, 0)
+                (RawBroadcastMessage::VideoCapture, encode_mode(mode), 0, 0)
             }
         };
 
@@ -260,13 +297,13 @@ impl Broadcast {
     ///
     /// Returns [`IRacingSDKError`] if `RegisterWindowMessageW` fails.
     pub fn new() -> Result<Self> {
-        let message: Vec<u16> = crate::windows::wide_string(BROADCAST_MESSAGE_NAME);
+        let message: Vec<u16> = crate::windows::wide_string(IRSDK_BROADCASTMSGNAME);
 
         let id = unsafe { RegisterWindowMessageW(PCWSTR::from_raw(message.as_ptr())) };
 
         if id == 0 {
             return Err(IRacingSDKError::connection_failed(format!(
-                "Failed to register broadcast window message '{BROADCAST_MESSAGE_NAME}'"
+                "Failed to register broadcast window message '{IRSDK_BROADCASTMSGNAME}'"
             )));
         }
 
@@ -286,7 +323,7 @@ impl Broadcast {
         let (broadcast_type, var1, var2, var3) = message.try_into()?;
 
         // Pack the low/high words to match the Windows broadcast contract.
-        let wparam_value = (broadcast_type.to_raw() as usize) | ((var1 as usize) << 16);
+        let wparam_value = (i32::from(broadcast_type) as usize) | ((var1 as usize) << 16);
         let lparam_value = i32::from(var2) | (i32::from(var3) << 16);
 
         unsafe {
@@ -315,7 +352,10 @@ mod tests {
         let encoded: BroadcastMessageFormat = BroadcastCommand::CameraSwitchPosition(3, 2, 1)
             .try_into()
             .unwrap();
-        assert_eq!(encoded, (RawBroadcastMessage::CamSwitchPos, 3, 2, 1));
+        assert_eq!(
+            encoded,
+            (RawBroadcastMessage::CameraSwitchPosition, 3, 2, 1)
+        );
     }
 
     #[test]
@@ -324,7 +364,10 @@ mod tests {
             BroadcastCommand::CameraSwitchNumber("001".to_string(), 4, 5)
                 .try_into()
                 .unwrap();
-        assert_eq!(encoded, (RawBroadcastMessage::CamSwitchNum, 3001, 4, 5));
+        assert_eq!(
+            encoded,
+            (RawBroadcastMessage::CameraSwitchNumber, 3001, 4, 5)
+        );
     }
 
     #[test]
@@ -336,7 +379,7 @@ mod tests {
             reload_all_textures_message,
             (
                 RawBroadcastMessage::ReloadTextures,
-                ReloadTexturesMode::All.into(),
+                encode_mode(ReloadTexturesMode::All),
                 0,
                 0
             )
@@ -349,7 +392,7 @@ mod tests {
             reload_index_textures_message,
             (
                 RawBroadcastMessage::ReloadTextures,
-                ReloadTexturesMode::CarIdx.into(),
+                encode_mode(ReloadTexturesMode::CarIndex),
                 7,
                 0
             )
@@ -385,7 +428,7 @@ mod tests {
             set_play_position_message,
             (
                 RawBroadcastMessage::ReplaySetPlayPosition,
-                ReplayPositionMode::Current.into(),
+                encode_mode(ReplayPositionMode::Current),
                 0x86A0,
                 0x0001
             )
@@ -425,7 +468,7 @@ mod tests {
             begin_chat_command,
             (
                 RawBroadcastMessage::ChatCommand,
-                ChatCommandMode::BeginChat.into(),
+                encode_mode(ChatCommandMode::BeginChat),
                 0,
                 0
             )
@@ -437,7 +480,7 @@ mod tests {
             chat_command_macro,
             (
                 RawBroadcastMessage::ChatCommand,
-                ChatCommandMode::Macro.into(),
+                encode_mode(ChatCommandMode::Macro),
                 9,
                 0
             )
@@ -470,7 +513,7 @@ mod tests {
             set_fuel_command,
             (
                 RawBroadcastMessage::PitCommand,
-                PitCommandMode::Fuel.into(),
+                encode_mode(PitCommandMode::Fuel),
                 14,
                 0
             )
@@ -484,7 +527,7 @@ mod tests {
             clear_tearoff_command,
             (
                 RawBroadcastMessage::PitCommand,
-                PitCommandMode::ClearWs.into(),
+                encode_mode(PitCommandMode::ClearWindshieldTearoff),
                 0,
                 0
             )
@@ -502,7 +545,7 @@ mod tests {
             set_replay_state_message,
             (
                 RawBroadcastMessage::ReplaySetState,
-                ReplayStateMode::EraseTape.into(),
+                encode_mode(ReplayStateMode::EraseTape),
                 0,
                 0
             )
@@ -513,7 +556,7 @@ mod tests {
     fn encodes_ffb_max_force_bits() {
         let (_, var1, var2, var3) = BroadcastCommand::FFBCommand(20.9998).try_into().unwrap();
         let bits = 20.9998f32.to_bits();
-        assert_eq!(var1, u16::from(FfbCommandMode::MaxForce));
+        assert_eq!(var1, encode_mode(FfbCommandMode::MaxForce));
         assert_eq!(var2, (bits & 0xFFFF) as u16);
         assert_eq!(var3, ((bits >> 16) & 0xFFFF) as u16);
     }

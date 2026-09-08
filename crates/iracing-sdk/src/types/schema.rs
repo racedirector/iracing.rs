@@ -5,7 +5,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::IRacingSDKError;
+use crate::{
+    IRacingSDKError, Result, VariableHeader, parse_utils,
+    types::irsdk::VariableType as IRSDKVariableType,
+};
 
 use super::VariableType;
 
@@ -39,6 +42,47 @@ pub struct VariableInfo {
     /// # Description
     /// Human-readable description
     pub description: String,
+}
+
+impl TryFrom<&VariableHeader> for VariableInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: &VariableHeader) -> Result<Self> {
+        Ok(VariableInfo {
+            name: parse_utils::c_string_to_string(&value.name),
+            description: parse_utils::c_string_to_string(&value.description),
+            units: parse_utils::c_string_to_string(&value.unit),
+            offset: usize::try_from(value.offset).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "VariableInfo::try_from",
+                    format!("Could not convert {} to usize", value.offset),
+                )
+            })?,
+            count: usize::try_from(value.count).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "VariableInfo::try_from",
+                    format!("Could not convert {} to usize", value.count,),
+                )
+            })?,
+            count_as_time: value.count_as_time != 0,
+            data_type: IRSDKVariableType::try_from(value.variable_type)
+                .map_err(|_| {
+                    IRacingSDKError::parse_error(
+                        "VariableInfo::try_from",
+                        format!("Could not convert {} to VariableType", value.variable_type),
+                    )
+                })?
+                .into(),
+        })
+    }
+}
+
+impl TryFrom<VariableHeader> for VariableInfo {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: VariableHeader) -> Result<Self> {
+        Self::try_from(&value)
+    }
 }
 
 /// # Variable schema

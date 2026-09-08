@@ -33,6 +33,8 @@ mod tests {
 
     #[test]
     fn constants_match_sdk_definitions() {
+        assert_eq!(IRSDK_MEMMAPFILENAME, "Local\\IRSDKMemMapFileName");
+        assert_eq!(IRSDK_DATAVALIDEVENTNAME, "Local\\IRSDKDataValidEvent");
         assert_eq!(IRSDK_MAX_BUFS, 4);
         assert_eq!(IRSDK_MAX_STRING, 32);
         assert_eq!(IRSDK_MAX_DESC, 64);
