@@ -662,4 +662,22 @@ mod tests {
 
         Ok(())
     }
+    #[test]
+    fn generated_fixture_metadata_matches_manifest() -> Result<()> {
+        let manifest = crate::test_utils::load_fixture_manifest()?;
+
+        for fixture in &manifest.fixtures {
+            let file_path = fixture.fixture_path()?;
+            let reader = crate::ibt::IbtReader::open(&file_path)
+                .with_context(|| format!("Opening {}", file_path.display()))?;
+            ensure!(
+                reader.total_frames() > 0,
+                "Fixture should contain telemetry frames"
+            );
+            assert_eq!(reader.total_frames(), fixture.num_frames);
+            assert_eq!(reader.tick_rate(), fixture.tick_rate as f64);
+        }
+
+        Ok(())
+    }
 }

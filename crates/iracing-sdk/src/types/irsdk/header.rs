@@ -429,4 +429,26 @@ mod tests {
             header.buffers[1].buffer_offset
         );
     }
+    #[test]
+    fn header_reader_rejects_truncated_input() {
+        let truncated_data = vec![0u8; 10];
+        let mut cursor = std::io::Cursor::new(truncated_data);
+        let result = Header::try_from_reader(&mut cursor);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            IRacingSDKError::Parse { .. } => {}
+            other => panic!("Expected Parse error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn header_validation_rejects_unsupported_version() {
+        let mut header = valid_live_header();
+        header.version = 999;
+        assert!(matches!(
+            header.validate(),
+            Err(IRacingSDKError::Version { .. })
+        ));
+    }
 }
