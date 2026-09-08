@@ -50,6 +50,7 @@ csv = { workspace = true }
 encoding_rs = "0.8.35"
 futures = "0.3"
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
+iracing-sdk-protocol = { version = "0.1.0", path = "../iracing-sdk-protocol" }
 pin-project-lite = "0.2"
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }

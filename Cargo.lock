@@ -1102,6 +1102,7 @@ dependencies = [
  "encoding_rs",
  "futures",
  "iracing-sdk-derive",
+ "iracing-sdk-protocol",
  "pin-project-lite",
  "proptest",
  "schemars",
@@ -1127,6 +1128,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "iracing-sdk-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "thiserror",
+ "tracing",
+ "type-layout",
 ]
 
 [[package]]

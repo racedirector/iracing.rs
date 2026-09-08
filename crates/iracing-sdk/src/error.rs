@@ -12,6 +12,10 @@ pub type Result<T, E = IRacingSDKError> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum IRacingSDKError {
+    /// An error occurred while decoding or validating iRacing protocol data.
+    #[error(transparent)]
+    Protocol(#[from] iracing_sdk_protocol::ProtocolError),
+
     /// Failed to open or maintain a connection to the iRacing shared-memory API.
     #[error("Failed to connect to iRacing: {reason}")]
     Connection {
@@ -143,6 +147,7 @@ impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
         match self {
+            Self::Protocol(_) => false,
             Self::Connection { .. } => true,
             Self::Buffer { .. } => true,
             Self::File { .. } => false,
@@ -163,6 +168,17 @@ impl IRacingSDKError {
     /// Returns suggested recovery actions for this error.
     pub fn recovery_suggestions(&self) -> Vec<&'static str> {
         match self {
+            Self::Protocol(error) => match error {
+                iracing_sdk_protocol::ProtocolError::Memory { .. } => vec![
+                    "Check memory access bounds",
+                    "Verify the protocol buffer is complete",
+                ],
+                iracing_sdk_protocol::ProtocolError::Version { .. } => vec![
+                    "Verify iRacing SDK version compatibility",
+                    "Update this library if the protocol has changed",
+                ],
+                _ => vec!["Verify the input conforms to the iRacing SDK protocol"],
+            },
             Self::Connection { .. } => vec![
                 "Ensure iRacing is running",
                 "Check Windows permissions for shared memory access",
