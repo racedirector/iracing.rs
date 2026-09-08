@@ -16,12 +16,6 @@
 //! Live header and variable discovery are compiled only for Windows targets;
 //! session schema parsing remains available on every supported platform.
 
-#[cfg(windows)]
-pub mod header;
-
-#[cfg(windows)]
-pub mod variables;
-
 pub mod session;
 
 pub use session::{SessionInfo, SessionInfoParser};

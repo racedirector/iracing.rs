@@ -89,8 +89,6 @@ primitives-schema = [
   "--",
 ]
 
-live-headers = ["run", "-p", "iracing-sdk", "--bin", "live-headers", "--"]
-
 live-session-parser = [
   "run",
   "-p",

@@ -5,7 +5,10 @@ use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
+use crate::{
+    BitField, IRacingSDKError, VarData, VariableInfo,
+    types::irsdk::VariableType as IRSDKVariableType,
+};
 
 /// Supported telemetry data types.
 /// Maps to iRacing SDK's irsdk_VarType enum.
@@ -55,6 +58,20 @@ impl VariableType {
             | VariableType::Float32
             | VariableType::BitField => 4,
             VariableType::Float64 => 8,
+        }
+    }
+}
+
+impl From<IRSDKVariableType> for VariableType {
+    fn from(value: IRSDKVariableType) -> Self {
+        match value {
+            IRSDKVariableType::Character => Self::Char,
+            IRSDKVariableType::Boolean => Self::Bool,
+            IRSDKVariableType::Integer => Self::Int32,
+            IRSDKVariableType::BitField => Self::BitField,
+            IRSDKVariableType::Float => Self::Float32,
+            IRSDKVariableType::Double => Self::Float64,
+            IRSDKVariableType::ElementTypeCount => unreachable!("Should not have index element."),
         }
     }
 }
