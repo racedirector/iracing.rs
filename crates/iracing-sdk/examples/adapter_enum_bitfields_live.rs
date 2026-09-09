@@ -3,10 +3,10 @@ use anyhow::Result;
 use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, SchemaProvider, providers::live::LiveProvider,
+    AdapterValidation, BitField, EngineWarnings, FieldExtraction, FrameAdapter, IRacingSDKError,
+    SchemaProvider, SessionFlags, SessionState, TrackSurface, VarData,
+    providers::live::LiveProvider,
 };
-#[cfg(windows)]
-use iracing_sdk::{BitField, IRacingSDKError, VarData};
 
 #[cfg(windows)]
 #[derive(Parser, Debug)]
@@ -19,10 +19,10 @@ struct Args {
 #[cfg(windows)]
 #[derive(Debug)]
 struct TelemetryRow {
-    session_state: iracing_sdk::SessionState,
-    session_flags: iracing_sdk::SessionFlags,
-    track_surface: iracing_sdk::TrackSurface,
-    engine_warnings: iracing_sdk::EngineWarnings,
+    session_state: SessionState,
+    session_flags: SessionFlags,
+    track_surface: TrackSurface,
+    engine_warnings: EngineWarnings,
 }
 
 #[cfg(windows)]
@@ -72,14 +72,12 @@ impl FrameAdapter for TelemetryRow {
         let engine_warnings_raw = fetch_bitfield("EngineWarnings");
 
         Self {
-            session_state: iracing_sdk::SessionState::try_from(session_state_raw)
-                .unwrap_or_default(),
-            session_flags: iracing_sdk::SessionFlags::try_from(session_flags_raw)
-                .unwrap_or_default(),
-            track_surface: iracing_sdk::TrackSurface::try_from(track_surface_raw)
-                .unwrap_or_default(),
-            engine_warnings: iracing_sdk::EngineWarnings::try_from(engine_warnings_raw)
-                .unwrap_or_default(),
+            session_state: SessionState::try_from(session_state_raw)
+                .unwrap_or(SessionState::Invalid),
+            session_flags: SessionFlags::try_from(session_flags_raw).unwrap_or_default(),
+            track_surface: TrackSurface::try_from(track_surface_raw)
+                .unwrap_or(TrackSurface::SurfaceNotInWorld),
+            engine_warnings: EngineWarnings::try_from(engine_warnings_raw).unwrap_or_default(),
         }
     }
 }
@@ -114,10 +112,8 @@ async fn main() -> Result<()> {
                 packet.tick,
                 row.session_state,
                 row.track_surface,
-                row.session_flags
-                    .contains(iracing_sdk::SessionFlags::CAUTION),
-                row.engine_warnings
-                    .contains(iracing_sdk::EngineWarnings::MANDATORY_REPAIR_NEEDED),
+                row.session_flags.has_any_caution(),
+                row.engine_warnings.has_mandatory_repair_warning(),
             );
 
             seen += 1;
