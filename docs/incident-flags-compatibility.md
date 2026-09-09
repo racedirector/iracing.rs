@@ -6,7 +6,7 @@ Make `IncidentFlags` accept the live-schema `Int32` representation in addition t
 
 ## Key Changes
 
-- `crates/iracing-sdk/src/types/irsdk/flags.rs` defines the canonical `IncidentFlags` type and accepts either `VariableType::BitField` or `VariableType::Int32` in `VarData::from_bytes`.
+- `crates/iracing-sdk/src/types/irsdk/flags.rs` defines the canonical `IncidentFlags` type and accepts either `VariableType::BitField` or `VariableType::Integer` in `VarData::from_bytes`.
 - Preserve the raw bit pattern when decoding `Int32`, including high-bit values, so packed-field and structured accessors work on every valid incident payload.
 - Expose `report()`, `penalty()`, and `classify()` for structured access while retaining `report_bits()` and `penalty_bits()` for raw packed-field access.
 - Preserve the incident-specific JSON Schema annotations for masks and named report/penalty codes.
@@ -16,7 +16,7 @@ Make `IncidentFlags` accept the live-schema `Int32` representation in addition t
 
 ## Test Plan
 
-- Unit-test `IncidentFlags::from_bytes` with `VariableType::Int32` using a `PlayerIncidents`-style payload.
+- Unit-test `IncidentFlags::from_bytes` with `VariableType::Integer` using a `PlayerIncidents`-style payload.
 - Keep a regression test that the same type decodes from `VariableType::BitField`.
 - Verify high-bit/sign preservation so the `Int32` representation does not lose raw flags when its signed value is negative.
 - Keep adapter-level coverage proving `telemetry_type_mismatch_details::<IncidentFlags>` accepts both schema representations and that a derived frame field can validate and adapt either representation.

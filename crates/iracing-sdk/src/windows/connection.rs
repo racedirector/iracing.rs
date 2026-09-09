@@ -6,7 +6,7 @@
 use crate::{
     IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
     VariableInfo,
-    types::irsdk::{
+    irsdk::{
         Header, VariableHeader,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
@@ -110,8 +110,8 @@ impl Connection {
         connection.validate_connection()?;
 
         tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
-
         tracing::debug!("Successfully connected to iRacing shared memory");
+
         Ok(connection)
     }
 
@@ -291,7 +291,7 @@ impl Connection {
     /// Validate initial connection
     fn validate_connection(&self) -> Result<()> {
         let header = self.header();
-        header.validate()?;
+        header.validate_live()?;
 
         tracing::debug!(
             ver = header.version,
@@ -337,7 +337,7 @@ unsafe impl Sync for Connection {}
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
-    use crate::{StatusField, VariableBuffer, types::irsdk::constants::IRSDK_VER};
+    use crate::irsdk::{StatusField, VariableBuffer, constants::IRSDK_VER};
     use std::mem::ManuallyDrop;
 
     fn test_connection() -> ManuallyDrop<Connection> {

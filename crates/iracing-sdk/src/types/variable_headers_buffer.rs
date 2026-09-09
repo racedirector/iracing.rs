@@ -1,4 +1,4 @@
-use super::{VariableHeader, irsdk::WireType};
+use crate::irsdk::{VariableHeader, WireType};
 
 /// Exact, owned snapshot of a variable-header region advertised by an SDK header.
 ///

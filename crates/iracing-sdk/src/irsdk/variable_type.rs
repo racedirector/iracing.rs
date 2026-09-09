@@ -1,8 +1,6 @@
 //! Exact Rust representation of `irsdk_VarType`.
 
 use std::fmt;
-#[cfg(feature = "codegen")]
-use std::unreachable;
 
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
@@ -14,16 +12,21 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
 pub enum VariableType {
     /// `irsdk_char`.
+    #[serde(alias = "Char")]
     Character = 0,
     /// `irsdk_bool`.
+    #[serde(alias = "Bool")]
     Boolean = 1,
     /// `irsdk_int`.
+    #[serde(alias = "Int32")]
     Integer = 2,
     /// `irsdk_bitField`.
     BitField = 3,
     /// `irsdk_float`.
+    #[serde(alias = "Float32")]
     Float = 4,
     /// `irsdk_double`.
+    #[serde(alias = "Float64")]
     Double = 5,
     /// `irsdk_ETCount` is an array bound, not a variable kind.
     ElementTypeCount = 6,
@@ -31,8 +34,7 @@ pub enum VariableType {
 
 impl fmt::Display for VariableType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result = write!(formatter, "{self:?}");
-        result
+        write!(formatter, "{self:?}")
     }
 }
 
@@ -89,7 +91,7 @@ impl From<VariableType> for Schema {
             VariableType::Integer | VariableType::BitField => "integer",
             VariableType::Float | VariableType::Double => "number",
             VariableType::ElementTypeCount => {
-                unreachable!("Variable type should never be the count sentinel")
+                return false.into();
             }
         };
 
@@ -104,6 +106,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_metadata_names_deserialize_to_sdk_types() {
+        for (legacy, expected) in [
+            ("Char", VariableType::Character),
+            ("Bool", VariableType::Boolean),
+            ("Int32", VariableType::Integer),
+            ("Float32", VariableType::Float),
+            ("Float64", VariableType::Double),
+        ] {
+            let decoded: VariableType = serde_yaml_ng::from_str(legacy).unwrap();
+            assert_eq!(decoded, expected);
+            assert_eq!(
+                serde_yaml_ng::to_string(&decoded).unwrap().trim(),
+                expected.to_string()
+            );
+        }
+        for unsupported in ["Int8", "UInt8", "Int16", "UInt16", "UInt32"] {
+            assert!(serde_yaml_ng::from_str::<VariableType>(unsupported).is_err());
+        }
+    }
+
+    #[test]
     fn values_and_sizes_match_the_sdk() {
         assert_eq!(i32::from(VariableType::Character), 0);
         assert_eq!(i32::from(VariableType::ElementTypeCount), 6);
@@ -111,5 +134,15 @@ mod tests {
         assert_eq!(VariableType::Double.byte_size(), Some(8));
         assert_eq!(VariableType::ElementTypeCount.byte_size(), None);
         assert!(!VariableType::ElementTypeCount.is_storage_type());
+    }
+
+    #[test]
+    fn variable_type_size_returns_correct_values() {
+        assert_eq!(VariableType::Character.byte_size().unwrap(), 1);
+        assert_eq!(VariableType::Boolean.byte_size().unwrap(), 1);
+        assert_eq!(VariableType::Integer.byte_size().unwrap(), 4);
+        assert_eq!(VariableType::Float.byte_size().unwrap(), 4);
+        assert_eq!(VariableType::BitField.byte_size().unwrap(), 4);
+        assert_eq!(VariableType::Double.byte_size().unwrap(), 8);
     }
 }

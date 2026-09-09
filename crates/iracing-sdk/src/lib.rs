@@ -58,7 +58,9 @@
 //! - `benchmark`: enables benchmark targets.
 //!
 pub mod adapters;
+mod codegen;
 mod error;
+pub mod irsdk;
 mod parse_utils;
 pub mod test_utils;
 pub mod types;
@@ -101,6 +103,8 @@ pub mod windows;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection, WaitResult};
+
+pub use windows::PitCommand;
 
 // Main API exports
 pub use connections::ibt::IbtConnection;

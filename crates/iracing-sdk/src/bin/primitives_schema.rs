@@ -15,6 +15,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf};
 
 use anyhow::Result;
 use clap::Parser;
+use iracing_sdk::irsdk::*;
 use serde::Serialize;
 
 /// # iRacing Enums and BitFlags Schema
@@ -22,55 +23,55 @@ use serde::Serialize;
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 struct IrsdkPrimitivesSchema {
     #[serde(rename = "irsdk_StatusField")]
-    status_field: iracing_sdk::StatusField,
+    status_field: StatusField,
     #[serde(rename = "irsdk_TrkLoc")]
-    trk_loc: iracing_sdk::TrackLocation,
+    trk_loc: TrackLocation,
     #[serde(rename = "irsdk_TrkSurf")]
-    trk_surf: iracing_sdk::TrackSurface,
+    trk_surf: TrackSurface,
     #[serde(rename = "irsdk_SessionState")]
-    session_state: iracing_sdk::SessionState,
+    session_state: SessionState,
     #[serde(rename = "irsdk_CarLeftRight")]
-    car_left_right: iracing_sdk::CarLeftRight,
+    car_left_right: CarLeftRight,
     #[serde(rename = "irsdk_PitSvStatus")]
-    pit_sv_status: iracing_sdk::PitServiceStatus,
+    pit_sv_status: PitServiceStatus,
     #[serde(rename = "irsdk_PaceMode")]
-    pace_mode: iracing_sdk::PaceMode,
+    pace_mode: PaceMode,
     #[serde(rename = "irsdk_TrackWetness")]
-    track_wetness: iracing_sdk::TrackWetness,
+    track_wetness: TrackWetness,
     #[serde(rename = "irsdk_BroadcastMsg")]
-    broadcast_msg: iracing_sdk::BroadcastMessage,
+    broadcast_msg: BroadcastMessage,
     #[serde(rename = "irsdk_ChatCommandMode")]
-    chat_command_mode: iracing_sdk::ChatCommandMode,
+    chat_command_mode: ChatCommandMode,
     #[serde(rename = "irsdk_PitCommandMode")]
-    pit_command_mode: iracing_sdk::PitCommandMode,
+    pit_command_mode: PitCommandMode,
     #[serde(rename = "irsdk_TelemetryCommandMode")]
-    telemetry_command_mode: iracing_sdk::TelemetryCommandMode,
+    telemetry_command_mode: TelemetryCommandMode,
     #[serde(rename = "irsdk_RpyStateMode")]
-    rpy_state_mode: iracing_sdk::ReplayStateMode,
+    rpy_state_mode: ReplayStateMode,
     #[serde(rename = "irsdk_ReloadTexturesMode")]
-    reload_textures_mode: iracing_sdk::ReloadTexturesMode,
+    reload_textures_mode: ReloadTexturesMode,
     #[serde(rename = "irsdk_RpySrchMode")]
-    rpy_srch_mode: iracing_sdk::ReplaySearchMode,
+    rpy_srch_mode: ReplaySearchMode,
     #[serde(rename = "irsdk_RpyPosMode")]
-    rpy_pos_mode: iracing_sdk::ReplayPositionMode,
+    rpy_pos_mode: ReplayPositionMode,
     #[serde(rename = "irsdk_FFBCommandMode")]
-    ffb_command_mode: iracing_sdk::FfbCommandMode,
+    ffb_command_mode: ForceFeedbackCommandMode,
     #[serde(rename = "irsdk_csMode")]
-    cs_mode: iracing_sdk::CameraSwitchFocus,
+    cs_mode: CameraSwitchFocusMode,
     #[serde(rename = "irsdk_VideoCaptureMode")]
-    video_capture_mode: iracing_sdk::VideoCaptureMode,
+    video_capture_mode: VideoCaptureMode,
     #[serde(rename = "irsdk_EngineWarnings")]
-    engine_warnings: iracing_sdk::EngineWarnings,
+    engine_warnings: EngineWarnings,
     #[serde(rename = "irsdk_Flags")]
-    flags: iracing_sdk::SessionFlags,
+    flags: SessionFlags,
     #[serde(rename = "irsdk_CameraState")]
-    camera_state: iracing_sdk::CameraState,
+    camera_state: CameraState,
     #[serde(rename = "irsdk_PitSvFlags")]
-    pit_sv_flags: iracing_sdk::PitServiceFlags,
+    pit_sv_flags: PitServiceFlags,
     #[serde(rename = "irsdk_PaceFlags")]
-    pace_flags: iracing_sdk::PaceFlags,
+    pace_flags: PaceFlags,
     #[serde(rename = "irsdk_IncidentFlags")]
-    incident_flags: iracing_sdk::IncidentFlags,
+    incident_flags: IncidentFlags,
 }
 
 /// CLI arguments for the iRacing primitives schema generator.

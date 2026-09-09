@@ -1,6 +1,6 @@
 use crate::{
-    Header, IRacingSDKError, Result, SessionInfoBuffer, VariableHeader, VariableHeadersBuffer,
-    irsdk::WireType,
+    IRacingSDKError, Result, SessionInfoBuffer, VariableHeadersBuffer,
+    irsdk::{Header, VariableHeader, WireType},
 };
 use std::ops::Range;
 
@@ -210,7 +210,7 @@ impl TryFrom<&Header> for VariableHeaderRegion {
 #[cfg(test)]
 mod tests {
     use super::{VariableHeaderRegion, checked_range};
-    use crate::{Header, VariableHeader, irsdk::WireType};
+    use crate::irsdk::{Header, VariableHeader, WireType};
 
     #[test]
     fn variable_header_region_rejects_negative_count() {

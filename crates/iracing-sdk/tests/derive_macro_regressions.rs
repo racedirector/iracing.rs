@@ -1,8 +1,9 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use iracing_sdk::{
-    BitField, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, IncidentFlags,
-    VariableInfo, VariableSchema, VariableType,
+    BitField, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, VariableInfo,
+    VariableSchema,
+    irsdk::{IncidentFlags, VariableType},
 };
 use iracing_sdk_derive::IRacingTelemetryFrame;
 
@@ -11,9 +12,9 @@ use iracing_sdk_derive::IRacingTelemetryFrame;
 /// # Examples
 ///
 /// ```
-/// let info = make_variable_info("Speed", VariableType::Float32, 0);
+/// let info = make_variable_info("Speed", VariableType::Float, 0);
 /// assert_eq!(info.name, "Speed");
-/// assert_eq!(info.data_type, VariableType::Float32);
+/// assert_eq!(info.data_type, VariableType::Float);
 /// assert_eq!(info.offset, 0);
 /// assert_eq!(info.count, 1);
 /// ```
@@ -38,7 +39,7 @@ fn make_variable_info(name: &str, data_type: VariableType, offset: usize) -> Var
 /// # Examples
 ///
 /// ```
-/// let entries = &[("Speed", VariableType::Float32, 0usize)];
+/// let entries = &[("Speed", VariableType::Float, 0usize)];
 /// let schema = make_schema(entries, 4);
 /// let _ = schema; // use schema for validation/adaptation in tests
 /// ```
@@ -164,7 +165,7 @@ struct IncidentRow {
 
 #[test]
 fn derive_supports_generic_structs() {
-    let schema = Arc::new(make_schema(&[("Speed", VariableType::Float32, 0)], 4));
+    let schema = Arc::new(make_schema(&[("Speed", VariableType::Float, 0)], 4));
     let packet = make_packet(Arc::clone(&schema), 42.25f32.to_le_bytes().to_vec());
 
     let validation = GenericRow::<u8>::validate_schema(&schema).expect("validation should pass");
@@ -176,7 +177,7 @@ fn derive_supports_generic_structs() {
 
 #[test]
 fn calculated_expressions_preserve_non_telemetry_identifiers() {
-    let schema = Arc::new(make_schema(&[("Speed", VariableType::Float32, 0)], 4));
+    let schema = Arc::new(make_schema(&[("Speed", VariableType::Float, 0)], 4));
     let packet = make_packet(Arc::clone(&schema), 100.0f32.to_le_bytes().to_vec());
 
     let validation = CalculatedRow::validate_schema(&schema).expect("validation should pass");
@@ -190,11 +191,11 @@ fn calculated_expressions_preserve_non_telemetry_identifiers() {
 fn validate_schema_treats_incompatible_optional_and_default_fields_as_missing() {
     let schema = Arc::new(make_schema(
         &[
-            ("OptionalInt", VariableType::Float32, 0),
-            ("DefaultedFloat", VariableType::Int32, 4),
-            ("TypeDefaultFloat", VariableType::Bool, 8),
-            ("HasFlagField", VariableType::Int32, 12),
-            ("MappedFlagField", VariableType::UInt32, 16),
+            ("OptionalInt", VariableType::Float, 0),
+            ("DefaultedFloat", VariableType::Integer, 4),
+            ("TypeDefaultFloat", VariableType::Boolean, 8),
+            ("HasFlagField", VariableType::Integer, 12),
+            ("MappedFlagField", VariableType::Float, 16),
         ],
         20,
     ));
@@ -238,14 +239,14 @@ fn validate_schema_treats_incompatible_optional_and_default_fields_as_missing() 
 
 #[test]
 fn validate_schema_rejects_incompatible_required_fields() {
-    let schema = make_schema(&[("Speed", VariableType::Int32, 0)], 4);
+    let schema = make_schema(&[("Speed", VariableType::Integer, 0)], 4);
 
     let err = CriticalRow::validate_schema(&schema).expect_err("validation should fail");
     match err {
         IRacingSDKError::Parse { context, details } => {
             assert_eq!(context, "Frame adapter validation");
             assert!(details.contains("Field 'Speed' has incompatible telemetry type"));
-            assert!(details.contains("Expected Float32, got Int32"));
+            assert!(details.contains("Expected Float, got Integer"));
         }
         other => panic!("unexpected error: {other:?}"),
     }
@@ -253,14 +254,14 @@ fn validate_schema_rejects_incompatible_required_fields() {
 
 #[test]
 fn validate_schema_rejects_incompatible_required_bitfields() {
-    let schema = make_schema(&[("SessionFlags", VariableType::Int32, 0)], 4);
+    let schema = make_schema(&[("SessionFlags", VariableType::Integer, 0)], 4);
 
     let err = CriticalBitfieldRow::validate_schema(&schema).expect_err("validation should fail");
     match err {
         IRacingSDKError::Parse { context, details } => {
             assert_eq!(context, "Frame adapter validation");
             assert!(details.contains("Field 'SessionFlags' has incompatible telemetry type"));
-            assert!(details.contains("Expected BitField, got Int32"));
+            assert!(details.contains("Expected BitField, got Integer"));
         }
         other => panic!("unexpected error: {other:?}"),
     }
@@ -270,7 +271,7 @@ fn validate_schema_rejects_incompatible_required_bitfields() {
 fn incident_flags_validate_and_adapt_from_bitfield_or_int32_storage() {
     const RAW: u32 = 0x8000_0408;
 
-    for data_type in [VariableType::BitField, VariableType::Int32] {
+    for data_type in [VariableType::BitField, VariableType::Integer] {
         let schema = Arc::new(make_schema(&[("PlayerIncidents", data_type, 0)], 4));
         let packet = make_packet(Arc::clone(&schema), RAW.to_le_bytes().to_vec());
 

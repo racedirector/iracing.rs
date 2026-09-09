@@ -2,13 +2,11 @@ use std::io::Read;
 use type_layout::TypeLayout;
 
 use super::{
+    StatusField, VariableBuffer, VariableHeader, WireType,
     constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
     error::{header_validation_error, mismatched_version_error},
-    flags::StatusField,
-    variable_buffer::VariableBuffer,
-    variable_header::VariableHeader,
 };
-use crate::{IRacingSDKError, Result, types::irsdk::wire_type::WireType};
+use crate::{IRacingSDKError, Result};
 
 /// An iRacing SDK header.
 #[repr(C)]

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::{
     SchemaProvider, TelemetryValue, VariableInfo, VariableSchema,
-    types::variable_type::TelemetryValueProvider,
+    types::telemetry_value::TelemetryValueProvider,
 };
 
 /// Raw telemetry frame packet for the stream-based architecture
@@ -48,7 +48,7 @@ impl FramePacket {
     pub fn value(
         &self,
         name: &str,
-    ) -> crate::Result<Option<crate::types::variable_type::TelemetryValue>> {
+    ) -> crate::Result<Option<crate::types::telemetry_value::TelemetryValue>> {
         let Some(info) = self.variable(name) else {
             return Ok(None);
         };
@@ -72,14 +72,14 @@ impl TelemetryValueProvider for FramePacket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::VariableType;
+    use crate::irsdk::VariableType;
     use std::collections::HashMap;
 
     #[test]
     fn frame_packet_provides_schema_and_telemetry_values() {
         let rpm_info = VariableInfo {
             name: "RPM".into(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,

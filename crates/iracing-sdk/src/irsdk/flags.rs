@@ -6,7 +6,8 @@
 //! corresponding methods on each bitmask test for any matching bit, while
 //! `has_all` tests for every bit in a mask.
 
-use crate::{BitField, IRacingSDKError, VarData, VariableInfo, VariableType};
+use super::VariableType;
+use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
 
 use super::macros::sdk_bitmask;
 use type_layout::TypeLayout;
@@ -421,7 +422,7 @@ impl VarData for IncidentFlags {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         match info.data_type {
             VariableType::BitField => <BitField as VarData>::from_bytes(data, info).map(Self::from),
-            VariableType::Int32 => {
+            VariableType::Integer => {
                 <i32 as VarData>::from_bytes(data, info).map(|value| Self::from(value as u32))
             }
             actual => Err(IRacingSDKError::type_conversion(
@@ -457,11 +458,11 @@ impl schemars::JsonSchema for IncidentFlags {
         schema_object.insert("x-irsdk-masks".into(), serde_json::Value::Object(masks));
         schema_object.insert(
             "x-irsdk-report-codes".into(),
-            crate::types::codegen::named_schema_values(Self::SCHEMA_REPORT_CODES),
+            crate::codegen::named_schema_values(Self::SCHEMA_REPORT_CODES),
         );
         schema_object.insert(
             "x-irsdk-penalty-codes".into(),
-            crate::types::codegen::named_schema_values(Self::SCHEMA_PENALTY_CODES),
+            crate::codegen::named_schema_values(Self::SCHEMA_PENALTY_CODES),
         );
         schema
     }
@@ -470,7 +471,7 @@ impl schemars::JsonSchema for IncidentFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BitField, VarData, VariableInfo, VariableType};
+    use crate::{BitField, VarData, VariableInfo, irsdk::VariableType};
 
     fn variable_info(data_type: VariableType) -> VariableInfo {
         VariableInfo {
@@ -555,6 +556,12 @@ mod tests {
         assert!(optional.has_optional_repair_warning());
 
         assert!(!EngineWarnings::empty().has_any_repair_warning());
+
+        let warnings =
+            EngineWarnings::MANDATORY_REPAIR_NEEDED.union(EngineWarnings::OPTIONAL_REPAIR_NEEDED);
+
+        assert!(warnings.contains(EngineWarnings::MANDATORY_REPAIR_NEEDED));
+        assert!(warnings.contains(EngineWarnings::OPTIONAL_REPAIR_NEEDED));
     }
 
     #[test]
@@ -629,7 +636,7 @@ mod tests {
                 .expect("decode IncidentFlags from BitField storage");
         let from_int32 = IncidentFlags::from_bytes(
             &(RAW as i32).to_le_bytes(),
-            &variable_info(VariableType::Int32),
+            &variable_info(VariableType::Integer),
         )
         .expect("decode IncidentFlags from Int32 storage");
 
@@ -640,9 +647,26 @@ mod tests {
     }
 
     #[test]
+    fn incident_report_field_is_extracted_without_a_penalty() {
+        let incident = IncidentFlags::REPORT_CONTACT_WITH_WORLD;
+
+        assert_eq!(incident.report_bits(), 0x04);
+        assert_eq!(incident.penalty_bits(), 0x00);
+        assert_eq!(BitField::from(incident).value(), incident.bits());
+    }
+
+    #[test]
+    fn incident_penalty_field_is_extracted_without_a_report() {
+        let incident = IncidentFlags::PENALTY_ZERO_X;
+
+        assert_eq!(incident.report_bits(), 0x00);
+        assert_eq!(incident.penalty_bits(), 0x01);
+    }
+
+    #[test]
     fn incident_flags_reject_other_storage_types() {
         let error =
-            IncidentFlags::from_bytes(&0u32.to_le_bytes(), &variable_info(VariableType::UInt32))
+            IncidentFlags::from_bytes(&0u32.to_le_bytes(), &variable_info(VariableType::Float))
                 .expect_err("UInt32 must not decode as IncidentFlags");
 
         assert!(matches!(
@@ -654,7 +678,7 @@ mod tests {
 
     #[test]
     fn adapter_validation_accepts_incident_storage_types() {
-        for data_type in [VariableType::BitField, VariableType::Int32] {
+        for data_type in [VariableType::BitField, VariableType::Integer] {
             assert_eq!(
                 crate::adapters::telemetry_type_mismatch_details::<IncidentFlags>(&variable_info(
                     data_type

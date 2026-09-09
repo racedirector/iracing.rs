@@ -71,7 +71,7 @@ impl AdapterValidation {
     ///
     /// let speed_info = VariableInfo {
     ///     name: "Speed".to_string(),
-    ///     data_type: VariableType::Float32,
+    ///     data_type: VariableType::Float,
     ///     offset: 0,
     ///     count: 1,
     ///     count_as_time: false,
@@ -132,7 +132,7 @@ impl AdapterValidation {
 /// # use iracing_sdk::{VariableInfo, VariableType};
 /// let var_info = VariableInfo {
 ///     name: "Speed".to_string(),
-///     data_type: VariableType::Float32,
+///     data_type: VariableType::Float,
 ///     offset: 0,
 ///     count: 1,
 ///     count_as_time: false,

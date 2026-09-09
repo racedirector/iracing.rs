@@ -1,4 +1,4 @@
-use iracing_sdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
+use iracing_sdk::irsdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
 use iracing_sdk_derive::IRacingTelemetryFrame;
 use serde::Serialize;
 
