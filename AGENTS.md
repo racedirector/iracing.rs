@@ -8,7 +8,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - `cargo build --workspace` for workspace sanity; release builds defer to cargo-dist.
 - `cargo test --workspace --all-targets` hits every crate; scope with `cargo test -p <crate>` or `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` when debugging.
-- `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. Use `--no-drift-check` only when intentionally updating fixtures.
+- `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. For intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings` are the formatting/lint gates.
 - For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p <crate> --examples --bins`.
 - Codegen binaries require `cargo build -p iracing-sdk --features codegen,schema-discovery` when you need schema outputs.
@@ -21,7 +21,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## Test Data
 
-- Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; run `cargo test-fixtures` after changing fixture profiles.
+- Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; for intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - Use helpers from `iracing_sdk::test_utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
 - Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` and the generated schemas it indexes. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use the session and primitive schemas for object shapes and legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
 

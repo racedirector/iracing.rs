@@ -123,6 +123,18 @@ impl VariableSchema {
 
         for header in headers.iter_headers() {
             let variable = VariableInfo::try_from(header)?;
+
+            if variable.name.is_empty() {
+                return Err(schema_validation_error("Variable header has empty name"));
+            }
+
+            if variables.contains_key(&variable.name) {
+                return Err(schema_validation_error(format!(
+                    "Duplicate variable name '{}' in header region",
+                    variable.name
+                )));
+            }
+
             variables.insert(variable.name.clone(), variable);
         }
 
