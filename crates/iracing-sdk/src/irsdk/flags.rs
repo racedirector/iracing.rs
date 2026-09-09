@@ -308,6 +308,60 @@ sdk_bitmask! {
 )]
 pub struct IncidentFlags(u32);
 
+/// The low-byte report code in [`IncidentFlags`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IncidentReport {
+    /// No report.
+    NoReport,
+    /// Loss of control.
+    OutOfControl,
+    /// Off-track report.
+    OffTrack,
+    /// Continuing off-track report.
+    OffTrackOngoing,
+    /// Contact with the world.
+    ContactWithWorld,
+    /// Collision with the world.
+    CollisionWithWorld,
+    /// Continuing collision with the world.
+    CollisionWithWorldOngoing,
+    /// Contact with another car.
+    ContactWithCar,
+    /// Collision with another car.
+    CollisionWithCar,
+    /// An unrecognized report code, preserved verbatim.
+    Unknown(u8),
+}
+
+/// The second-byte penalty code in [`IncidentFlags`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IncidentPenalty {
+    /// No penalty report (distinct from a reported zero-point penalty).
+    NoReport,
+    /// A zero-point penalty.
+    ZeroX,
+    /// A one-point penalty.
+    OneX,
+    /// A two-point penalty.
+    TwoX,
+    /// A four-point penalty.
+    FourX,
+    /// An unrecognized penalty code, preserved verbatim.
+    Unknown(u8),
+}
+
+/// Independent report and penalty fields decoded from [`IncidentFlags`].
+///
+/// This does not infer severity or discard unusual combinations. Reserved upper
+/// bits remain available through [`IncidentFlags::bits`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct IncidentClassification {
+    /// The incident report.
+    pub report: IncidentReport,
+    /// The reported penalty.
+    pub penalty: IncidentPenalty,
+}
+
 impl IncidentFlags {
     /// `irsdk_Incident_RepNoReport`.
     pub const REPORT_NONE: Self = Self(0x0000);
@@ -391,6 +445,52 @@ impl IncidentFlags {
     /// Returns the second-byte incident penalty field.
     pub const fn penalty_bits(self) -> u8 {
         ((self.0 & Self::PENALTY_MASK) >> 8) as u8
+    }
+
+    /// Decodes the report field, preserving unrecognized codes.
+    pub const fn report(self) -> IncidentReport {
+        match self.report_bits() {
+            0 => IncidentReport::NoReport,
+            1 => IncidentReport::OutOfControl,
+            2 => IncidentReport::OffTrack,
+            3 => IncidentReport::OffTrackOngoing,
+            4 => IncidentReport::ContactWithWorld,
+            5 => IncidentReport::CollisionWithWorld,
+            6 => IncidentReport::CollisionWithWorldOngoing,
+            7 => IncidentReport::ContactWithCar,
+            8 => IncidentReport::CollisionWithCar,
+            code => IncidentReport::Unknown(code),
+        }
+    }
+
+    /// Decodes the penalty field independently of the report field.
+    pub const fn penalty(self) -> IncidentPenalty {
+        match self.penalty_bits() {
+            0 => IncidentPenalty::NoReport,
+            1 => IncidentPenalty::ZeroX,
+            2 => IncidentPenalty::OneX,
+            3 => IncidentPenalty::TwoX,
+            4 => IncidentPenalty::FourX,
+            code => IncidentPenalty::Unknown(code),
+        }
+    }
+
+    /// Decodes both packed fields without inferring severity.
+    ///
+    /// ```
+    /// use iracing_sdk::irsdk::{IncidentFlags, IncidentPenalty, IncidentReport};
+    ///
+    /// let flags = IncidentFlags::from_bits_retain(0x8000_0408);
+    /// let incident = flags.classify();
+    /// assert_eq!(incident.report, IncidentReport::CollisionWithCar);
+    /// assert_eq!(incident.penalty, IncidentPenalty::FourX);
+    /// assert_eq!(flags.bits(), 0x8000_0408);
+    /// ```
+    pub const fn classify(self) -> IncidentClassification {
+        IncidentClassification {
+            report: self.report(),
+            penalty: self.penalty(),
+        }
     }
 }
 
@@ -644,6 +744,57 @@ mod tests {
         assert_eq!(from_int32.bits(), RAW);
         assert_eq!(from_int32.report_bits(), 8);
         assert_eq!(from_int32.penalty_bits(), 4);
+        for flags in [from_bitfield, from_int32] {
+            assert_eq!(
+                flags.classify(),
+                IncidentClassification {
+                    report: IncidentReport::CollisionWithCar,
+                    penalty: IncidentPenalty::FourX,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn incident_classification_preserves_every_field_combination() {
+        let reports = [
+            IncidentReport::NoReport,
+            IncidentReport::OutOfControl,
+            IncidentReport::OffTrack,
+            IncidentReport::OffTrackOngoing,
+            IncidentReport::ContactWithWorld,
+            IncidentReport::CollisionWithWorld,
+            IncidentReport::CollisionWithWorldOngoing,
+            IncidentReport::ContactWithCar,
+            IncidentReport::CollisionWithCar,
+        ];
+        let penalties = [
+            IncidentPenalty::NoReport,
+            IncidentPenalty::ZeroX,
+            IncidentPenalty::OneX,
+            IncidentPenalty::TwoX,
+            IncidentPenalty::FourX,
+        ];
+        for report in 0..=u8::MAX {
+            for penalty in 0..=u8::MAX {
+                let raw = 0xabcd_0000 | u32::from(report) | (u32::from(penalty) << 8);
+                let flags = IncidentFlags::from_bits_retain(raw);
+                let expected = IncidentClassification {
+                    report: reports
+                        .get(usize::from(report))
+                        .copied()
+                        .unwrap_or(IncidentReport::Unknown(report)),
+                    penalty: penalties
+                        .get(usize::from(penalty))
+                        .copied()
+                        .unwrap_or(IncidentPenalty::Unknown(penalty)),
+                };
+                assert_eq!(flags.report(), expected.report);
+                assert_eq!(flags.penalty(), expected.penalty);
+                assert_eq!(flags.classify(), expected);
+                assert_eq!(flags.bits(), raw);
+            }
+        }
     }
 
     #[test]

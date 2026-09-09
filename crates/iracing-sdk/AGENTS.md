@@ -24,6 +24,8 @@
 - `benches/`: Criterion benchmarks gated by the `benchmark` feature.
 - `yaml_utils`: cleans iRacing's malformed YAML before parsing; use it instead of custom scrubbing.
 
+- Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.
+
 ## Platform & Feature Guardrails
 
 - Gate actual shared-memory, live-provider, and Win32 broadcast transports with `#[cfg(windows)]`. Keep portable typed commands and the non-Windows `LiveConnection` builder stub available where the public API already promises them.

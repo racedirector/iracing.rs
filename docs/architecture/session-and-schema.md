@@ -21,6 +21,20 @@ little-endian conversion centralized.
 The live header/variable discovery modules are Windows-gated. The resulting
 schema and frame types are platform-neutral.
 
+`VariableInfo::data_type` uses `irsdk::VariableType`, also re-exported at the
+crate root. Only the six SDK storage kinds are valid telemetry metadata;
+header conversion, schema validation, and runtime decoding reject the count
+sentinel. Array strides use SDK byte widths. `VarData` supports `u8` for
+characters, `bool`, `i32`, `BitField`, `f32`, `f64`, and their vectors.
+
+Metadata serialization emits `Character`, `Boolean`, `Integer`, `BitField`,
+`Float`, and `Double`. Deserialization also accepts the previous `Char`, `Bool`,
+`Int32`, `Float32`, and `Float64` names. The former synthetic integer storage
+variants are no longer supported. `TelemetryValue` retains its payload names
+and variants for source/serialization compatibility, but SDK decoding only
+produces the supported storage values and arrays. `DynamicFrame::bitfield`
+replaces the former synthetic unsigned-integer shortcut.
+
 ## Session YAML path
 
 iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
