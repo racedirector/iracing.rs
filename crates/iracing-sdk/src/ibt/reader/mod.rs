@@ -85,7 +85,7 @@ impl IbtReader {
 
         // Parse IBT header
         let header = Header::try_from_reader(&mut cursor)?;
-        header.validate()?;
+        header.validate_ibt()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
         let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
