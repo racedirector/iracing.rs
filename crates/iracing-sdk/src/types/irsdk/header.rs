@@ -160,6 +160,10 @@ impl Header {
             ));
         }
 
+        if self.buffer_length < 0 {
+            return Err(header_validation_error("Buffer length cannot be negative"));
+        }
+
         Ok(())
     }
 
@@ -264,10 +268,6 @@ impl Header {
     /// values.
     pub fn validate_ibt(&self) -> Result<()> {
         self.validate()?;
-
-        if self.buffer_count < 0 {
-            return Err(header_validation_error("Buffer length cannot be negative"));
-        }
 
         // !!!: These may be relevant in the common validation
         if self.buffer_length > 100_000_000 {

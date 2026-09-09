@@ -68,6 +68,7 @@ pub use bitfield::{
 };
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
+pub(crate) use iracing_session_string::IRacingSessionString;
 pub use irsdk::{
     DiskSubHeader, Header, VariableBuffer, VariableHeader,
     broadcast::{
@@ -85,8 +86,9 @@ pub use irsdk::{
         TrackWetness,
     },
 };
-pub use regions::VariableHeaderRegion;
+pub use regions::{SessionInfoRegion, VariableHeaderRegion};
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
+pub use session_info_buffer::SessionInfoBuffer;
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
 pub use variable_headers_buffer::VariableHeadersBuffer;

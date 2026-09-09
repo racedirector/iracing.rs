@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    provider::Provider, yaml_utils,
+    provider::Provider,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -176,25 +176,7 @@ impl LiveProvider {
         tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
-        let raw_yaml = match self.connection.session_info() {
-            Some(yaml) => yaml,
-            None => {
-                tracing::debug!("No session info available");
-                return Ok(None);
-            }
-        };
-
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
-
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-
-        Ok(Some(cleaned_yaml))
+        Ok(self.connection.session_info())
     }
 }
 

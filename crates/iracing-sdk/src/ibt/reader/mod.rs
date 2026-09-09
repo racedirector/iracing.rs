@@ -32,9 +32,9 @@
 
 use super::format::extract_variable_schema;
 use crate::{
-    IRacingSDKError, Result, SchemaProvider, VariableSchema,
-    irsdk::{DiskSubHeader, Header, VariableHeader, WireType},
-    yaml_utils,
+    IRacingSDKError, Result, SchemaProvider, VariableHeaderRegion, VariableSchema,
+    irsdk::{DiskSubHeader, Header},
+    types::{IRacingSessionString, SessionInfoRegion},
 };
 use std::{
     fs::File,
@@ -47,9 +47,14 @@ pub struct IbtReader {
     data: Vec<u8>,
     current_position: usize,
     path: Option<PathBuf>,
+
     header: Header,
     disk_header: DiskSubHeader,
     variable_schema: VariableSchema,
+
+    session_info_region: SessionInfoRegion,
+    variable_headers_region: VariableHeaderRegion,
+
     current_frame: usize,
     total_frames: usize,
     frame_data_start: usize,
@@ -90,43 +95,25 @@ impl IbtReader {
         // Parse disk sub-header (note: may be corrupted, but we'll try)
         let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
 
+        let variable_headers_region = VariableHeaderRegion::try_from(&header)?;
+        let variable_headers_range = variable_headers_region.checked_range(data.len())?;
+
+        let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Variable headers parse",
+                "Could not parse buffer_length to usize",
+            )
+        })?;
+
         // Extract variable schema
-        let variable_schema = extract_variable_schema(&mut cursor, &header)?;
+        let variable_schema =
+            extract_variable_schema(&mut cursor, &variable_headers_region, frame_size)?;
 
-        // Calculate frame data start position correctly with checked arithmetic
-        // Frame data starts AFTER both variable headers AND session info
-        // 1. Variable headers are at header.var_header_offset and each is IRSDK_VAR_HEADER_SIZE bytes
-        let var_headers_size = header
-            .variable_count
-            .checked_mul(VariableHeader::WIRE_SIZE as i32)
-            .ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame data calculation".to_string(),
-                details: "Variable headers size calculation overflowed".to_string(),
-            })?;
-
-        let var_headers_end = header
-            .variable_header_offset
-            .checked_add(var_headers_size)
-            .ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame data calculation".to_string(),
-                details: "Variable headers end calculation overflowed".to_string(),
-            })?;
-
-        // 2. Session info comes after variable headers (if present)
-        let session_info_end = if header.session_info_len > 0 {
-            header
-                .session_info_offset
-                .checked_add(header.session_info_len)
-                .ok_or_else(|| IRacingSDKError::Parse {
-                    context: "Frame data calculation".to_string(),
-                    details: "Session info end calculation overflowed".to_string(),
-                })?
-        } else {
-            var_headers_end
-        };
+        let session_info_region = SessionInfoRegion::try_from(&header)?;
+        let session_info_range = session_info_region.checked_range(data.len())?;
 
         // Frame data starts after whichever comes last: variable headers or session info
-        let frame_data_start = session_info_end.max(var_headers_end) as usize;
+        let frame_data_start = session_info_range.end.max(variable_headers_range.end);
 
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes =
@@ -165,6 +152,8 @@ impl IbtReader {
             current_frame: 0,
             total_frames,
             frame_data_start,
+            variable_headers_region,
+            session_info_region,
         })
     }
 
@@ -174,27 +163,14 @@ impl IbtReader {
     /// to fix iRacing's non-standard format issues. Parsing happens at the Connection level.
     /// This method extracts on-demand, no caching.
     pub fn session_yaml(&self) -> Result<Option<String>> {
-        // Check if session info exists
-        if self.header.session_info_len <= 0 || self.header.session_info_offset <= 0 {
+        if !self.session_info_region.is_valid() {
             return Ok(None);
         }
 
-        // Extract raw YAML from memory
-        let raw_yaml = yaml_utils::extract_yaml_from_memory(
-            &self.data,
-            self.header.session_info_offset,
-            self.header.session_info_len,
-        )?;
+        let buffer = self.session_info_region.buffer(&self.data)?;
+        let session_string = IRacingSessionString::try_from(buffer)?;
 
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
-
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        Ok(Some(cleaned_yaml))
+        Ok(Some(session_string.into()))
     }
 
     /// Get total number of frames in the file

@@ -1,6 +1,6 @@
 use crate::{
-    Header, IRacingSDKError, Result, VariableHeader, irsdk::WireType,
-    types::variable_headers_buffer::VariableHeadersBuffer,
+    Header, IRacingSDKError, Result, SessionInfoBuffer, VariableHeader, VariableHeadersBuffer,
+    irsdk::WireType,
 };
 use std::ops::Range;
 
@@ -27,50 +27,65 @@ fn checked_range(
     Ok(offset..end)
 }
 
-// pub struct SessionInfoRegion {
-//     offset: usize,
-//     length: usize,
-// }
+pub struct SessionInfoRegion {
+    offset: usize,
+    length: usize,
+}
 
-// impl SessionInfoRegion {
-//     pub fn checked_range(&self, data_len: usize) -> Result<Range<usize>> {
-//         checked_range(
-//             self.offset,
-//             self.length,
-//             data_len,
-//             "SessionInfoRegion::checked_range",
-//         )
-//     }
+impl SessionInfoRegion {
+    /// Returns the region's byte offset from the beginning of the source.
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
 
-//     pub fn bytes<'a>(&self, source: &'a [u8]) -> Result<&'a [u8]> {
-//         Ok(&source[self.checked_range(source.len())?])
-//     }
+    /// Returns the region's byte length: the header count times the wire size
+    /// of a [`VariableHeader`].
+    pub fn length(&self) -> usize {
+        self.length
+    }
 
-//     pub fn buffer(&self, source: &[u8]) -> Result<SessionInfoBuffer> {
-//         Ok(SessionInfoBuffer::from_checked_region(self.bytes(source)?))
-//     }
-// }
+    pub fn checked_range(&self, data_len: usize) -> Result<Range<usize>> {
+        checked_range(
+            self.offset,
+            self.length,
+            data_len,
+            "SessionInfoRegion::checked_range",
+        )
+    }
 
-// impl TryFrom<&Header> for SessionInfoRegion {
-//     type Error = IRacingSDKError;
+    pub fn bytes<'a>(&self, source: &'a [u8]) -> Result<&'a [u8]> {
+        Ok(&source[self.checked_range(source.len())?])
+    }
 
-//     fn try_from(value: &Header) -> Result<Self> {
-//         Ok(SessionInfoRegion {
-//             offset: usize::try_from(value.session_info_offset).map_err(|_| {
-//                 IRacingSDKError::parse_error(
-//                     "SessionInfoRegion::try_from",
-//                     format!("Could not convert {} to usize", value.session_info_offset),
-//                 )
-//             })?,
-//             length: usize::try_from(value.session_info_len).map_err(|_| {
-//                 IRacingSDKError::parse_error(
-//                     "SessionInfoRegion::try_from",
-//                     format!("Could not convert {} to usize", value.session_info_len),
-//                 )
-//             })?,
-//         })
-//     }
-// }
+    pub fn buffer(&self, source: &[u8]) -> Result<SessionInfoBuffer> {
+        Ok(SessionInfoBuffer::from_checked_region(self.bytes(source)?))
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.offset > 0 && self.length > 0
+    }
+}
+
+impl TryFrom<&Header> for SessionInfoRegion {
+    type Error = IRacingSDKError;
+
+    fn try_from(value: &Header) -> Result<Self> {
+        Ok(SessionInfoRegion {
+            offset: usize::try_from(value.session_info_offset).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "SessionInfoRegion::try_from",
+                    format!("Could not convert {} to usize", value.session_info_offset),
+                )
+            })?,
+            length: usize::try_from(value.session_info_len).map_err(|_| {
+                IRacingSDKError::parse_error(
+                    "SessionInfoRegion::try_from",
+                    format!("Could not convert {} to usize", value.session_info_len),
+                )
+            })?,
+        })
+    }
+}
 
 /// Location and size of the variable-header region advertised by a [`Header`].
 ///
@@ -176,7 +191,7 @@ impl TryFrom<&Header> for VariableHeaderRegion {
         })?;
 
         let length = count
-            .checked_mul(VariableHeader::WIRE_SIZE as usize)
+            .checked_mul(VariableHeader::WIRE_SIZE)
             .ok_or_else(|| {
                 IRacingSDKError::parse_error(
                     "VariableHeaderRegion::try_from",

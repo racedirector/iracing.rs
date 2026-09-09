@@ -1,5 +1,6 @@
 use type_layout::TypeLayout;
 
+use crate::parse_utils::nul_terminated_bytes;
 use crate::{IRacingSDKError, Result};
 
 use super::VariableType;
@@ -94,7 +95,7 @@ impl VariableHeader {
         self.variable_type()?;
 
         // Skip empty or invalid variables
-        if self.name.is_empty() {
+        if nul_terminated_bytes(&self.name).is_empty() {
             return Err(variable_header_validation_error("Name cannot be empty"));
         }
 

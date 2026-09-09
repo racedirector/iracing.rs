@@ -21,8 +21,7 @@
 //! - O(1) schema validation after parsing
 
 use crate::{
-    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, irsdk::Header,
-    types::VariableHeaderRegion,
+    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, types::VariableHeaderRegion,
 };
 
 use std::io::{Read, Seek, SeekFrom};
@@ -30,21 +29,13 @@ use std::io::{Read, Seek, SeekFrom};
 /// Extract variable schema from IBT file headers
 pub fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
-    header: &Header,
+    region: &VariableHeaderRegion,
+    frame_size: usize,
 ) -> Result<VariableSchema> {
     tracing::debug!(
         "Extracting variable schema for {} variables",
-        header.variable_count
+        region.count()
     );
-
-    let region = VariableHeaderRegion::try_from(header)?;
-
-    let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
-        IRacingSDKError::parse_error(
-            "Variable headers parse",
-            "Could not parse buffer_length to usize",
-        )
-    })?;
 
     // Seek to the variable headers section and parse all variables
     reader
