@@ -243,7 +243,7 @@ impl Connection {
             let info_ptr = self.base.as_ptr().add(session_info_region.offset());
             let info_slice = std::slice::from_raw_parts(info_ptr, session_info_region.length());
 
-            let session_info_buffer = SessionInfoBuffer::from_checked_region(&info_slice);
+            let session_info_buffer = SessionInfoBuffer::from_checked_region(info_slice);
             let session_info = match IRacingSessionString::try_from(session_info_buffer) {
                 Ok(s) => s,
                 _ => return None,
