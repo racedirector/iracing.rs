@@ -4,13 +4,13 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::{
-    IRacingSDKError, Result, VariableInfo,
+    IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
+    VariableInfo,
     types::irsdk::{
         Header, VariableHeader,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
     windows::wide_string,
-    yaml_utils,
 };
 use std::ptr::NonNull;
 use std::time::Duration;
@@ -233,20 +233,23 @@ impl Connection {
     /// Get session info YAML string
     pub fn session_info(&self) -> Option<String> {
         let header = self.header();
-        if header.session_info_len <= 0 {
-            return None;
-        }
-        if header.session_info_offset < 0 {
-            return None;
-        }
+        let session_info_region = match SessionInfoRegion::try_from(header) {
+            Ok(region) if region.is_valid() => region,
+            _ => return None,
+        };
 
         unsafe {
             // Get the slice of the session yaml
-            let info_ptr = self.base.as_ptr().add(header.session_info_offset as usize);
-            let info_slice = std::slice::from_raw_parts(info_ptr, header.session_info_len as usize);
+            let info_ptr = self.base.as_ptr().add(session_info_region.offset());
+            let info_slice = std::slice::from_raw_parts(info_ptr, session_info_region.length());
 
-            // Parse and return
-            yaml_utils::extract_yaml_from_memory(info_slice, 0, header.session_info_len).ok()
+            let session_info_buffer = SessionInfoBuffer::from_checked_region(&info_slice);
+            let session_info = match IRacingSessionString::try_from(session_info_buffer) {
+                Ok(s) => s,
+                _ => return None,
+            };
+
+            Some(session_info.into())
         }
     }
 
