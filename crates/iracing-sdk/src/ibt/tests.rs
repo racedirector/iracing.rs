@@ -1,7 +1,11 @@
 //! Cross-module compatibility checks against the generated IBT fixture manifest.
 
-use crate::test_utils::load_fixture_manifest;
-use crate::{DiskSubHeader, Header, VariableHeader, irsdk::WireType};
+use super::format::extract_variable_schema;
+use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
+use crate::{
+    DiskSubHeader, Header, VariableHeader, VariableHeaderRegion, VariableInfo, VariableType,
+    irsdk::WireType,
+};
 use anyhow::{Context, Result, ensure};
 
 #[test]
@@ -86,6 +90,57 @@ fn test_generated_fixture_profiles_cover_increasing_shapes() -> Result<()> {
     assert!(medium.frame_size < large.frame_size);
     assert!(small.num_frames < medium.num_frames);
     assert!(medium.num_frames < large.num_frames);
+
+    Ok(())
+}
+
+fn variable_type(expected: &str) -> VariableType {
+    match expected {
+        "Char" => VariableType::Char,
+        "Bool" => VariableType::Bool,
+        "Int32" => VariableType::Int32,
+        "BitField" => VariableType::BitField,
+        "Float32" => VariableType::Float32,
+        "Float64" => VariableType::Float64,
+        other => panic!("Unsupported manifest variable type: {}", other),
+    }
+}
+
+fn assert_required_variable(actual: &VariableInfo, expected: &IbtVariableManifest) {
+    assert_eq!(actual.name, expected.name);
+    assert_eq!(actual.data_type, variable_type(&expected.data_type));
+    assert_eq!(actual.offset, expected.offset);
+    assert_eq!(actual.count, expected.count);
+    assert_eq!(actual.units, expected.units);
+}
+
+#[test]
+fn test_generated_fixture_variables_match_manifest() -> Result<()> {
+    let manifest = load_fixture_manifest()?;
+
+    for fixture in &manifest.fixtures {
+        let path = fixture.fixture_path()?;
+        let mut reader = std::io::BufReader::new(
+            std::fs::File::open(&path).with_context(|| format!("Opening {}", path.display()))?,
+        );
+        let header = Header::try_from_reader(&mut reader)?;
+        let region = VariableHeaderRegion::try_from(&header)?;
+        let frame_size = usize::try_from(header.buffer_length)?;
+        let schema = extract_variable_schema(&mut reader, &region, frame_size)?;
+
+        assert_eq!(schema.frame_size, fixture.frame_size);
+        assert_eq!(schema.variable_count(), fixture.num_vars as usize);
+
+        for expected in &fixture.required_variables {
+            let actual = schema.variables.get(&expected.name).with_context(|| {
+                format!(
+                    "Fixture {} missing variable {}",
+                    fixture.name, expected.name
+                )
+            })?;
+            assert_required_variable(actual, expected);
+        }
+    }
 
     Ok(())
 }
