@@ -1,6 +1,6 @@
 //! Utils useful for parsing raw values from buffers
 
-use crate::{IRacingSDKError, Result, VariableInfo, VariableType};
+use crate::{IRacingSDKError, Result, VariableInfo, irsdk::VariableType};
 
 #[allow(unused)]
 pub(crate) fn bytes_at_size(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {

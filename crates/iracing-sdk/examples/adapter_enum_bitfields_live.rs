@@ -3,8 +3,9 @@ use anyhow::Result;
 use clap::Parser;
 #[cfg(windows)]
 use iracing_sdk::{
-    AdapterValidation, BitField, EngineWarnings, FieldExtraction, FrameAdapter, IRacingSDKError,
-    SchemaProvider, SessionFlags, SessionState, TrackSurface, VarData,
+    AdapterValidation, BitField, FieldExtraction, FrameAdapter, IRacingSDKError, SchemaProvider,
+    VarData,
+    irsdk::{EngineWarnings, SessionFlags, SessionState, TrackSurface},
     providers::live::LiveProvider,
 };
 

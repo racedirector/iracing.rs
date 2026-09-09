@@ -6,11 +6,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{
-    IRacingSDKError, Result, VariableHeader, parse_utils,
-    types::irsdk::VariableType as IRSDKVariableType,
+    IRacingSDKError, Result,
+    irsdk::{VariableHeader, VariableType as IRSDKVariableType},
+    parse_utils,
 };
 
-use super::{VariableType, variable_headers_buffer::VariableHeadersBuffer};
+use super::variable_headers_buffer::VariableHeadersBuffer;
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -26,7 +27,8 @@ pub struct VariableInfo {
     pub name: String,
     /// # Data type
     /// Data type of the variable
-    pub data_type: VariableType,
+    #[cfg_attr(feature = "codegen", schemars(schema_with = "storage_type_schema"))]
+    pub data_type: IRSDKVariableType,
     /// # Byte offset
     /// Byte offset within the telemetry frame
     pub offset: usize,
@@ -42,6 +44,14 @@ pub struct VariableInfo {
     /// # Description
     /// Human-readable description
     pub description: String,
+}
+
+impl VariableInfo {
+    pub(crate) fn storage_byte_size(&self) -> Result<usize> {
+        self.data_type.byte_size().ok_or_else(|| {
+            schema_validation_error("ElementTypeCount cannot describe a telemetry variable")
+        })
+    }
 }
 
 impl TryFrom<&VariableHeader> for VariableInfo {
@@ -65,14 +75,7 @@ impl TryFrom<&VariableHeader> for VariableInfo {
                 )
             })?,
             count_as_time: value.count_as_time != 0,
-            data_type: IRSDKVariableType::try_from(value.variable_type)
-                .map_err(|_| {
-                    IRacingSDKError::parse_error(
-                        "VariableInfo::try_from",
-                        format!("Could not convert {} to VariableType", value.variable_type),
-                    )
-                })?
-                .into(),
+            data_type: value.variable_type()?,
         })
     }
 }
@@ -161,7 +164,11 @@ impl VariableSchema {
             }
 
             // Validate that variable fits within frame
-            let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
+            let end_offset = var_info
+                .storage_byte_size()?
+                .checked_mul(var_info.count)
+                .and_then(|size| var_info.offset.checked_add(size))
+                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
             if end_offset > self.frame_size {
                 return Err(IRacingSDKError::memory_access_error(var_info.offset));
             }
@@ -230,10 +237,18 @@ pub trait SchemaProvider {
     }
 }
 
+#[cfg(feature = "codegen")]
+fn storage_type_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": "string",
+        "enum": ["Character", "Boolean", "Integer", "BitField", "Float", "Double"]
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{irsdk::WireType, types::irsdk::VariableType as IRSDKVariableType};
+    use crate::{irsdk::VariableType as IRSDKVariableType, irsdk::WireType};
 
     struct TestProvider {
         schema: VariableSchema,
@@ -246,10 +261,64 @@ mod tests {
     }
 
     #[test]
+    fn rejects_sentinel_and_overflowing_metadata() {
+        use crate::{TelemetryValue, VarData};
+        let mut header = VariableHeader::new(
+            IRSDKVariableType::Float,
+            0,
+            1,
+            false,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+        let mut info = VariableInfo::try_from(&header).unwrap();
+        header.variable_type = 6;
+        assert!(VariableInfo::try_from(&header).is_err());
+        info.data_type = IRSDKVariableType::ElementTypeCount;
+        for count in [0, 1, 2] {
+            info.count = count;
+            assert!(TelemetryValue::decode(&[], &info).is_err());
+            assert!(Vec::<f32>::from_bytes(&[], &info).is_err());
+            assert!(
+                VariableSchema::new(HashMap::from([("Speed".into(), info.clone())]), 4).is_err()
+            );
+        }
+        info.data_type = IRSDKVariableType::Float;
+        info.count = usize::MAX;
+        assert!(
+            VariableSchema::new(HashMap::from([("Speed".into(), info.clone())]), usize::MAX)
+                .is_err()
+        );
+        info.count = 1;
+        info.offset = usize::MAX;
+        assert!(VariableSchema::new(HashMap::from([("Speed".into(), info)]), usize::MAX).is_err());
+    }
+
+    #[cfg(feature = "codegen")]
+    #[test]
+    fn metadata_schema_only_advertises_storage_types() {
+        let schema = schemars::schema_for!(VariableInfo);
+        let value = serde_json::to_value(schema).unwrap();
+        assert_eq!(
+            value["properties"]["data_type"]["enum"],
+            serde_json::json!([
+                "Character",
+                "Boolean",
+                "Integer",
+                "BitField",
+                "Float",
+                "Double"
+            ])
+        );
+    }
+
+    #[test]
     fn schema_provider_basic_usage() {
         let speed = VariableInfo {
             name: "Speed".to_string(),
-            data_type: VariableType::Float32,
+            data_type: IRSDKVariableType::Float,
             offset: 0,
             count: 1,
             count_as_time: false,

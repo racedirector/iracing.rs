@@ -71,7 +71,7 @@ pub use validation::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VariableInfo, VariableType};
+    use crate::{VariableInfo, irsdk::VariableType};
 
     #[test]
     fn adapter_validation_creation() {
@@ -79,7 +79,7 @@ mod tests {
             name: "Speed".to_string(),
             var_info: VariableInfo {
                 name: "Speed".to_string(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 0,
                 count: 1,
                 count_as_time: false,
@@ -101,7 +101,7 @@ mod tests {
             name: "Speed".to_string(),
             var_info: VariableInfo {
                 name: "Speed".to_string(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 0,
                 count: 1,
                 count_as_time: false,

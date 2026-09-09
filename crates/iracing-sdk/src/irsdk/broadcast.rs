@@ -82,13 +82,13 @@ sdk_enum! {
     pub enum ReplaySearchMode {
         ToStart = 0,
         ToEnd = 1,
-        PrevSession = 2,
+        PreviousSession = 2,
         NextSession = 3,
-        PrevLap = 4,
+        PreviousLap = 4,
         NextLap = 5,
-        PrevFrame = 6,
+        PreviousFrame = 6,
         NextFrame = 7,
-        PrevIncident = 8,
+        PreviousIncident = 8,
         NextIncident = 9,
         Last = 10,
     }

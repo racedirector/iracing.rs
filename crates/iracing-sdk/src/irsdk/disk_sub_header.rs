@@ -1,7 +1,8 @@
 use std::io::Read;
 use type_layout::TypeLayout;
 
-use crate::{IRacingSDKError, Result, types::irsdk::WireType};
+use super::WireType;
+use crate::{IRacingSDKError, Result};
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///

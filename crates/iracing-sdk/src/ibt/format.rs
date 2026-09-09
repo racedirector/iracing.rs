@@ -68,7 +68,7 @@ pub fn extract_variable_schema<R: Read + Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Header, irsdk::WireType};
+    use crate::irsdk::{Header, WireType};
     use std::io::Cursor;
 
     #[test]

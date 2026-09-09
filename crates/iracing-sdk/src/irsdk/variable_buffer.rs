@@ -1,6 +1,5 @@
+use super::WireType;
 use type_layout::TypeLayout;
-
-use crate::types::irsdk::wire_type::WireType;
 
 /// iRacing variable buffer information
 #[repr(C)]

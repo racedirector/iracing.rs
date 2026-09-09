@@ -16,7 +16,14 @@ properties:
   data_type:
     title: Data type
     description: Data type of the variable
-    $ref: '#/$defs/VariableType'
+    type: string
+    enum:
+    - Character
+    - Boolean
+    - Integer
+    - BitField
+    - Float
+    - Double
   description:
     title: Description
     description: Human-readable description
@@ -43,42 +50,3 @@ required:
 - count_as_time
 - units
 - description
-$defs:
-  VariableType:
-    description: |-
-      Supported telemetry data types.
-      Maps to iRacing SDK's irsdk_VarType enum.
-    oneOf:
-    - description: 8-bit character (maps to irsdk_char)
-      type: string
-      const: Char
-    - description: 8-bit signed integer
-      type: string
-      const: Int8
-    - description: 8-bit unsigned integer
-      type: string
-      const: UInt8
-    - description: 16-bit signed integer
-      type: string
-      const: Int16
-    - description: 16-bit unsigned integer
-      type: string
-      const: UInt16
-    - description: 32-bit signed integer (maps to irsdk_int)
-      type: string
-      const: Int32
-    - description: 32-bit unsigned integer
-      type: string
-      const: UInt32
-    - description: 32-bit floating point (maps to irsdk_float)
-      type: string
-      const: Float32
-    - description: 64-bit floating point (maps to irsdk_double)
-      type: string
-      const: Float64
-    - description: Boolean value (maps to irsdk_bool)
-      type: string
-      const: Bool
-    - description: 32-bit bitfield (maps to irsdk_bitField)
-      type: string
-      const: BitField

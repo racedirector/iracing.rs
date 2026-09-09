@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use super::VarData;
-use crate::{BitField, IRacingSDKError, VariableInfo, VariableType};
+use crate::{BitField, IRacingSDKError, VarData, VariableInfo, irsdk::VariableType};
 
 /// Runtime value type that can hold any telemetry data.
+///
+/// SDK decoding produces only `Char`, `Bool`, `Int32`, `BitField`, `Float32`,
+/// `Float64`, and arrays. Other integer variants remain available for callers
+/// constructing values directly or reading previously serialized values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TelemetryValue {
     /// An 8-bit character value (`irsdk_char`).
@@ -35,6 +38,7 @@ pub enum TelemetryValue {
 impl TelemetryValue {
     /// Decodes requested VariableInfo from the provided data.
     pub fn decode(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+        info.storage_byte_size()?;
         match info.count {
             0 => Ok(Self::Array(Vec::new())),
             1 => Self::decode_scalar(data, info),
@@ -45,26 +49,20 @@ impl TelemetryValue {
     fn decode_scalar(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         match info.data_type {
             VariableType::Character => u8::from_bytes(data, info).map(Self::Char),
-            // VariableType::Int8 => i8::from_bytes(data, info).map(Self::Int8),
-            // VariableType::UInt8 => u8::from_bytes(data, info).map(Self::UInt8),
-            // VariableType::Int16 => i16::from_bytes(data, info).map(Self::Int16),
-            // VariableType::UInt16 => u16::from_bytes(data, info).map(Self::UInt16),
-            // VariableType::Int32 => i32::from_bytes(data, info).map(Self::Int32),
-            // VariableType::UInt32 => u32::from_bytes(data, info).map(Self::UInt32),
-            // VariableType::Float32 => f32::from_bytes(data, info).map(Self::Float32),
-            // VariableType::Float64 => f64::from_bytes(data, info).map(Self::Float64),
-            // VariableType::Bool => bool::from_bytes(data, info).map(Self::Bool),
             VariableType::BitField => BitField::from_bytes(data, info).map(Self::BitField),
             VariableType::Boolean => bool::from_bytes(data, info).map(Self::Bool),
             VariableType::Integer => i32::from_bytes(data, info).map(Self::Int32),
-            VariableType::Float => f64::from_bytes(data, info).map(Self::Float64),
-            VariableType::Double => todo!(),
-            VariableType::ElementTypeCount => todo!(),
+            VariableType::Float => f32::from_bytes(data, info).map(Self::Float32),
+            VariableType::Double => f64::from_bytes(data, info).map(Self::Float64),
+            VariableType::ElementTypeCount => Err(IRacingSDKError::parse_error(
+                "TelemetryValue::decode",
+                "ElementTypeCount is not a storage type",
+            )),
         }
     }
 
     fn decode_array(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        let element_size = info.data_type.byte_size();
+        let element_size = info.storage_byte_size()?;
         let mut values = Vec::with_capacity(info.count);
         let mut element_info = info.clone();
         element_info.count = 1;

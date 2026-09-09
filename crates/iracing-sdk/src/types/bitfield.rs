@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{EngineWarnings, PitServiceFlags, SessionFlags};
+use crate::irsdk::{EngineWarnings, PitServiceFlags, SessionFlags};
 
 /// BitField type for handling iRacing bitfield variables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +102,25 @@ pub fn pit_service_has_full_service(flags: BitField) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bitfield_constructor_works() {
+        let bitfield = BitField::new(0x12345678);
+        assert_eq!(bitfield.value(), 0x12345678);
+    }
+
+    #[test]
+    fn bitfield_flag_operations_basic() {
+        let bitfield = BitField::new(0b1010);
+        assert!(bitfield.is_set(1));
+        assert!(!bitfield.is_set(0));
+        assert!(bitfield.is_set(3));
+        assert!(!bitfield.is_set(2));
+        assert!(bitfield.has_flag(0b0010));
+        assert!(!bitfield.has_flag(0b0001));
+        assert!(bitfield.has_flag(0b1000));
+        assert!(!bitfield.has_flag(0b0100));
+    }
 
     #[test]
     fn engine_repair_helpers_accept_typed_warning_bits() {

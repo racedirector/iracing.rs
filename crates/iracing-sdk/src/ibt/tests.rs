@@ -3,14 +3,14 @@
 use super::format::extract_variable_schema;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
-    DiskSubHeader, Header, VariableHeader, VariableHeaderRegion, VariableInfo, VariableType,
-    irsdk::WireType,
+    VariableHeaderRegion, VariableInfo,
+    irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType},
 };
 use anyhow::{Context, Result, ensure};
 
 #[test]
 fn test_generated_fixture_headers_match_manifest() -> Result<()> {
-    use crate::StatusField;
+    use crate::irsdk::StatusField;
 
     let manifest = load_fixture_manifest()?;
     assert_eq!(manifest.layout.live_header_prefix_size, Header::WIRE_SIZE);
@@ -96,12 +96,12 @@ fn test_generated_fixture_profiles_cover_increasing_shapes() -> Result<()> {
 
 fn variable_type(expected: &str) -> VariableType {
     match expected {
-        "Char" => VariableType::Char,
-        "Bool" => VariableType::Bool,
-        "Int32" => VariableType::Int32,
+        "Char" => VariableType::Character,
+        "Bool" => VariableType::Boolean,
+        "Int32" => VariableType::Integer,
         "BitField" => VariableType::BitField,
-        "Float32" => VariableType::Float32,
-        "Float64" => VariableType::Float64,
+        "Float32" => VariableType::Float,
+        "Float64" => VariableType::Double,
         other => panic!("Unsupported manifest variable type: {}", other),
     }
 }

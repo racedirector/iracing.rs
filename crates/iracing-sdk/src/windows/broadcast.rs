@@ -43,10 +43,14 @@
 //! ```
 
 use crate::{
-    BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode, FfbCommandMode,
-    IRacingSDKError, PitCommandMode, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, Result, TelemetryCommandMode, VideoCaptureMode,
-    types::irsdk::constants::IRSDK_BROADCASTMSGNAME, windows::utils::pad_car_number,
+    IRacingSDKError, Result,
+    irsdk::{
+        BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode,
+        ForceFeedbackCommandMode, PitCommandMode, ReloadTexturesMode, ReplayPositionMode,
+        ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
+        constants::IRSDK_BROADCASTMSGNAME,
+    },
+    windows::utils::pad_car_number,
 };
 use {
     windows::Win32::{
@@ -261,7 +265,7 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
                 let (low, high) = split_u32_words(bits);
                 (
                     RawBroadcastMessage::ForceFeedbackCommand,
-                    encode_mode(FfbCommandMode::MaxForce),
+                    encode_mode(ForceFeedbackCommandMode::MaxForce),
                     low,
                     high,
                 )
@@ -556,7 +560,7 @@ mod tests {
     fn encodes_ffb_max_force_bits() {
         let (_, var1, var2, var3) = BroadcastCommand::FFBCommand(20.9998).try_into().unwrap();
         let bits = 20.9998f32.to_bits();
-        assert_eq!(var1, encode_mode(FfbCommandMode::MaxForce));
+        assert_eq!(var1, encode_mode(ForceFeedbackCommandMode::MaxForce));
         assert_eq!(var2, (bits & 0xFFFF) as u16);
         assert_eq!(var3, ((bits >> 16) & 0xFFFF) as u16);
     }
