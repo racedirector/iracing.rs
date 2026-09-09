@@ -210,7 +210,23 @@ impl TryFrom<&Header> for VariableHeaderRegion {
 #[cfg(test)]
 mod tests {
     use super::{VariableHeaderRegion, checked_range};
-    use crate::{VariableHeader, irsdk::WireType};
+    use crate::{Header, VariableHeader, irsdk::WireType};
+
+    #[test]
+    fn variable_header_region_rejects_negative_count() {
+        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        header.variable_count = -1;
+
+        assert!(VariableHeaderRegion::try_from(&header).is_err());
+    }
+
+    #[test]
+    fn variable_header_region_rejects_negative_offset() {
+        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        header.variable_header_offset = -1;
+
+        assert!(VariableHeaderRegion::try_from(&header).is_err());
+    }
 
     #[test]
     fn checked_range_accepts_region_within_data() {
