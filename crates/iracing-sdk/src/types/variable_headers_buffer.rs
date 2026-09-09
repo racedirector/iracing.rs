@@ -24,8 +24,10 @@ impl VariableHeadersBuffer {
 
     /// Iterates over the wire headers represented by this exact snapshot.
     pub fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
-        self.bytes
-            .chunks_exact(VariableHeader::WIRE_SIZE)
+        let (chunks, _) = self.bytes.as_chunks::<{ VariableHeader::WIRE_SIZE }>();
+
+        chunks
+            .iter()
             .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })
     }
 }
