@@ -133,7 +133,6 @@ pub struct DriverInput {
 
     #[field_name = "PlayerIncidents"]
     #[fail_if_missing]
-    // #[calculated = "iracing_sdk::types::IncidentFlags::from_bits_retain"]
     pub player_incidents: IncidentFlags,
 
     #[field_name = "SessionFlags"]

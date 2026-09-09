@@ -282,5 +282,12 @@ fn incident_flags_validate_and_adapt_from_bitfield_or_int32_storage() {
         assert_eq!(row.incidents.bits(), RAW);
         assert_eq!(row.incidents.report_bits(), 8);
         assert_eq!(row.incidents.penalty_bits(), 4);
+        assert_eq!(
+            row.incidents.classify(),
+            iracing_sdk::irsdk::IncidentClassification {
+                report: iracing_sdk::irsdk::IncidentReport::CollisionWithCar,
+                penalty: iracing_sdk::irsdk::IncidentPenalty::FourX,
+            }
+        );
     }
 }
