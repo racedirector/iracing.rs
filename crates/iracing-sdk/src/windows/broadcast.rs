@@ -46,9 +46,9 @@ use crate::{
     IRacingSDKError, Result,
     irsdk::{
         BroadcastMessage as RawBroadcastMessage, CameraState, ChatCommandMode,
-        ForceFeedbackCommandMode, PitCommandMode, ReloadTexturesMode, ReplayPositionMode,
-        ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
-        constants::IRSDK_BROADCASTMSGNAME,
+        ForceFeedbackCommandMode, PitCommand, PitCommandMode, ReloadTexturesMode,
+        ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode,
+        VideoCaptureMode, constants::IRSDK_BROADCASTMSGNAME,
     },
     windows::utils::pad_car_number,
 };
@@ -59,56 +59,6 @@ use {
     },
     windows::core::PCWSTR,
 };
-
-/// Commands that adjust pit service behavior for the player's car.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PitCommand {
-    /// Clear all pending pit service selections.
-    Clear,
-    /// Request a windshield tearoff.
-    Tearoff,
-    /// Set fuel amount in gallons.
-    Fuel(u16),
-    /// Set left-front tire pressure in PSI.
-    LF(u16),
-    /// Set right-front tire pressure in PSI.
-    RF(u16),
-    /// Set left-rear tire pressure in PSI.
-    LR(u16),
-    /// Set right-rear tire pressure in PSI.
-    RR(u16),
-    /// Clear all tire pressure changes.
-    ClearTires,
-    /// Request fast repair.
-    FastRepair,
-    /// Clear windshield tearoff request.
-    ClearTearoff,
-    /// Clear fast repair request.
-    ClearFastRepair,
-    /// Clear fuel request.
-    ClearFuel,
-}
-
-impl PitCommand {
-    fn encode(self) -> (u16, u16) {
-        use PitCommandMode as Id;
-
-        match self {
-            PitCommand::Clear => (encode_mode(Id::Clear), 0),
-            PitCommand::Tearoff => (encode_mode(Id::WindshieldTearoff), 0),
-            PitCommand::Fuel(gal) => (encode_mode(Id::Fuel), gal),
-            PitCommand::LF(pressure) => (encode_mode(Id::LeftFrontTire), pressure),
-            PitCommand::RF(pressure) => (encode_mode(Id::RightFrontTire), pressure),
-            PitCommand::LR(pressure) => (encode_mode(Id::LeftRearTire), pressure),
-            PitCommand::RR(pressure) => (encode_mode(Id::RightRearTire), pressure),
-            PitCommand::ClearTires => (encode_mode(Id::ClearTires), 0),
-            PitCommand::FastRepair => (encode_mode(Id::FastRepair), 0),
-            PitCommand::ClearTearoff => (encode_mode(Id::ClearWindshieldTearoff), 0),
-            PitCommand::ClearFastRepair => (encode_mode(Id::ClearFastRepair), 0),
-            PitCommand::ClearFuel => (encode_mode(Id::ClearFuel), 0),
-        }
-    }
-}
 
 /// Messages that can be sent to the iRacing simulation.
 ///
@@ -158,12 +108,6 @@ pub enum BroadcastCommand {
     ReplaySearchSessionTime(u16, u32),
     /// Control video capture.
     VideoCapture(VideoCaptureMode),
-}
-
-impl BroadcastCommand {
-    fn encode_pit(command: PitCommand) -> (u16, u16) {
-        command.encode()
-    }
 }
 
 type BroadcastMessageFormat = (RawBroadcastMessage, u16, u16, u16);
@@ -251,7 +195,33 @@ impl TryFrom<BroadcastCommand> for BroadcastMessageFormat {
                 )
             }
             BroadcastCommand::PitCommand(pit_command_mode) => {
-                let (var1, var2) = BroadcastCommand::encode_pit(pit_command_mode);
+                let (var1, var2) = match pit_command_mode {
+                    PitCommand::Clear => (encode_mode(PitCommandMode::Clear), 0),
+                    PitCommand::Tearoff => (encode_mode(PitCommandMode::WindshieldTearoff), 0),
+                    PitCommand::Fuel(gal) => (encode_mode(PitCommandMode::Fuel), gal),
+                    PitCommand::LF(pressure) => {
+                        (encode_mode(PitCommandMode::LeftFrontTire), pressure)
+                    }
+                    PitCommand::RF(pressure) => {
+                        (encode_mode(PitCommandMode::RightFrontTire), pressure)
+                    }
+                    PitCommand::LR(pressure) => {
+                        (encode_mode(PitCommandMode::LeftRearTire), pressure)
+                    }
+                    PitCommand::RR(pressure) => {
+                        (encode_mode(PitCommandMode::RightRearTire), pressure)
+                    }
+                    PitCommand::ClearTires => (encode_mode(PitCommandMode::ClearTires), 0),
+                    PitCommand::FastRepair => (encode_mode(PitCommandMode::FastRepair), 0),
+                    PitCommand::ClearTearoff => {
+                        (encode_mode(PitCommandMode::ClearWindshieldTearoff), 0)
+                    }
+                    PitCommand::ClearFastRepair => {
+                        (encode_mode(PitCommandMode::ClearFastRepair), 0)
+                    }
+                    PitCommand::ClearFuel => (encode_mode(PitCommandMode::ClearFuel), 0),
+                };
+
                 (RawBroadcastMessage::PitCommand, var1, var2, 0)
             }
             BroadcastCommand::TelemetryCommand(mode) => (

@@ -37,6 +37,15 @@ replaces the former synthetic unsigned-integer shortcut.
 
 ## Session YAML path
 
+`SessionInfoBuffer` owns the complete captured region. Its `payload()` method
+borrows a `SessionInfoPayload` ending before the first NUL, preserving the original
+region without allocating. The payload detects `WeekendInfo.Encoding` and decodes
+the same bounded slice: declared UTF-8 uses replacement for malformed sequences,
+declared ISO-8859-1 maps each byte to its code point, and absent or unknown
+declarations use UTF-8 validation with an ISO-8859-1 fallback. Converting the
+buffer to `String` delegates to this payload decoder. Neither boundary nor
+encoding is cached; YAML cleanup and parsing remain subsequent operations.
+
 iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
 that standard parsers do not accept directly. The code has two cleanup surfaces:
 
@@ -75,6 +84,19 @@ The `schema-discovery` feature adds flattened maps for unknown YAML fields and
 helpers that collect their paths, inferred types, and examples. This supports
 evolving the typed model without silently losing evidence of new simulator
 fields.
+
+`cargo session schema ibt --path <file.ibt>` and, on Windows,
+`cargo session schema live` generate a schema from a captured typed value.
+Discovery maps serialize their keys inline in the appropriate domain, so
+unknown keys appear in the inferred schema and its example, not under an
+`unknown_fields` property. Both commands also include
+`x-iracing-unknown-fields`, a path-sorted report from `collect_unknown_fields`
+with types and examples. This extension is evidence for model updates, not a
+JSON Schema validation constraint. The report traverses unknown leaves; inspect
+the captured example for empty containers and full values.
+
+The repo skill `.agents/skills/update-session-schema/SKILL.md` guides capture
+selection, domain model updates, and verification.
 
 ## Generated reference artifacts
 

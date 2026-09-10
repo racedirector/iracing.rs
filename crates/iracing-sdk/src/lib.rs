@@ -85,6 +85,8 @@ pub use adapters::*;
 pub use error::*;
 pub use types::*;
 
+pub use irsdk::broadcast::PitCommand;
+
 #[doc(hidden)]
 pub mod __private {
     pub use tracing;
@@ -103,8 +105,6 @@ pub mod windows;
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
 pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection, WaitResult};
-
-pub use windows::PitCommand;
 
 // Main API exports
 pub use connections::ibt::IbtConnection;

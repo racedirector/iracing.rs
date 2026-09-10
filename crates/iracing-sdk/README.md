@@ -155,8 +155,10 @@ impl FrameAdapter for Row {
 |---|---|---|
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
 | Session parsing (`SessionInfoParser`) | Yes | Yes |
+| `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
+| `session schema live` and `session snapshot live` | No | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-session-parser`, `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
+| `live-position` example / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
 ## Examples and Binaries
 
@@ -175,14 +177,17 @@ impl FrameAdapter for Row {
 
 ### Binaries
 
-- `ibt-session-parser`:
-  - `cargo run -p iracing-sdk --bin ibt-session-parser -- --ibt-path ./session.ibt --output-path ./session.yaml`
+- `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
+  - Type schema: `cargo session schema type`
+  - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`
+  - Session snapshot from an IBT recording: `cargo session snapshot ibt --path ./session.ibt --output ./session.yaml`
+  - Live schema (Windows only): `cargo session schema live`
+  - Live snapshot (Windows only): `cargo session snapshot live --output ./live-session.yaml`
+  - All subcommands default to YAML on stdout. Use `--output -` for explicit stdout, `--output <file>` for a file, or `--encoding json` / `--encoding json-pretty` for JSON. Diagnostics go to stderr.
 - `ibt-json-snapshot`:
   - `cargo run -p iracing-sdk --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
 - `ibt-to-json`:
   - `cargo run -p iracing-sdk --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
-- `live-session-parser` (Windows only):
-  - `cargo run -p iracing-sdk --bin live-session-parser -- --output-path .\\live-session.yaml`
 - `live-to-csv` (Windows only):
   - `cargo run -p iracing-sdk --bin live-to-csv -- --output-path .\\live.csv`
 - `live-json-snapshot` (Windows only):
@@ -197,5 +202,5 @@ impl FrameAdapter for Row {
   - Run `cargo test-fixtures` from the repository root.
 - `live-*` tools fail on non-Windows:
   - Live shared memory APIs are Windows-only.
-- No session YAML written by parser tools:
-  - `session_yaml()`/`session_info()` can legitimately return no content if unavailable.
+- No session snapshot available:
+  - `session snapshot` reports an error when the source contains no session information.

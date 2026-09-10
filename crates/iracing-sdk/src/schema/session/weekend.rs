@@ -16,6 +16,8 @@ use std::collections::HashMap;
 #[serde(rename_all = "PascalCase")]
 #[serde(default)]
 pub struct WeekendInfo {
+    /// AltAssetTag (observed null; type unconfirmed).
+    pub alt_asset_tag: Option<String>,
     /// Encoding used for the raw session string (for example, `UTF8` or `ISO_8859_1`)
     pub encoding: Option<String>,
     /// Track name

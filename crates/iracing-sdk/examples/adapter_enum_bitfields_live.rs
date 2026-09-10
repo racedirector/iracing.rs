@@ -75,10 +75,10 @@ impl FrameAdapter for TelemetryRow {
         Self {
             session_state: SessionState::try_from(session_state_raw)
                 .unwrap_or(SessionState::Invalid),
-            session_flags: SessionFlags::try_from(session_flags_raw).unwrap_or_default(),
+            session_flags: SessionFlags::from(session_flags_raw),
             track_surface: TrackSurface::try_from(track_surface_raw)
                 .unwrap_or(TrackSurface::SurfaceNotInWorld),
-            engine_warnings: EngineWarnings::try_from(engine_warnings_raw).unwrap_or_default(),
+            engine_warnings: EngineWarnings::from(engine_warnings_raw),
         }
     }
 }

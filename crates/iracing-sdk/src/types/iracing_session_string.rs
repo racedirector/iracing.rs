@@ -70,6 +70,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rejects_empty_text_after_sanitizing() {
+        for input in ["", " \n\r\t", "\x00\x08\x0b\x0c\x1f"] {
+            assert!(IRacingSessionString::try_from(input).is_err());
+            assert!(IRacingSessionString::try_from(input.to_owned()).is_err());
+        }
+    }
+
+    #[test]
+    fn preserves_clean_text_exactly() {
+        let input = "UserName: O'Connor, Mike\r\nDriverSetupName: setups\\race\n";
+        let sanitized = IRacingSessionString::try_from(input).unwrap();
+        assert_eq!(String::from(sanitized), input);
+    }
+
+    #[test]
+    fn removes_control_characters_at_each_range_boundary() {
+        let sanitized = IRacingSessionString::try_from("a\x00\x08\x0b\x0c\x0e\x1fb\n\r\t").unwrap();
+        assert_eq!(String::from(sanitized), "ab\n\r\t");
+    }
+
+    #[test]
+    fn buffer_conversion_decodes_then_sanitizes() {
+        let buffer = SessionInfoBuffer::from_checked_region(b"UserName: Jos\xe9\x01\n\0padding");
+        let sanitized = IRacingSessionString::try_from(buffer).unwrap();
+        assert_eq!(String::from(sanitized), "UserName: Jos\u{e9}\n");
+    }
+
+    #[test]
+    fn buffer_conversion_rejects_empty_nul_terminated_text() {
+        let buffer = SessionInfoBuffer::from_checked_region(b"\0UserName: ignored");
+        assert!(IRacingSessionString::try_from(buffer).is_err());
+    }
+
+    #[test]
     fn test_iracing_session_string_control_characters_removed() {
         let result: IRacingSessionString = "WeekendInfo:\n\x00\x01\x02  TrackName: test\x03"
             .to_string()

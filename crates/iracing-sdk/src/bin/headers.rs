@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use iracing_sdk::irsdk::{DiskSubHeader, Header, VariableBuffer};
+use iracing_sdk::irsdk::{DiskSubHeader, Header, VariableBuffer, VariableHeader};
 use std::{fs::File, io::BufReader, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 use type_layout::TypeLayout;
@@ -40,7 +40,7 @@ enum Commands {
         #[arg(short, long)]
         timeout_ms: Option<u64>,
         /// How often to poll for a connection. Default is 1 second.
-        #[arg(short, long, default_value_t = 1)]
+        #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u64).range(1..))]
         poll_s: u64,
     },
     /// Prints the type information for the header data structures.
@@ -70,10 +70,6 @@ fn main() -> Result<()> {
             timeout_ms,
             poll_s,
         } => {
-            if poll_s < 1 {
-                return Err(anyhow::anyhow!("Timeout cannot be < 1"));
-            }
-
             print_live_header(wait, timeout_ms, Duration::from_secs(poll_s))?;
         }
         Commands::Type => print_type_layout()?,
@@ -93,6 +89,11 @@ fn print_type_layout() -> Result<()> {
     println!(
         "DiskSubHeader type layout:\n{}",
         DiskSubHeader::type_layout()
+    );
+
+    println!(
+        "VariableHeader type layout:\n{}",
+        VariableHeader::type_layout()
     );
 
     Ok(())
