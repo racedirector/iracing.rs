@@ -18,4 +18,4 @@
 
 pub mod session;
 
-pub use session::{SessionInfo, SessionInfoParser};
+pub use session::SessionInfo;

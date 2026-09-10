@@ -159,6 +159,10 @@ impl VariableHeaderRegion {
             self.bytes(source)?,
         ))
     }
+
+    pub fn is_valid(&self) -> bool {
+        self.offset > 0 && self.length > 0
+    }
 }
 
 impl TryFrom<&Header> for VariableHeaderRegion {
@@ -209,8 +213,41 @@ impl TryFrom<&Header> for VariableHeaderRegion {
 
 #[cfg(test)]
 mod tests {
-    use super::{VariableHeaderRegion, checked_range};
+    use super::{SessionInfoRegion, VariableHeaderRegion, checked_range};
     use crate::irsdk::{Header, VariableHeader, WireType};
+
+    #[test]
+    fn session_region_rejects_negative_header_fields() {
+        for (offset, length) in [(-1, 1), (1, -1)] {
+            let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+            header.session_info_offset = offset;
+            header.session_info_len = length;
+            assert!(SessionInfoRegion::try_from(&header).is_err());
+        }
+    }
+
+    #[test]
+    fn session_region_copies_only_advertised_bytes() {
+        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        header.session_info_offset = 4;
+        header.session_info_len = 7;
+        let region = SessionInfoRegion::try_from(&header).unwrap();
+        let mut source = b"skipSessionpadding".to_vec();
+        assert_eq!(region.bytes(&source).unwrap(), b"Session");
+        let buffer = region.buffer(&source).unwrap();
+        source.fill(0);
+        assert_eq!(String::from(buffer), "Session");
+    }
+
+    #[test]
+    fn session_region_requires_the_full_region_even_with_early_nul() {
+        let region = SessionInfoRegion {
+            offset: 1,
+            length: 4,
+        };
+        assert!(region.buffer(b"x\0").is_err());
+        assert!(region.buffer(b"x\0pad").is_ok());
+    }
 
     #[test]
     fn variable_header_region_rejects_negative_count() {

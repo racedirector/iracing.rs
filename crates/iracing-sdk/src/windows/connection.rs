@@ -5,7 +5,7 @@
 
 use crate::{
     IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
-    VariableInfo,
+    VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
     irsdk::{
         Header, VariableHeader,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
@@ -230,27 +230,29 @@ impl Connection {
         None
     }
 
-    /// Get session info YAML string
-    pub fn session_info(&self) -> Option<String> {
+    /// Get session info buffer from header-determined region.
+    pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
         let header = self.header();
         let session_info_region = match SessionInfoRegion::try_from(header) {
             Ok(region) if region.is_valid() => region,
             _ => return None,
         };
 
-        unsafe {
+        let session_info_bytes = unsafe {
             // Get the slice of the session yaml
             let info_ptr = self.base.as_ptr().add(session_info_region.offset());
-            let info_slice = std::slice::from_raw_parts(info_ptr, session_info_region.length());
+            std::slice::from_raw_parts(info_ptr, session_info_region.length())
+        };
 
-            let session_info_buffer = SessionInfoBuffer::from_checked_region(info_slice);
-            let session_info = match IRacingSessionString::try_from(session_info_buffer) {
-                Ok(s) => s,
-                _ => return None,
-            };
+        session_info_region.buffer(session_info_bytes).ok()
+    }
 
-            Some(session_info.into())
-        }
+    /// Get session info YAML string
+    pub fn session_info(&self) -> Option<String> {
+        let buffer = self.session_info_buffer()?;
+        let session_info = IRacingSessionString::try_from(buffer).ok()?;
+
+        Some(session_info.into())
     }
 
     /// Get session info update counter
@@ -258,34 +260,30 @@ impl Connection {
         self.header().session_info_update
     }
 
+    /// Get variable headers buffer from header-determined region.
+    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
+        let header = self.header();
+        let variable_headers_region = match VariableHeaderRegion::try_from(header) {
+            Ok(r) if r.is_valid() => r,
+            _ => return None,
+        };
+
+        let variable_header_bytes = unsafe {
+            let var_header_ptr = self.base.as_ptr().add(variable_headers_region.offset());
+            std::slice::from_raw_parts(var_header_ptr, variable_headers_region.length())
+        };
+
+        variable_headers_region.buffer(variable_header_bytes).ok()
+    }
+
     /// Get all variable definitions from the header
     pub fn get_variables(&self) -> Result<Vec<VariableInfo>> {
-        let header = self.header();
-        if header.variable_count <= 0 || header.variable_header_offset <= 0 {
-            return Ok(Vec::new());
-        }
+        let buffer = match self.variable_headers_buffer() {
+            Some(b) => b,
+            _ => return Ok(Vec::new()),
+        };
 
-        let mut variables = Vec::new();
-
-        unsafe {
-            let var_header_ptr = self
-                .base
-                .as_ptr()
-                .add(header.variable_header_offset as usize);
-
-            for i in 0..header.variable_count {
-                let var_ptr =
-                    var_header_ptr.add(i as usize * std::mem::size_of::<VariableHeader>());
-                let var_header = &*(var_ptr as *const VariableHeader);
-
-                // Convert to our VariableInfo format
-                let var_info = VariableInfo::try_from(var_header)?;
-
-                variables.push(var_info);
-            }
-        }
-
-        Ok(variables)
+        buffer.iter_headers().map(VariableInfo::try_from).collect()
     }
 
     /// Validate initial connection
@@ -306,7 +304,7 @@ impl Connection {
     /// Find the buffer with the highest tick count
     pub fn find_latest_buffer(&self, header: &Header) -> usize {
         let mut latest = 0;
-        let num_buf = std::cmp::min(header.buffer_count, 4) as usize;
+        let num_buf = header.buffer_count.clamp(0, 4) as usize;
         for i in 1..num_buf {
             if header.buffers[latest].tick_count < header.buffers[i].tick_count {
                 latest = i;

@@ -3,10 +3,10 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[cfg(windows)]
 use iracing_sdk::{
     irsdk::{
-        CameraState, ChatCommandMode, ReplayPositionMode, ReplaySearchMode, ReplayStateMode,
-        TelemetryCommandMode, VideoCaptureMode,
+        CameraState, ChatCommandMode, PitCommand, ReplayPositionMode, ReplaySearchMode,
+        ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
     },
-    windows::{Broadcast, BroadcastCommand, PitCommand},
+    windows::{Broadcast, BroadcastCommand},
 };
 
 #[derive(Parser, Debug)]

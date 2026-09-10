@@ -32,7 +32,8 @@
 
 use super::format::extract_variable_schema;
 use crate::{
-    IRacingSDKError, Result, SchemaProvider, VariableHeaderRegion, VariableSchema,
+    IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
+    VariableSchema,
     irsdk::{DiskSubHeader, Header},
     types::{IRacingSessionString, SessionInfoRegion},
 };
@@ -97,7 +98,6 @@ impl IbtReader {
 
         let variable_headers_region = VariableHeaderRegion::try_from(&header)?;
         let variable_headers_range = variable_headers_region.checked_range(data.len())?;
-
         let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
             IRacingSDKError::parse_error(
                 "Variable headers parse",
@@ -157,20 +157,24 @@ impl IbtReader {
         })
     }
 
+    /// Gets the session info bytes buffer from `data`.
+    pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
+        if !self.session_info_region.is_valid() {
+            return None;
+        }
+
+        self.session_info_region.buffer(&self.data).ok()
+    }
+
     /// Get cleaned session YAML from the IBT file
     ///
     /// Returns preprocessed YAML string ready for parsing. The YAML has been cleaned
-    /// to fix iRacing's non-standard format issues. Parsing happens at the Connection level.
-    /// This method extracts on-demand, no caching.
-    pub fn session_yaml(&self) -> Result<Option<String>> {
-        if !self.session_info_region.is_valid() {
-            return Ok(None);
-        }
+    /// to fix iRacing's non-standard format issues.
+    pub fn session_yaml(&self) -> Option<String> {
+        let buffer = self.session_info_buffer()?;
+        let session_string = IRacingSessionString::try_from(buffer).ok()?;
 
-        let buffer = self.session_info_region.buffer(&self.data)?;
-        let session_string = IRacingSessionString::try_from(buffer)?;
-
-        Ok(Some(session_string.into()))
+        Some(session_string.into())
     }
 
     /// Get total number of frames in the file
@@ -586,12 +590,9 @@ mod tests {
         );
 
         // Extract session YAML
-        let yaml_result = reader
+        let yaml = reader
             .session_yaml()
             .with_context(|| "Extracting session YAML")?;
-
-        // Verify we got YAML
-        let yaml = yaml_result.expect("IBT file should contain session YAML");
 
         // Verify YAML is non-empty
         ensure!(!yaml.is_empty(), "Session YAML should not be empty");

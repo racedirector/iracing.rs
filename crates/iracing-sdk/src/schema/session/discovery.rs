@@ -3,10 +3,11 @@
 //! This module provides types and helpers for discovering unknown fields during
 //! session info parsing. Only available when the `schema-discovery` feature is enabled.
 
+use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Value;
 
 /// Report of an unknown field discovered during schema parsing
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UnknownField {
     /// JSON path to the field (e.g., "WeekendInfo.TelemetryOptions.NewField")
     pub path: String,
@@ -17,7 +18,7 @@ pub struct UnknownField {
 }
 
 /// Types of unknown fields that can be discovered
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UnknownFieldType {
     /// String value
     String,

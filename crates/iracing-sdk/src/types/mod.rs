@@ -58,18 +58,13 @@ mod var_data;
 mod variable_headers_buffer;
 
 // Re-export all public types
-pub use bitfield::{
-    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed, engine_repairs_needed,
-    pit_service_has_full_service, pit_service_has_tire_service, session_dq_scoring_invalid,
-    session_penalty_shown, session_start_control_shown, session_under_caution,
-    session_under_yellow, tick_after_u32,
-};
+pub use bitfield::BitField;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::{SessionInfoRegion, VariableHeaderRegion};
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
-pub use session_info_buffer::SessionInfoBuffer;
+pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;

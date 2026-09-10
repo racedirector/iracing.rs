@@ -15,7 +15,7 @@ Rust workspace for working with iRacing telemetry and simulation state:
 ## Crates
 
 - [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing/caching (`SessionInfoParser`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
-- [`crates/iracing-sdk`](crates/iracing-sdk) — also contains the schema generator binaries (`session-schema`, `disk-variable-schema`, `disk-session-schema`, `car-setup-schema`, `live-session-schema`, `live-variable-schema`, …).
+- [`crates/iracing-sdk`](crates/iracing-sdk) — also contains the schema generator binaries (`session`, `disk-variable-schema`, `car-setup-schema`, `live-variable-schema`, …).
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-fixtures`](crates/test-fixtures) — unpublished Rust tooling for deterministic `.ibt` fixture generation, verification, and drift checks.
 
@@ -31,12 +31,12 @@ that one capture is an exhaustive schema for every car and session.
 
 | Artifact | Purpose | Regenerate from workspace root |
 | --- | --- | --- |
-| [`docs/reference/session-schema.yml`](docs/reference/session-schema.yml) | Baseline schema for `iracing_sdk::SessionInfo`. | `cargo session-schema -- --output-path ./docs/reference/session-schema.yml` |
-| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo variable-schema -- --output-path ./docs/reference/variable-schema.yml` |
-| [`docs/reference/primitives-schema.yml`](docs/reference/primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo primitives-schema -- --output-path ./docs/reference/primitives-schema.yml` |
-| [`docs/reference/disk-variable-schema.yml`](docs/reference/disk-variable-schema.yml) | Telemetry variable schema derived from `.ibt` headers. | `cargo disk-variable-schema -- --ibt-path <PATH_TO_FILE.ibt> --output-path ./docs/reference/disk-variable-schema.yml` |
-| [`docs/reference/live-session-schema.yml`](docs/reference/live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo live-session-schema -- --output-path ./docs/reference/live-session-schema.yml` |
-| [`docs/reference/live-variable-schema.yml`](docs/reference/live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | `cargo live-variable-schema -- --output-path ./docs/reference/live-variable-schema.yml` |
+| [`docs/reference/session-schema.yml`](docs/reference/session-schema.yml) | Baseline schema for `iracing_sdk::SessionInfo`. | `cargo session schema type --output-path ./docs/reference/session-schema.yml` |
+| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo variable-schema --output-path ./docs/reference/variable-schema.yml` |
+| [`docs/reference/primitives-schema.yml`](docs/reference/primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo primitives-schema --output-path ./docs/reference/primitives-schema.yml` |
+| [`docs/reference/disk-variable-schema.yml`](docs/reference/disk-variable-schema.yml) | Telemetry variable schema derived from `.ibt` headers. | `cargo disk-variable-schema --ibt-path <PATH_TO_FILE.ibt> --output-path ./docs/reference/disk-variable-schema.yml` |
+| [`docs/reference/live-session-schema.yml`](docs/reference/live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo session schema live --output-path ./docs/reference/live-session-schema.yml` |
+| [`docs/reference/live-variable-schema.yml`](docs/reference/live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | `cargo live-variable-schema --output-path ./docs/reference/live-variable-schema.yml` |
 
 ## Getting Started
 
@@ -69,11 +69,12 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo ibt-session-parser` | `cargo run -p iracing-sdk --bin ibt-session-parser --` | Extract session YAML from `.ibt`. |
 | `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
-| `cargo session-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session-schema --` | Emit baseline session schema. |
+| `cargo session schema type` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- schema type` | Emit baseline session schema. |
+| `cargo session schema ibt` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- schema ibt` | Discover session schema from an IBT recording. |
 | `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin variable-schema --` | Emit baseline variable schema. |
 | `cargo primitives-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin primitives-schema --` | Emit the `irsdk_*` primitive schema catalog. |
 | `cargo disk-variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin disk-variable-schema --` | Generate telemetry schema from `.ibt` headers. |
-| `cargo live-session-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin live-session-schema --` | Collect live session schema (Windows). |
+| `cargo session schema live` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- schema live` | Collect live session schema (Windows). |
 | `cargo live-variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin live-variable-schema --` | Collect live telemetry variable schema (Windows). |
 
 ## Development Notes

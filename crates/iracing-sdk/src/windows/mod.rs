@@ -40,6 +40,6 @@ mod broadcast;
 mod connection;
 mod utils;
 
-pub use broadcast::{Broadcast, BroadcastCommand, PitCommand};
+pub use broadcast::{Broadcast, BroadcastCommand};
 pub use connection::{Connection, WaitResult};
 pub use utils::wide_string;

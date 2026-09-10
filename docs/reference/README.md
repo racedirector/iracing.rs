@@ -34,9 +34,9 @@ retaining the selected fields' real names and metadata.
 
 | Artifact | Purpose | Regenerate from workspace root |
 | --- | --- | --- |
-| [`session-schema.yml`](session-schema.yml) | Baseline schema for `iracing_sdk::SessionInfo`. | `cargo session-schema -- --output-path ./docs/reference/session-schema.yml` |
-| [`variable-schema.yml`](variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo variable-schema -- --output-path ./docs/reference/variable-schema.yml` |
-| [`primitives-schema.yml`](primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo primitives-schema -- --output-path ./docs/reference/primitives-schema.yml` |
-| [`disk-variable-schema.yml`](disk-variable-schema.yml) | Latest authoritative disk telemetry schema, captured from `fordmustanggt4_interlagos gp 2026-08-01 11-24-51.ibt`. | `cargo disk-variable-schema -- --ibt-path <PATH_TO_FILE.ibt> --output-path ./docs/reference/disk-variable-schema.yml` |
-| [`live-session-schema.yml`](live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo live-session-schema -- --output-path ./docs/reference/live-session-schema.yml` |
-| [`live-variable-schema.yml`](live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | `cargo live-variable-schema -- --output-path ./docs/reference/live-variable-schema.yml` |
+| [`session-schema.yml`](session-schema.yml) | Baseline schema for `iracing_sdk::SessionInfo`. | `cargo session schema type --output-path ./docs/reference/session-schema.yml` |
+| [`variable-schema.yml`](variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo variable-schema --output-path ./docs/reference/variable-schema.yml` |
+| [`primitives-schema.yml`](primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo primitives-schema --output-path ./docs/reference/primitives-schema.yml` |
+| [`disk-variable-schema.yml`](disk-variable-schema.yml) | Latest authoritative disk telemetry schema, captured from `fordmustanggt4_interlagos gp 2026-08-01 11-24-51.ibt`. | `cargo disk-variable-schema --ibt-path <PATH_TO_FILE.ibt> --output-path ./docs/reference/disk-variable-schema.yml` |
+| [`live-session-schema.yml`](live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo session schema live --output-path ./docs/reference/live-session-schema.yml` |
+| [`live-variable-schema.yml`](live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | `cargo live-variable-schema --output-path ./docs/reference/live-variable-schema.yml` |
