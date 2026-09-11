@@ -156,7 +156,10 @@ impl IbtReader {
         })
     }
 
-    /// Gets the session info bytes buffer from `data`.
+    /// Returns an owned snapshot of the file's advertised session-information region.
+    ///
+    /// Returns `None` when the header advertises no region or the region cannot
+    /// be copied from the file data.
     pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
         if !self.session_info_region.is_valid() {
             return None;
@@ -165,10 +168,10 @@ impl IbtReader {
         self.session_info_region.buffer(&self.data).ok()
     }
 
-    /// Get cleaned session YAML from the IBT file
+    /// Returns decoded session-information text with invalid control characters removed.
     ///
-    /// Returns preprocessed YAML string ready for parsing. The YAML has been cleaned
-    /// to fix iRacing's non-standard format issues.
+    /// Returns `None` when the file has no session-information region or the
+    /// NUL-bounded payload is empty after sanitization.
     pub fn session_yaml(&self) -> Option<String> {
         let buffer = self.session_info_buffer()?;
         let session_string = IRacingSessionString::try_from(buffer).ok()?;
@@ -225,7 +228,13 @@ impl IbtReader {
         &self.header
     }
 
-    /// Seek to a specific frame (for random access)
+    /// Positions the reader so the next call to [`Self::read_next_frame`] reads
+    /// `frame_number`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if `frame_number` is outside the file's frame range
+    /// or its byte position cannot be represented by `usize`.
     pub fn seek_to_frame(&mut self, frame_number: usize) -> Result<()> {
         if frame_number >= self.total_frames {
             return Err(IRacingSDKError::Parse {
@@ -260,9 +269,16 @@ impl IbtReader {
         Ok(())
     }
 
-    /// Read the next frame as raw bytes
+    /// Reads the next frame as raw bytes and advances the reader by one frame.
     ///
-    /// Returns frame data, tick count, and session version for downstream frame processing.
+    /// The returned tuple contains the frame data, its zero-based frame index as
+    /// a synthetic tick, and the header's session-information update counter.
+    /// Returns `Ok(None)` at end of file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the next advertised frame extends beyond the
+    /// loaded file data.
     pub fn read_next_frame(&mut self) -> Result<Option<(Vec<u8>, u32, u32)>> {
         // Check if we've reached the end
         if self.current_frame >= self.total_frames {

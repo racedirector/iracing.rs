@@ -34,6 +34,12 @@ pub struct VariableHeader {
 
 impl VariableHeader {
     /// Constructs a validated variable header and zero-fills its fixed strings and ABI padding.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-configuration error if `variable_type` is the SDK
+    /// sentinel, `offset` is negative, `count` is not positive, or a string is
+    /// non-ASCII, contains a NUL, or does not fit its fixed-width field.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         variable_type: VariableType,

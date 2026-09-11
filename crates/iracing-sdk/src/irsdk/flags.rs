@@ -291,7 +291,7 @@ impl PitServiceFlags {
         self.has_all(Self::FULL_SERVICE_FLAGS)
     }
 
-    /// Returns whether any service is requested.
+    /// Returns whether any tire, fuel, or windshield-tearoff service is requested.
     pub const fn has_any_service(self) -> bool {
         self.has_any(Self::FULL_SERVICE_FLAGS)
     }

@@ -36,7 +36,15 @@ pub enum TelemetryValue {
 }
 
 impl TelemetryValue {
-    /// Decodes requested VariableInfo from the provided data.
+    /// Decodes the variable described by `info` from a complete telemetry frame.
+    ///
+    /// `info.offset` is relative to the start of `data`; a zero element count
+    /// produces an empty [`Self::Array`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata does not describe an SDK storage type,
+    /// its extent overflows, or the requested bytes are outside `data`.
     pub fn decode(data: &[u8], info: &VariableInfo) -> Result<Self> {
         info.storage_byte_size()?;
         match info.count {

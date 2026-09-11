@@ -42,8 +42,12 @@ impl DiskSubHeader {
         }
     }
 
-    /// Attempts to read a buffer of `Self::WIRE_SIZE` from the reader and uses
-    /// `WireType::read_from_bytes` to construct `DiskSubHeader`.
+    /// Reads and decodes one complete IBT disk sub-header from `reader`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if `reader` cannot supply the required
+    /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut buffer = [0u8; Self::WIRE_SIZE];
 
