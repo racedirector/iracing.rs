@@ -5,9 +5,9 @@
 
 use crate::{
     IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
-    VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
+    VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
     irsdk::{
-        Header, VariableHeader,
+        Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
     windows::wide_string,

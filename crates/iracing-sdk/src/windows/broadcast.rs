@@ -19,7 +19,7 @@
 //!
 //! ```rust
 //! # #[cfg(windows)] {
-//! use iracing_sdk::windows::{BroadcastCommand, PitCommand};
+//! use iracing_sdk::{PitCommand, windows::BroadcastCommand};
 //!
 //! let camera = BroadcastCommand::CameraSwitchPosition(0, 1, 2);
 //! let pit = BroadcastCommand::PitCommand(PitCommand::Fuel(8));
@@ -69,7 +69,7 @@ use {
 /// # Examples
 ///
 /// ```
-/// use iracing_sdk::windows::{BroadcastCommand, PitCommand};
+/// use iracing_sdk::{PitCommand, windows::BroadcastCommand};
 ///
 /// let _ = BroadcastCommand::CameraSwitchPosition(0, 0, 0);
 /// let _ = BroadcastCommand::PitCommand(PitCommand::Fuel(8));

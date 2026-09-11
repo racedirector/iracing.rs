@@ -322,7 +322,7 @@ impl TryFrom<IRacingSessionString> for SessionInfo {
 
     fn try_from(value: IRacingSessionString) -> Result<Self> {
         let session_info = String::from(value);
-        Ok(SessionInfo::parse(&session_info)?)
+        SessionInfo::parse(&session_info)
     }
 }
 

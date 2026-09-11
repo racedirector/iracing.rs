@@ -20,7 +20,7 @@
 //! ## Usage Example
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, VariableType};
+//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, irsdk::VariableType};
 //! use std::collections::HashMap;
 //!
 //! // Create a schema for RPM data
