@@ -31,7 +31,7 @@
         "lap_count": 1,
         "record_count": 12
       },
-      "sha256": "c0ce28dd236e9f8abbe7b7139201af49aaac321fdec0536c56c6c3f50ca3a5a2",
+      "sha256": "22fedd675d6f39c01fbdffd24e877b983b2cb2946e8dce50e892759504e1166e",
       "required_variables": [
         {
           "name": "SessionTime",
@@ -113,7 +113,7 @@
         "lap_count": 3,
         "record_count": 24
       },
-      "sha256": "d7e751dd0b08a444a97a53cecead3dc8a450823ae4636598d88a4a133521046e",
+      "sha256": "b389516c6175bff78d14e9ec70b5c0372901eb670fdd42a4d65de362b7ccbab4",
       "required_variables": [
         {
           "name": "SessionTime",

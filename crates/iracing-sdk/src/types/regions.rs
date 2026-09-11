@@ -27,6 +27,11 @@ fn checked_range(
     Ok(offset..end)
 }
 
+/// Location and size of the session-information region advertised by a [`Header`].  
+///  
+/// Construction validates the offset and length conversions, but does not check  
+/// that the region fits in a source. Use [`Self::checked_range`], [`Self::bytes`],  
+/// or [`Self::buffer`] to validate source bounds before accessing the region.  
 pub struct SessionInfoRegion {
     offset: usize,
     length: usize,
@@ -38,12 +43,17 @@ impl SessionInfoRegion {
         self.offset
     }
 
-    /// Returns the region's byte length: the header count times the wire size
-    /// of a [`VariableHeader`].
+    /// Returns the session-information byte length advertised by the source header.
     pub fn length(&self) -> usize {
         self.length
     }
 
+    /// Returns the region's half-open byte range within a source of `data_len` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the end offset overflows `usize` or exceeds
+    /// `data_len`.
     pub fn checked_range(&self, data_len: usize) -> Result<Range<usize>> {
         checked_range(
             self.offset,
@@ -53,14 +63,32 @@ impl SessionInfoRegion {
         )
     }
 
+    /// Borrows the session-information bytes from the complete source without copying.
+    ///
+    /// `source` must begin at the origin used by [`Self::offset`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the region's end offset overflows `usize` or
+    /// the region extends beyond `source`.
     pub fn bytes<'a>(&self, source: &'a [u8]) -> Result<&'a [u8]> {
         Ok(&source[self.checked_range(source.len())?])
     }
 
+    /// Copies the session-information bytes into an owned buffer.
+    ///
+    /// `source` must begin at the origin used by [`Self::offset`]. The returned
+    /// buffer is independent of `source`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the region's end offset overflows `usize` or
+    /// the region extends beyond `source`.
     pub fn buffer(&self, source: &[u8]) -> Result<SessionInfoBuffer> {
         Ok(SessionInfoBuffer::from_checked_region(self.bytes(source)?))
     }
 
+    /// Returns whether the header advertised a nonzero session-information region.
     pub fn is_valid(&self) -> bool {
         self.offset > 0 && self.length > 0
     }
@@ -160,6 +188,7 @@ impl VariableHeaderRegion {
         ))
     }
 
+    /// Returns whether the header advertised a nonzero variable-header region.
     pub fn is_valid(&self) -> bool {
         self.offset > 0 && self.length > 0
     }

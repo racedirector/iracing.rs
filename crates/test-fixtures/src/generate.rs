@@ -29,6 +29,53 @@ const DISK_HEADER_SIZE: usize = DiskSubHeader::WIRE_SIZE;
 /// Offset at which the first variable header begins in generated IBT files.
 const IBT_PREAMBLE_SIZE: usize = MAIN_HEADER_SIZE + DISK_HEADER_SIZE;
 
+/// One telemetry value written by [`build_frame`].
+#[derive(Clone, Copy)]
+struct FrameWrite {
+    name: &'static str,
+    data_type: VariableType,
+    offset: i32,
+    count: i32,
+    required: bool,
+}
+
+impl FrameWrite {
+    const fn required(name: &'static str, data_type: VariableType, offset: i32) -> Self {
+        Self {
+            name,
+            data_type,
+            offset,
+            count: 1,
+            required: true,
+        }
+    }
+
+    const fn optional(name: &'static str, data_type: VariableType, offset: i32) -> Self {
+        Self {
+            name,
+            data_type,
+            offset,
+            count: 1,
+            required: false,
+        }
+    }
+}
+
+const GENERATED_FRAME_WRITES: &[FrameWrite] = &[
+    FrameWrite::required("SessionTime", VariableType::Double, 0),
+    FrameWrite::required("Speed", VariableType::Float, 8),
+    FrameWrite::required("LapDist", VariableType::Float, 12),
+    FrameWrite::required("LapCompleted", VariableType::Integer, 16),
+    FrameWrite::required("Brake", VariableType::Float, 20),
+    FrameWrite::required("Throttle", VariableType::Float, 24),
+    FrameWrite::required("RPM", VariableType::Float, 28),
+    FrameWrite::required("Gear", VariableType::Integer, 32),
+    FrameWrite::optional("SteeringWheelAngle", VariableType::Float, 36),
+    FrameWrite::optional("FuelLevel", VariableType::Float, 40),
+    FrameWrite::optional("TrackTemp", VariableType::Float, 44),
+    FrameWrite::optional("OnPitRoad", VariableType::Boolean, 48),
+    FrameWrite::optional("SessionFlags", VariableType::BitField, 52),
+];
 /// One completely materialized output waiting to be written below the root.
 struct Artifact {
     /// Repository-relative destination path.
@@ -219,6 +266,27 @@ fn validate_profile(profile: &Profile) -> Result<()> {
             variable.name
         );
     }
+    for write in GENERATED_FRAME_WRITES {
+        let variable = profile
+            .variables
+            .iter()
+            .find(|variable| variable.name == write.name);
+        ensure!(
+            variable.is_some() || !write.required,
+            "{} build_frame requires variable {}",
+            profile.name,
+            write.name
+        );
+        if variable.is_some() {
+            ensure!(
+                declares_frame_write(profile, *write),
+                "{} build_frame writes {} at offset {}, but no matching variable is declared",
+                profile.name,
+                write.name,
+                write.offset
+            );
+        }
+    }
     Ok(())
 }
 
@@ -239,13 +307,19 @@ fn build_frame(profile: &Profile, index: usize, random: &mut ChaCha8Rng) -> Vec<
     write_f32(&mut frame, 24, 0.55 + (index % 5) as f64 * 0.05);
     write_f32(&mut frame, 28, 3200.0 + index as f64 * 12.0);
     write_i32(&mut frame, 32, 1 + (index % 5) as i32);
-    if profile.frame_size >= 44 {
+    if declares_generated_variable(profile, "SteeringWheelAngle") {
         write_f32(&mut frame, 36, -0.12 + random.random::<f64>() * 0.24);
+    }
+    if declares_generated_variable(profile, "FuelLevel") {
         write_f32(&mut frame, 40, 45.0 - index as f64 * 0.02);
     }
-    if profile.frame_size >= 56 {
+    if declares_generated_variable(profile, "TrackTemp") {
         write_f32(&mut frame, 44, 31.5 + index as f64 * 0.01);
+    }
+    if declares_generated_variable(profile, "OnPitRoad") {
         frame[48] = u8::from(index == 0 || index == profile.frame_count - 1);
+    }
+    if declares_generated_variable(profile, "SessionFlags") {
         write_i32(
             &mut frame,
             52,
@@ -253,6 +327,22 @@ fn build_frame(profile: &Profile, index: usize, random: &mut ChaCha8Rng) -> Vec<
         );
     }
     frame
+}
+
+fn declares_generated_variable(profile: &Profile, name: &str) -> bool {
+    GENERATED_FRAME_WRITES
+        .iter()
+        .find(|write| write.name == name)
+        .is_some_and(|write| declares_frame_write(profile, *write))
+}
+
+fn declares_frame_write(profile: &Profile, write: FrameWrite) -> bool {
+    profile.variables.iter().any(|variable| {
+        variable.name == write.name
+            && variable.data_type == write.data_type
+            && variable.offset == write.offset
+            && variable.count == write.count
+    })
 }
 
 /// Writes a little-endian signed integer into a known-valid frame range.
@@ -342,11 +432,11 @@ mod tests {
         let expected = [
             (
                 "profile_small",
-                "c0ce28dd236e9f8abbe7b7139201af49aaac321fdec0536c56c6c3f50ca3a5a2",
+                "22fedd675d6f39c01fbdffd24e877b983b2cb2946e8dce50e892759504e1166e",
             ),
             (
                 "profile_medium",
-                "d7e751dd0b08a444a97a53cecead3dc8a450823ae4636598d88a4a133521046e",
+                "b389516c6175bff78d14e9ec70b5c0372901eb670fdd42a4d65de362b7ccbab4",
             ),
             (
                 "profile_large",

@@ -65,7 +65,7 @@ impl AdapterValidation {
     /// ```
     /// use iracing_sdk::{
     ///     AdapterValidation, FieldExtraction, FramePacket, VariableInfo, VariableSchema,
-    ///     VariableType,
+    ///     irsdk::VariableType,
     /// };
     /// use std::{collections::HashMap, sync::Arc};
     ///

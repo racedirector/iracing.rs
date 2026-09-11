@@ -61,3 +61,14 @@ fn focused_and_default_commands_succeed() {
         String::from_utf8_lossy(&explicit_check.stderr)
     );
 }
+
+/// Verification must fail when the root contains no fixture artifacts.
+#[test]
+fn verify_fails_in_an_empty_root() {
+    let directory = tempfile::tempdir().unwrap();
+    let verify = Command::new(env!("CARGO_BIN_EXE_test-fixtures"))
+        .args(["--repo-root", directory.path().to_str().unwrap(), "verify"])
+        .output()
+        .unwrap();
+    assert!(!verify.status.success());
+}

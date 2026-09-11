@@ -233,18 +233,18 @@ impl Connection {
     /// Get session info buffer from header-determined region.
     pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
         let header = self.header();
-        let session_info_region = match SessionInfoRegion::try_from(header) {
-            Ok(region) if region.is_valid() => region,
-            _ => return None,
-        };
+
+        let region = SessionInfoRegion::try_from(header)
+            .ok()
+            .filter(|r| r.is_valid())?;
 
         let session_info_bytes = unsafe {
             // Get the slice of the session yaml
-            let info_ptr = self.base.as_ptr().add(session_info_region.offset());
-            std::slice::from_raw_parts(info_ptr, session_info_region.length())
+            let info_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(info_ptr, region.length())
         };
 
-        session_info_region.buffer(session_info_bytes).ok()
+        region.buffer(session_info_bytes).ok()
     }
 
     /// Get session info YAML string
@@ -263,17 +263,17 @@ impl Connection {
     /// Get variable headers buffer from header-determined region.
     pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header();
-        let variable_headers_region = match VariableHeaderRegion::try_from(header) {
-            Ok(r) if r.is_valid() => r,
-            _ => return None,
-        };
+
+        let region = VariableHeaderRegion::try_from(header)
+            .ok()
+            .filter(|r| r.is_valid())?;
 
         let variable_header_bytes = unsafe {
-            let var_header_ptr = self.base.as_ptr().add(variable_headers_region.offset());
-            std::slice::from_raw_parts(var_header_ptr, variable_headers_region.length())
+            let var_header_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(var_header_ptr, region.length())
         };
 
-        variable_headers_region.buffer(variable_header_bytes).ok()
+        region.buffer(variable_header_bytes).ok()
     }
 
     /// Get all variable definitions from the header

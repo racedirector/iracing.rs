@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{BitField, IRacingSDKError, VarData, VariableInfo, irsdk::VariableType};
+use crate::{BitField, IRacingSDKError, Result, VarData, VariableInfo, irsdk::VariableType};
 
 /// Runtime value type that can hold any telemetry data.
 ///
@@ -37,7 +37,7 @@ pub enum TelemetryValue {
 
 impl TelemetryValue {
     /// Decodes requested VariableInfo from the provided data.
-    pub fn decode(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    pub fn decode(data: &[u8], info: &VariableInfo) -> Result<Self> {
         info.storage_byte_size()?;
         match info.count {
             0 => Ok(Self::Array(Vec::new())),
@@ -46,7 +46,7 @@ impl TelemetryValue {
         }
     }
 
-    fn decode_scalar(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn decode_scalar(data: &[u8], info: &VariableInfo) -> Result<Self> {
         match info.data_type {
             VariableType::Character => u8::from_bytes(data, info).map(Self::Char),
             VariableType::BitField => BitField::from_bytes(data, info).map(Self::BitField),
@@ -61,7 +61,7 @@ impl TelemetryValue {
         }
     }
 
-    fn decode_array(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn decode_array(data: &[u8], info: &VariableInfo) -> Result<Self> {
         let element_size = info.storage_byte_size()?;
         let mut values = Vec::with_capacity(info.count);
         let mut element_info = info.clone();
@@ -90,5 +90,5 @@ impl TelemetryValue {
 /// callers supply the corresponding [`VariableInfo`].
 pub trait TelemetryValueProvider {
     /// Decodes the telemetry value described by `info`.
-    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue>;
+    fn telemetry_value(&self, info: &VariableInfo) -> Result<TelemetryValue>;
 }
