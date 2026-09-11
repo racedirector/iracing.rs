@@ -11,7 +11,7 @@ use anyhow::{Context, Result, bail, ensure};
 use iracing_sdk::{
     SchemaProvider,
     ibt::IbtReader,
-    irsdk::{DiskSubHeader, Header, VariableHeader, WireType},
+    irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType},
 };
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
@@ -153,6 +153,25 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
                 c_string(&variable.name) == expected.name,
                 "{} variable {index} name mismatch",
                 path.display()
+            );
+            let expected_type = match expected.data_type.as_str() {
+                "Char" => VariableType::Character,
+                "Bool" => VariableType::Boolean,
+                "Int32" => VariableType::Integer,
+                "BitField" => VariableType::BitField,
+                "Float32" => VariableType::Float,
+                "Float64" => VariableType::Double,
+                other => bail!(
+                    "{} variable {} has unsupported manifest data type {other}",
+                    path.display(),
+                    expected.name
+                ),
+            };
+            ensure!(
+                variable.variable_type()? == expected_type,
+                "{} variable {} data type mismatch",
+                path.display(),
+                expected.name
             );
             ensure!(
                 variable.offset == expected.offset as i32,
@@ -316,4 +335,33 @@ fn c_string(bytes: &[u8]) -> String {
         .position(|byte| *byte == 0)
         .unwrap_or(bytes.len());
     String::from_utf8_lossy(&bytes[..end]).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verifier_rejects_mismatched_manifest_storage_type() {
+        let directory = tempfile::tempdir().unwrap();
+        crate::generate(directory.path()).unwrap();
+        let manifest_path = directory.path().join("test-data/ibt/manifest.json");
+        let mut manifest: FixtureManifest =
+            serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        let variable = manifest.fixtures[0]
+            .required_variables
+            .iter_mut()
+            .find(|variable| variable.name == "Speed")
+            .unwrap();
+        assert_eq!(variable.data_type, "Float32");
+        variable.data_type = "Int32".into();
+        fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+
+        let error = verify(directory.path()).unwrap_err().to_string();
+        assert!(error.contains("profile_small.ibt"), "{error}");
+        assert!(
+            error.contains("variable Speed data type mismatch"),
+            "{error}"
+        );
+    }
 }

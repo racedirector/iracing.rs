@@ -84,7 +84,7 @@ Defined in `.cargo/config.toml` for convenience:
 - **Session parsing**: `SessionInfoParser` caches YAML, so reuse it rather than reparsing on every frame.
 - **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
 - **Schema discovery**: When new fields appear, run the appropriate codegen bin with `--discover` and incorporate the results back into `iracing-sdk` to improve typings.
-- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). Run `cargo test-fixtures` after changing fixture profiles.
+- **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). `cargo test-fixtures` regenerates and verifies fixtures, then runs a scoped `git diff --exit-code` check for drift. After intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 
 ## Testing
 
