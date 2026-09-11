@@ -4,13 +4,12 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::{
-    ByteParser, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
+    ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
+    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
     irsdk::{
-        Header, VariableHeader,
+        Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
-    types::ByteRegion,
     windows::wide_string,
 };
 use std::ptr::NonNull;

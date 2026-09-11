@@ -129,7 +129,7 @@ impl AdapterValidation {
 ///
 /// ```no_run
 /// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
-/// # use iracing_sdk::{VariableInfo, VariableType};
+/// # use iracing_sdk::{VariableInfo, irsdk::VariableType};
 /// let var_info = VariableInfo {
 ///     name: "Speed".to_string(),
 ///     data_type: VariableType::Float,
