@@ -18,9 +18,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 [package.metadata.dist]
 dist = true
 
-[package.metadata.dist.bin.live-session-parser]
-targets = ["x86_64-pc-windows-msvc"]
-
 [package.metadata.dist.bin.broadcast-cli]
 targets = ["x86_64-pc-windows-msvc"]
 
@@ -33,13 +30,7 @@ targets = ["x86_64-pc-windows-msvc"]
 [package.metadata.dist.bin.live-to-jsonl]
 targets = ["x86_64-pc-windows-msvc"]
 
-[package.metadata.dist.bin.live-session-schema]
-targets = ["x86_64-pc-windows-msvc"]
-
 [package.metadata.dist.bin.live-variable-schema]
-targets = ["x86_64-pc-windows-msvc"]
-
-[package.metadata.dist.bin.live-headers]
 targets = ["x86_64-pc-windows-msvc"]
 
 [lints]
@@ -61,6 +52,7 @@ serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+type-layout = "0.2.0"
 
 # Windows-specific dependencies (for live telemetry)
 [target.'cfg(windows)'.dependencies]
@@ -166,10 +158,6 @@ path = "examples/live_position_derive.rs"
 required-features = ["derive"]
 
 [[example]]
-name = "enum-bitfields-disk"
-path = "examples/enum_bitfields_disk.rs"
-
-[[example]]
 name = "adapter-disk-position"
 path = "examples/adapter_disk_position.rs"
 
@@ -195,27 +183,13 @@ path = "src/bin/car_setup_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
-name = "disk-session-schema"
-path = "src/bin/disk_session_schema.rs"
-required-features = ["codegen"]
-
-[[bin]]
 name = "disk-variable-schema"
 path = "src/bin/disk_variable_schema.rs"
 required-features = ["codegen"]
 
 [[bin]]
-name = "ibt-headers"
-path = "src/bin/ibt_headers.rs"
-
-[[bin]]
-name = "ibt-session-parser"
-path = "src/bin/ibt_session_parser.rs"
-
-[[bin]]
-name = "live-session-schema"
-path = "src/bin/live_session_schema.rs"
-required-features = ["codegen"]
+name = "headers"
+path = "src/bin/headers.rs"
 
 [[bin]]
 name = "live-variable-schema"
@@ -240,14 +214,6 @@ name = "ibt-to-json"
 path = "src/bin/ibt_to_json.rs"
 
 [[bin]]
-name = "live-headers"
-path = "src/bin/live_headers.rs"
-
-[[bin]]
-name = "live-session-parser"
-path = "src/bin/live_session_parser.rs"
-
-[[bin]]
 name = "live-to-csv"
 path = "src/bin/live_to_csv.rs"
 
@@ -260,9 +226,9 @@ name = "live-to-jsonl"
 path = "src/bin/live_to_jsonl.rs"
 
 [[bin]]
-name = "session-schema"
-path = "src/bin/session_schema.rs"
-required-features = ["codegen"]
+name = "session"
+path = "src/bin/session.rs"
+required-features = ["codegen", "schema-discovery"]
 
 [[bin]]
 name = "variable-schema"

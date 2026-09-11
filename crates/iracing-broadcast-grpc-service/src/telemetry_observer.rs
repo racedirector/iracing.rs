@@ -33,7 +33,7 @@ pub(crate) struct ReplaySpeedTelemetry {
 pub(crate) struct CameraStateTelemetry {
     #[field_name = "CamCameraState"]
     #[fail_if_missing]
-    pub state: iracing_sdk::CameraState,
+    pub state: iracing_sdk::irsdk::CameraState,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, iracing_sdk::IRacingTelemetryFrame)]
@@ -55,7 +55,7 @@ pub(crate) struct ReplayPositionTelemetry {
 pub(crate) struct PitServiceTelemetry {
     #[field_name = "PitSvFlags"]
     #[fail_if_missing]
-    pub service_flags: iracing_sdk::PitServiceFlags,
+    pub service_flags: iracing_sdk::irsdk::PitServiceFlags,
 
     #[field_name = "PitSvFuel"]
     #[fail_if_missing]
@@ -238,7 +238,7 @@ mod tests {
 
     use async_trait::async_trait;
     use iracing_sdk::{
-        FramePacket, IRacingSDKError, VariableInfo, VariableSchema, VariableType,
+        FramePacket, IRacingSDKError, VariableInfo, VariableSchema, irsdk::VariableType,
         provider::Provider,
     };
     use tokio::sync::Mutex;
@@ -357,11 +357,11 @@ mod tests {
     fn full_schema() -> Arc<VariableSchema> {
         make_schema(
             &[
-                ("CamCarIdx", VariableType::Int32, 0),
-                ("CamGroupNumber", VariableType::Int32, 4),
-                ("CamCameraNumber", VariableType::Int32, 8),
-                ("ReplayPlaySpeed", VariableType::Int32, 12),
-                ("ReplayPlaySlowMotion", VariableType::Bool, 16),
+                ("CamCarIdx", VariableType::Integer, 0),
+                ("CamGroupNumber", VariableType::Integer, 4),
+                ("CamCameraNumber", VariableType::Integer, 8),
+                ("ReplayPlaySpeed", VariableType::Integer, 12),
+                ("ReplayPlaySlowMotion", VariableType::Boolean, 16),
             ],
             17,
         )
@@ -370,8 +370,8 @@ mod tests {
     fn schema_missing_camera_fields() -> Arc<VariableSchema> {
         make_schema(
             &[
-                ("ReplayPlaySpeed", VariableType::Int32, 12),
-                ("ReplayPlaySlowMotion", VariableType::Bool, 16),
+                ("ReplayPlaySpeed", VariableType::Integer, 12),
+                ("ReplayPlaySlowMotion", VariableType::Boolean, 16),
             ],
             17,
         )

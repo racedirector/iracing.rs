@@ -127,6 +127,16 @@ pub enum IRacingSDKError {
         /// Human-readable explanation of the configuration requirement.
         reason: String,
     },
+
+    /// A byte buffer does not match a wire type's required size.
+    #[error("Invalid wire size: expected {expected} bytes, received {actual}")]
+    WireSize {
+        /// Required wire representation size.
+        expected: usize,
+
+        /// Number of bytes supplied.
+        actual: usize,
+    },
 }
 
 impl IRacingSDKError {
@@ -146,6 +156,7 @@ impl IRacingSDKError {
             Self::WindowsApi { .. } => true,
             Self::SchemaValidation { .. } => false,
             Self::InvalidConfiguration { .. } => false,
+            Self::WireSize { .. } => false,
         }
     }
 
@@ -214,6 +225,7 @@ impl IRacingSDKError {
                 "Review the documented requirements for the configuration field",
                 "Provide a supported nonzero configuration value",
             ],
+            Self::WireSize { .. } => vec!["Contact the maintainer"],
         }
     }
 

@@ -126,7 +126,7 @@ impl CsvTelemetryWriterBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iracing_sdk::VariableType;
+    use iracing_sdk::irsdk::VariableType;
     use std::{
         collections::HashMap,
         time::{SystemTime, UNIX_EPOCH},
@@ -180,8 +180,8 @@ mod tests {
 
     #[test]
     fn writer_emits_headers_and_telemetry_rows() -> Result<()> {
-        let speed = variable("Speed", VariableType::Float32, 0, 1);
-        let lap_distances = variable("CarIdxLapDistPct", VariableType::Float32, 4, 3);
+        let speed = variable("Speed", VariableType::Float, 0, 1);
+        let lap_distances = variable("CarIdxLapDistPct", VariableType::Float, 4, 3);
         let variables = vec![speed, lap_distances];
         let provider = TestTelemetryValueProvider {
             values: HashMap::from([

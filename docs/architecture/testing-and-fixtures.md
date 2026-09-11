@@ -17,18 +17,21 @@ test-data/
     profile_large.yaml
 ```
 
-`scripts/generate_test_fixtures.py` defines profiles and writes both `.ibt` and
-session YAML files. The binary layout deliberately follows the SDK's disk/header
-constants. `scripts/verify_test_fixtures.py` checks manifest invariants, hashes,
-headers, frame geometry, variables, and companion YAML.
+The unpublished `test-fixtures` crate defines profiles and writes both `.ibt`
+and session YAML files. It constructs the 112-byte SDK header, 32-byte disk
+sub-header, and 144-byte variable headers through `iracing-sdk` wire types.
+Its verifier checks manifest invariants, hashes, headers, frame geometry,
+variables, companion YAML, and complete parsing through `IbtReader`.
 
-`scripts/check_test_fixtures.py` is the normal entry point. It:
+`cargo test-fixtures` is the normal entry point. It:
 
 1. regenerates fixtures;
 2. verifies them;
 3. runs `git diff --exit-code` over generated fixture directories.
 
 Use `--no-drift-check` only while intentionally changing generated output.
+Focused workflows are available through `cargo test-fixtures generate`,
+`cargo test-fixtures verify`, and `cargo test-fixtures check`.
 
 ## Manifest contract
 
@@ -79,7 +82,7 @@ skip a required integration test because data is absent. The best-effort
 The root quality workflow runs on Ubuntu and Windows:
 
 ```text
-python scripts/check_test_fixtures.py
+cargo test-fixtures
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings
 cargo test --workspace --all-targets

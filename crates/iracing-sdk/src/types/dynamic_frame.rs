@@ -8,7 +8,7 @@
 use crate::{
     FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
-    types::variable_type::TelemetryValueProvider,
+    types::telemetry_value::TelemetryValueProvider,
 };
 use std::sync::Arc;
 
@@ -38,8 +38,8 @@ impl DynamicFrame {
         self.get(name)
     }
 
-    /// Look up a variable as `u32`, or `None` if missing or the wrong type.
-    pub fn u32(&self, name: &str) -> Option<u32> {
+    /// Look up an SDK bitfield, or `None` if missing or the wrong type.
+    pub fn bitfield(&self, name: &str) -> Option<crate::BitField> {
         self.get(name)
     }
 
@@ -98,7 +98,7 @@ impl FrameAdapter for DynamicFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VariableInfo, VariableSchema, types::VariableType};
+    use crate::{VariableInfo, VariableSchema, irsdk::VariableType};
     use std::collections::HashMap;
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
             "RPM".to_string(),
             VariableInfo {
                 name: "RPM".into(),
-                data_type: VariableType::Int32,
+                data_type: VariableType::Integer,
                 offset: 0,
                 count: 1,
                 count_as_time: false,
@@ -121,7 +121,7 @@ mod tests {
             "Speed".to_string(),
             VariableInfo {
                 name: "Speed".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 4,
                 count: 1,
                 count_as_time: false,
@@ -133,7 +133,7 @@ mod tests {
             "CarIdxLapDistPct".to_string(),
             VariableInfo {
                 name: "CarIdxLapDistPct".into(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset: 8,
                 count: 4,
                 count_as_time: false,
@@ -175,6 +175,6 @@ mod tests {
         assert!(df.f32("Speed").unwrap() - 42.5 < 1e-5);
         let lap_dist_values: Vec<f32> = df.get("CarIdxLapDistPct").unwrap();
         assert_eq!(lap_dist_values, lap_dist);
-        assert_eq!(df.u32("Missing"), None);
+        assert_eq!(df.bitfield("Missing"), None);
     }
 }

@@ -7,3 +7,6 @@ pub mod format;
 pub mod reader;
 
 pub use reader::IbtReader;
+
+#[cfg(test)]
+mod tests;

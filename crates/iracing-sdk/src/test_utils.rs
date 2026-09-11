@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 
 /// Guidance shown when telemetry fixtures are missing from the repository checkout.
-pub const FIXTURE_INSTALL_GUIDANCE: &str = "Telemetry fixtures are generated under test-data/. Run `python3 scripts/generate_test_fixtures.py` from the repository root to recreate them.";
+pub const FIXTURE_INSTALL_GUIDANCE: &str = "Telemetry fixtures are generated under test-data/. Run `cargo test-fixtures generate` from the repository root to recreate them.";
 
 /// Manifest for deterministic generated IBT fixtures.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -148,7 +148,7 @@ pub fn load_fixture_manifest() -> Result<FixtureManifest, FixtureError> {
 
     let manifest: FixtureManifest = serde_json::from_str(&contents).map_err(|err| {
         FixtureError::new(format!(
-            "Failed to parse fixture manifest {}: {}. Regenerate fixtures with `python3 scripts/generate_test_fixtures.py`.",
+            "Failed to parse fixture manifest {}: {}. Regenerate fixtures with `cargo test-fixtures generate`.",
             path.display(),
             err
         ))
@@ -483,6 +483,6 @@ mod tests {
         assert!(result.is_err());
         let message = result.unwrap_err().to_string();
         assert!(message.contains("Missing telemetry fixture"));
-        assert!(message.contains("generate_test_fixtures.py"));
+        assert!(message.contains("cargo test-fixtures generate"));
     }
 }

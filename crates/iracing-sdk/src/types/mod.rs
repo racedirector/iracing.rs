@@ -20,14 +20,14 @@
 //! ## Usage Example
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, VariableType};
+//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, irsdk::VariableType};
 //! use std::collections::HashMap;
 //!
 //! // Create a schema for RPM data
 //! let mut variables = HashMap::new();
 //! variables.insert("RPM".to_string(), VariableInfo {
 //!     name: "RPM".to_string(),
-//!     data_type: VariableType::Float32,
+//!     data_type: VariableType::Float,
 //!     offset: 0,
 //!     count: 1,
 //!     count_as_time: false,
@@ -46,48 +46,34 @@
 //! ```
 
 mod bitfield;
-mod broadcast;
-mod codegen;
 mod dynamic_frame;
 mod frame;
-mod incident;
-mod irsdk_bitflags;
-mod irsdk_enums;
-pub mod irsdk_flags;
+mod iracing_session_string;
+mod regions;
 mod schema;
+mod session_info_buffer;
+mod telemetry_value;
 mod update_rate;
 mod var_data;
-mod variable_type;
+mod variable_headers_buffer;
 
 // Re-export all public types
-pub use bitfield::{
-    BitField, engine_mandatory_repair_needed, engine_optional_repair_needed, engine_repairs_needed,
-    pit_service_has_full_service, pit_service_has_tire_service, session_dq_scoring_invalid,
-    session_penalty_shown, session_start_control_shown, session_under_caution,
-    session_under_yellow, tick_after_u32,
-};
-pub use broadcast::PitCommand;
+pub use bitfield::BitField;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
-pub use incident::encode_incident;
-pub use incident::{IncidentClassification, IncidentPenalty, IncidentReport, decode_incident};
-pub use irsdk_bitflags::{
-    CameraState, EngineWarnings, IncidentFlags, PaceFlags, PitServiceFlags, SessionFlags,
-};
-pub use irsdk_enums::{
-    BroadcastMessage, CameraSwitchFocus, CarLeftRight, ChatCommandMode, FfbCommandMode, PaceMode,
-    PitCommandMode, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, SessionState, StatusField, TelemetryCommandMode, TrackLocation, TrackSurface,
-    TrackWetness, VideoCaptureMode,
-};
+pub(crate) use iracing_session_string::IRacingSessionString;
+pub use regions::{SessionInfoRegion, VariableHeaderRegion};
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
+pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
+pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_type::{TelemetryValue, TelemetryValueProvider, VariableType};
+pub use variable_headers_buffer::VariableHeadersBuffer;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::irsdk::VariableType;
 
     use proptest::prelude::*;
 
@@ -96,10 +82,9 @@ mod tests {
         fn arb_variable_info()(
             name in "[a-zA-Z][a-zA-Z0-9_]*",
             data_type in prop::sample::select(vec![
-                VariableType::Char, VariableType::Int8, VariableType::UInt8,
-                VariableType::Int16, VariableType::UInt16, VariableType::Int32,
-                VariableType::UInt32, VariableType::Float32, VariableType::Float64,
-                VariableType::Bool, VariableType::BitField
+                VariableType::Character, VariableType::Integer,
+                VariableType::Float, VariableType::Double,
+                VariableType::Boolean, VariableType::BitField
             ]),
             offset in 0..1024usize,
             count in 1..10usize,
@@ -139,7 +124,7 @@ mod tests {
             // Adjust variable offsets to ensure they fit within frame_size
             for (name, mut var_info) in variables.into_iter() {
                 // Ensure offset is within reasonable bounds for the frame size
-                let max_size = var_info.data_type.size() * var_info.count;
+                let max_size = var_info.data_type.byte_size().unwrap() * var_info.count;
                 if max_size < frame_size {
                     var_info.offset %= frame_size - max_size;
                 } else {
@@ -163,7 +148,7 @@ mod tests {
 
             // All variable offsets should be reasonable
             for var_info in schema.variables.values() {
-                let end_offset = var_info.offset + (var_info.data_type.size() * var_info.count);
+                let end_offset = var_info.offset + (var_info.data_type.byte_size().unwrap() * var_info.count);
                 prop_assert!(end_offset <= schema.frame_size);
                 prop_assert!(var_info.count > 0);
             }
@@ -175,27 +160,24 @@ mod tests {
 
         #[test]
         fn prop_variable_type_size_calculations_correct(var_type in prop::sample::select(vec![
-            VariableType::Char, VariableType::Int8, VariableType::UInt8,
-            VariableType::Int16, VariableType::UInt16, VariableType::Int32,
-            VariableType::UInt32, VariableType::Float32, VariableType::Float64,
-            VariableType::Bool, VariableType::BitField
+            VariableType::Character, VariableType::Integer,
+            VariableType::Float, VariableType::Double,
+            VariableType::Boolean, VariableType::BitField
         ])) {
             // VariableType size calculations correct for all enum variants
-            let size = var_type.size();
+            let size = var_type.byte_size().unwrap();
             prop_assert!(size > 0);
             prop_assert!(size <= 8);
 
             match var_type {
-                VariableType::Char | VariableType::Int8 | VariableType::UInt8 | VariableType::Bool => {
+                VariableType::ElementTypeCount => unreachable!(),
+                VariableType::Character | VariableType::Boolean => {
                     prop_assert_eq!(size, 1);
                 },
-                VariableType::Int16 | VariableType::UInt16 => {
-                    prop_assert_eq!(size, 2);
-                },
-                VariableType::Int32 | VariableType::UInt32 | VariableType::Float32 | VariableType::BitField => {
+                VariableType::Integer | VariableType::Float | VariableType::BitField => {
                     prop_assert_eq!(size, 4);
                 },
-                VariableType::Float64 => {
+                VariableType::Double => {
                     prop_assert_eq!(size, 8);
                 },
             }
@@ -213,7 +195,7 @@ mod tests {
 
             let var_info = VariableInfo {
                 name: "test".to_string(),
-                data_type: VariableType::Float32,
+                data_type: VariableType::Float,
                 offset,
                 count: 1,
                 count_as_time: false,
@@ -245,7 +227,7 @@ mod tests {
 
             let var_info = VariableInfo {
                 name: "test".to_string(),
-                data_type: VariableType::Int32,
+                data_type: VariableType::Integer,
                 offset,
                 count: 1,
                 count_as_time: false,
@@ -316,132 +298,5 @@ mod tests {
             let flag = 1 << bit_index;
             prop_assert_eq!(bitfield.has_flag(flag), expected_bit_set);
         }
-    }
-
-    // Unit tests for trivial constructors and pure functions
-    #[test]
-    fn variable_type_size_returns_correct_values() {
-        assert_eq!(VariableType::Char.size(), 1);
-        assert_eq!(VariableType::Int8.size(), 1);
-        assert_eq!(VariableType::UInt8.size(), 1);
-        assert_eq!(VariableType::Bool.size(), 1);
-        assert_eq!(VariableType::Int16.size(), 2);
-        assert_eq!(VariableType::UInt16.size(), 2);
-        assert_eq!(VariableType::Int32.size(), 4);
-        assert_eq!(VariableType::UInt32.size(), 4);
-        assert_eq!(VariableType::Float32.size(), 4);
-        assert_eq!(VariableType::BitField.size(), 4);
-        assert_eq!(VariableType::Float64.size(), 8);
-    }
-
-    #[test]
-    fn bitfield_constructor_works() {
-        let bitfield = BitField::new(0x12345678);
-        assert_eq!(bitfield.value(), 0x12345678);
-    }
-
-    #[test]
-    fn bitfield_flag_operations_basic() {
-        let bitfield = BitField::new(0b1010);
-        assert!(bitfield.is_set(1));
-        assert!(!bitfield.is_set(0));
-        assert!(bitfield.is_set(3));
-        assert!(!bitfield.is_set(2));
-        assert!(bitfield.has_flag(0b0010));
-        assert!(!bitfield.has_flag(0b0001));
-        assert!(bitfield.has_flag(0b1000));
-        assert!(!bitfield.has_flag(0b0100));
-    }
-
-    #[test]
-    fn test_incident_decoding_rep_only() {
-        use crate::irsdk_flags::incident as inc;
-        let bits = BitField::new(inc::REP_CONTACT_WITH_WORLD as u32);
-        let decoded = decode_incident(bits);
-        assert!(matches!(decoded.report, IncidentReport::ContactWithWorld));
-        assert!(matches!(decoded.penalty, IncidentPenalty::None));
-    }
-
-    #[test]
-    fn test_incident_decoding_pen_only() {
-        use crate::irsdk_flags::incident as inc;
-        let bits = BitField::new(((inc::PEN_0X as u32) << 8) & inc::PEN_MASK);
-        let decoded = decode_incident(bits);
-        assert!(matches!(decoded.report, IncidentReport::NoReport));
-        assert!(matches!(decoded.penalty, IncidentPenalty::ZeroX));
-    }
-
-    #[test]
-    fn test_engine_warnings_new_bits_present() {
-        use crate::irsdk_flags::engine_warnings as ew;
-        let flags = BitField::new(ew::MAND_REP_NEEDED | ew::OPT_REP_NEEDED);
-        assert!(flags.has_flag(ew::MAND_REP_NEEDED));
-        assert!(flags.has_flag(ew::OPT_REP_NEEDED));
-    }
-
-    #[test]
-    fn test_engine_repair_helpers() {
-        use crate::irsdk_flags::engine_warnings as ew;
-        let flags = BitField::new(ew::MAND_REP_NEEDED | ew::OPT_REP_NEEDED);
-        assert!(engine_mandatory_repair_needed(flags));
-        assert!(engine_optional_repair_needed(flags));
-        assert!(engine_repairs_needed(flags));
-        let none = BitField::new(0);
-        assert!(!engine_mandatory_repair_needed(none));
-        assert!(!engine_optional_repair_needed(none));
-        assert!(!engine_repairs_needed(none));
-    }
-
-    #[test]
-    fn test_session_dq_scoring_invalid_helper() {
-        use crate::irsdk_flags::session_flags as sf;
-        let flags = BitField::new(sf::DQ_SCORING_INVALID);
-        assert!(session_dq_scoring_invalid(flags));
-        let none = BitField::new(0);
-        assert!(!session_dq_scoring_invalid(none));
-    }
-
-    #[test]
-    fn test_session_control_and_caution_helpers() {
-        use crate::irsdk_flags::flags as f;
-
-        let none = BitField::new(0);
-        assert!(!session_start_control_shown(none));
-        assert!(!session_under_caution(none));
-        assert!(!session_under_yellow(none));
-
-        let start = BitField::new(f::START_READY);
-        assert!(session_start_control_shown(start));
-        assert!(!session_under_caution(start));
-        assert!(!session_under_yellow(start));
-
-        let caution = BitField::new(f::CAUTION_WAVING);
-        assert!(!session_start_control_shown(caution));
-        assert!(session_under_caution(caution));
-        assert!(!session_under_yellow(caution));
-
-        let yellow = BitField::new(f::YELLOW_WAVING);
-        assert!(!session_start_control_shown(yellow));
-        assert!(!session_under_caution(yellow));
-        assert!(session_under_yellow(yellow));
-    }
-
-    #[test]
-    fn test_pit_service_helpers() {
-        use crate::irsdk_flags::pit_sv_flags as p;
-
-        let none = BitField::new(0);
-        assert!(!pit_service_has_tire_service(none));
-        assert!(!pit_service_has_full_service(none));
-
-        let tire_only = BitField::new(p::RR_TIRE_CHANGE);
-        assert!(pit_service_has_tire_service(tire_only));
-
-        let fuel_only = BitField::new(p::FUEL_FILL);
-        assert!(!pit_service_has_tire_service(fuel_only));
-
-        let mixed = BitField::new(p::LF_TIRE_CHANGE | p::FUEL_FILL | p::WINDSHIELD_TEAROFF);
-        assert!(pit_service_has_tire_service(mixed));
-        assert!(pit_service_has_full_service(mixed));
     }
 }

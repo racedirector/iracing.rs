@@ -30,8 +30,13 @@
 //! - Frame reading is allocation-minimal except for the returned frame bytes
 //! - Seeking operations are O(1) as they only update internal position counters
 
-use super::format::{IRSDK_VAR_HEADER_SIZE, IbtDiskSubHeader, IbtHeader, extract_variable_schema};
-use crate::{IRacingSDKError, Result, SchemaProvider, VariableSchema, yaml_utils};
+use super::format::extract_variable_schema;
+use crate::{
+    IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
+    VariableSchema,
+    irsdk::{DiskSubHeader, Header},
+    types::{IRacingSessionString, SessionInfoRegion},
+};
 use std::{
     fs::File,
     io::Read,
@@ -43,9 +48,13 @@ pub struct IbtReader {
     data: Vec<u8>,
     current_position: usize,
     path: Option<PathBuf>,
-    header: IbtHeader,
-    disk_header: IbtDiskSubHeader,
+
+    header: Header,
+    disk_header: DiskSubHeader,
     variable_schema: VariableSchema,
+
+    session_info_region: SessionInfoRegion,
+    // variable_headers_region: VariableHeaderRegion,
     current_frame: usize,
     total_frames: usize,
     frame_data_start: usize,
@@ -80,49 +89,30 @@ impl IbtReader {
         let mut cursor = std::io::Cursor::new(data.as_slice());
 
         // Parse IBT header
-        let header = IbtHeader::parse_from_reader(&mut cursor)?;
-        header.validate()?;
+        let header = Header::try_from_reader(&mut cursor)?;
+        header.validate_ibt()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
-        let disk_header = IbtDiskSubHeader::parse_from_reader_with_header(&mut cursor, &header)?;
+        let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
+
+        let variable_headers_region = VariableHeaderRegion::try_from(&header)?;
+        let variable_headers_range = variable_headers_region.checked_range(data.len())?;
+        let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Variable headers parse",
+                "Could not parse buffer_length to usize",
+            )
+        })?;
 
         // Extract variable schema
-        let variable_schema = extract_variable_schema(&mut cursor, &header)?;
+        let variable_schema =
+            extract_variable_schema(&mut cursor, &variable_headers_region, frame_size)?;
 
-        // Calculate frame data start position correctly with checked arithmetic
-        // Frame data starts AFTER both variable headers AND session info
-        // 1. Variable headers are at header.var_header_offset and each is IRSDK_VAR_HEADER_SIZE bytes
-        let var_headers_size = header
-            .num_vars
-            .checked_mul(IRSDK_VAR_HEADER_SIZE as i32)
-            .ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame data calculation".to_string(),
-                details: "Variable headers size calculation overflowed".to_string(),
-            })?;
-
-        let var_headers_end = header
-            .var_header_offset
-            .checked_add(var_headers_size)
-            .ok_or_else(|| IRacingSDKError::Parse {
-                context: "Frame data calculation".to_string(),
-                details: "Variable headers end calculation overflowed".to_string(),
-            })?;
-
-        // 2. Session info comes after variable headers (if present)
-        let session_info_end = if header.session_info_len > 0 {
-            header
-                .session_info_offset
-                .checked_add(header.session_info_len)
-                .ok_or_else(|| IRacingSDKError::Parse {
-                    context: "Frame data calculation".to_string(),
-                    details: "Session info end calculation overflowed".to_string(),
-                })?
-        } else {
-            var_headers_end
-        };
+        let session_info_region = SessionInfoRegion::try_from(&header)?;
+        let session_info_range = session_info_region.checked_range(data.len())?;
 
         // Frame data starts after whichever comes last: variable headers or session info
-        let frame_data_start = session_info_end.max(var_headers_end) as usize;
+        let frame_data_start = session_info_range.end.max(variable_headers_range.end);
 
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes =
@@ -133,8 +123,8 @@ impl IbtReader {
                     details: "Frame data start position exceeds file size".to_string(),
                 })?;
 
-        let total_frames = if header.buf_len > 0 {
-            remaining_bytes / header.buf_len as usize
+        let total_frames = if header.buffer_length > 0 {
+            remaining_bytes / header.buffer_length as usize
         } else {
             0 // No telemetry data if buf_len is 0
         };
@@ -161,36 +151,32 @@ impl IbtReader {
             current_frame: 0,
             total_frames,
             frame_data_start,
+            // variable_headers_region,
+            session_info_region,
         })
     }
 
-    /// Get cleaned session YAML from the IBT file
+    /// Returns an owned snapshot of the file's advertised session-information region.
     ///
-    /// Returns preprocessed YAML string ready for parsing. The YAML has been cleaned
-    /// to fix iRacing's non-standard format issues. Parsing happens at the Connection level.
-    /// This method extracts on-demand, no caching.
-    pub fn session_yaml(&self) -> Result<Option<String>> {
-        // Check if session info exists
-        if self.header.session_info_len <= 0 || self.header.session_info_offset <= 0 {
-            return Ok(None);
+    /// Returns `None` when the header advertises no region or the region cannot
+    /// be copied from the file data.
+    pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
+        if !self.session_info_region.is_valid() {
+            return None;
         }
 
-        // Extract raw YAML from memory
-        let raw_yaml = yaml_utils::extract_yaml_from_memory(
-            &self.data,
-            self.header.session_info_offset,
-            self.header.session_info_len,
-        )?;
+        self.session_info_region.buffer(&self.data).ok()
+    }
 
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
+    /// Returns decoded session-information text with invalid control characters removed.
+    ///
+    /// Returns `None` when the file has no session-information region or the
+    /// NUL-bounded payload is empty after sanitization.
+    pub fn session_yaml(&self) -> Option<String> {
+        let buffer = self.session_info_buffer()?;
+        let session_string = IRacingSessionString::try_from(buffer).ok()?;
 
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        Ok(Some(cleaned_yaml))
+        Some(session_string.into())
     }
 
     /// Get total number of frames in the file
@@ -233,16 +219,22 @@ impl IbtReader {
     }
 
     /// Get disk metadata from the disk sub-header
-    pub fn disk_header(&self) -> &IbtDiskSubHeader {
+    pub fn disk_header(&self) -> &DiskSubHeader {
         &self.disk_header
     }
 
     /// Get the IBT header information
-    pub fn header(&self) -> &IbtHeader {
+    pub fn header(&self) -> &Header {
         &self.header
     }
 
-    /// Seek to a specific frame (for random access)
+    /// Positions the reader so the next call to [`Self::read_next_frame`] reads
+    /// `frame_number`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if `frame_number` is outside the file's frame range
+    /// or its byte position cannot be represented by `usize`.
     pub fn seek_to_frame(&mut self, frame_number: usize) -> Result<()> {
         if frame_number >= self.total_frames {
             return Err(IRacingSDKError::Parse {
@@ -255,7 +247,7 @@ impl IbtReader {
         }
 
         // Calculate position for frame with checked arithmetic
-        let frame_size = self.header.buf_len as usize;
+        let frame_size = self.header.buffer_length as usize;
         let frame_byte_offset =
             frame_number
                 .checked_mul(frame_size)
@@ -277,9 +269,16 @@ impl IbtReader {
         Ok(())
     }
 
-    /// Read the next frame as raw bytes
+    /// Reads the next frame as raw bytes and advances the reader by one frame.
     ///
-    /// Returns frame data, tick count, and session version for downstream frame processing.
+    /// The returned tuple contains the frame data, its zero-based frame index as
+    /// a synthetic tick, and the header's session-information update counter.
+    /// Returns `Ok(None)` at end of file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the next advertised frame extends beyond the
+    /// loaded file data.
     pub fn read_next_frame(&mut self) -> Result<Option<(Vec<u8>, u32, u32)>> {
         // Check if we've reached the end
         if self.current_frame >= self.total_frames {
@@ -287,11 +286,11 @@ impl IbtReader {
         }
 
         // Handle IBT files with no telemetry data
-        if self.header.buf_len == 0 {
+        if self.header.buffer_length == 0 {
             return Ok(None);
         }
 
-        let frame_size = self.header.buf_len as usize;
+        let frame_size = self.header.buffer_length as usize;
         let start_pos = self.current_position;
         let end_pos = start_pos + frame_size;
 
@@ -586,7 +585,7 @@ mod tests {
 
         if let Some(speed) = schema.get_variable("Speed") {
             ensure!(
-                speed.offset + speed.data_type.size() * speed.count <= data.len(),
+                speed.offset + speed.data_type.byte_size().unwrap() * speed.count <= data.len(),
                 "Speed variable must fit within the frame buffer"
             );
         }
@@ -606,12 +605,9 @@ mod tests {
         );
 
         // Extract session YAML
-        let yaml_result = reader
+        let yaml = reader
             .session_yaml()
             .with_context(|| "Extracting session YAML")?;
-
-        // Verify we got YAML
-        let yaml = yaml_result.expect("IBT file should contain session YAML");
 
         // Verify YAML is non-empty
         ensure!(!yaml.is_empty(), "Session YAML should not be empty");
@@ -655,6 +651,24 @@ mod tests {
             !session.session_info.sessions.is_empty(),
             "Should have at least one session"
         );
+
+        Ok(())
+    }
+    #[test]
+    fn generated_fixture_metadata_matches_manifest() -> Result<()> {
+        let manifest = crate::test_utils::load_fixture_manifest()?;
+
+        for fixture in &manifest.fixtures {
+            let file_path = fixture.fixture_path()?;
+            let reader = crate::ibt::IbtReader::open(&file_path)
+                .with_context(|| format!("Opening {}", file_path.display()))?;
+            ensure!(
+                reader.total_frames() > 0,
+                "Fixture should contain telemetry frames"
+            );
+            assert_eq!(reader.total_frames(), fixture.num_frames);
+            assert_eq!(reader.tick_rate(), fixture.tick_rate as f64);
+        }
 
         Ok(())
     }

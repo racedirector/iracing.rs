@@ -5,6 +5,7 @@ members = [
   "crates/iracing-sdk",
   "crates/iracing-sdk-derive",
   "crates/iracing-simulation",
+  "crates/test-fixtures",
   "examples/driver-inputs",
   "examples/iracing-lifecycle-monitor",
 ]
@@ -22,10 +23,13 @@ edition = "2024"
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
+rand = "0.9"
+rand_chacha = "0.9"
 schemars = { version = "1.2", features = ["derive"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1" }
 serde_yaml_ng = "0.10"
+sha2 = "0.10"
 thiserror = "2.0.16"
 tokio = { version = "1", features = ["rt", "macros"] }
 tracing = "0.1.41"

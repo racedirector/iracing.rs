@@ -24,6 +24,8 @@
 - `benches/`: Criterion benchmarks gated by the `benchmark` feature.
 - `yaml_utils`: cleans iRacing's malformed YAML before parsing; use it instead of custom scrubbing.
 
+- Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.
+
 ## Platform & Feature Guardrails
 
 - Gate actual shared-memory, live-provider, and Win32 broadcast transports with `#[cfg(windows)]`. Keep portable typed commands and the non-Windows `LiveConnection` builder stub available where the public API already promises them.
@@ -33,7 +35,8 @@
 
 ## Examples & Binaries
 
-- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo live-session-parser`, `cargo broadcast-cli`; they map to bins in this crate.
+- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo session`, `cargo broadcast-cli`; they map to bins in this crate.
+- Use `cargo session schema type`, `cargo session schema ibt --path ./session.ibt`, and `cargo session snapshot ibt --path ./session.ibt` for session schemas and snapshots; `schema live` and `snapshot live` require Windows. Output defaults to stdout; use `--output <file>` for a file. The alias enables `codegen,schema-discovery`.
 - Keep cross-platform examples (`disk-position`, `adapter-disk-position`, `enum-bitfields-disk`) runnable on non-Windows machines.
 - Keep adapter examples importing from `iracing_sdk`; derive examples should rely on the `derive` feature re-export from this crate.
 
