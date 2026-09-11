@@ -44,7 +44,11 @@ impl FramePacket {
 }
 
 impl FramePacket {
-    /// Retrieves the variable from the frame by name.
+    /// Decodes a variable from this frame by name.
+    ///
+    /// Returns `Ok(None)` when the schema has no variable with that name.
+    /// Returns an error when the matching variable cannot be decoded from the
+    /// frame data.
     pub fn value(
         &self,
         name: &str,

@@ -49,8 +49,12 @@ impl Header {
     const MAX_LIVE_VARIABLES: i32 = 5_000;
     const MAX_LIVE_BUFFER_LENGTH: i32 = 10_000_000;
 
-    /// Reads a buffer of `Self::WIRE_SIZE` from the provided reader and uses
-    /// the `read_from_bytes` of `WireType` to create an instance of `Self`
+    /// Reads and decodes one complete SDK header from `reader`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if `reader` cannot supply the required
+    /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         let mut buffer = [0u8; Self::WIRE_SIZE];
 
@@ -66,6 +70,9 @@ impl Header {
 
     #[allow(clippy::too_many_arguments)]
     /// Constructs a header value, filling the ABI padding automatically.
+    ///
+    /// This does not validate field values; use [`Self::validate_live`] or
+    /// [`Self::validate_ibt`] for the intended source.
     pub fn new(
         version: i32,
         status: StatusField,
@@ -283,8 +290,10 @@ impl Header {
         Ok(())
     }
 
-    /// Convenience for indicating if the header is generall considered valid.
-    /// This value is not cached and performs validation.
+    /// Returns whether this header passes the common checks in [`Self::validate`].
+    ///
+    /// This performs validation on every call and does not apply the additional
+    /// live or IBT checks.
     pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
     }
