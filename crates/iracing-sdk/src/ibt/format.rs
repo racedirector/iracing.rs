@@ -27,7 +27,7 @@ use crate::{
 use std::io::{Read, Seek, SeekFrom};
 
 /// Extract variable schema from IBT file headers
-pub fn extract_variable_schema<R: Read + Seek>(
+pub(super) fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
     region: &VariableHeaderRegion,
     frame_size: usize,
