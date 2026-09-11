@@ -244,7 +244,7 @@ impl Connection {
             std::slice::from_raw_parts(info_ptr, region.length())
         };
 
-        region.buffer(session_info_bytes).ok()
+        Some(SessionInfoBuffer::from_checked_region(session_info_bytes))
     }
 
     /// Get session info YAML string
@@ -273,7 +273,9 @@ impl Connection {
             std::slice::from_raw_parts(var_header_ptr, region.length())
         };
 
-        region.buffer(variable_header_bytes).ok()
+        Some(VariableHeadersBuffer::from_checked_region(
+            variable_header_bytes,
+        ))
     }
 
     /// Get all variable definitions from the header
