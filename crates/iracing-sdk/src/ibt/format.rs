@@ -21,7 +21,8 @@
 //! - O(1) schema validation after parsing
 
 use crate::{
-    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, types::VariableHeaderRegion,
+    ByteRegion, IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema,
+    types::VariableHeaderRegion,
 };
 
 use std::io::{Read, Seek, SeekFrom};
