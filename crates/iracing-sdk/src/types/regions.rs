@@ -44,6 +44,7 @@ fn checked_range(
 /// Construction validates the offset and length conversions, but does not check  
 /// that the region fits in a source. Use [`Self::checked_range`], [`Self::bytes`],  
 /// or [`Self::buffer`] to validate source bounds before accessing the region.  
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SessionInfoRegion {
     offset: usize,
     length: usize,
@@ -136,6 +137,7 @@ impl TryFrom<&Header> for SessionInfoRegion {
 /// region fits in a source. Use [`Self::checked_range`], [`Self::bytes`], or
 /// [`Self::buffer`] to validate source bounds before accessing the region.
 /// Individual variable headers are not semantically validated by this type.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VariableHeaderRegion {
     offset: usize,
     length: usize,
