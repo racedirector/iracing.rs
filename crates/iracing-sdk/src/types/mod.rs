@@ -7,7 +7,7 @@
 //!
 //! The type system maps directly to iRacing SDK structures:
 //! - [`VariableSchema`] describes the structure of telemetry variables with O(1) lookup
-//! - [`VariableType`] maps to iRacing's `irsdk_VarType` enum with size information
+//! - [`irsdk::VariableType`](crate::irsdk::VariableType) maps to iRacing's `irsdk_VarType` enum with size information
 //! - [`VarData`] trait provides type-safe parsing from binary telemetry data
 //! - [`BitField`] handles iRacing's bitfield variables with flag operations
 //!

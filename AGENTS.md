@@ -42,7 +42,7 @@ on commands, boundaries, and easy-to-miss constraints.
 ## Patterns & Gotchas
 
 - Frame extraction is little-endian; always rely on `VarData::from_bytes` rather than manual decoding to avoid drift.
-- `SessionInfoParser` offers version-keyed caching for memory-backed callers. The telemetry task has separate live and IBT session policies; preserve their documented retry, ordering, and EOF semantics instead of adding a second per-frame parser.
+- Session parsing uses `SessionInfo::parse` after source decoding and sanitization. The telemetry task has separate live and IBT session policies; preserve their documented retry, ordering, and EOF semantics instead of adding a second per-frame parser.
 - Live providers and Win32 transports compile only on Windows, while `LiveConnection` retains a portable stub and broadcast command types remain portable. Gate at the narrowest OS-dependent boundary.
 - Do not generalize recorded replay semantics to live telemetry. `Telemetry::spawn_ibt` uses `OnDemandDelivery`, and `IbtConnection` advances its shared cursor only after every active subscription acknowledges the retained frame; live delivery remains latest-wins.
 

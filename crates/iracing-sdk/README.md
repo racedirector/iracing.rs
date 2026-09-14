@@ -6,7 +6,7 @@ This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
 - Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
-- Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
+- Session YAML parsing via `SessionInfo::parse`; telemetry session policies handle source-specific updates
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
 
@@ -15,7 +15,7 @@ This crate provides:
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
 2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
 3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
-4. For session YAML parsing and caching, rely on `SessionInfoParser`.
+4. Parse decoded session YAML with `SessionInfo::parse`; use telemetry session policies for live updates or IBT replay.
 5. On Windows, use `WindowsConnection` for live telemetry.
 
 ## Install
@@ -46,12 +46,12 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader}
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{VarData, ibt::IbtReader};
+use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
 
 fn main() -> iracing_sdk::Result<()> {
     let mut reader = IbtReader::open("telemetry.ibt")?;
     let speed_info = reader
-        .variables()
+        .schema()
         .get_variable("Speed")
         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
             context: "schema lookup".to_string(),
@@ -75,7 +75,7 @@ use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
 fn main() -> iracing_sdk::Result<()> {
     let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(yaml) = reader.session_yaml()? {
+    if let Some(yaml) = reader.session_yaml() {
         let session = SessionInfo::parse(&yaml)?;
         println!("Track: {}", session.weekend_info.track_display_name);
     }
@@ -154,7 +154,7 @@ impl FrameAdapter for Row {
 | Capability | Linux/macOS | Windows |
 |---|---|---|
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
-| Session parsing (`SessionInfoParser`) | Yes | Yes |
+| Session parsing (`SessionInfo::parse`) | Yes | Yes |
 | `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
 | `session schema live` and `session snapshot live` | No | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
