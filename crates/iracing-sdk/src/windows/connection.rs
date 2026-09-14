@@ -4,12 +4,13 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::{
-    IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
-    VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
+    ByteParser, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
+    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
     irsdk::{
         Header, VariableHeader,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
+    types::ByteRegion,
     windows::wide_string,
 };
 use std::ptr::NonNull;
@@ -238,11 +239,7 @@ impl Connection {
             .ok()
             .filter(|r| r.is_valid())?;
 
-        let session_info_bytes = unsafe {
-            // Get the slice of the session yaml
-            let info_ptr = self.base.as_ptr().add(region.offset());
-            std::slice::from_raw_parts(info_ptr, region.length())
-        };
+        let session_info_bytes = self.bytes_at_region(region);
 
         Some(SessionInfoBuffer::from_checked_region(session_info_bytes))
     }
@@ -268,10 +265,7 @@ impl Connection {
             .ok()
             .filter(|r| r.is_valid())?;
 
-        let variable_header_bytes = unsafe {
-            let var_header_ptr = self.base.as_ptr().add(region.offset());
-            std::slice::from_raw_parts(var_header_ptr, region.length())
-        };
+        let variable_header_bytes = self.bytes_at_region(region);
 
         Some(VariableHeadersBuffer::from_checked_region(
             variable_header_bytes,
@@ -313,6 +307,15 @@ impl Connection {
             }
         }
         latest
+    }
+}
+
+impl ByteParser for Connection {
+    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
+        unsafe {
+            let bytes_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(bytes_ptr, region.length())
+        }
     }
 }
 

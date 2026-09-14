@@ -32,8 +32,8 @@
 
 use super::format::extract_variable_schema;
 use crate::{
-    IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
-    VariableSchema,
+    ByteParser, ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer,
+    VariableHeaderRegion, VariableSchema,
     irsdk::{DiskSubHeader, Header},
     types::{IRacingSessionString, SessionInfoRegion},
 };
@@ -162,7 +162,10 @@ impl IbtReader {
             return None;
         }
 
-        self.session_info_region.buffer(&self.data).ok()
+        let bytes = self.bytes_at_region(self.session_info_region);
+
+        Some(SessionInfoBuffer::from_checked_region(bytes))
+        // self.session_info_region.buffer(&self.data).ok()
     }
 
     /// Get cleaned session YAML from the IBT file
@@ -299,6 +302,12 @@ impl IbtReader {
         self.current_position = end_pos;
 
         Ok(Some((frame_data, tick_count, session_version)))
+    }
+}
+
+impl ByteParser for IbtReader {
+    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
+        &self.data[region.offset()..region.length()]
     }
 }
 

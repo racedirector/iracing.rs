@@ -62,7 +62,7 @@ pub use bitfield::BitField;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub(crate) use iracing_session_string::IRacingSessionString;
-pub use regions::{SessionInfoRegion, VariableHeaderRegion};
+pub use regions::*;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
