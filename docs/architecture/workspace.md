@@ -11,8 +11,6 @@ workspace applications
   ├─ driver-inputs ───────────────► iracing-sdk
   └─ iracing-lifecycle-monitor ───► iracing-sdk
                                 └─► iracing-simulation
-
-iracing-broadcast-grpc-service ───► iracing-sdk
 iracing-sdk ── optional derive ───► iracing-sdk-derive
 ```
 
@@ -58,19 +56,6 @@ Owns simulation lifecycle checks that do not require telemetry:
 - Windows-only process enumeration for `iRacingSim64DX11.exe`.
 
 It does not own shared-memory telemetry or broadcast commands.
-
-### `iracing-broadcast-grpc-service`
-
-Owns the network boundary for broadcast controls:
-
-- the protobuf contract and generated tonic/prost bindings;
-- gRPC request validation and response mapping;
-- application use cases expressed against internal ports;
-- adapters to SDK broadcast commands and telemetry/session observation;
-- the Windows server binary with health and reflection services.
-
-Raw Win32 message identifiers and packing remain in `iracing-sdk`. Generated
-protobuf types remain portable; the real service composition is Windows-only.
 
 ### Workspace applications
 

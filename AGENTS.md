@@ -30,13 +30,11 @@ on commands, boundaries, and easy-to-miss constraints.
 - `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
-- `crates/iracing-broadcast-grpc-service`: generated cross-platform protobuf/tonic surface plus a Windows-only, layered command-and-observation service.
 - `examples/*`: publish-disabled workspace applications that exercise the crates as downstream users would.
 
 ## Package-Specific Guidance
 
-- Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`, and `iracing-broadcast-grpc-service`.
-- For the broadcast gRPC service, read `crates/iracing-broadcast-grpc-service/docs/architecture.md` before changing protocol, server, client, response semantics, platform support, or operational behavior.
+- Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`.
 
 ## Patterns & Gotchas
 

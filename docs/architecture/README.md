@@ -25,11 +25,6 @@ disagree, verify the implementation and update both in the same change.
 - [Testing and fixtures](testing-and-fixtures.md): deterministic data,
   test-helper contracts, and CI-aligned validation.
 
-The broadcast crate also has a detailed local document at
-[`crates/iracing-broadcast-grpc-service/docs/architecture.md`](../../crates/iracing-broadcast-grpc-service/docs/architecture.md).
-The repo-level document explains how that crate fits into the workspace; the
-crate-local document is authoritative for RPC behavior and extension work.
-
 ## Reading paths
 
 For telemetry work, read this index, [workspace structure](workspace.md), and
