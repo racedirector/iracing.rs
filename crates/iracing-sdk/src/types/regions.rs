@@ -10,6 +10,29 @@ pub trait ByteRegion {
     fn offset(&self) -> usize;
     /// Returns the session-information byte length advertised by the source header.
     fn length(&self) -> usize;
+
+    /// Returns the range for the offset and length without checking for overflow.
+    fn range(&self) -> Range<usize> {
+        let offset = self.offset();
+        let length = self.length();
+
+        offset..offset + length
+    }
+
+    /// Returns the checked range for the offset and length.
+    fn checked_range(&self) -> Result<Range<usize>> {
+        let offset = self.offset();
+        let length = self.length();
+
+        let end = offset.checked_add(length).ok_or_else(|| {
+            IRacingSDKError::parse_error(
+                "ByteRegion",
+                format!("Region offset {offset} + length {length} overflows usize"),
+            )
+        })?;
+
+        Ok(offset..end)
+    }
 }
 
 pub(crate) trait ByteParser {

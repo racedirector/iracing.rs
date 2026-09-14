@@ -168,7 +168,6 @@ impl IbtReader {
         let bytes = self.bytes_at_region(self.session_info_region);
 
         Some(SessionInfoBuffer::from_checked_region(bytes))
-        // self.session_info_region.buffer(&self.data).ok()
     }
 
     /// Returns decoded session-information text with invalid control characters removed.
@@ -321,15 +320,15 @@ impl IbtReader {
     }
 }
 
-impl ByteParser for IbtReader {
-    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
-        &self.data[region.offset()..region.length()]
-    }
-}
-
 impl SchemaProvider for IbtReader {
     fn schema(&self) -> &VariableSchema {
         &self.variable_schema
+    }
+}
+
+impl ByteParser for IbtReader {
+    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
+        &self.data[region.range()]
     }
 }
 
