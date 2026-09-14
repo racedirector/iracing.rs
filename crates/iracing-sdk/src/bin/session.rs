@@ -164,6 +164,7 @@ fn main() -> anyhow::Result<()> {
 
 fn handle_discovery_command(command: DiscoveryCommands) -> Result<()> {
     match command {
+        #[cfg(windows)]
         DiscoveryCommands::Live { output, encoding } => {
             let session_info = capture_live_session_info()?;
             let unknown_fields = session_info.collect_unknown_fields();
