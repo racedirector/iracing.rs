@@ -5,7 +5,7 @@
 
 use crate::{
     ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
+    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
     irsdk::{
         Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
