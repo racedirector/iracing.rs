@@ -4,6 +4,18 @@ use crate::{
 };
 use std::ops::Range;
 
+/// A half-open byte region used for parsing.
+pub trait ByteRegion {
+    /// Returns the region's byte offset from the beginning of the source.
+    fn offset(&self) -> usize;
+    /// Returns the session-information byte length advertised by the source header.
+    fn length(&self) -> usize;
+}
+
+pub(crate) trait ByteParser {
+    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8];
+}
+
 fn checked_range(
     offset: usize,
     length: usize,
@@ -37,17 +49,19 @@ pub struct SessionInfoRegion {
     length: usize,
 }
 
-impl SessionInfoRegion {
+impl ByteRegion for SessionInfoRegion {
     /// Returns the region's byte offset from the beginning of the source.
-    pub fn offset(&self) -> usize {
+    fn offset(&self) -> usize {
         self.offset
     }
 
     /// Returns the session-information byte length advertised by the source header.
-    pub fn length(&self) -> usize {
+    fn length(&self) -> usize {
         self.length
     }
+}
 
+impl SessionInfoRegion {
     /// Returns the region's half-open byte range within a source of `data_len` bytes.
     ///
     /// # Errors
@@ -128,18 +142,17 @@ pub struct VariableHeaderRegion {
     count: usize,
 }
 
-impl VariableHeaderRegion {
-    /// Returns the region's byte offset from the beginning of the source.
-    pub fn offset(&self) -> usize {
+impl ByteRegion for VariableHeaderRegion {
+    fn offset(&self) -> usize {
         self.offset
     }
 
-    /// Returns the region's byte length: the header count times the wire size
-    /// of a [`VariableHeader`].
-    pub fn length(&self) -> usize {
+    fn length(&self) -> usize {
         self.length
     }
+}
 
+impl VariableHeaderRegion {
     /// Returns the number of variable headers advertised by the source header.
     pub fn count(&self) -> usize {
         self.count
