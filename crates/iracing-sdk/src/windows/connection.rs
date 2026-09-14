@@ -4,13 +4,12 @@
 //! following the same patterns as the official C++ SDK implementation.
 
 use crate::{
-    ByteParser, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
+    ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
     SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo, VariableSchema,
     irsdk::{
-        Header, VariableHeader,
+        Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
     },
-    types::ByteRegion,
     windows::wide_string,
 };
 use std::ptr::NonNull;
@@ -231,7 +230,9 @@ impl Connection {
         None
     }
 
-    /// Get session info buffer from header-determined region.
+    /// Copies the session-information region advertised by the live header.
+    ///
+    /// Returns `None` when the header advertises no usable region.
     pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
         let header = self.header();
 
@@ -244,7 +245,10 @@ impl Connection {
         Some(SessionInfoBuffer::from_checked_region(session_info_bytes))
     }
 
-    /// Get session info YAML string
+    /// Returns decoded live session-information text with invalid control characters removed.
+    ///
+    /// Returns `None` when no usable region exists or the NUL-bounded payload is
+    /// empty after sanitization.
     pub fn session_info(&self) -> Option<String> {
         let buffer = self.session_info_buffer()?;
         let session_info = IRacingSessionString::try_from(buffer).ok()?;
@@ -257,7 +261,9 @@ impl Connection {
         self.header().session_info_update
     }
 
-    /// Get variable headers buffer from header-determined region.
+    /// Copies the variable-header region advertised by the live header.
+    ///
+    /// Returns `None` when the header advertises no usable region.
     pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header();
 
@@ -272,7 +278,13 @@ impl Connection {
         ))
     }
 
-    /// Get all variable definitions from the header
+    /// Decodes all variable definitions from a copied variable-header region.
+    ///
+    /// Returns an empty vector when no usable variable-header region exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any variable header contains invalid metadata.
     pub fn get_variables(&self) -> Result<Vec<VariableInfo>> {
         let buffer = match self.variable_headers_buffer() {
             Some(b) => b,

@@ -144,7 +144,13 @@ impl VariableSchema {
         Self::new(variables, frame_size)
     }
 
-    /// Validate the schema for consistency.
+    /// Validates variable names, counts, storage types, and frame bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a map key differs from its variable name, a count
+    /// is zero, the type is not an SDK storage type, or a variable's byte extent
+    /// overflows or exceeds the frame size.
     pub fn validate(&self) -> crate::Result<()> {
         for (name, var_info) in &self.variables {
             // Validate variable count
