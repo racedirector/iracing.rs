@@ -143,10 +143,10 @@ impl TryFrom<&Header> for SessionInfoRegion {
                     format!("Could not convert {} to usize", value.session_info_offset),
                 )
             })?,
-            length: usize::try_from(value.session_info_len).map_err(|_| {
+            length: usize::try_from(value.session_info_length).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "SessionInfoRegion::try_from",
-                    format!("Could not convert {} to usize", value.session_info_len),
+                    format!("Could not convert {} to usize", value.session_info_length),
                 )
             })?,
         })
@@ -288,7 +288,7 @@ mod tests {
         for (offset, length) in [(-1, 1), (1, -1)] {
             let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
             header.session_info_offset = offset;
-            header.session_info_len = length;
+            header.session_info_length = length;
             assert!(SessionInfoRegion::try_from(&header).is_err());
         }
     }
@@ -297,7 +297,7 @@ mod tests {
     fn session_region_copies_only_advertised_bytes() {
         let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
         header.session_info_offset = 4;
-        header.session_info_len = 7;
+        header.session_info_length = 7;
         let region = SessionInfoRegion::try_from(&header).unwrap();
         let mut source = b"skipSessionpadding".to_vec();
         assert_eq!(region.bytes(&source).unwrap(), b"Session");

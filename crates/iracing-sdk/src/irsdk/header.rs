@@ -21,7 +21,7 @@ pub struct Header {
     /// Incremented when session info changes
     pub session_info_update: i32,
     /// Length in bytes of session info
-    pub session_info_len: i32,
+    pub session_info_length: i32,
     /// Offset to session info
     pub session_info_offset: i32,
     /// Number of telemetry variables
@@ -78,7 +78,7 @@ impl Header {
         status: StatusField,
         tick_rate: i32,
         session_info_update: i32,
-        session_info_len: i32,
+        session_info_length: i32,
         session_info_offset: i32,
         variable_count: i32,
         variable_header_offset: i32,
@@ -93,7 +93,7 @@ impl Header {
             status,
             tick_rate,
             session_info_update,
-            session_info_len,
+            session_info_length,
             session_info_offset,
             variable_count,
             variable_header_offset,
@@ -143,7 +143,7 @@ impl Header {
             ));
         }
 
-        if self.session_info_len < 0 {
+        if self.session_info_length < 0 {
             return Err(header_validation_error(
                 "Session info length cannot be negative",
             ));
@@ -159,7 +159,7 @@ impl Header {
 
         self.validate_variable_offset()?;
 
-        if self.tick_rate < 0 || self.session_info_len < -1 {
+        if self.tick_rate < 0 || self.session_info_length < -1 {
             return Err(header_validation_error(
                 "Header contains invalid negative values",
             ));
@@ -174,10 +174,10 @@ impl Header {
 
     fn validate_session_offset(&self) -> Result<()> {
         if self.session_info_offset > 0
-            && self.session_info_len > 0
+            && self.session_info_length > 0
             && self
                 .session_info_offset
-                .checked_add(self.session_info_len)
+                .checked_add(self.session_info_length)
                 .is_none()
         {
             return Err(header_validation_error(
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(offset_of!(Header, status), 4);
         assert_eq!(offset_of!(Header, tick_rate), 8);
         assert_eq!(offset_of!(Header, session_info_update), 12);
-        assert_eq!(offset_of!(Header, session_info_len), 16);
+        assert_eq!(offset_of!(Header, session_info_length), 16);
         assert_eq!(offset_of!(Header, session_info_offset), 20);
         assert_eq!(offset_of!(Header, variable_count), 24);
         assert_eq!(offset_of!(Header, variable_header_offset), 28);

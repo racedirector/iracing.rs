@@ -278,7 +278,7 @@ fn compare_header(path: &Path, header: &Header, fixture: &crate::model::IbtFixtu
         path.display()
     );
     ensure!(
-        header.session_info_len == fixture.session_info_len,
+        header.session_info_length == fixture.session_info_len,
         "{} session length mismatch",
         path.display()
     );

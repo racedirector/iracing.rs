@@ -40,7 +40,7 @@ fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         assert_eq!(header.variable_header_offset, 144);
         assert_eq!(header.buffer_length, fixture.frame_size as i32);
         assert_eq!(header.buffer_count, fixture.num_buf);
-        assert_eq!(header.session_info_len, fixture.session_info_len);
+        assert_eq!(header.session_info_length, fixture.session_info_len);
         assert_eq!(header.session_info_offset, fixture.session_info_offset);
         assert_eq!(header.session_info_update, fixture.session_info_update);
 
