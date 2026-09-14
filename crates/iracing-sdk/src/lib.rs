@@ -16,8 +16,8 @@
 //!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
-//!   - [`schema::SessionInfo`], [`schema::SessionInfoParser`]
-//!   - [`yaml_utils`] for iRacing YAML cleanup
+//!   - [`schema::SessionInfo`] and [`schema::SessionInfo::parse`] for session YAML
+//!   - [`types::SessionInfoBuffer`] for decoding session data from the SDK
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`

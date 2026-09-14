@@ -44,35 +44,25 @@ the same bounded slice: declared UTF-8 uses replacement for malformed sequences,
 declared ISO-8859-1 maps each byte to its code point, and absent or unknown
 declarations use UTF-8 validation with an ISO-8859-1 fallback. Converting the
 buffer to `String` delegates to this payload decoder. Neither boundary nor
-encoding is cached; YAML cleanup and parsing remain subsequent operations.
+encoding is cached; control-character cleanup and parsing remain subsequent operations.
 
-iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
-that standard parsers do not accept directly. The code has two cleanup surfaces:
-
-- `yaml_utils` extracts bounded memory regions, decodes UTF-8 with a
-  Windows-1252 fallback, and performs low-level control-character cleanup;
-- `SessionInfoParser` includes a compatibility preprocessor for problematic
-  unquoted fields, deserializes `SessionInfo`, validates required high-level
-  content, and can cache by session version.
-
-`SessionInfo::parse` is the lighter path for YAML that a provider has already
-cleaned. Provider and caller contracts must make preprocessing ownership clear;
-do not stack ad hoc cleaners at each call site.
+iRacing session data can contain control characters and non-UTF-8 bytes.
+`SessionInfoBuffer` bounds and decodes the captured bytes; the internal
+`IRacingSessionString` removes invalid control characters and rejects empty
+text. `IbtReader::session_yaml` and live acquisition supply this sanitized
+text. `SessionInfo::parse` then deserializes it into the typed session model.
+Keep decoding and sanitization in the source path.
 
 ## Caching and publication
 
-`SessionInfoParser::parse_from_memory` caches a cloned `SessionInfo` keyed by the
-numeric session version. Repeated calls at the same version reuse the cache.
-
-The telemetry task does not use that cache directly. It has source-specific
-session policies:
+The telemetry task has source-specific session policies:
 
 - live: detect version transitions, immediately own the current YAML, and parse
   queued snapshots sequentially on a background FIFO worker before publishing;
 - IBT: fetch and parse immutable session YAML once before frames.
 
-Architecture changes must distinguish parser caching from telemetry publication.
-They solve different problems.
+Session version tracking and publication belong to these policies, not to
+`SessionInfo::parse`.
 
 ## Typed session model
 

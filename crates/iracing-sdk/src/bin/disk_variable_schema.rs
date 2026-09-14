@@ -4,7 +4,7 @@
 //! (serialized as YAML) based on the embedded variable headers.
 //!
 //! # Behavior
-//! - Opens `--ibt-path` via `iracing_sdk::IbtReader`
+//! - Opens `--ibt-path` via `iracing_sdk::ibt::IbtReader`
 //! - Reads the telemetry variable schema from the file
 //! - Converts it to JSON Schema and writes YAML to `--output-path`
 //!
