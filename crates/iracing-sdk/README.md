@@ -180,8 +180,10 @@ impl FrameAdapter for Row {
 - `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
   - Type schema: `cargo session schema type`
   - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`
+  - Schema additions discovered from an IBT recording: `cargo session discover ibt --path ./session.ibt`
   - Session snapshot from an IBT recording: `cargo session snapshot ibt --path ./session.ibt --output ./session.yaml`
   - Live schema (Windows only): `cargo session schema live`
+  - Live schema additions (Windows only): `cargo session discover live`
   - Live snapshot (Windows only): `cargo session snapshot live --output ./live-session.yaml`
   - All subcommands default to YAML on stdout. Use `--output -` for explicit stdout, `--output <file>` for a file, or `--encoding json` / `--encoding json-pretty` for JSON. Diagnostics go to stderr.
 - `ibt-json-snapshot`:
