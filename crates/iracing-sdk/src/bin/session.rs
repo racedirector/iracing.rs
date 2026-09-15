@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use iracing_sdk::{ibt::reader::IbtReader, schema::SessionInfo};
 use schemars::{schema_for, schema_for_value};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 
 use output_writer::{OutputEncoding, OutputTarget, write_to_output};
@@ -235,7 +235,7 @@ fn handle_schema_command(command: SchemaOutputCommands) -> Result<()> {
     Ok(())
 }
 
-fn capture_disk_session_info(ibt_path: &PathBuf) -> Result<SessionInfo> {
+fn capture_disk_session_info<P: AsRef<Path>>(ibt_path: &P) -> Result<SessionInfo> {
     let reader = IbtReader::open(ibt_path)?;
 
     let buffer = reader
