@@ -238,7 +238,8 @@ impl Connection {
 
         let region = SessionInfoRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())?;
+            .filter(|r| r.is_valid())
+            .map(|r| r.as_region())?;
 
         let session_info_bytes = self.bytes_at_region(region);
 
@@ -269,7 +270,8 @@ impl Connection {
 
         let region = VariableHeaderRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())?;
+            .filter(|r| r.is_valid())
+            .map(|r| r.region)?;
 
         let variable_header_bytes = self.bytes_at_region(region);
 
@@ -323,10 +325,10 @@ impl Connection {
 }
 
 impl ByteParser for Connection {
-    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
+    fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
         unsafe {
-            let bytes_ptr = self.base.as_ptr().add(region.offset());
-            std::slice::from_raw_parts(bytes_ptr, region.length())
+            let bytes_ptr = self.base.as_ptr().add(region.offset);
+            std::slice::from_raw_parts(bytes_ptr, region.length)
         }
     }
 }

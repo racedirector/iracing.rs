@@ -109,10 +109,14 @@ impl IbtReader {
             extract_variable_schema(&mut cursor, &variable_headers_region, frame_size)?;
 
         let session_info_region = SessionInfoRegion::try_from(&header)?;
-        let session_info_range = session_info_region.checked_range(data.len())?;
 
         // Frame data starts after whichever comes last: variable headers or session info
-        let frame_data_start = session_info_range.end.max(variable_headers_range.end);
+        let frame_data_start = if session_info_region.is_valid() {
+            let session_info_range = session_info_region.checked_range(data.len())?;
+            session_info_range.end.max(variable_headers_range.end)
+        } else {
+            variable_headers_range.end
+        };
 
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes =
@@ -161,7 +165,7 @@ impl IbtReader {
             return None;
         }
 
-        let bytes = self.bytes_at_region(self.session_info_region);
+        let bytes = self.bytes_at_region(self.session_info_region.as_region());
 
         Some(SessionInfoBuffer::from_checked_region(bytes))
     }
@@ -323,7 +327,7 @@ impl SchemaProvider for IbtReader {
 }
 
 impl ByteParser for IbtReader {
-    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
+    fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
         &self.data[region.as_range()]
     }
 }

@@ -21,8 +21,7 @@
 //! - O(1) schema validation after parsing
 
 use crate::{
-    ByteRegion, IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema,
-    types::VariableHeaderRegion,
+    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, types::VariableHeaderRegion,
 };
 
 use std::io::{Read, Seek, SeekFrom};
@@ -38,21 +37,20 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
         region.count()
     );
 
-    // Seek to the variable headers section and parse all variables
-    reader
-        .seek(SeekFrom::Start(region.offset() as u64))
-        .map_err(|e| {
-            IRacingSDKError::parse_error(
-                "Variable headers seek".to_string(),
-                format!(
-                    "Failed to seek to variable headers at offset {}: {}",
-                    region.offset(),
-                    e
-                ),
-            )
-        })?;
+    let offset = region.region.offset;
 
-    let mut bytes = vec![0; region.length()];
+    // Seek to the variable headers section and parse all variables
+    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| {
+        IRacingSDKError::parse_error(
+            "Variable headers seek".to_string(),
+            format!(
+                "Failed to seek to variable headers at offset {}: {}",
+                offset, e
+            ),
+        )
+    })?;
+
+    let mut bytes = vec![0; region.region.length];
 
     reader.read_exact(&mut bytes).map_err(|e| {
         IRacingSDKError::parse_error(

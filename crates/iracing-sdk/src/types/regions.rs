@@ -4,23 +4,25 @@ use crate::{
 };
 use std::ops::Range;
 
-/// A half-open byte region used for parsing.
-pub trait ByteRegion {
-    /// Returns the region's byte offset from the beginning of the source.
-    fn offset(&self) -> usize;
-    /// Returns the session-information byte length advertised by the source header.
-    fn length(&self) -> usize;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ByteRegion {
+    pub offset: usize,
+    pub length: usize,
+}
 
-    /// Returns the range for the offset and length without checking for overflow.
-    fn as_range(&self) -> Range<usize> {
-        let offset = self.offset();
-        offset..offset + self.length()
+impl ByteRegion {
+    /// Returns whether the header advertised a nonzero session-information region.
+    pub fn is_valid(&self) -> bool {
+        self.offset > 0 && self.length > 0
     }
 
-    /// Returns the checked range for the offset and length.
-    fn checked_range(&self) -> Result<Range<usize>> {
-        let offset = self.offset();
-        let length = self.length();
+    pub fn as_range(&self) -> Range<usize> {
+        self.offset..self.offset + self.length
+    }
+
+    pub fn as_checked_range(&self) -> Result<Range<usize>> {
+        let offset = self.offset;
+        let length = self.length;
 
         let end = offset.checked_add(length).ok_or_else(|| {
             IRacingSDKError::parse_error(
@@ -34,30 +36,27 @@ pub trait ByteRegion {
 }
 
 pub(crate) trait ByteParser {
-    fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8];
+    fn bytes_at_region(&self, region: ByteRegion) -> &[u8];
 }
 
 fn checked_range(
-    offset: usize,
-    length: usize,
+    region: ByteRegion,
     data_len: usize,
     context: &'static str,
 ) -> Result<Range<usize>> {
-    let end = offset.checked_add(length).ok_or_else(|| {
-        IRacingSDKError::parse_error(
-            context,
-            format!("Region offset {offset} + length {length} overflows usize"),
-        )
-    })?;
+    let range = region.as_checked_range()?;
 
-    if end > data_len {
+    if range.end > data_len {
         return Err(IRacingSDKError::parse_error(
             context,
-            format!("Region {offset}..{end} exceeds data length {data_len}"),
+            format!(
+                "Region {}..{} exceeds data length {data_len}",
+                range.start, range.end
+            ),
         ));
     }
 
-    Ok(offset..end)
+    Ok(range)
 }
 
 /// Location and size of the session-information region advertised by a [`Header`].  
@@ -66,24 +65,14 @@ fn checked_range(
 /// that the region fits in a source. Use [`Self::checked_range`], [`Self::bytes`],  
 /// or [`Self::buffer`] to validate source bounds before accessing the region.  
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct SessionInfoRegion {
-    offset: usize,
-    length: usize,
-}
-
-impl ByteRegion for SessionInfoRegion {
-    /// Returns the region's byte offset from the beginning of the source.
-    fn offset(&self) -> usize {
-        self.offset
-    }
-
-    /// Returns the session-information byte length advertised by the source header.
-    fn length(&self) -> usize {
-        self.length
-    }
-}
+pub struct SessionInfoRegion(ByteRegion);
 
 impl SessionInfoRegion {
+    /// Returns the associated byte region.
+    pub fn as_region(&self) -> ByteRegion {
+        self.0
+    }
+
     /// Returns the region's half-open byte range within a source of `data_len` bytes.
     ///
     /// # Errors
@@ -92,8 +81,7 @@ impl SessionInfoRegion {
     /// `data_len`.
     pub fn checked_range(&self, data_len: usize) -> Result<Range<usize>> {
         checked_range(
-            self.offset,
-            self.length,
+            self.as_region(),
             data_len,
             "SessionInfoRegion::checked_range",
         )
@@ -124,9 +112,9 @@ impl SessionInfoRegion {
         Ok(SessionInfoBuffer::from_checked_region(self.bytes(source)?))
     }
 
-    /// Returns whether the header advertised a nonzero session-information region.
+    /// Returns whether the header advertised a nonzero variable-header region.
     pub fn is_valid(&self) -> bool {
-        self.offset > 0 && self.length > 0
+        self.as_region().is_valid()
     }
 }
 
@@ -134,7 +122,7 @@ impl TryFrom<&Header> for SessionInfoRegion {
     type Error = IRacingSDKError;
 
     fn try_from(value: &Header) -> Result<Self> {
-        Ok(SessionInfoRegion {
+        Ok(SessionInfoRegion(ByteRegion {
             offset: usize::try_from(value.session_info_offset).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "SessionInfoRegion::try_from",
@@ -147,7 +135,7 @@ impl TryFrom<&Header> for SessionInfoRegion {
                     format!("Could not convert {} to usize", value.session_info_length),
                 )
             })?,
-        })
+        }))
     }
 }
 
@@ -160,22 +148,15 @@ impl TryFrom<&Header> for SessionInfoRegion {
 /// Individual variable headers are not semantically validated by this type.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VariableHeaderRegion {
-    offset: usize,
-    length: usize,
-    count: usize,
-}
-
-impl ByteRegion for VariableHeaderRegion {
-    fn offset(&self) -> usize {
-        self.offset
-    }
-
-    fn length(&self) -> usize {
-        self.length
-    }
+    pub region: ByteRegion,
+    pub count: usize,
 }
 
 impl VariableHeaderRegion {
+    pub fn as_region(&self) -> ByteRegion {
+        self.region
+    }
+
     /// Returns the number of variable headers advertised by the source header.
     pub fn count(&self) -> usize {
         self.count
@@ -188,12 +169,7 @@ impl VariableHeaderRegion {
     /// Returns a parse error if the end offset overflows `usize` or exceeds
     /// `data_len`.
     pub fn checked_range(&self, data_len: usize) -> Result<Range<usize>> {
-        checked_range(
-            self.offset,
-            self.length,
-            data_len,
-            "VariableHeaderRegion::checked_range",
-        )
+        checked_range(self.region, data_len, "VariableHeaderRegion::checked_range")
     }
 
     /// Borrows the region's bytes from the complete source without copying.
@@ -226,7 +202,7 @@ impl VariableHeaderRegion {
 
     /// Returns whether the header advertised a nonzero variable-header region.
     pub fn is_valid(&self) -> bool {
-        self.offset > 0 && self.length > 0
+        self.region.is_valid()
     }
 }
 
@@ -269,8 +245,7 @@ impl TryFrom<&Header> for VariableHeaderRegion {
             })?;
 
         Ok(VariableHeaderRegion {
-            offset,
-            length,
+            region: ByteRegion { offset, length },
             count,
         })
     }
@@ -279,7 +254,10 @@ impl TryFrom<&Header> for VariableHeaderRegion {
 #[cfg(test)]
 mod tests {
     use super::{SessionInfoRegion, VariableHeaderRegion, checked_range};
-    use crate::irsdk::{Header, VariableHeader, WireType};
+    use crate::{
+        irsdk::{Header, VariableHeader, WireType},
+        types::regions::ByteRegion,
+    };
 
     #[test]
     fn session_region_rejects_negative_header_fields() {
@@ -306,10 +284,11 @@ mod tests {
 
     #[test]
     fn session_region_requires_the_full_region_even_with_early_nul() {
-        let region = SessionInfoRegion {
+        let region = SessionInfoRegion(ByteRegion {
             offset: 1,
             length: 4,
-        };
+        });
+
         assert!(region.buffer(b"x\0").is_err());
         assert!(region.buffer(b"x\0pad").is_ok());
     }
@@ -332,24 +311,40 @@ mod tests {
 
     #[test]
     fn checked_range_accepts_region_within_data() {
-        assert_eq!(checked_range(4, 6, 10, "test").unwrap(), 4..10);
+        let region = ByteRegion {
+            offset: 4,
+            length: 6,
+        };
+        assert_eq!(checked_range(region, 10, "test").unwrap(), 4..10);
     }
 
     #[test]
     fn checked_range_rejects_region_beyond_data() {
-        assert!(checked_range(4, 7, 10, "test").is_err());
+        let region = ByteRegion {
+            offset: 4,
+            length: 7,
+        };
+
+        assert!(checked_range(region, 10, "test").is_err());
     }
 
     #[test]
     fn checked_range_rejects_endpoint_overflow() {
-        assert!(checked_range(usize::MAX, 1, usize::MAX, "test").is_err());
+        let region = ByteRegion {
+            offset: usize::MAX,
+            length: 1,
+        };
+
+        assert!(checked_range(region, usize::MAX, "test").is_err());
     }
 
     #[test]
     fn variable_header_region_extracts_bytes_and_owned_buffer() {
         let region = VariableHeaderRegion {
-            offset: 4,
-            length: VariableHeader::WIRE_SIZE,
+            region: ByteRegion {
+                offset: 4,
+                length: VariableHeader::WIRE_SIZE,
+            },
             count: 1,
         };
         let source = vec![0; 4 + VariableHeader::WIRE_SIZE];
@@ -364,8 +359,10 @@ mod tests {
     #[test]
     fn variable_header_region_rejects_short_source() {
         let region = VariableHeaderRegion {
-            offset: 4,
-            length: VariableHeader::WIRE_SIZE,
+            region: ByteRegion {
+                offset: 4,
+                length: VariableHeader::WIRE_SIZE,
+            },
             count: 1,
         };
 
