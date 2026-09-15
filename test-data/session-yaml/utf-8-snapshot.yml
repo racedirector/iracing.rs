@@ -2582,7 +2582,7 @@ RadioInfo:
       IsDeletable: 0
 DriverInfo:
   DriverCarIdx: 14
-  DriverUserID: 378767
+  DriverUserID: 910015
   PaceCarIdx: 64
   DriverIsAdmin: 0
   DriverHeadPosX: 0.07
@@ -2619,12 +2619,12 @@ DriverInfo:
     TireCompoundType: AllPurpose
   Drivers:
   - CarIdx: 0
-    UserName: Ethan Conde
-    AbbrevName: Conde, E
-    Initials: EC
-    UserID: 921678
+    UserName: Synthetic UTF Driver 01
+    AbbrevName: Driver 01, S
+    Initials: S1
+    UserID: 910001
     TeamID: 0
-    TeamName: Ethan Conde
+    TeamName: Synthetic UTF Driver 01
     CarNumber: '2'
     CarNumberRaw: 2
     CarPath: raygr22
@@ -2671,12 +2671,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 1
-    UserName: Jason L
-    AbbrevName: L, J
-    Initials: JL
-    UserID: 746385
+    UserName: Synthetic UTF Driver 02
+    AbbrevName: Driver 02, S
+    Initials: S2
+    UserID: 910002
     TeamID: 0
-    TeamName: Jason L
+    TeamName: Synthetic UTF Driver 02
     CarNumber: '8'
     CarNumberRaw: 8
     CarPath: raygr22
@@ -2723,12 +2723,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 2
-    UserName: Jake Kacik
-    AbbrevName: Kacik, J
-    Initials: JK
-    UserID: 275661
+    UserName: Synthetic UTF Driver 03
+    AbbrevName: Driver 03, S
+    Initials: S3
+    UserID: 910003
     TeamID: 0
-    TeamName: Jake Kacik
+    TeamName: Synthetic UTF Driver 03
     CarNumber: '11'
     CarNumberRaw: 11
     CarPath: raygr22
@@ -2775,12 +2775,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 3
-    UserName: Evan Campbell
-    AbbrevName: Campbell, E
-    Initials: EC
-    UserID: 603750
+    UserName: Synthetic UTF Driver 04
+    AbbrevName: Driver 04, S
+    Initials: S4
+    UserID: 910004
     TeamID: 0
-    TeamName: Evan Campbell
+    TeamName: Synthetic UTF Driver 04
     CarNumber: '71'
     CarNumberRaw: 71
     CarPath: raygr22
@@ -2827,12 +2827,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 4
-    UserName: Carson Catlin
-    AbbrevName: Catlin, C
-    Initials: CC
-    UserID: 647365
+    UserName: Synthetic UTF Driver 05
+    AbbrevName: Driver 05, S
+    Initials: S5
+    UserID: 910005
     TeamID: 0
-    TeamName: Carson Catlin
+    TeamName: Synthetic UTF Driver 05
     CarNumber: '666'
     CarNumberRaw: 666
     CarPath: raygr22
@@ -2879,12 +2879,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 5
-    UserName: ⛟⛟ Ả̴̢ǘ̵͚s̴̝̑t̸̞͝i̶̫͋n̸͍̍ ̵̨̕T̷̗̈
-    AbbrevName: ̵̨̕T̷̗̈, �
-    Initials: ��
-    UserID: 289508
+    UserName: ⛟⛟ Synthetic UTF Driver 06 Ả̴̢ǘ̵͚
+    AbbrevName: Ả̴̢ǘ̵͚, �
+    Initials: �S
+    UserID: 910006
     TeamID: 0
-    TeamName: ⛟⛟ Ả̴̢ǘ̵͚s̴̝̑t̸̞͝i̶̫͋n̸͍̍ ̵̨̕T̷̗̈
+    TeamName: ⛟⛟ Synthetic UTF Driver 06 Ả̴̢ǘ̵͚
     CarNumber: '243'
     CarNumberRaw: 243
     CarPath: raygr22
@@ -2931,12 +2931,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 6
-    UserName: Scott Fleming
-    AbbrevName: Fleming, S
-    Initials: SF
-    UserID: 974845
+    UserName: Synthetic UTF Driver 07
+    AbbrevName: Driver 07, S
+    Initials: S7
+    UserID: 910007
     TeamID: 0
-    TeamName: Scott Fleming
+    TeamName: Synthetic UTF Driver 07
     CarNumber: '37'
     CarNumberRaw: 37
     CarPath: raygr22
@@ -2983,12 +2983,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 7
-    UserName: (X) Ryan Murphy
-    AbbrevName: Murphy, (
-    Initials: (M
-    UserID: 526514
+    UserName: (X) Synthetic UTF Driver 08
+    AbbrevName: Driver 08, (
+    Initials: (S
+    UserID: 910008
     TeamID: 0
-    TeamName: (X) Ryan Murphy
+    TeamName: (X) Synthetic UTF Driver 08
     CarNumber: '02'
     CarNumberRaw: 2002
     CarPath: raygr22
@@ -3035,12 +3035,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 8
-    UserName: Corey Barrett
-    AbbrevName: Barrett, C
-    Initials: CB
-    UserID: 134173
+    UserName: Synthetic UTF Driver 09
+    AbbrevName: Driver 09, S
+    Initials: S9
+    UserID: 910009
     TeamID: 0
-    TeamName: Corey Barrett
+    TeamName: Synthetic UTF Driver 09
     CarNumber: '7'
     CarNumberRaw: 7
     CarPath: raygr22
@@ -3087,12 +3087,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 9
-    UserName: (X) Kyle Smith
-    AbbrevName: Smith, (
+    UserName: (X) Synthetic UTF Driver 10
+    AbbrevName: Driver 10, (
     Initials: (S
-    UserID: 174631
+    UserID: 910010
     TeamID: 0
-    TeamName: (X) Kyle Smith
+    TeamName: (X) Synthetic UTF Driver 10
     CarNumber: '549'
     CarNumberRaw: 549
     CarPath: raygr22
@@ -3139,12 +3139,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 10
-    UserName: Alex Andersen
-    AbbrevName: Andersen, A
-    Initials: AA
-    UserID: 423403
+    UserName: Synthetic UTF Driver 11
+    AbbrevName: Driver 11, S
+    Initials: S11
+    UserID: 910011
     TeamID: 0
-    TeamName: Alex Andersen
+    TeamName: Synthetic UTF Driver 11
     CarNumber: '067'
     CarNumberRaw: 3067
     CarPath: raygr22
@@ -3191,12 +3191,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 11
-    UserName: Darren Baie
-    AbbrevName: Baie, D
-    Initials: DB
-    UserID: 459450
+    UserName: Synthetic UTF Driver 12
+    AbbrevName: Driver 12, S
+    Initials: S12
+    UserID: 910012
     TeamID: 0
-    TeamName: Darren Baie
+    TeamName: Synthetic UTF Driver 12
     CarNumber: '22'
     CarNumberRaw: 22
     CarPath: raygr22
@@ -3243,12 +3243,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 12
-    UserName: (XXX) River Page
-    AbbrevName: Page, (
-    Initials: (P
-    UserID: 725902
+    UserName: (XXX) Synthetic UTF Driver 13
+    AbbrevName: Driver 13, (
+    Initials: (S
+    UserID: 910013
     TeamID: 0
-    TeamName: (XXX) River Page
+    TeamName: (XXX) Synthetic UTF Driver 13
     CarNumber: '63'
     CarNumberRaw: 63
     CarPath: raygr22
@@ -3295,12 +3295,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 13
-    UserName: Tyler A👻ino
-    AbbrevName: A👻ino, T
-    Initials: TA
-    UserID: 532866
+    UserName: Synthetic UTF 👻 Driver 14
+    AbbrevName: 👻 Driver, S
+    Initials: S14
+    UserID: 910014
     TeamID: 0
-    TeamName: Tyler A👻ino
+    TeamName: Synthetic UTF 👻 Driver 14
     CarNumber: '69'
     CarNumberRaw: 69
     CarPath: raygr22
@@ -3347,12 +3347,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 14
-    UserName: (XX) Stin
-    AbbrevName: Stin, (
+    UserName: (XX) Synthetic UTF Driver 15
+    AbbrevName: Driver 15, (
     Initials: (S
-    UserID: 378767
+    UserID: 910015
     TeamID: 0
-    TeamName: (XX) Stin
+    TeamName: (XX) Synthetic UTF Driver 15
     CarNumber: '18'
     CarNumberRaw: 18
     CarPath: raygr22
@@ -3399,12 +3399,12 @@ DriverInfo:
     CurDriverIncidentCount: 0
     TeamIncidentCount: 0
   - CarIdx: 15
-    UserName: (XXXX) Ryan Verhulst
-    AbbrevName: Verhulst, (
-    Initials: (V
-    UserID: 151153
+    UserName: (XXXX) Synthetic UTF Driver 16
+    AbbrevName: Driver 16, (
+    Initials: (S
+    UserID: 910016
     TeamID: 0
-    TeamName: (XXXX) Ryan Verhulst
+    TeamName: (XXXX) Synthetic UTF Driver 16
     CarNumber: '12'
     CarNumberRaw: 12
     CarPath: raygr22
@@ -3451,12 +3451,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 16
-    UserName: Brooks Clayton
-    AbbrevName: Clayton, B
-    Initials: BC
-    UserID: 715269
+    UserName: Synthetic UTF Driver 17
+    AbbrevName: Driver 17, S
+    Initials: S17
+    UserID: 910017
     TeamID: 0
-    TeamName: Brooks Clayton
+    TeamName: Synthetic UTF Driver 17
     CarNumber: '9'
     CarNumberRaw: 9
     CarPath: raygr22
@@ -3503,12 +3503,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 17
-    UserName: (XX) Buzz
-    AbbrevName: Buzz, (
-    Initials: (B
-    UserID: 150895
+    UserName: (XX) Synthetic UTF Driver 18
+    AbbrevName: Driver 18, (
+    Initials: (S
+    UserID: 910018
     TeamID: 0
-    TeamName: (XX) Buzz
+    TeamName: (XX) Synthetic UTF Driver 18
     CarNumber: '87'
     CarNumberRaw: 87
     CarPath: raygr22
@@ -3555,12 +3555,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 18
-    UserName: Greg Beckman
-    AbbrevName: Beckman, G
-    Initials: GB
-    UserID: 773503
+    UserName: Synthetic UTF Driver 19
+    AbbrevName: Driver 19, S
+    Initials: S19
+    UserID: 910019
     TeamID: 0
-    TeamName: Greg Beckman
+    TeamName: Synthetic UTF Driver 19
     CarNumber: '42'
     CarNumberRaw: 42
     CarPath: raygr22
@@ -3607,12 +3607,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 19
-    UserName: Alessandro König
-    AbbrevName: König, A
-    Initials: AK
-    UserID: 461089
+    UserName: Synthetic UTF Driver 20 ö
+    AbbrevName: Encoded ö, S
+    Initials: S20
+    UserID: 910020
     TeamID: 0
-    TeamName: Alessandro König
+    TeamName: Synthetic UTF Driver 20 ö
     CarNumber: '16'
     CarNumberRaw: 16
     CarPath: raygr22
@@ -3659,12 +3659,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 20
-    UserName: (X) Tyler Carlton
-    AbbrevName: Carlton, (
-    Initials: (C
-    UserID: 839731
+    UserName: (X) Synthetic UTF Driver 21
+    AbbrevName: Driver 21, (
+    Initials: (S
+    UserID: 910021
     TeamID: 0
-    TeamName: (X) Tyler Carlton
+    TeamName: (X) Synthetic UTF Driver 21
     CarNumber: '45'
     CarNumberRaw: 45
     CarPath: raygr22
@@ -3711,12 +3711,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 21
-    UserName: Chris Bright
-    AbbrevName: Bright, C
-    Initials: CB
-    UserID: 579282
+    UserName: Synthetic UTF Driver 22
+    AbbrevName: Driver 22, S
+    Initials: S22
+    UserID: 910022
     TeamID: 0
-    TeamName: Chris Bright
+    TeamName: Synthetic UTF Driver 22
     CarNumber: '10'
     CarNumberRaw: 10
     CarPath: raygr22
@@ -3763,12 +3763,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 22
-    UserName: Aaron Thacker
-    AbbrevName: Thacker, A
-    Initials: AT
-    UserID: 139237
+    UserName: Synthetic UTF Driver 23
+    AbbrevName: Driver 23, S
+    Initials: S23
+    UserID: 910023
     TeamID: 0
-    TeamName: Aaron Thacker
+    TeamName: Synthetic UTF Driver 23
     CarNumber: '816'
     CarNumberRaw: 816
     CarPath: raygr22
@@ -3815,12 +3815,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 23
-    UserName: Erik Ronnenberg
-    AbbrevName: Ronnenberg, E
-    Initials: ER
-    UserID: 463140
+    UserName: Synthetic UTF Driver 24
+    AbbrevName: Driver 24, S
+    Initials: S24
+    UserID: 910024
     TeamID: 0
-    TeamName: Erik Ronnenberg
+    TeamName: Synthetic UTF Driver 24
     CarNumber: '017'
     CarNumberRaw: 3017
     CarPath: raygr22
@@ -3867,12 +3867,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 24
-    UserName: Stefan Pursell
-    AbbrevName: Pursell, S
-    Initials: SP
-    UserID: 519882
+    UserName: Synthetic UTF Driver 25
+    AbbrevName: Driver 25, S
+    Initials: S25
+    UserID: 910025
     TeamID: 0
-    TeamName: Stefan Pursell
+    TeamName: Synthetic UTF Driver 25
     CarNumber: '57'
     CarNumberRaw: 57
     CarPath: raygr22
@@ -3919,12 +3919,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 25
-    UserName: (XXXX) Mathieu Dupuis
-    AbbrevName: Dupuis, (
-    Initials: (D
-    UserID: 155659
+    UserName: (XXXX) Synthetic UTF Driver 26
+    AbbrevName: Driver 26, (
+    Initials: (S
+    UserID: 910026
     TeamID: 0
-    TeamName: (XXXX) Mathieu Dupuis
+    TeamName: (XXXX) Synthetic UTF Driver 26
     CarNumber: '703'
     CarNumberRaw: 703
     CarPath: raygr22
@@ -3971,12 +3971,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 26
-    UserName: ヽ༼ຈل͜ຈ༽ﾉ🧀 Giovanni Romano🧀ヽ༼ຈل͜ຈ�
-    AbbrevName: Romano🧀ヽ༼ຈل͜ຈ�, �
-    Initials: �R
-    UserID: 294349
+    UserName: ヽ༼ຈل͜ຈ༽ﾉ🧀 Synthetic UTF Driver 27🧀ヽ༼ຈل͜ຈ�
+    AbbrevName: Driver🧀ヽ༼ຈل͜ຈ�, �
+    Initials: �S
+    UserID: 910027
     TeamID: 0
-    TeamName: ヽ༼ຈل͜ຈ༽ﾉ🧀 Giovanni Romano🧀ヽ༼ຈل͜ຈ�
+    TeamName: ヽ༼ຈل͜ຈ༽ﾉ🧀 Synthetic UTF Driver 27🧀ヽ༼ຈل͜ຈ�
     CarNumber: '99'
     CarNumberRaw: 99
     CarPath: raygr22
@@ -4023,12 +4023,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 27
-    UserName: (X) Alejandro México
-    AbbrevName: México, (
-    Initials: (M
-    UserID: 168010
+    UserName: (X) Synthetic UTF Driver 28 é
+    AbbrevName: Encoded é, (
+    Initials: (S
+    UserID: 910028
     TeamID: 0
-    TeamName: (X) Alejandro México
+    TeamName: (X) Synthetic UTF Driver 28 é
     CarNumber: '19'
     CarNumberRaw: 19
     CarPath: raygr22
@@ -4075,12 +4075,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 28
-    UserName: Blake Gambrell
-    AbbrevName: Gambrell, B
-    Initials: BG
-    UserID: 815209
+    UserName: Synthetic UTF Driver 29
+    AbbrevName: Driver 29, S
+    Initials: S29
+    UserID: 910029
     TeamID: 0
-    TeamName: Blake Gambrell
+    TeamName: Synthetic UTF Driver 29
     CarNumber: '79'
     CarNumberRaw: 79
     CarPath: raygr22
@@ -4127,12 +4127,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 29
-    UserName: Chris Flams
-    AbbrevName: Flams, C
-    Initials: CF
-    UserID: 200335
+    UserName: Synthetic UTF Driver 30
+    AbbrevName: Driver 30, S
+    Initials: S30
+    UserID: 910030
     TeamID: 0
-    TeamName: Chris Flams
+    TeamName: Synthetic UTF Driver 30
     CarNumber: '137'
     CarNumberRaw: 137
     CarPath: raygr22
@@ -4179,12 +4179,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 30
-    UserName: (X) Castro
-    AbbrevName: Castro, (
-    Initials: (C
-    UserID: 597879
+    UserName: (X) Synthetic UTF Driver 31
+    AbbrevName: Driver 31, (
+    Initials: (S
+    UserID: 910031
     TeamID: 0
-    TeamName: (X) Castro
+    TeamName: (X) Synthetic UTF Driver 31
     CarNumber: '4'
     CarNumberRaw: 4
     CarPath: raygr22
@@ -4231,12 +4231,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 31
-    UserName: Rognald HotDognald
-    AbbrevName: HotDognald, R
-    Initials: RH
-    UserID: 436586
+    UserName: Synthetic UTF Driver 32
+    AbbrevName: Driver 32, S
+    Initials: S32
+    UserID: 910032
     TeamID: 0
-    TeamName: Rognald HotDognald
+    TeamName: Synthetic UTF Driver 32
     CarNumber: '119'
     CarNumberRaw: 119
     CarPath: raygr22
@@ -4283,12 +4283,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 32
-    UserName: Mr. Hall
-    AbbrevName: Hall, M
-    Initials: MH
-    UserID: 89801
+    UserName: Synthetic UTF Driver 33
+    AbbrevName: Driver 33, S
+    Initials: S33
+    UserID: 910033
     TeamID: 0
-    TeamName: Mr. Hall
+    TeamName: Synthetic UTF Driver 33
     CarNumber: '64'
     CarNumberRaw: 64
     CarPath: raygr22

@@ -5,7 +5,17 @@ const SMALL_SESSION: &str =
 
 #[test]
 fn captured_buffers_deserialize_track_session_and_driver_fields() {
-    for (bytes, track, display, track_id, current, count, driver_idx, first_driver) in [
+    for (
+        bytes,
+        track,
+        display,
+        track_id,
+        current,
+        count,
+        driver_idx,
+        driver_user_id,
+        first_driver,
+    ) in [
         (
             include_bytes!("../../../../../test-data/session-yaml/utf-8-snapshot.yml").as_slice(),
             "roadatlanta full",
@@ -14,7 +24,8 @@ fn captured_buffers_deserialize_track_session_and_driver_fields() {
             4,
             5,
             14,
-            "Ethan Conde",
+            910015,
+            "Synthetic UTF Driver 01",
         ),
         (
             include_bytes!("../../../../../test-data/session-yaml/iso-8859-1-snapshot.yml")
@@ -25,7 +36,8 @@ fn captured_buffers_deserialize_track_session_and_driver_fields() {
             2,
             3,
             2,
-            "Elisha Whitfield",
+            900003,
+            "Synthetic ISO Driver 01",
         ),
     ] {
         let session = SessionInfo::try_from(SessionInfoBuffer::from_checked_region(bytes))
@@ -38,7 +50,7 @@ fn captured_buffers_deserialize_track_session_and_driver_fields() {
         assert_eq!(session.session_info.sessions[0].session_type, "Practice");
         let driver_info = session.driver_info.unwrap();
         assert_eq!(driver_info.driver_car_idx, Some(driver_idx));
-        assert_eq!(driver_info.driver_user_id, Some(378767));
+        assert_eq!(driver_info.driver_user_id, Some(driver_user_id));
         let drivers = driver_info.drivers.unwrap();
         assert_eq!(drivers[0].car_idx, 0);
         assert_eq!(drivers[0].user_name, first_driver);

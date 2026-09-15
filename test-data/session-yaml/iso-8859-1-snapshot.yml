@@ -826,7 +826,7 @@ RadioInfo:
       IsDeletable: 0
 DriverInfo:
   DriverCarIdx: 2
-  DriverUserID: 378767
+  DriverUserID: 900003
   PaceCarIdx: 64
   DriverIsAdmin: 0
   DriverHeadPosX: 0.383
@@ -865,12 +865,12 @@ DriverInfo:
     TireCompoundType: Wet
   Drivers:
   - CarIdx: 0
-    UserName: Elisha Whitfield
-    AbbrevName: Whitfield, E
-    Initials: EW
-    UserID: 1006403
+    UserName: Synthetic ISO Driver 01
+    AbbrevName: Driver 01, S
+    Initials: S1
+    UserID: 900001
     TeamID: 0
-    TeamName: Elisha Whitfield
+    TeamName: Synthetic ISO Driver 01
     CarNumber: '1'
     CarNumberRaw: 1
     CarPath: amvalkyriegtp
@@ -917,12 +917,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 1
-    UserName: Garrett Konrath
-    AbbrevName: Konrath, G
-    Initials: GK
-    UserID: 104644
+    UserName: Synthetic ISO Driver 02
+    AbbrevName: Driver 02, S
+    Initials: S2
+    UserID: 900002
     TeamID: 0
-    TeamName: Garrett Konrath
+    TeamName: Synthetic ISO Driver 02
     CarNumber: '9'
     CarNumberRaw: 9
     CarPath: cadillacvseriesrgtp
@@ -969,12 +969,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 2
-    UserName: Justin Makaila
-    AbbrevName: Makaila, J
-    Initials: JM
-    UserID: 378767
+    UserName: Synthetic ISO Driver 03
+    AbbrevName: Driver 03, S
+    Initials: S3
+    UserID: 900003
     TeamID: 0
-    TeamName: Justin Makaila
+    TeamName: Synthetic ISO Driver 03
     CarNumber: '2'
     CarNumberRaw: 2
     CarPath: cadillacvseriesrgtp
@@ -1021,12 +1021,12 @@ DriverInfo:
     CurDriverIncidentCount: 0
     TeamIncidentCount: 0
   - CarIdx: 3
-    UserName: Max Schweid
-    AbbrevName: Schweid, M
-    Initials: MS
-    UserID: 702971
+    UserName: Synthetic ISO Driver 04
+    AbbrevName: Driver 04, S
+    Initials: S4
+    UserID: 900004
     TeamID: 0
-    TeamName: Max Schweid
+    TeamName: Synthetic ISO Driver 04
     CarNumber: '98'
     CarNumberRaw: 98
     CarPath: amvalkyriegtp
@@ -1073,12 +1073,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 4
-    UserName: Breen Lyden2
-    AbbrevName: Lyden2, B
-    Initials: BL
-    UserID: 1079978
+    UserName: Synthetic ISO Driver 05
+    AbbrevName: Driver 05, S
+    Initials: S5
+    UserID: 900005
     TeamID: 0
-    TeamName: Breen Lyden2
+    TeamName: Synthetic ISO Driver 05
     CarNumber: '3'
     CarNumberRaw: 3
     CarPath: amvalkyriegtp
@@ -1125,12 +1125,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 5
-    UserName: Dusty Summers
+    UserName: Synthetic ISO Driver 06
     AbbrevName: null
     Initials: null
-    UserID: 293096
+    UserID: 900006
     TeamID: 0
-    TeamName: Dusty Summers
+    TeamName: Synthetic ISO Driver 06
     CarNumber: '4'
     CarNumberRaw: 4
     CarPath: cadillacvseriesrgtp
@@ -1177,12 +1177,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 6
-    UserName: Bill J Walker
-    AbbrevName: Walker, B
-    Initials: BW
-    UserID: 221653
+    UserName: Synthetic ISO Driver 07
+    AbbrevName: Driver 07, S
+    Initials: S7
+    UserID: 900007
     TeamID: 0
-    TeamName: Bill J Walker
+    TeamName: Synthetic ISO Driver 07
     CarNumber: '5'
     CarNumberRaw: 5
     CarPath: amvalkyriegtp
@@ -1229,12 +1229,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 7
-    UserName: Nicholas Compton
-    AbbrevName: Compton, N
-    Initials: NC
-    UserID: 495029
+    UserName: Synthetic ISO Driver 08
+    AbbrevName: Driver 08, S
+    Initials: S8
+    UserID: 900008
     TeamID: 0
-    TeamName: Nicholas Compton
+    TeamName: Synthetic ISO Driver 08
     CarNumber: '80'
     CarNumberRaw: 80
     CarPath: cadillacvseriesrgtp
@@ -1281,12 +1281,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 8
-    UserName: Casey Lee3
-    AbbrevName: Lee3, C
-    Initials: CL
-    UserID: 1224457
+    UserName: Synthetic ISO Driver 09
+    AbbrevName: Driver 09, S
+    Initials: S9
+    UserID: 900009
     TeamID: 0
-    TeamName: Casey Lee3
+    TeamName: Synthetic ISO Driver 09
     CarNumber: '39'
     CarNumberRaw: 39
     CarPath: amvalkyriegtp
@@ -1333,12 +1333,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 9
-    UserName: Shohei Sato
-    AbbrevName: Sato, S
-    Initials: SS
-    UserID: 82396
+    UserName: Synthetic ISO Driver 10
+    AbbrevName: Driver 10, S
+    Initials: S10
+    UserID: 900010
     TeamID: 0
-    TeamName: Shohei Sato
+    TeamName: Synthetic ISO Driver 10
     CarNumber: '6'
     CarNumberRaw: 6
     CarPath: amvalkyriegtp
@@ -1385,12 +1385,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 10
-    UserName: Darren J Carey
-    AbbrevName: Carey, D
-    Initials: DC
-    UserID: 660172
+    UserName: Synthetic ISO Driver 11
+    AbbrevName: Driver 11, S
+    Initials: S11
+    UserID: 900011
     TeamID: 0
-    TeamName: Darren J Carey
+    TeamName: Synthetic ISO Driver 11
     CarNumber: '74'
     CarNumberRaw: 74
     CarPath: acuraarx06gtp
@@ -1437,12 +1437,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 11
-    UserName: Dale T Simpson
-    AbbrevName: Simpson, D
-    Initials: DS
-    UserID: 931581
+    UserName: Synthetic ISO Driver 12
+    AbbrevName: Driver 12, S
+    Initials: S12
+    UserID: 900012
     TeamID: 0
-    TeamName: Dale T Simpson
+    TeamName: Synthetic ISO Driver 12
     CarNumber: '8'
     CarNumberRaw: 8
     CarPath: ferrari499p
@@ -1489,12 +1489,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 12
-    UserName: Austin Kenton
-    AbbrevName: Kenton, A
-    Initials: AK
-    UserID: 990784
+    UserName: Synthetic ISO Driver 13
+    AbbrevName: Driver 13, S
+    Initials: S13
+    UserID: 900013
     TeamID: 0
-    TeamName: Austin Kenton
+    TeamName: Synthetic ISO Driver 13
     CarNumber: '275'
     CarNumberRaw: 275
     CarPath: cadillacvseriesrgtp
@@ -1541,12 +1541,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 13
-    UserName: Gian Cardoso
-    AbbrevName: Cardoso, G
-    Initials: GC
-    UserID: 886176
+    UserName: Synthetic ISO Driver 14
+    AbbrevName: Driver 14, S
+    Initials: S14
+    UserID: 900014
     TeamID: 0
-    TeamName: Gian Cardoso
+    TeamName: Synthetic ISO Driver 14
     CarNumber: '42'
     CarNumberRaw: 42
     CarPath: mclaren720sgt3
@@ -1593,12 +1593,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 14
-    UserName: Jon Reynolds
-    AbbrevName: Reynolds, J
-    Initials: JR
-    UserID: 1472827
+    UserName: Synthetic ISO Driver 15
+    AbbrevName: Driver 15, S
+    Initials: S15
+    UserID: 900015
     TeamID: 0
-    TeamName: Jon Reynolds
+    TeamName: Synthetic ISO Driver 15
     CarNumber: '7'
     CarNumberRaw: 7
     CarPath: bmwm4gt3
@@ -1645,12 +1645,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 15
-    UserName: Mark Rawlinson
-    AbbrevName: Rawlinson, M
-    Initials: MR
-    UserID: 608767
+    UserName: Synthetic ISO Driver 16
+    AbbrevName: Driver 16, S
+    Initials: S16
+    UserID: 900016
     TeamID: 0
-    TeamName: Mark Rawlinson
+    TeamName: Synthetic ISO Driver 16
     CarNumber: '23'
     CarNumberRaw: 23
     CarPath: ferrari296gt3
@@ -1697,12 +1697,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 16
-    UserName: Connor Callahan
-    AbbrevName: Callahan, C
-    Initials: CC
-    UserID: 958616
+    UserName: Synthetic ISO Driver 17
+    AbbrevName: Driver 17, S
+    Initials: S17
+    UserID: 900017
     TeamID: 0
-    TeamName: Connor Callahan
+    TeamName: Synthetic ISO Driver 17
     CarNumber: '10'
     CarNumberRaw: 10
     CarPath: ferrari296gt3
@@ -1749,12 +1749,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 17
-    UserName: Taylor Henry2
-    AbbrevName: Henry2, T
-    Initials: TH
-    UserID: 1502346
+    UserName: Synthetic ISO Driver 18
+    AbbrevName: Driver 18, S
+    Initials: S18
+    UserID: 900018
     TeamID: 0
-    TeamName: Taylor Henry2
+    TeamName: Synthetic ISO Driver 18
     CarNumber: '11'
     CarNumberRaw: 11
     CarPath: chevyvettez06rgt3
@@ -1801,12 +1801,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 18
-    UserName: Collin Lassiter
-    AbbrevName: Lassiter, C
-    Initials: CL
-    UserID: 1324196
+    UserName: Synthetic ISO Driver 19
+    AbbrevName: Driver 19, S
+    Initials: S19
+    UserID: 900019
     TeamID: 0
-    TeamName: Collin Lassiter
+    TeamName: Synthetic ISO Driver 19
     CarNumber: '12'
     CarNumberRaw: 12
     CarPath: chevyvettez06rgt3
@@ -1853,12 +1853,12 @@ DriverInfo:
     CurDriverIncidentCount: -1
     TeamIncidentCount: -1
   - CarIdx: 19
-    UserName: Matt Jarnigan
-    AbbrevName: Jarnigan, M
-    Initials: MJ
-    UserID: 1213094
+    UserName: Synthetic ISO Driver 20
+    AbbrevName: Driver 20, S
+    Initials: S20
+    UserID: 900020
     TeamID: 0
-    TeamName: Matt Jarnigan
+    TeamName: Synthetic ISO Driver 20
     CarNumber: '13'
     CarNumberRaw: 13
     CarPath: porsche992rgt3
