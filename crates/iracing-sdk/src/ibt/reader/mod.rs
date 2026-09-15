@@ -123,11 +123,7 @@ impl IbtReader {
                     details: "Frame data start position exceeds file size".to_string(),
                 })?;
 
-        let total_frames = if frame_size > 0 {
-            remaining_bytes / frame_size
-        } else {
-            0 // No telemetry data if buf_len is 0
-        };
+        let total_frames = remaining_bytes.checked_div(frame_size).unwrap_or(0);
 
         // Cross-check disk_header.record_count against total_frames for debugging
         if disk_header.record_count > 0 && total_frames > 0 {
