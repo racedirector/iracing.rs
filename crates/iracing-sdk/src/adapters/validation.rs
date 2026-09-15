@@ -65,13 +65,13 @@ impl AdapterValidation {
     /// ```
     /// use iracing_sdk::{
     ///     AdapterValidation, FieldExtraction, FramePacket, VariableInfo, VariableSchema,
-    ///     VariableType,
+    ///     irsdk::VariableType,
     /// };
     /// use std::{collections::HashMap, sync::Arc};
     ///
     /// let speed_info = VariableInfo {
     ///     name: "Speed".to_string(),
-    ///     data_type: VariableType::Float32,
+    ///     data_type: VariableType::Float,
     ///     offset: 0,
     ///     count: 1,
     ///     count_as_time: false,
@@ -129,10 +129,10 @@ impl AdapterValidation {
 ///
 /// ```no_run
 /// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
-/// # use iracing_sdk::{VariableInfo, VariableType};
+/// # use iracing_sdk::{VariableInfo, irsdk::VariableType};
 /// let var_info = VariableInfo {
 ///     name: "Speed".to_string(),
-///     data_type: VariableType::Float32,
+///     data_type: VariableType::Float,
 ///     offset: 0,
 ///     count: 1,
 ///     count_as_time: false,

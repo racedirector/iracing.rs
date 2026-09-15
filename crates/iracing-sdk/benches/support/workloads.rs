@@ -5,8 +5,9 @@
 //! aggregate consumer benchmark from silently evolving into different shapes.
 
 use iracing_sdk::{
-    IRacingTelemetryFrame, VariableInfo, VariableSchema, VariableType,
+    IRacingTelemetryFrame, VariableInfo, VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
+    irsdk::VariableType,
     types::{FramePacket, VarData},
 };
 
@@ -170,21 +171,21 @@ pub fn prepare_consumer_workload(
     let lap_dist_pct = super::require_variable(
         schema,
         "CarIdxLapDistPct",
-        VariableType::Float32,
+        VariableType::Float,
         CAR_INDEX_COUNT,
     )
     .clone();
     let track_surface = super::require_variable(
         schema,
         "CarIdxTrackSurface",
-        VariableType::Int32,
+        VariableType::Integer,
         CAR_INDEX_COUNT,
     )
     .clone();
     let on_pit_road = super::require_variable(
         schema,
         "CarIdxOnPitRoad",
-        VariableType::Bool,
+        VariableType::Boolean,
         CAR_INDEX_COUNT,
     )
     .clone();

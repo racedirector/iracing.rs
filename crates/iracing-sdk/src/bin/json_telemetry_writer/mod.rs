@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use iracing_sdk::{
         AdapterValidation, BitField, FrameAdapter, FramePacket, IRacingSDKError, VariableSchema,
-        VariableType,
+        irsdk::VariableType,
     };
     use serde::ser::Error as _;
     use std::{
@@ -190,7 +190,7 @@ mod tests {
     fn variable(name: &str) -> VariableInfo {
         VariableInfo {
             name: name.to_string(),
-            data_type: VariableType::Int32,
+            data_type: VariableType::Integer,
             offset: 0,
             count: 1,
             count_as_time: false,

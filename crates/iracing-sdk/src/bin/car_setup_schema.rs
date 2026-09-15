@@ -47,16 +47,16 @@ fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
     let reader = IbtReader::open(&ibt_path)?;
 
     let session_yaml = reader
-        .session_yaml()?
+        .session_info_buffer()
         .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?;
 
-    Ok(SessionInfo::parse(&session_yaml)?)
+    Ok(SessionInfo::try_from(session_yaml)?)
 }
 
 /// Connects to live iRacing shared memory and parses the current session info.
 #[cfg(windows)]
 fn parse_live_session() -> Result<SessionInfo> {
-    use iracing_sdk::{WindowsConnection, schema::SessionInfoParser};
+    use iracing_sdk::WindowsConnection;
 
     tracing::info!("Opening iRacing connection");
 
@@ -70,9 +70,7 @@ fn parse_live_session() -> Result<SessionInfo> {
         .session_info()
         .ok_or_else(|| anyhow!("No live session YAML is available"))?;
 
-    let parser = SessionInfoParser::new();
-
-    parser.parse(&raw_session_yaml)
+    SessionInfo::parse(&raw_session_yaml).map_err(|e| anyhow!("Error parsing SessionInfo: {}", e))
 }
 
 /// Non-Windows stub — always returns an error directing the caller to use `--ibt-path`.

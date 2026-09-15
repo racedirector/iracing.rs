@@ -28,71 +28,26 @@ impl BitField {
     }
 }
 
-/// Compare tick counters in u32 space with wraparound using half-range rule.
-/// Returns true if `a` is considered newer than `b`.
-pub fn tick_after_u32(a: u32, b: u32) -> bool {
-    if a == b {
-        return false;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bitfield_constructor_works() {
+        let bitfield = BitField::new(0x12345678);
+        assert_eq!(bitfield.value(), 0x12345678);
     }
-    a.wrapping_sub(b) < 0x8000_0000
-}
 
-/// Convenience: check if EngineWarnings indicate mandatory repair needed (1.19)
-pub fn engine_mandatory_repair_needed(bits: BitField) -> bool {
-    let warnings = super::irsdk_bitflags::EngineWarnings::from(bits);
-    warnings.has_required_repairs()
-}
-
-/// Convenience: check if EngineWarnings indicate optional repair needed (1.19)
-pub fn engine_optional_repair_needed(bits: BitField) -> bool {
-    let warnings = super::irsdk_bitflags::EngineWarnings::from(bits);
-    warnings.has_optional_repairs()
-}
-
-/// Convenience: check if EngineWarnings include any repair needed (1.19)
-pub fn engine_repairs_needed(bits: BitField) -> bool {
-    let warnings = super::irsdk_bitflags::EngineWarnings::from(bits);
-    warnings.has_repairs()
-}
-
-/// Convenience: check if SessionFlags indicate disqualification scoring invalid (1.19)
-pub fn session_dq_scoring_invalid(flags: BitField) -> bool {
-    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
-    session_flags.has_dq_scoring_invalid()
-}
-
-/// Convenience: check if SessionFlags indicate start control being shown (1.19)
-pub fn session_start_control_shown(flags: BitField) -> bool {
-    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
-    session_flags.has_start_control()
-}
-
-/// Convenience: check if SessionFlags indicate penalty being shown
-pub fn session_penalty_shown(flags: BitField) -> bool {
-    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
-    session_flags.has_penalty()
-}
-
-/// Convenience: check if SessionFlags indicate the session is under caution (1.19)
-pub fn session_under_caution(flags: BitField) -> bool {
-    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
-    session_flags.has_caution()
-}
-
-/// Convenience: check if SessionFlags indicate the session is yellow (1.19)
-pub fn session_under_yellow(flags: BitField) -> bool {
-    let session_flags = super::irsdk_bitflags::SessionFlags::from(flags);
-    session_flags.has_yellow()
-}
-
-/// Convenience: check if PitServiceFlags include any tire service request (1.19)
-pub fn pit_service_has_tire_service(flags: BitField) -> bool {
-    let pit_service = super::irsdk_bitflags::PitServiceFlags::from(flags);
-    pit_service.has_tire_service()
-}
-
-/// Convenience: check if PitServiceFlags represent "full service" (4 tires + fuel + tearoff) (1.19)
-pub fn pit_service_has_full_service(flags: BitField) -> bool {
-    let pit_service = super::irsdk_bitflags::PitServiceFlags::from(flags);
-    pit_service.has_full_service()
+    #[test]
+    fn bitfield_flag_operations_basic() {
+        let bitfield = BitField::new(0b1010);
+        assert!(bitfield.is_set(1));
+        assert!(!bitfield.is_set(0));
+        assert!(bitfield.is_set(3));
+        assert!(!bitfield.is_set(2));
+        assert!(bitfield.has_flag(0b0010));
+        assert!(!bitfield.has_flag(0b0001));
+        assert!(bitfield.has_flag(0b1000));
+        assert!(!bitfield.has_flag(0b0100));
+    }
 }

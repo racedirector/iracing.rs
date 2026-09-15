@@ -6,7 +6,7 @@ This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`
 - Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
-- Session YAML parsing and caching via `SessionInfo` and `SessionInfoParser`
+- Session YAML parsing via `SessionInfo::parse`; telemetry session policies handle source-specific updates
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
 
@@ -15,7 +15,7 @@ This crate provides:
 1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
 2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
 3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
-4. For session YAML parsing and caching, rely on `SessionInfoParser`.
+4. Parse decoded session YAML with `SessionInfo::parse`; use telemetry session policies for live updates or IBT replay.
 5. On Windows, use `WindowsConnection` for live telemetry.
 
 ## Install
@@ -46,12 +46,12 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader}
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{VarData, ibt::IbtReader};
+use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
 
 fn main() -> iracing_sdk::Result<()> {
     let mut reader = IbtReader::open("telemetry.ibt")?;
     let speed_info = reader
-        .variables()
+        .schema()
         .get_variable("Speed")
         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
             context: "schema lookup".to_string(),
@@ -75,7 +75,7 @@ use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
 fn main() -> iracing_sdk::Result<()> {
     let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(yaml) = reader.session_yaml()? {
+    if let Some(yaml) = reader.session_yaml() {
         let session = SessionInfo::parse(&yaml)?;
         println!("Track: {}", session.weekend_info.track_display_name);
     }
@@ -154,9 +154,11 @@ impl FrameAdapter for Row {
 | Capability | Linux/macOS | Windows |
 |---|---|---|
 | `.ibt` replay (`IbtReader`) | Yes | Yes |
-| Session parsing (`SessionInfoParser`) | Yes | Yes |
+| Session parsing (`SessionInfo::parse`) | Yes | Yes |
+| `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
+| `session schema live` and `session snapshot live` | No | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-session-parser`, `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
+| `live-position` example / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
 ## Examples and Binaries
 
@@ -175,14 +177,19 @@ impl FrameAdapter for Row {
 
 ### Binaries
 
-- `ibt-session-parser`:
-  - `cargo run -p iracing-sdk --bin ibt-session-parser -- --ibt-path ./session.ibt --output-path ./session.yaml`
+- `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
+  - Type schema: `cargo session schema type`
+  - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`
+  - Schema additions discovered from an IBT recording: `cargo session discover ibt --path ./session.ibt`
+  - Session snapshot from an IBT recording: `cargo session snapshot ibt --path ./session.ibt --output ./session.yaml`
+  - Live schema (Windows only): `cargo session schema live`
+  - Live schema additions (Windows only): `cargo session discover live`
+  - Live snapshot (Windows only): `cargo session snapshot live --output ./live-session.yaml`
+  - All subcommands default to YAML on stdout. Use `--output -` for explicit stdout, `--output <file>` for a file, or `--encoding json` / `--encoding json-pretty` for JSON. Diagnostics go to stderr.
 - `ibt-json-snapshot`:
   - `cargo run -p iracing-sdk --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
 - `ibt-to-json`:
   - `cargo run -p iracing-sdk --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
-- `live-session-parser` (Windows only):
-  - `cargo run -p iracing-sdk --bin live-session-parser -- --output-path .\\live-session.yaml`
 - `live-to-csv` (Windows only):
   - `cargo run -p iracing-sdk --bin live-to-csv -- --output-path .\\live.csv`
 - `live-json-snapshot` (Windows only):
@@ -194,8 +201,8 @@ impl FrameAdapter for Row {
 
 - Missing telemetry fixtures during tests:
   - Generated fixtures live under `test-data/ibt/` and are listed in `test-data/ibt/manifest.json`.
-  - Run `python3 scripts/check_test_fixtures.py` from the repository root.
+  - Run `cargo test-fixtures` from the repository root.
 - `live-*` tools fail on non-Windows:
   - Live shared memory APIs are Windows-only.
-- No session YAML written by parser tools:
-  - `session_yaml()`/`session_info()` can legitimately return no content if unavailable.
+- No session snapshot available:
+  - `session snapshot` reports an error when the source contains no session information.

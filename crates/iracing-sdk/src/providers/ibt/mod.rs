@@ -98,7 +98,7 @@ impl Provider for IbtProvider {
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        self.reader.session_yaml()
+        Ok(self.reader.session_yaml())
     }
 
     fn tick_rate(&self) -> f64 {

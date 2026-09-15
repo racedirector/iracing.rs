@@ -63,14 +63,14 @@ fn run() -> Result<()> {
     }
 
     // Build schema from variables
-    let variables: Vec<_> = connection.get_variables();
+    let variables: Vec<_> = connection.get_variables()?;
     let mut variable_map = std::collections::HashMap::new();
 
     for var_info in variables {
         variable_map.insert(var_info.name.clone(), var_info);
     }
 
-    let frame_size = connection.header().buf_len as usize;
+    let frame_size = connection.header().buffer_length as usize;
     let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
 
     // ------------------------------------------------------------

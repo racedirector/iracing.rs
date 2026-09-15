@@ -1,0 +1,93 @@
+//! Raw decoding for fixed-size structures from the iRacing SDK wire format.
+//!
+//! [`WireType`] is intended for `Copy` types whose Rust memory layout exactly
+//! matches a structure defined by the iRacing C SDK. It performs an unaligned
+//! copy from a byte slice; it does not deserialize individual fields or perform
+//! semantic validation.
+
+use std::io::Write;
+
+use crate::{IRacingSDKError, Result};
+
+/// A fixed-size type that can be copied directly from its iRacing wire representation.
+///
+/// The SDK wire format is little-endian. Because [`read_from_bytes`](Self::read_from_bytes)
+/// copies the representation without byte swapping, this trait is suitable only on
+/// little-endian targets.
+///
+/// # Safety
+///
+/// Implementing this trait asserts all of the following:
+///
+/// - `Self` has a stable layout that exactly matches the corresponding SDK structure,
+///   including field offsets and padding. SDK structures should normally use `#[repr(C)]`.
+/// - [`WIRE_SIZE`](Self::WIRE_SIZE) equals `size_of::<Self>()`.
+/// - Every possible sequence of `WIRE_SIZE` bytes is a valid value of `Self`. In
+///   particular, the type must not contain references, pointers with validity
+///   requirements, `bool`, `char`, or enums with invalid discriminants.
+/// - Interpreting the SDK's little-endian bytes as the target's native representation
+///   produces the intended field values.
+/// - Every byte in the representation, including padding, is initialized. Constructors
+///   for wire types must explicitly initialize ABI padding before values are written.
+///
+/// Violating these requirements can make the safe
+/// [`read_from_bytes`](Self::read_from_bytes) method cause undefined behavior.
+pub unsafe trait WireType: Copy + Sized {
+    /// The exact size, in bytes, of this type's wire representation.
+    ///
+    /// Implementations should use the default value. An override must remain equal to
+    /// `size_of::<Self>()` as required by the trait's safety contract.
+    const WIRE_SIZE: usize = std::mem::size_of::<Self>();
+
+    /// Copies a value from its fixed-size wire representation.
+    ///
+    /// The input may be unaligned. Bytes are copied as the target's native
+    /// representation without byte-order conversion or semantic validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IRacingSDKError::WireSize`] when `bytes.len()` is not exactly
+    /// [`WIRE_SIZE`](Self::WIRE_SIZE).
+    #[inline]
+    fn read_from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != Self::WIRE_SIZE {
+            return Err(IRacingSDKError::WireSize {
+                expected: Self::WIRE_SIZE,
+                actual: bytes.len(),
+            });
+        }
+
+        // SAFETY:
+        // - The length check guarantees that `WIRE_SIZE` bytes are readable.
+        // - The `WireType` implementation guarantees that every byte pattern is
+        //   valid for `Self` and that its layout matches the wire representation.
+        Ok(unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>()) })
+    }
+
+    /// Reads a value without checking the input length.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must contain at least `Self::WIRE_SIZE` readable bytes.
+    #[inline]
+    unsafe fn read_from_bytes_unchecked(bytes: &[u8]) -> Self {
+        debug_assert!(bytes.len() >= Self::WIRE_SIZE);
+
+        // SAFETY: The caller guarantees sufficient readable bytes, and the
+        // `WireType` contract guarantees that the representation is valid.
+        unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<Self>()) }
+    }
+
+    /// Writes this value's exact fixed-size wire representation.
+    ///
+    /// No byte-order conversion is performed. Like decoding, encoding is therefore
+    /// supported only on little-endian targets.
+    fn write_to<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // SAFETY: The `WireType` contract guarantees the complete object
+        // representation is initialized and exactly `WIRE_SIZE` bytes long.
+        let bytes = unsafe {
+            std::slice::from_raw_parts((self as *const Self).cast::<u8>(), Self::WIRE_SIZE)
+        };
+        writer.write_all(bytes)
+    }
+}

@@ -65,6 +65,8 @@ pub struct Session {
     /// Results fastest lap data
     #[cfg_attr(feature = "codegen", schemars(with = "Option<Vec<serde_json::Value>>"))]
     pub results_fastest_lap: Option<Vec<serde_yaml_ng::Value>>,
+    /// Results qualifying
+    pub qualify_positions: Option<Vec<QualifyResult>>,
     /// Results average lap time
     pub results_average_lap_time: Option<f64>,
     /// Number of caution flags

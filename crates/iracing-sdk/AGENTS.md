@@ -11,8 +11,8 @@
 
 - `ibt/`: `IbtReader` iterates `.ibt` telemetry; rely on `VariableSchema` and `VariableInfo` metadata instead of re-parsing frame bytes.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
-- `schema/session/`: `SessionInfoParser` caches YAML; only re-parse when `session_version` changes.
-- `schema/header.rs` and `schema/variables.rs`: Windows-only live schema discovery for shared-memory headers and variable definitions.
+- `schema/session/`: `SessionInfo::parse` deserializes decoded session YAML; the live telemetry session policy tracks `session_version`, while IBT parses its session once.
+- Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `VariableSchema` for variable metadata.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
 - `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. `IbtConnection` coordinates one shared cursor across acknowledged subscribers; `LiveConnection` exposes watch-backed latest snapshots.
 - `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.
@@ -22,7 +22,9 @@
 - `examples/`: cross-platform disk examples plus Windows live/broadcast examples.
 - `tests/`: integration and derive macro regression tests.
 - `benches/`: Criterion benchmarks gated by the `benchmark` feature.
-- `yaml_utils`: cleans iRacing's malformed YAML before parsing; use it instead of custom scrubbing.
+- `SessionInfoBuffer` bounds and decodes captured session bytes; `IRacingSessionString` removes invalid control characters before parsing. Keep that cleanup in the source path.
+
+- Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.
 
 ## Platform & Feature Guardrails
 
@@ -33,7 +35,8 @@
 
 ## Examples & Binaries
 
-- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo live-session-parser`, `cargo broadcast-cli`; they map to bins in this crate.
+- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo session`, `cargo broadcast-cli`; they map to bins in this crate.
+- Use `cargo session schema type`, `cargo session schema ibt --path ./session.ibt`, `cargo session discover ibt --path ./session.ibt`, and `cargo session snapshot ibt --path ./session.ibt` for session schemas, discovery, and snapshots; `schema live`, `discover live`, and `snapshot live` require Windows. Output defaults to stdout; use `--output <file>` for a file. The alias enables `codegen,schema-discovery`.
 - Keep cross-platform examples (`disk-position`, `adapter-disk-position`, `enum-bitfields-disk`) runnable on non-Windows machines.
 - Keep adapter examples importing from `iracing_sdk`; derive examples should rely on the `derive` feature re-export from this crate.
 

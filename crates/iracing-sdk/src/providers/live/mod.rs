@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    provider::Provider, yaml_utils,
+    provider::Provider,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -59,14 +59,14 @@ impl LiveProvider {
         max_no_connection_attempts: Option<u32>,
     ) -> Result<Self> {
         let header = connection.header();
-        let variables = connection.get_variables();
+        let variables = connection.get_variables()?;
         let mut variable_map = std::collections::HashMap::new();
 
         for var_info in variables {
             variable_map.insert(var_info.name.clone(), var_info);
         }
 
-        let frame_size = header.buf_len as usize;
+        let frame_size = header.buffer_length as usize;
         let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
 
         Ok(Self {
@@ -131,7 +131,7 @@ impl LiveProvider {
                 let frame_data = data.to_vec();
                 let header = self.connection.header();
                 let latest_buf_idx = self.connection.find_latest_buffer(header);
-                let tick = header.var_buf[latest_buf_idx].tick_count as u32;
+                let tick = header.buffers[latest_buf_idx].tick_count as u32;
                 let session_version = header.session_info_update as u32;
 
                 tracing::trace!(
@@ -176,25 +176,7 @@ impl LiveProvider {
         tracing::debug!("Fetching session YAML from shared memory");
 
         // Get raw YAML from shared memory
-        let raw_yaml = match self.connection.session_info() {
-            Some(yaml) => yaml,
-            None => {
-                tracing::debug!("No session info available");
-                return Ok(None);
-            }
-        };
-
-        // Return None if empty
-        if raw_yaml.trim().is_empty() {
-            return Ok(None);
-        }
-
-        // Preprocess to fix iRacing's YAML issues
-        let cleaned_yaml = yaml_utils::preprocess_iracing_yaml(&raw_yaml)?;
-
-        tracing::info!("Extracted session YAML ({} bytes)", cleaned_yaml.len());
-
-        Ok(Some(cleaned_yaml))
+        Ok(self.connection.session_info())
     }
 }
 

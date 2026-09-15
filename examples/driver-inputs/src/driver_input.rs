@@ -1,4 +1,6 @@
-use iracing_sdk::{IncidentFlags, SessionFlags, SessionState, TrackLocation};
+use iracing_sdk::irsdk::{
+    EngineWarnings, IncidentFlags, SessionFlags, SessionState, TrackLocation,
+};
 use iracing_sdk_derive::IRacingTelemetryFrame;
 use serde::Serialize;
 
@@ -133,50 +135,37 @@ pub struct DriverInput {
 
     #[field_name = "PlayerIncidents"]
     #[fail_if_missing]
-    // #[calculated = "iracing_sdk::types::IncidentFlags::from_bits_retain"]
     pub player_incidents: IncidentFlags,
 
     #[field_name = "SessionFlags"]
     #[fail_if_missing]
     pub flags: SessionFlags,
 
-    #[bitfield_map(
+    #[bitfield(
         name = "SessionFlags",
-        decoder = "iracing_sdk::types::session_start_control_shown"
+        has = "SessionFlags::START_CONTROL_FLAGS.bits()"
     )]
     pub has_start_control: bool,
 
-    #[bitfield_map(
-        name = "SessionFlags",
-        decoder = "iracing_sdk::types::session_under_yellow"
-    )]
+    #[bitfield(name = "SessionFlags", has = "SessionFlags::YELLOW_FLAGS.bits()")]
     pub is_yellow: bool,
 
-    #[bitfield_map(
-        name = "SessionFlags",
-        decoder = "iracing_sdk::types::session_under_caution"
-    )]
+    #[bitfield(name = "SessionFlags", has = "SessionFlags::CAUTION_FLAGS.bits()")]
     pub is_caution: bool,
 
-    #[bitfield(
-        name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::DEBRIS.bits()"
-    )]
+    #[bitfield(name = "SessionFlags", has = "SessionFlags::DEBRIS.bits()")]
     pub is_debris: bool,
 
-    #[bitfield(name = "SessionFlags", has = "iracing_sdk::SessionFlags::BLUE.bits()")]
+    #[bitfield(name = "SessionFlags", has = "SessionFlags::BLUE.bits()")]
     pub is_faster_car_approaching: bool,
 
-    #[bitfield_map(
+    #[bitfield(
         name = "EngineWarnings",
-        decoder = "iracing_sdk::types::engine_repairs_needed"
+        has = "EngineWarnings::REPAIR_WARNINGS.bits()"
     )]
     pub has_repairs: bool,
 
-    #[bitfield(
-        name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::SERVICIBLE.bits()"
-    )]
+    #[bitfield(name = "SessionFlags", has = "SessionFlags::SERVICIBLE.bits()")]
     pub is_servicible: bool,
 
     ///

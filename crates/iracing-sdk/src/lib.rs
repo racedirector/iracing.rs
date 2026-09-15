@@ -16,12 +16,12 @@
 //!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
-//!   - [`schema::SessionInfo`], [`schema::SessionInfoParser`]
-//!   - [`yaml_utils`] for iRacing YAML cleanup
+//!   - [`schema::SessionInfo`] and [`schema::SessionInfo::parse`] for session YAML
+//!   - [`types::SessionInfoBuffer`] for decoding session data from the SDK
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`
-//!   - [`PitCommand`] is cross-platform typed data for pit-service broadcast commands.
+//!   - Typed broadcast command data remains available independently of the Win32 transport.
 //!
 //! # Quick start
 //!
@@ -58,10 +58,12 @@
 //! - `benchmark`: enables benchmark targets.
 //!
 pub mod adapters;
+mod codegen;
 mod error;
+pub mod irsdk;
+mod parse_utils;
 pub mod test_utils;
 pub mod types;
-pub mod yaml_utils;
 
 // Stream-based modules
 pub mod connections;
@@ -82,6 +84,8 @@ pub mod schema;
 pub use adapters::*;
 pub use error::*;
 pub use types::*;
+
+pub use irsdk::broadcast::PitCommand;
 
 #[doc(hidden)]
 pub mod __private {

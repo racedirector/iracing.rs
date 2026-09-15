@@ -21,35 +21,48 @@ little-endian conversion centralized.
 The live header/variable discovery modules are Windows-gated. The resulting
 schema and frame types are platform-neutral.
 
+`VariableInfo::data_type` uses `irsdk::VariableType`, also re-exported at the
+crate root. Only the six SDK storage kinds are valid telemetry metadata;
+header conversion, schema validation, and runtime decoding reject the count
+sentinel. Array strides use SDK byte widths. `VarData` supports `u8` for
+characters, `bool`, `i32`, `BitField`, `f32`, `f64`, and their vectors.
+
+Metadata serialization emits `Character`, `Boolean`, `Integer`, `BitField`,
+`Float`, and `Double`. Deserialization also accepts the previous `Char`, `Bool`,
+`Int32`, `Float32`, and `Float64` names. The former synthetic integer storage
+variants are no longer supported. `TelemetryValue` retains its payload names
+and variants for source/serialization compatibility, but SDK decoding only
+produces the supported storage values and arrays. `DynamicFrame::bitfield`
+replaces the former synthetic unsigned-integer shortcut.
+
 ## Session YAML path
 
-iRacing session data can contain control characters, non-UTF-8 bytes, and YAML
-that standard parsers do not accept directly. The code has two cleanup surfaces:
+`SessionInfoBuffer` owns the complete captured region. Its `payload()` method
+borrows a `SessionInfoPayload` ending before the first NUL, preserving the original
+region without allocating. The payload detects `WeekendInfo.Encoding` and decodes
+the same bounded slice: declared UTF-8 uses replacement for malformed sequences,
+declared ISO-8859-1 maps each byte to its code point, and absent or unknown
+declarations use UTF-8 validation with an ISO-8859-1 fallback. Converting the
+buffer to `String` delegates to this payload decoder. Neither boundary nor
+encoding is cached; control-character cleanup and parsing remain subsequent operations.
 
-- `yaml_utils` extracts bounded memory regions, decodes UTF-8 with a
-  Windows-1252 fallback, and performs low-level control-character cleanup;
-- `SessionInfoParser` includes a compatibility preprocessor for problematic
-  unquoted fields, deserializes `SessionInfo`, validates required high-level
-  content, and can cache by session version.
-
-`SessionInfo::parse` is the lighter path for YAML that a provider has already
-cleaned. Provider and caller contracts must make preprocessing ownership clear;
-do not stack ad hoc cleaners at each call site.
+iRacing session data can contain control characters and non-UTF-8 bytes.
+`SessionInfoBuffer` bounds and decodes the captured bytes; the internal
+`IRacingSessionString` removes invalid control characters and rejects empty
+text. `IbtReader::session_yaml` and live acquisition supply this sanitized
+text. `SessionInfo::parse` then deserializes it into the typed session model.
+Keep decoding and sanitization in the source path.
 
 ## Caching and publication
 
-`SessionInfoParser::parse_from_memory` caches a cloned `SessionInfo` keyed by the
-numeric session version. Repeated calls at the same version reuse the cache.
-
-The telemetry task does not use that cache directly. It has source-specific
-session policies:
+The telemetry task has source-specific session policies:
 
 - live: detect version transitions, immediately own the current YAML, and parse
   queued snapshots sequentially on a background FIFO worker before publishing;
 - IBT: fetch and parse immutable session YAML once before frames.
 
-Architecture changes must distinguish parser caching from telemetry publication.
-They solve different problems.
+Session version tracking and publication belong to these policies, not to
+`SessionInfo::parse`.
 
 ## Typed session model
 
@@ -61,6 +74,19 @@ The `schema-discovery` feature adds flattened maps for unknown YAML fields and
 helpers that collect their paths, inferred types, and examples. This supports
 evolving the typed model without silently losing evidence of new simulator
 fields.
+
+`cargo session schema ibt --path <file.ibt>` and, on Windows,
+`cargo session schema live` generate a schema from a captured typed value.
+Discovery maps serialize their keys inline in the appropriate domain, so
+unknown keys appear in the inferred schema and its example, not under an
+`unknown_fields` property. Both commands also include
+`x-iracing-unknown-fields`, a path-sorted report from `collect_unknown_fields`
+with types and examples. This extension is evidence for model updates, not a
+JSON Schema validation constraint. The report traverses unknown leaves; inspect
+the captured example for empty containers and full values.
+
+The repo skill `.agents/skills/update-session-schema/SKILL.md` guides capture
+selection, domain model updates, and verification.
 
 ## Generated reference artifacts
 

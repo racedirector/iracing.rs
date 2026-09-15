@@ -4,7 +4,8 @@ use clap::Parser;
 use csv::Writer;
 use driver_input::DriverInput;
 use iracing_sdk::{
-    FrameAdapter, SchemaProvider, SessionFlags, provider::Provider, providers::ibt::IbtProvider,
+    FrameAdapter, SchemaProvider, irsdk::SessionFlags, provider::Provider,
+    providers::ibt::IbtProvider,
 };
 use std::{fs::File, path::PathBuf};
 use tracing_subscriber::EnvFilter;
