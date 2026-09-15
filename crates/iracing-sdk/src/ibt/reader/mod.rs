@@ -123,8 +123,8 @@ impl IbtReader {
                     details: "Frame data start position exceeds file size".to_string(),
                 })?;
 
-        let total_frames = if header.buffer_length > 0 {
-            remaining_bytes / header.buffer_length as usize
+        let total_frames = if frame_size > 0 {
+            remaining_bytes / frame_size
         } else {
             0 // No telemetry data if buf_len is 0
         };
@@ -328,7 +328,7 @@ impl SchemaProvider for IbtReader {
 
 impl ByteParser for IbtReader {
     fn bytes_at_region(&self, region: impl ByteRegion) -> &[u8] {
-        &self.data[region.range()]
+        &self.data[region.as_range()]
     }
 }
 

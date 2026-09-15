@@ -12,11 +12,9 @@ pub trait ByteRegion {
     fn length(&self) -> usize;
 
     /// Returns the range for the offset and length without checking for overflow.
-    fn range(&self) -> Range<usize> {
+    fn as_range(&self) -> Range<usize> {
         let offset = self.offset();
-        let length = self.length();
-
-        offset..offset + length
+        offset..offset + self.length()
     }
 
     /// Returns the checked range for the offset and length.

@@ -1,0 +1,13 @@
+# Live telemetry parser implementation notes
+
+These notes accompany [the live telemetry specification](live-telemetry-spec.md). They describe the current code and refactor implications, not additional protocol rules.
+
+`crates/iracing-sdk/src/windows/connection.rs` opens the mapping and event read-only, maps the entire object, exposes the mapped header by reference, and builds schemas from copied variable-header bytes. Its initial `Header::validate_live` checks field values and offset arithmetic but does not compare advertised ranges with the actual mapped-view length or check overlap. `ByteParser::bytes_at_region` performs unchecked pointer arithmetic for session and variable regions. A parsed live-layout value could own a copied header/schema and proven ranges for session storage and all active buffers, invalidated on connection-layout changes.
+
+The current frame path selects the descriptor with the numerically greatest tick rather than `curBuf`. It creates a borrowed mapping slice, compares `tickCount` before and after creating that slice, returns the borrow, and copies it later in `LiveProvider`. Creating a slice performs no memory copy, so the existing check does not protect the later copy. It also checks the post-copy-equivalent value against `tickCount`, while the SDK 1.20 publication protocol requires the saved `tickCount` to equal the later `tickCountBegin`. The owned copy, barriers, and two-field consistency check should live inside the mmap acquisition boundary and return tick plus bytes together.
+
+After receiving the borrowed frame, `LiveProvider` currently reads the header again, reselects a buffer, and uses that later tick plus session version in the packet. Consequently its bytes, tick, and version can describe different observations. Frame acquisition should return its checked tick. Session revision remains a separate observation because the producer does not publish frame and YAML atomically.
+
+`WindowsConnection::session_info_buffer` presently reads the header once and copies the advertised region without comparing `sessionInfoUpdate` before and after the copy. A session-snapshot operation can use a version/copy/version retry and return owned bytes with the accepted version. YAML sanitizing and typed parsing can remain outside the shared-memory boundary.
+
+The data-valid event path already treats timeouts and signals as reasons to poll again, which matches the event's hint semantics. The higher-level live delivery policy is latest-wins, appropriate for rotating shared memory where missed historical ticks cannot be recovered. Connection liveness policy, retry limits, logging, throttling, and typed session publication belong above mmap parsing.
