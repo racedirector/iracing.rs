@@ -4,9 +4,12 @@ use crate::{
 };
 use std::ops::Range;
 
+/// Offset and length for a byte span within an SDK data source.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ByteRegion {
+    /// Start offset of the region, measured in bytes from the source origin.
     pub offset: usize,
+    /// Length of the region in bytes.
     pub length: usize,
 }
 
@@ -16,10 +19,19 @@ impl ByteRegion {
         self.offset > 0 && self.length > 0
     }
 
+    /// Returns the region as a half-open byte range.
+    ///
+    /// This performs unchecked addition for the range end. Use
+    /// [`Self::as_checked_range`] when handling untrusted offsets or lengths.
     pub fn as_range(&self) -> Range<usize> {
         self.offset..self.offset + self.length
     }
 
+    /// Returns the region as a half-open byte range with overflow checking.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the end offset overflows `usize`.
     pub fn as_checked_range(&self) -> Result<Range<usize>> {
         let offset = self.offset;
         let length = self.length;
@@ -89,7 +101,7 @@ impl SessionInfoRegion {
 
     /// Borrows the session-information bytes from the complete source without copying.
     ///
-    /// `source` must begin at the origin used by [`Self::offset`].
+    /// `source` must begin at the origin used by the underlying [`ByteRegion`].
     ///
     /// # Errors
     ///
@@ -101,8 +113,8 @@ impl SessionInfoRegion {
 
     /// Copies the session-information bytes into an owned buffer.
     ///
-    /// `source` must begin at the origin used by [`Self::offset`]. The returned
-    /// buffer is independent of `source`.
+    /// `source` must begin at the origin used by the underlying [`ByteRegion`].
+    /// The returned buffer is independent of `source`.
     ///
     /// # Errors
     ///
@@ -148,11 +160,14 @@ impl TryFrom<&Header> for SessionInfoRegion {
 /// Individual variable headers are not semantically validated by this type.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VariableHeaderRegion {
+    /// Byte span containing the contiguous variable-header records.
     pub region: ByteRegion,
+    /// Number of variable-header records advertised by the source header.
     pub count: usize,
 }
 
 impl VariableHeaderRegion {
+    /// Returns the associated byte region.
     pub fn as_region(&self) -> ByteRegion {
         self.region
     }
@@ -174,7 +189,7 @@ impl VariableHeaderRegion {
 
     /// Borrows the region's bytes from the complete source without copying.
     ///
-    /// `source` must begin at the origin used by [`Self::offset`].
+    /// `source` must begin at the origin used by [`Self::region`].
     ///
     /// # Errors
     ///
@@ -186,7 +201,7 @@ impl VariableHeaderRegion {
 
     /// Copies the region's bytes into an owned variable-header snapshot.
     ///
-    /// `source` must begin at the origin used by [`Self::offset`]. The returned
+    /// `source` must begin at the origin used by [`Self::region`]. The returned
     /// buffer is independent of `source`; individual headers are not
     /// semantically validated.
     ///
