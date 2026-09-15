@@ -21,6 +21,14 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    // ------------------------------------------------------------
+    // Logging initialization.
+    // Default to TRACE unless RUST_LOG is set.
+    // ------------------------------------------------------------
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("trace"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
+
     let args = Args::parse();
 
     let mut reader = IbtReader::open(&args.ibt_path)?;
