@@ -16,6 +16,7 @@ on commands, boundaries, and easy-to-miss constraints.
 ## Quality Gates
 
 - Before committing or pushing, run and pass the checks that match `.github/workflows/quality.yml`: fixture verification, formatting, clippy, and workspace tests.
+- The quality workflow also compile-checks every `iracing-sdk` benchmark on Ubuntu and Windows. `.github/workflows/benchmarks.yml` runs deterministic benchmarks in quick mode for relevant PRs/main pushes and with full sampling weekly or by manual dispatch; the live simulator benchmark remains compile-only in hosted CI.
 - When changes touch docs or public APIs for `iracing-sdk`, `iracing-sdk-derive`, or `iracing-simulation`, also run the crate-specific doctest, docs-as-warnings, and examples/bins checks from `.github/workflows/docs.yml`.
 - CI runs the main quality gate on both Ubuntu and Windows. Local runs on one OS are useful, but do not ignore platform-specific failures surfaced by the other CI runner.
 
@@ -46,6 +47,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## CI & Release
 
-- `quality.yml` runs fixture verification, formatting, clippy, and workspace tests on pull requests and pushes to `main`.
+- `quality.yml` runs fixture verification, formatting, clippy, workspace tests, and benchmark compilation on pull requests and pushes to `main`.
+- `benchmarks.yml` smoke-runs deterministic benchmarks for relevant pull requests and `main` pushes, performs full sampled runs weekly or on manual request, and uploads Criterion reports.
 - `docs.yml` runs doctests, docs with warnings as errors, and `cargo check` for examples/bins for touched documentation crates; run those targets locally before opening PRs.
 - Releases are tag-driven (`v*`) via `cargo dist`; keep version bumps and dist metadata coordinated when preparing a release.

@@ -135,6 +135,20 @@ Several cases await source-paced frames, so results include simulator cadence,
 Tokio scheduling, and operating-system wake-up behavior. Follow the target’s
 module documentation before interpreting or comparing its output.
 
+## CI coverage
+
+The quality workflow compiles every benchmark target on Ubuntu and Windows for
+each pull request and push to `main`. This includes `live_frame_latency`, which
+is compile-only in hosted CI because meaningful execution requires Windows and
+an active iRacing session.
+
+The benchmark workflow executes every deterministic Criterion target plus the
+allocation diagnostic. Relevant pull requests and pushes to `main` use
+Criterion's quick mode as a runtime smoke test. A weekly schedule and manual
+`full` dispatch use normal statistical sampling and retain Criterion reports as
+workflow artifacts for 14 days. Use manual `quick` dispatches for inexpensive
+ad-hoc validation.
+
 ## Comparing results
 
 - Compare like-for-like case names, schema revisions, build profiles, machines,
