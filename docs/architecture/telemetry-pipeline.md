@@ -23,7 +23,11 @@ same.
 ## Wire and schema layer
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
-YAML region, and fixed-size frame records from `.ibt` data. Live
+YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
+private seekable file plus owned schema/session metadata and reads one owned
+frame on demand; `from_bytes` uses the same parser over an owned in-memory
+cursor. Source offsets are `u64`, while validated frame/allocation sizes use
+`usize`. Metadata access never moves the telemetry cursor. Live
 `WindowsConnection` interprets the related shared-memory header and rotating
 buffers.
 

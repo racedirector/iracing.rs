@@ -13,6 +13,7 @@ different targets are not interchangeable measurements of “frame latency.”
 | `telemetry_delivery_e2e` | Deterministic in-process provider-to-adapted-subscriber delivery | IBT I/O, Windows shared memory, or simulator pacing |
 | `subscriber_fanout` | One shared SDK stream with service-side fan-out versus one SDK stream per client, using heterogeneous requested-field projections | WS/gRPC serialization, sockets, client backpressure, or network I/O |
 | `live_frame_latency` | Manual live subscriptions with a running simulator | Stable, deterministic CI performance |
+| `ibt_reader_measurement` | File-backed versus legacy-equivalent in-memory IBT construction, retained application heap, and sequential replay throughput | Kernel/filesystem page cache, cross-machine performance, or zero-copy frame cost |
 
 Run all compile-safe targets with:
 
@@ -106,6 +107,23 @@ Projection vectors are fresh output values suitable for later serialization,
 but serialization, protocol framing, network writes, per-client queues, slow
 clients, and multi-threaded service scheduling are outside the measured
 boundary.
+
+## IBT reader storage measurement
+
+`ibt_reader_measurement` is a one-pass diagnostic rather than a Criterion
+statistical benchmark. It selects the smallest and largest real recordings of
+at least 1 MiB under `test-data`, then reports two modes for each:
+
+- `file` calls `IbtReader::open(path)`;
+- `memory_baseline` reproduces the old ownership model with `fs::read(path)`
+  followed by `IbtReader::from_bytes(bytes)`.
+
+The tracking allocator reports heap bytes retained when construction returns
+and peak additional heap during construction. The diagnostic asserts that the
+file-backed reader retains less than half the recording length while the
+baseline retains at least the recording length. These are application-heap
+measurements. They do not include kernel/filesystem page cache, and replay
+timing remains sensitive to cache warmth and machine load.
 
 ## Manual live benchmark
 
