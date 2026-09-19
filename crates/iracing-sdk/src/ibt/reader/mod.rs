@@ -84,7 +84,16 @@ impl IbtReader {
         Self::from_bytes_with_path(data.into(), None)
     }
 
-    /// Create IbtReader from bytes with path context
+    /// Parses owned `.ibt` data and records its optional source path.
+    ///
+    /// The frame region starts after the latest present metadata region. Its
+    /// frame count includes only complete frames through the end of the input;
+    /// the disk sub-header's record count does not alter those bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the headers, metadata regions, or variable schema
+    /// cannot be parsed and validated from the input.
     fn from_bytes_with_path(data: Vec<u8>, path: Option<PathBuf>) -> Result<Self> {
         let mut cursor = std::io::Cursor::new(data.as_slice());
 
