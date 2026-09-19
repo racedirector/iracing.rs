@@ -52,7 +52,7 @@ jobs:
           - ibt_reader_performance
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -90,7 +90,7 @@ jobs:
           - telemetry_delivery_allocations
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: true
 
