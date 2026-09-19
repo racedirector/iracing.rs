@@ -48,3 +48,6 @@ jobs:
 
       - name: Test workspace
         run: cargo test --workspace --all-targets
+
+      - name: Compile all benchmarks
+        run: cargo bench -p iracing-sdk --features benchmark --no-run

@@ -1,0 +1,104 @@
+name: Benchmarks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/benchmarks.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-sdk/**"
+      - "test-data/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/benchmarks.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-sdk/**"
+      - "test-data/**"
+  schedule:
+    - cron: "17 5 * * 0"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Benchmark sampling mode
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - quick
+
+concurrency:
+  group: benchmarks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  criterion:
+    name: ${{ matrix.benchmark }} (${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'full')) && 'full' || 'quick' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark:
+          - adapter_performance
+          - aggregate_frame_parsing
+          - telemetry_delivery_e2e
+          - subscriber_fanout
+          - frame_construction
+          - var_data_extraction
+          - ibt_reader_performance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run quick benchmark smoke
+        if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.mode == 'quick')
+        run: cargo bench -p iracing-sdk --features benchmark --bench ${{ matrix.benchmark }} -- --quick
+
+      - name: Run statistically sampled benchmark
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'full')
+        run: cargo bench -p iracing-sdk --features benchmark --bench ${{ matrix.benchmark }}
+
+      - name: Upload Criterion report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-${{ matrix.benchmark }}-${{ github.run_id }}
+          path: target/criterion
+          if-no-files-found: ignore
+          retention-days: 14
+
+  diagnostics:
+    name: ${{ matrix.benchmark }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark:
+          - telemetry_delivery_allocations
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run diagnostic
+        run: cargo bench -p iracing-sdk --features benchmark --bench ${{ matrix.benchmark }}
