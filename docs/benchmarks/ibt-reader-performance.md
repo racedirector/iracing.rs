@@ -1,7 +1,7 @@
 # IBT reader performance baseline
 
 This report establishes the timing baseline for the IBT storage refactor in
-#84. The benchmark target is intentionally checked in before the implementation
+issue #84. The benchmark target is intentionally checked in before the implementation
 changes so the same cases and timed boundaries can be run on both revisions.
 
 ## Reproduce
