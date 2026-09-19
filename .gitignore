@@ -52,7 +52,8 @@ no_llvm_build
 /build-rust-analyzer
 /dist/
 /unicode-downloads
-/target
+# Cargo build output, including package-local targets.
+target/
 /library/target
 /src/bootstrap/target
 /src/ci/citool/target
@@ -66,6 +67,11 @@ src/tools/nix-dev-shell/flake.lock
 
 ## ICE reports
 rustc-ice-*.txt
+
+## Rust tooling
+**/*.rs.bk
+*.profraw
+*.profdata
 
 ## Temporary files
 *~
