@@ -41,7 +41,6 @@ use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
-    sync::Mutex,
 };
 
 enum IbtSource {
@@ -69,7 +68,7 @@ impl Seek for IbtSource {
 
 /// IBT file reader for cross-platform replay.
 pub struct IbtReader {
-    source: Mutex<IbtSource>,
+    source: IbtSource,
     source_len: u64,
     current_position: u64,
     path: Option<PathBuf>,
@@ -78,7 +77,7 @@ pub struct IbtReader {
     disk_header: DiskSubHeader,
     variable_schema: VariableSchema,
 
-    session_info_region: SessionInfoRegion,
+    session_info: Option<SessionInfoBuffer>,
     // variable_headers_region: VariableHeaderRegion,
     current_frame: usize,
     total_frames: usize,
@@ -150,6 +149,14 @@ impl IbtReader {
             variable_headers_end
         };
 
+        let session_info = if session_info_region.is_valid() {
+            let bytes =
+                Self::read_owned_region(&mut source, source_len, session_info_region.as_region())?;
+            Some(SessionInfoBuffer::from_owned_checked_region(bytes))
+        } else {
+            None
+        };
+
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes = source_len.checked_sub(frame_data_start).ok_or_else(|| {
             IRacingSDKError::parse_error(
@@ -186,7 +193,7 @@ impl IbtReader {
         }
 
         Ok(IbtReader {
-            source: Mutex::new(source),
+            source,
             source_len,
             current_position: frame_data_start,
             path,
@@ -197,7 +204,7 @@ impl IbtReader {
             total_frames,
             frame_data_start,
             // variable_headers_region,
-            session_info_region,
+            session_info,
         })
     }
 
@@ -254,22 +261,11 @@ impl IbtReader {
 
     /// Returns an owned snapshot of the file's advertised session-information region.
     ///
-    /// Returns `None` when the header advertises no region or the region cannot
-    /// be copied from the file data.
+    /// Returns `None` when the header advertises no region. The snapshot is
+    /// validated and cached during construction, so this method never reads or
+    /// seeks the telemetry source.
     pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
-        if !self.session_info_region.is_valid() {
-            return None;
-        }
-
-        let mut source = self.source.lock().ok()?;
-        let bytes = Self::read_owned_region(
-            &mut source,
-            self.source_len,
-            self.session_info_region.as_region(),
-        )
-        .ok()?;
-
-        Some(SessionInfoBuffer::from_checked_region(&bytes))
+        self.session_info.clone()
     }
 
     /// Returns decoded session-information text with invalid control characters removed.
@@ -425,17 +421,16 @@ impl IbtReader {
             });
         }
 
-        let source = self.source.get_mut().map_err(|_| {
-            IRacingSDKError::parse_error("Frame reading", "IBT source lock is poisoned")
-        })?;
-        source.seek(SeekFrom::Start(start_pos)).map_err(|error| {
-            IRacingSDKError::parse_error(
-                "Frame seek",
-                format!("Failed to seek to frame {}: {error}", self.current_frame),
-            )
-        })?;
+        self.source
+            .seek(SeekFrom::Start(start_pos))
+            .map_err(|error| {
+                IRacingSDKError::parse_error(
+                    "Frame seek",
+                    format!("Failed to seek to frame {}: {error}", self.current_frame),
+                )
+            })?;
         let mut frame_data = vec![0; frame_size];
-        source.read_exact(&mut frame_data).map_err(|error| {
+        self.source.read_exact(&mut frame_data).map_err(|error| {
             IRacingSDKError::parse_error(
                 "Frame reading",
                 format!("Failed to read frame {}: {error}", self.current_frame),
@@ -504,6 +499,31 @@ mod tests {
             .read_next_frame()?
             .context("fixture should contain a frame")?;
         assert_eq!(frame[0], replacement);
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_remains_owned_after_the_source_changes() -> Result<()> {
+        let temporary_directory = tempfile::tempdir()?;
+        let temporary_file = temporary_directory.path().join("cached-metadata.ibt");
+        std::fs::copy(fixture_path()?, &temporary_file)?;
+        let reader = IbtReader::open(&temporary_file)?;
+        let expected_yaml = reader
+            .session_yaml()
+            .context("fixture should contain session metadata")?;
+
+        let mut file = OpenOptions::new().write(true).open(&temporary_file)?;
+        file.seek(SeekFrom::Start(u64::try_from(
+            reader.header().session_info_offset,
+        )?))?;
+        let session_length = usize::try_from(reader.header().session_info_length)?;
+        file.write_all(&vec![0; session_length])?;
+        file.flush()?;
+
+        assert_eq!(
+            reader.session_yaml().as_deref(),
+            Some(expected_yaml.as_str())
+        );
         Ok(())
     }
 
