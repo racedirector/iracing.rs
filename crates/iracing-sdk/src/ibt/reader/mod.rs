@@ -110,7 +110,9 @@ impl IbtReader {
 
         let session_info_region = SessionInfoRegion::try_from(&header)?;
 
-        // Frame data starts after whichever comes last: variable headers or session info
+        // IBT does not advertise a separate telemetry-region length. Preserve
+        // the offset-based parser contract by starting after the latest present
+        // metadata region and deriving complete frames from physical EOF.
         let frame_data_start = if session_info_region.is_valid() {
             let session_info_range = session_info_region.checked_range(data.len())?;
             session_info_range.end.max(variable_headers_range.end)
@@ -129,7 +131,9 @@ impl IbtReader {
 
         let total_frames = remaining_bytes.checked_div(frame_size).unwrap_or(0);
 
-        // Cross-check disk_header.record_count against total_frames for debugging
+        // The writer's record count is advisory for bounds: incomplete files
+        // and stale headers can disagree with physical EOF. Never let it
+        // authorize reading outside the EOF-derived complete-frame region.
         if disk_header.record_count > 0 && total_frames > 0 {
             let expected_frames = disk_header.record_count as usize;
             if expected_frames != total_frames {
