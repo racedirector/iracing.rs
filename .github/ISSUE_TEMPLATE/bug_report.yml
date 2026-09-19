@@ -1,0 +1,74 @@
+name: Bug report
+description: Report reproducible incorrect behavior, a regression, or a reliability problem.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve `iracing.rs`. Include enough evidence for someone else to reproduce the problem without guessing. Remove secrets and proprietary telemetry before attaching logs or captures.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what should have happened instead?
+      placeholder: |
+        Actual behavior:
+        Expected behavior:
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest reliable sequence, command, or code sample that demonstrates the problem.
+      placeholder: |
+        1. Run `...`
+        2. Read/connect using `...`
+        3. Observe `...`
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Include the exact error, relevant logs, backtrace, or failing test. Explain if the failure is intermittent.
+      render: shell
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the crate version or commit, Rust version, OS, enabled features, and whether the source is an IBT file or a live iRacing session.
+      placeholder: |
+        iracing.rs version/commit:
+        rustc version:
+        OS:
+        Cargo features:
+        Data source (IBT/live/synthetic):
+    validations:
+      required: true
+
+  - type: textarea
+    id: data
+    attributes:
+      label: Test data and scope
+      description: Identify the affected fixture/capture and whether the problem also occurs with generated fixtures. Do not upload licensed, private, or sensitive data without permission.
+      placeholder: Fixture or sanitized description of the capture; affected crates, commands, or APIs.
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and recovery
+      description: Who or what is affected? Is there a workaround, retry path, or way to recover without data loss?
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Add suspected cause, first known bad version, related issues/PRs, or anything intentionally not covered above.

@@ -1,0 +1,103 @@
+name: Change proposal
+description: Propose a feature, refactor, performance improvement, documentation change, or CI/release work.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the outcome and constraints before prescribing implementation. A good proposal gives an implementer clear boundaries and gives a reviewer observable success criteria.
+
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: Change type
+      options:
+        - Feature or public API
+        - Correctness or reliability
+        - Refactor or architecture
+        - Performance or benchmarking
+        - Documentation
+        - CI, release, or developer tooling
+        - Investigation or design decision
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and evidence
+      description: What limitation, need, or uncertainty exists today? Link code, measurements, failures, or prior discussion where available.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should users, downstream consumers, maintainers, or operators observe when this is complete?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: State both what belongs in this change and what is intentionally deferred or unchanged.
+      placeholder: |
+        In scope:
+        - ...
+
+        Out of scope:
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Describe a suggested design, relevant architecture boundary, and alternatives considered. This may be left open for an investigation issue.
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Behavioral and compatibility constraints
+      description: Record invariants involving ownership, ordering, EOF, retries, cancellation, platform/feature gates, public APIs, file formats, or replay/live differences. Write “None identified” when not applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use observable, independently verifiable conditions rather than implementation tasks alone.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Identify characterization, unit, integration, fixture, benchmark, platform, and documentation checks needed. Note checks that require Windows or a live simulator.
+      placeholder: |
+        - Tests to add or update: ...
+        - Commands to run: ...
+        - Platforms/data sources to exercise: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: delivery
+    attributes:
+      label: Risks, rollout, and recovery
+      description: Describe likely failure modes, performance or operational risks, migration needs, observability, and rollback. Write “Low risk; no special rollout” when appropriate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related work
+      description: Link parent/child issues, dependent PRs, relevant architecture docs, and follow-up work.
