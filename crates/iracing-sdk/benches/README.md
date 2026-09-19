@@ -13,6 +13,7 @@ different targets are not interchangeable measurements of “frame latency.”
 | `telemetry_delivery_e2e` | Deterministic in-process provider-to-adapted-subscriber delivery | IBT I/O, Windows shared memory, or simulator pacing |
 | `subscriber_fanout` | One shared SDK stream with service-side fan-out versus one SDK stream per client, using heterogeneous requested-field projections | WS/gRPC serialization, sockets, client backpressure, or network I/O |
 | `live_frame_latency` | Manual live subscriptions with a running simulator | Stable, deterministic CI performance |
+| `ibt_reader_performance` | IBT construction, complete sequential replay, and batched random seeks using two real recordings | Retained heap, cold-cache guarantees, provider/connection delivery, or consumer work |
 
 Run all compile-safe targets with:
 
@@ -29,6 +30,26 @@ cargo bench -p iracing-sdk --features benchmark --bench <target>
 The source-level documentation at the top of each benchmark defines its setup
 and timed boundaries, allocation behavior, throughput unit, and interpretation
 limits.
+
+## IBT reader performance
+
+`ibt_reader_performance` is a storage-layer benchmark whose cases and timed
+boundaries are intended to remain stable across reader implementations. It uses
+checked-in 5.9 MB and 142.6 MB recordings and measures construction, full
+sequential replay, and batches of 1,024 deterministic random seeks.
+
+Run this target alone before and after a reader change:
+
+```text
+cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
+```
+
+Construction includes the implementation's normal file-opening and metadata
+work. Sequential reader construction and random-seek reader construction occur
+outside their timed routines. Filesystem cache state is not controlled, so
+compare revisions on the same machine and interpret results as warm-cache local
+performance. Retained heap is intentionally measured separately so allocator
+instrumentation does not perturb these timings.
 
 ## Captured-schema fixture
 
