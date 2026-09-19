@@ -1,7 +1,7 @@
 use type_layout::TypeLayout;
 
 use crate::parse_utils::nul_terminated_bytes;
-use crate::{IRacingSDKError, Result};
+use crate::{Error, Result};
 
 use super::VariableType;
 use super::{
@@ -51,19 +51,19 @@ impl VariableHeader {
         unit: &str,
     ) -> Result<Self> {
         if !variable_type.is_storage_type() {
-            return Err(IRacingSDKError::invalid_configuration(
+            return Err(Error::invalid_configuration(
                 "variable_type",
                 "ElementTypeCount cannot describe telemetry storage",
             ));
         }
         if offset < 0 {
-            return Err(IRacingSDKError::invalid_configuration(
+            return Err(Error::invalid_configuration(
                 "offset",
                 "must be non-negative",
             ));
         }
         if count <= 0 {
-            return Err(IRacingSDKError::invalid_configuration(
+            return Err(Error::invalid_configuration(
                 "count",
                 "must be greater than zero",
             ));
@@ -123,19 +123,19 @@ impl VariableHeader {
 
 fn fixed_ascii<const N: usize>(field: &'static str, value: &str) -> Result<[u8; N]> {
     if !value.is_ascii() {
-        return Err(IRacingSDKError::invalid_configuration(
+        return Err(Error::invalid_configuration(
             field,
             "must contain ASCII only",
         ));
     }
     if value.as_bytes().contains(&0) {
-        return Err(IRacingSDKError::invalid_configuration(
+        return Err(Error::invalid_configuration(
             field,
             "must not contain an interior NUL byte",
         ));
     }
     if value.len() >= N {
-        return Err(IRacingSDKError::invalid_configuration(
+        return Err(Error::invalid_configuration(
             field,
             format!("must be shorter than {N} bytes to remain NUL-terminated"),
         ));

@@ -45,7 +45,6 @@
 //! # Ok::<(), iracing_sdk::IRacingSDKError>(())
 //! ```
 
-mod bitfield;
 mod dynamic_frame;
 mod frame;
 mod iracing_session_string;
@@ -58,9 +57,9 @@ mod var_data;
 mod variable_headers_buffer;
 
 // Re-export all public types
-pub use bitfield::BitField;
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
+pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::*;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};

@@ -2,8 +2,8 @@
 
 Workspace-only tooling for generating and verifying the deterministic `.ibt`
 fixtures used by `iracing-sdk` tests. This crate replaces the former Python
-scripts and deliberately depends on `iracing-sdk` as the source of truth for
-iRacing wire structures.
+scripts and deliberately depends on `iracing-irsdk` as the source of truth for
+iRacing wire structures and on `iracing-sdk` for end-to-end parser checks.
 
 The crate is not published or included in release artifacts.
 
@@ -83,7 +83,7 @@ intentional and structurally valid.
 
 ## Generator and verifier boundaries
 
-The generator uses `iracing-sdk` constructors and `WireType::write_to` for
+The generator uses `iracing-irsdk` constructors and `WireType::write_to` for
 `Header`, `DiskSubHeader`, and `VariableHeader`. Telemetry scalar values are
 written explicitly in little-endian form. The complete artifact set is built
 in memory before filesystem writes begin.
@@ -141,4 +141,3 @@ fixture change is present but not yet committed.
 - `src/generate.rs` — YAML, headers, frames, hashes, and artifact writes.
 - `src/verify.rs` — structural, manifest, YAML, and `IbtReader` validation.
 - `tests/cli.rs` — end-to-end command coverage against an isolated root.
-

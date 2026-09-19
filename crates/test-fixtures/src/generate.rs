@@ -7,7 +7,7 @@
 use std::{fs, path::Path};
 
 use anyhow::{Context, Result, ensure};
-use iracing_sdk::irsdk::{
+use iracing_irsdk::{
     DiskSubHeader, Header, StatusField, VariableBuffer, VariableHeader, VariableType, WireType,
 };
 use rand::{Rng, SeedableRng};

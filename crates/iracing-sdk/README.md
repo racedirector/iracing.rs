@@ -2,6 +2,10 @@
 
 Low-level iRacing telemetry parsing utilities for Rust.
 
+Native SDK wire definitions live in the dependency-light `iracing-irsdk` crate
+and remain available here through the backward-compatible `iracing_sdk::irsdk`
+namespace.
+
 This crate provides:
 
 - Cross-platform `.ibt` telemetry replay via `IbtReader`

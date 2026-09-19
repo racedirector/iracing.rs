@@ -3,7 +3,7 @@
 //! Profiles are generator inputs. Manifest types mirror the checked-in JSON
 //! contract consumed both here and by `iracing_sdk::test_utils`.
 
-use iracing_sdk::irsdk::VariableType;
+use iracing_irsdk::VariableType;
 use serde::{Deserialize, Serialize};
 
 /// One telemetry variable declared by a generated profile.

@@ -139,6 +139,25 @@ pub enum IRacingSDKError {
     },
 }
 
+impl From<iracing_irsdk::Error> for IRacingSDKError {
+    fn from(error: iracing_irsdk::Error) -> Self {
+        match error {
+            iracing_irsdk::Error::WireSize { expected, actual } => {
+                Self::WireSize { expected, actual }
+            }
+            iracing_irsdk::Error::Version { expected, found } => Self::Version { expected, found },
+            iracing_irsdk::Error::Parse { context, details } => Self::Parse { context, details },
+            iracing_irsdk::Error::InvalidConfiguration { field, reason } => {
+                Self::InvalidConfiguration { field, reason }
+            }
+            _ => Self::Parse {
+                context: "iRacing SDK wire data".to_owned(),
+                details: error.to_string(),
+            },
+        }
+    }
+}
+
 impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {

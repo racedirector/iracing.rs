@@ -58,7 +58,6 @@
 //! - `benchmark`: enables benchmark targets.
 //!
 pub mod adapters;
-mod codegen;
 mod error;
 pub mod irsdk;
 mod parse_utils;

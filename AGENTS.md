@@ -27,6 +27,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## Workspace Map
 
+- `crates/iracing-irsdk`: dependency-light native SDK wire contract: fixed-layout headers, intrinsic byte decoding, constants, enums, flags, packed fields, and portable broadcast command values. Do not add IBT navigation, shared-memory access, schemas, session parsing, or runtime orchestration here.
 - `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.

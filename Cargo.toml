@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "crates/iracing-irsdk",
   "crates/iracing-sdk",
   "crates/iracing-sdk-derive",
   "crates/iracing-simulation",
