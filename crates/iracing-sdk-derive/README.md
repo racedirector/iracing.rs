@@ -22,13 +22,18 @@ The `IRacingTelemetryFrame` derive macro recognizes these field-level attributes
 - Critical field: `#[field_name = "Temp"] #[fail_if_missing]`
 - Calculated field: `#[calculated = "std::time::Instant::now()"]`
 - Skipped field: `#[skip]`
-- Bitfield flag check: `#[bitfield(name = "SessionFlags", has = "iracing_sdk::SessionFlags::GREEN.bits()")]`
-- Bitfield decoder: `#[bitfield_map(name = "SessionFlags", decoder = "iracing_sdk::session_dq_scoring_invalid")]`
+- Bitfield flag check: `#[bitfield(name = "SessionFlags", has = "iracing_sdk::irsdk::SessionFlags::GREEN.bits()")]`
+- Bitfield decoder: `#[bitfield_map(name = "SessionFlags", decoder = "session_dq_scoring_invalid")]`
 
 ## Example
 
 ```rust,ignore
 use iracing_sdk_derive::IRacingTelemetryFrame;
+
+fn session_dq_scoring_invalid(bits: iracing_sdk::BitField) -> bool {
+    iracing_sdk::irsdk::SessionFlags::from(bits)
+        .has_disqualification_scoring_invalid()
+}
 
 #[derive(IRacingTelemetryFrame, Debug)]
 struct CarData {
@@ -50,13 +55,13 @@ struct CarData {
 
     #[bitfield(
         name = "SessionFlags",
-        has = "iracing_sdk::SessionFlags::GREEN.bits()"
+        has = "iracing_sdk::irsdk::SessionFlags::GREEN.bits()"
     )]
     is_green: bool,
 
     #[bitfield_map(
         name = "SessionFlags",
-        decoder = "iracing_sdk::session_dq_scoring_invalid"
+        decoder = "session_dq_scoring_invalid"
     )]
     dq_scoring_invalid: bool,
 }
