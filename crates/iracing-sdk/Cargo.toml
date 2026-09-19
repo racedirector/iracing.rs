@@ -138,6 +138,11 @@ harness = false
 required-features = ["benchmark"]
 
 [[bench]]
+name = "ibt_reader_measurement"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
 name = "var_data_extraction"
 harness = false
 required-features = ["benchmark"]
