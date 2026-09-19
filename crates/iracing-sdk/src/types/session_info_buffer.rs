@@ -98,13 +98,18 @@ impl SessionInfoBuffer {
         }
     }
 
+    /// Wraps owned bytes after a reader has copied an advertised region in full.
+    pub(crate) fn from_owned_checked_region(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+
     /// Wraps bytes after a reader has copied an advertised region in full.
     ///
     /// Construction is crate-private so source readers remain responsible for
     /// bounds checking and exact-read semantics.
     #[cfg(test)]
     pub(crate) fn from_snapshot(bytes: Vec<u8>) -> Self {
-        Self { bytes }
+        Self::from_owned_checked_region(bytes)
     }
 }
 
