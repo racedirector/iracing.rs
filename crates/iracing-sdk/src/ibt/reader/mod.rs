@@ -26,27 +26,52 @@
 //!
 //! ## Performance Notes
 //!
-//! - File data is loaded into memory at construction time for fast random access
+//! - Files remain file-backed; construction retains only the source and parsed metadata
 //! - Frame reading is allocation-minimal except for the returned frame bytes
-//! - Seeking operations are O(1) as they only update internal position counters
+//! - Seeking operations are O(1)
 
 use super::format::extract_variable_schema;
 use crate::{
-    ByteParser, ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer,
-    VariableHeaderRegion, VariableSchema,
+    ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
+    VariableSchema,
     irsdk::{DiskSubHeader, Header},
     types::{IRacingSessionString, SessionInfoRegion},
 };
 use std::{
     fs::File,
-    io::Read,
+    io::{Cursor, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
+    sync::Mutex,
 };
+
+enum IbtSource {
+    File(File),
+    Memory(Cursor<Vec<u8>>),
+}
+
+impl Read for IbtSource {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::File(source) => source.read(buffer),
+            Self::Memory(source) => source.read(buffer),
+        }
+    }
+}
+
+impl Seek for IbtSource {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        match self {
+            Self::File(source) => source.seek(position),
+            Self::Memory(source) => source.seek(position),
+        }
+    }
+}
 
 /// IBT file reader for cross-platform replay.
 pub struct IbtReader {
-    data: Vec<u8>,
-    current_position: usize,
+    source: Mutex<IbtSource>,
+    source_len: u64,
+    current_position: u64,
     path: Option<PathBuf>,
 
     header: Header,
@@ -57,55 +82,50 @@ pub struct IbtReader {
     // variable_headers_region: VariableHeaderRegion,
     current_frame: usize,
     total_frames: usize,
-    frame_data_start: usize,
+    frame_data_start: u64,
 }
 
 impl IbtReader {
     /// Open and parse an `.ibt` file.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let mut file = File::open(&path).map_err(|source| IRacingSDKError::File {
+        let file = File::open(&path).map_err(|source| IRacingSDKError::File {
             path: path.clone(),
             source,
         })?;
 
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)
-            .map_err(|source| IRacingSDKError::File {
-                path: path.clone(),
-                source,
-            })?;
-
-        Self::from_bytes_with_path(data, Some(path))
+        Self::from_source(IbtSource::File(file), Some(path))
     }
 
     /// Parse owned in-memory `.ibt` data.
     pub fn from_bytes<B: Into<Vec<u8>>>(data: B) -> Result<Self> {
-        Self::from_bytes_with_path(data.into(), None)
+        Self::from_source(IbtSource::Memory(Cursor::new(data.into())), None)
     }
 
-    /// Parses owned `.ibt` data and records its optional source path.
-    ///
-    /// The frame region starts after the latest present metadata region. Its
-    /// frame count includes only complete frames through the end of the input;
-    /// the disk sub-header's record count does not alter those bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the headers, metadata regions, or variable schema
-    /// cannot be parsed and validated from the input.
-    fn from_bytes_with_path(data: Vec<u8>, path: Option<PathBuf>) -> Result<Self> {
-        let mut cursor = std::io::Cursor::new(data.as_slice());
+    fn from_source(mut source: IbtSource, path: Option<PathBuf>) -> Result<Self> {
+        let source_len = source.seek(SeekFrom::End(0)).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "IBT source length",
+                format!("Failed to determine source length: {error}"),
+            )
+        })?;
+        source.seek(SeekFrom::Start(0)).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "IBT source seek",
+                format!("Failed to seek to source start: {error}"),
+            )
+        })?;
 
         // Parse IBT header
-        let header = Header::try_from_reader(&mut cursor)?;
+        let header = Header::try_from_reader(&mut source)?;
         header.validate_ibt()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
-        let disk_header = DiskSubHeader::try_from_reader(&mut cursor)?;
+        let disk_header = DiskSubHeader::try_from_reader(&mut source)?;
 
         let variable_headers_region = VariableHeaderRegion::try_from(&header)?;
-        let variable_headers_range = variable_headers_region.checked_range(data.len())?;
+        let variable_headers_end =
+            Self::validate_region(variable_headers_region.as_region(), source_len)?;
         let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
             IRacingSDKError::parse_error(
                 "Variable headers parse",
@@ -115,7 +135,7 @@ impl IbtReader {
 
         // Extract variable schema
         let variable_schema =
-            extract_variable_schema(&mut cursor, &variable_headers_region, frame_size)?;
+            extract_variable_schema(&mut source, &variable_headers_region, frame_size)?;
 
         let session_info_region = SessionInfoRegion::try_from(&header)?;
 
@@ -123,22 +143,33 @@ impl IbtReader {
         // the offset-based parser contract by starting after the latest present
         // metadata region and deriving complete frames from physical EOF.
         let frame_data_start = if session_info_region.is_valid() {
-            let session_info_range = session_info_region.checked_range(data.len())?;
-            session_info_range.end.max(variable_headers_range.end)
+            let session_info_end =
+                Self::validate_region(session_info_region.as_region(), source_len)?;
+            session_info_end.max(variable_headers_end)
         } else {
-            variable_headers_range.end
+            variable_headers_end
         };
 
         // Calculate total frames based on remaining file data with bounds checking
-        let remaining_bytes =
-            data.len()
-                .checked_sub(frame_data_start)
-                .ok_or_else(|| IRacingSDKError::Parse {
-                    context: "Frame data calculation".to_string(),
-                    details: "Frame data start position exceeds file size".to_string(),
-                })?;
-
-        let total_frames = remaining_bytes.checked_div(frame_size).unwrap_or(0);
+        let remaining_bytes = source_len.checked_sub(frame_data_start).ok_or_else(|| {
+            IRacingSDKError::parse_error(
+                "Frame data calculation",
+                "Frame data start position exceeds file size",
+            )
+        })?;
+        let frame_size_u64 = u64::try_from(frame_size).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Frame data calculation",
+                "Frame size cannot be represented as a source offset",
+            )
+        })?;
+        let total_frames = remaining_bytes.checked_div(frame_size_u64).unwrap_or(0);
+        let total_frames = usize::try_from(total_frames).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Frame data calculation",
+                "Frame count cannot be represented as usize",
+            )
+        })?;
 
         // The writer's record count is advisory for bounds: incomplete files
         // and stale headers can disagree with physical EOF. Never let it
@@ -155,7 +186,8 @@ impl IbtReader {
         }
 
         Ok(IbtReader {
-            data,
+            source: Mutex::new(source),
+            source_len,
             current_position: frame_data_start,
             path,
             header,
@@ -169,6 +201,57 @@ impl IbtReader {
         })
     }
 
+    fn validate_region(region: ByteRegion, source_len: u64) -> Result<u64> {
+        let range = region.as_checked_range()?;
+        let end = u64::try_from(range.end).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT region bounds",
+                "Region end cannot be represented as a source offset",
+            )
+        })?;
+        if end > source_len {
+            return Err(IRacingSDKError::parse_error(
+                "IBT region bounds",
+                format!(
+                    "Region {}..{} exceeds source length {source_len}",
+                    range.start, range.end
+                ),
+            ));
+        }
+        Ok(end)
+    }
+
+    fn read_owned_region(
+        source: &mut IbtSource,
+        source_len: u64,
+        region: ByteRegion,
+    ) -> Result<Vec<u8>> {
+        Self::validate_region(region, source_len)?;
+        let offset = u64::try_from(region.offset).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IBT region read",
+                "Region offset cannot be represented as a source offset",
+            )
+        })?;
+        source.seek(SeekFrom::Start(offset)).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "IBT region seek",
+                format!("Failed to seek to offset {offset}: {error}"),
+            )
+        })?;
+        let mut bytes = vec![0; region.length];
+        source.read_exact(&mut bytes).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "IBT region read",
+                format!(
+                    "Failed to read {} bytes at offset {offset}: {error}",
+                    region.length
+                ),
+            )
+        })?;
+        Ok(bytes)
+    }
+
     /// Returns an owned snapshot of the file's advertised session-information region.
     ///
     /// Returns `None` when the header advertises no region or the region cannot
@@ -178,9 +261,15 @@ impl IbtReader {
             return None;
         }
 
-        let bytes = self.bytes_at_region(self.session_info_region.as_region());
+        let mut source = self.source.lock().ok()?;
+        let bytes = Self::read_owned_region(
+            &mut source,
+            self.source_len,
+            self.session_info_region.as_region(),
+        )
+        .ok()?;
 
-        Some(SessionInfoBuffer::from_checked_region(bytes))
+        Some(SessionInfoBuffer::from_checked_region(&bytes))
     }
 
     /// Returns decoded session-information text with invalid control characters removed.
@@ -249,7 +338,7 @@ impl IbtReader {
     /// # Errors
     ///
     /// Returns a parse error if `frame_number` is outside the file's frame range
-    /// or its byte position cannot be represented by `usize`.
+    /// or its byte offset overflows the source address space.
     pub fn seek_to_frame(&mut self, frame_number: usize) -> Result<()> {
         if frame_number >= self.total_frames {
             return Err(IRacingSDKError::Parse {
@@ -262,14 +351,22 @@ impl IbtReader {
         }
 
         // Calculate position for frame with checked arithmetic
-        let frame_size = self.header.buffer_length as usize;
-        let frame_byte_offset =
-            frame_number
-                .checked_mul(frame_size)
-                .ok_or_else(|| IRacingSDKError::Parse {
-                    context: "Frame seek".to_string(),
-                    details: "Frame offset calculation overflowed".to_string(),
-                })?;
+        let requested_frame = frame_number;
+        let frame_size = u64::try_from(self.header.buffer_length).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Frame seek",
+                "Frame size cannot be represented as a source offset",
+            )
+        })?;
+        let frame_number = u64::try_from(frame_number).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Frame seek",
+                "Frame number cannot be represented as a source offset",
+            )
+        })?;
+        let frame_byte_offset = frame_number.checked_mul(frame_size).ok_or_else(|| {
+            IRacingSDKError::parse_error("Frame seek", "Frame offset calculation overflowed")
+        })?;
 
         let frame_offset = self
             .frame_data_start
@@ -280,7 +377,7 @@ impl IbtReader {
             })?;
 
         self.current_position = frame_offset;
-        self.current_frame = frame_number;
+        self.current_frame = requested_frame;
         Ok(())
     }
 
@@ -305,23 +402,45 @@ impl IbtReader {
             return Ok(None);
         }
 
-        let frame_size = self.header.buffer_length as usize;
+        let frame_size = usize::try_from(self.header.buffer_length)
+            .map_err(|_| IRacingSDKError::parse_error("Frame reading", "Invalid frame size"))?;
         let start_pos = self.current_position;
-        let end_pos = start_pos + frame_size;
+        let frame_size_u64 = u64::try_from(frame_size).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "Frame reading",
+                "Frame size cannot be represented as a source offset",
+            )
+        })?;
+        let end_pos = start_pos.checked_add(frame_size_u64).ok_or_else(|| {
+            IRacingSDKError::parse_error("Frame reading", "Frame end calculation overflowed")
+        })?;
 
-        if end_pos > self.data.len() {
+        if end_pos > self.source_len {
             return Err(IRacingSDKError::Parse {
                 context: "Frame reading".to_string(),
                 details: format!(
                     "Frame {} extends beyond data bounds ({} > {})",
-                    self.current_frame,
-                    end_pos,
-                    self.data.len()
+                    self.current_frame, end_pos, self.source_len
                 ),
             });
         }
 
-        let frame_data = self.data[start_pos..end_pos].to_vec();
+        let source = self.source.get_mut().map_err(|_| {
+            IRacingSDKError::parse_error("Frame reading", "IBT source lock is poisoned")
+        })?;
+        source.seek(SeekFrom::Start(start_pos)).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "Frame seek",
+                format!("Failed to seek to frame {}: {error}", self.current_frame),
+            )
+        })?;
+        let mut frame_data = vec![0; frame_size];
+        source.read_exact(&mut frame_data).map_err(|error| {
+            IRacingSDKError::parse_error(
+                "Frame reading",
+                format!("Failed to read frame {}: {error}", self.current_frame),
+            )
+        })?;
         let tick_count = self.current_frame as u32;
         let session_version = self.header.session_info_update as u32;
 
@@ -339,18 +458,14 @@ impl SchemaProvider for IbtReader {
     }
 }
 
-impl ByteParser for IbtReader {
-    fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
-        &self.data[region.as_range()]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::require_smallest_ibt_fixture;
     use anyhow::{Context, Result, ensure};
 
+    use std::fs::OpenOptions;
+    use std::io::{Seek, SeekFrom, Write};
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
 
@@ -369,6 +484,26 @@ mod tests {
         assert_eq!(reader.current_frame(), 0);
         assert!(reader.total_frames() > 0);
         assert!(reader.variable_count() > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn open_keeps_frames_file_backed() -> Result<()> {
+        let temporary_directory = tempfile::tempdir()?;
+        let temporary_file = temporary_directory.path().join("file-backed.ibt");
+        std::fs::copy(fixture_path()?, &temporary_file)?;
+        let mut reader = IbtReader::open(&temporary_file)?;
+
+        let replacement = 0xA5;
+        let mut file = OpenOptions::new().write(true).open(&temporary_file)?;
+        file.seek(SeekFrom::Start(reader.frame_data_start))?;
+        file.write_all(&[replacement])?;
+        file.flush()?;
+
+        let (frame, _, _) = reader
+            .read_next_frame()?
+            .context("fixture should contain a frame")?;
+        assert_eq!(frame[0], replacement);
         Ok(())
     }
 
