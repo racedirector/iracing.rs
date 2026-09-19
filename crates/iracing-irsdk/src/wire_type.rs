@@ -7,7 +7,7 @@
 
 use std::io::Write;
 
-use crate::{IRacingSDKError, Result};
+use crate::{Error, Result};
 
 /// A fixed-size type that can be copied directly from its iRacing wire representation.
 ///
@@ -46,12 +46,12 @@ pub unsafe trait WireType: Copy + Sized {
     ///
     /// # Errors
     ///
-    /// Returns [`IRacingSDKError::WireSize`] when `bytes.len()` is not exactly
+    /// Returns [`Error::WireSize`] when `bytes.len()` is not exactly
     /// [`WIRE_SIZE`](Self::WIRE_SIZE).
     #[inline]
     fn read_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != Self::WIRE_SIZE {
-            return Err(IRacingSDKError::WireSize {
+            return Err(Error::WireSize {
                 expected: Self::WIRE_SIZE,
                 actual: bytes.len(),
             });

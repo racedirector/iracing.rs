@@ -19,7 +19,7 @@ test-data/
 
 The unpublished `test-fixtures` crate defines profiles and writes both `.ibt`
 and session YAML files. It constructs the 112-byte SDK header, 32-byte disk
-sub-header, and 144-byte variable headers through `iracing-sdk` wire types.
+sub-header, and 144-byte variable headers through `iracing-irsdk` wire types.
 Its verifier checks manifest invariants, hashes, headers, frame geometry,
 variables, companion YAML, and complete parsing through `IbtReader`.
 
@@ -89,8 +89,8 @@ cargo test --workspace --all-targets
 ```
 
 The docs workflow conditionally runs doctests, rustdoc with warnings denied, and
-examples/binaries checks for `iracing-sdk`, `iracing-sdk-derive`, and
-`iracing-simulation` on Ubuntu and Windows.
+examples/binaries checks for `iracing-irsdk`, `iracing-sdk`,
+`iracing-sdk-derive`, and `iracing-simulation` on Ubuntu and Windows.
 
 Choose checks by affected boundary, but before pushing broad changes match the
 workflow rather than relying on a narrower local test.

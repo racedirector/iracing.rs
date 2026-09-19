@@ -6,9 +6,6 @@
 //! corresponding methods on each bitmask test for any matching bit, while
 //! `has_all` tests for every bit in a mask.
 
-use super::VariableType;
-use crate::{BitField, IRacingSDKError, VarData, VariableInfo};
-
 use super::macros::sdk_bitmask;
 use type_layout::TypeLayout;
 
@@ -483,7 +480,7 @@ impl IncidentFlags {
     /// Decodes both packed fields without inferring severity.
     ///
     /// ```
-    /// use iracing_sdk::irsdk::{IncidentFlags, IncidentPenalty, IncidentReport};
+    /// use iracing_irsdk::{IncidentFlags, IncidentPenalty, IncidentReport};
     ///
     /// let flags = IncidentFlags::from_bits_retain(0x8000_0408);
     /// let incident = flags.classify();
@@ -520,21 +517,6 @@ impl From<crate::BitField> for IncidentFlags {
 impl From<IncidentFlags> for crate::BitField {
     fn from(value: IncidentFlags) -> Self {
         Self::new(value.bits())
-    }
-}
-
-impl VarData for IncidentFlags {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        match info.data_type {
-            VariableType::BitField => <BitField as VarData>::from_bytes(data, info).map(Self::from),
-            VariableType::Integer => {
-                <i32 as VarData>::from_bytes(data, info).map(|value| Self::from(value as u32))
-            }
-            actual => Err(IRacingSDKError::type_conversion(
-                "BitField or Int32",
-                actual,
-            )),
-        }
     }
 }
 
@@ -576,19 +558,7 @@ impl schemars::JsonSchema for IncidentFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BitField, VarData, VariableInfo, irsdk::VariableType};
-
-    fn variable_info(data_type: VariableType) -> VariableInfo {
-        VariableInfo {
-            name: "PlayerIncidents".to_owned(),
-            data_type,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
-    }
+    use crate::BitField;
 
     #[test]
     fn bitmask_macro_provides_the_existing_structural_api() {
@@ -609,25 +579,12 @@ mod tests {
     }
 
     #[test]
-    fn bitmask_macro_provides_numeric_and_telemetry_conversions() {
+    fn bitmask_macro_provides_numeric_conversions() {
         let flags = SessionFlags::from(SessionFlags::GREEN.bits());
         let bitfield = BitField::from(flags);
         assert_eq!(bitfield.value(), SessionFlags::GREEN.bits());
         assert_eq!(SessionFlags::from(bitfield), flags);
         assert_eq!(u32::from(flags), SessionFlags::GREEN.bits());
-
-        let info = VariableInfo {
-            name: "SessionFlags".to_owned(),
-            data_type: VariableType::BitField,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        };
-        let decoded = SessionFlags::from_bytes(&SessionFlags::GREEN.bits().to_le_bytes(), &info)
-            .expect("decode SDK bitmask");
-        assert_eq!(decoded, SessionFlags::GREEN);
     }
 
     #[cfg(feature = "codegen")]
@@ -733,34 +690,6 @@ mod tests {
     }
 
     #[test]
-    fn incident_flags_decode_bitfield_and_int32_storage() {
-        const RAW: u32 = 0x8000_0408;
-
-        let from_bitfield =
-            IncidentFlags::from_bytes(&RAW.to_le_bytes(), &variable_info(VariableType::BitField))
-                .expect("decode IncidentFlags from BitField storage");
-        let from_int32 = IncidentFlags::from_bytes(
-            &(RAW as i32).to_le_bytes(),
-            &variable_info(VariableType::Integer),
-        )
-        .expect("decode IncidentFlags from Int32 storage");
-
-        assert_eq!(from_bitfield.bits(), RAW);
-        assert_eq!(from_int32.bits(), RAW);
-        assert_eq!(from_int32.report_bits(), 8);
-        assert_eq!(from_int32.penalty_bits(), 4);
-        for flags in [from_bitfield, from_int32] {
-            assert_eq!(
-                flags.classify(),
-                IncidentClassification {
-                    report: IncidentReport::CollisionWithCar,
-                    penalty: IncidentPenalty::FourX,
-                }
-            );
-        }
-    }
-
-    #[test]
     fn incident_classification_preserves_every_field_combination() {
         let reports = [
             IncidentReport::NoReport,
@@ -817,32 +746,6 @@ mod tests {
 
         assert_eq!(incident.report_bits(), 0x00);
         assert_eq!(incident.penalty_bits(), 0x01);
-    }
-
-    #[test]
-    fn incident_flags_reject_other_storage_types() {
-        let error =
-            IncidentFlags::from_bytes(&0u32.to_le_bytes(), &variable_info(VariableType::Float))
-                .expect_err("UInt32 must not decode as IncidentFlags");
-
-        assert!(matches!(
-            error,
-            crate::IRacingSDKError::TypeConversion { .. }
-        ));
-        assert!(error.to_string().contains("BitField or Int32"));
-    }
-
-    #[test]
-    fn adapter_validation_accepts_incident_storage_types() {
-        for data_type in [VariableType::BitField, VariableType::Integer] {
-            assert_eq!(
-                crate::adapters::telemetry_type_mismatch_details::<IncidentFlags>(&variable_info(
-                    data_type
-                ))
-                .expect("probe IncidentFlags compatibility"),
-                None
-            );
-        }
     }
 
     #[cfg(feature = "codegen")]

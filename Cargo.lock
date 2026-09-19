@@ -989,6 +989,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
+name = "iracing-irsdk"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "thiserror",
+ "type-layout",
+]
+
+[[package]]
 name = "iracing-lifecycle-monitor"
 version = "0.1.0"
 dependencies = [
@@ -1011,6 +1023,7 @@ dependencies = [
  "csv",
  "encoding_rs",
  "futures",
+ "iracing-irsdk",
  "iracing-sdk-derive",
  "pin-project-lite",
  "proptest",
@@ -2135,6 +2148,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "iracing-irsdk",
  "iracing-sdk",
  "rand",
  "rand_chacha",

@@ -12,6 +12,10 @@ workspace applications
   └─ iracing-lifecycle-monitor ───► iracing-sdk
                                 └─► iracing-simulation
 iracing-sdk ── optional derive ───► iracing-sdk-derive
+      │
+      └───────────────────────────► iracing-irsdk
+test-fixtures ────────────────────► iracing-irsdk
+      └───────────────────────────► iracing-sdk
 ```
 
 `iracing-sdk-derive` has a dev-dependency back on `iracing-sdk` for integration
@@ -19,20 +23,40 @@ coverage. That is a test-time relationship, not a runtime layering reversal.
 
 ## Crate responsibilities
 
+### `iracing-irsdk`
+
+Owns the native SDK contract that can be understood without knowing a data
+source or runtime:
+
+- fixed-layout `Header`, `DiskSubHeader`, `VariableBuffer`, and
+  `VariableHeader` structures;
+- intrinsic fixed-size wire decoding through `WireType`;
+- `VariableType`, constants, enum discriminants, flags, packed fields, and
+  broadcast command values;
+- optional schema metadata for those primitive definitions.
+
+It does not navigate IBT files, access Windows shared memory, build telemetry
+schemas or frames, parse session YAML, or orchestrate providers and streams.
+`iracing-sdk` re-exports the complete crate through `iracing_sdk::irsdk` for
+source compatibility.
+
 ### `iracing-sdk`
 
-Owns the iRacing data and command vocabulary:
+Owns source parsing, transport, schemas, and runtime behavior built on the wire
+contract:
 
-- `.ibt` wire-format parsing and random/sequential file access.
+- `.ibt` parsing, navigation, and random/sequential file access.
 - Telemetry variable schemas, frame packets, dynamic values, typed decoding,
-  bitfields, enums, and incident helpers.
+  and integration of SDK enums/flags with `VarData`.
 - Provider and connection abstractions for recorded and live telemetry.
 - Background telemetry task orchestration and source-specific policies.
 - Session YAML cleanup, typed deserialization, caching, and schema discovery.
 - Windows shared-memory mapping, update waiting, and broadcast message packing.
 - CLI tools, schema generators, and crate-level examples.
 
-Code that understands byte layout or Win32 iRacing transport belongs here.
+Code that understands a source, schema, session document, or runtime belongs
+here. Win32 transport remains here even though the portable command values it
+sends belong in `iracing-irsdk`.
 
 ### `iracing-sdk-derive`
 
@@ -111,7 +135,10 @@ Simulation
 
 ## Placement rules
 
-- Put byte decoding and variable type rules in `iracing-sdk`, not consumers.
+- Put intrinsic fixed-layout decoding and native SDK definitions in
+  `iracing-irsdk`.
+- Put source framing, file navigation, shared-memory transport, schema
+  construction, session parsing, and runtime behavior in `iracing-sdk`.
 - Put public protocol changes in `broadcast.proto` before generated/service code.
 - Put orchestration that can be tested with fake ports in `broadcast_app`, not
   tonic handlers or Win32 adapters.

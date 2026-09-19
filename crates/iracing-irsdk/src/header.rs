@@ -6,7 +6,7 @@ use super::{
     constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
     error::{header_validation_error, mismatched_version_error},
 };
-use crate::{IRacingSDKError, Result};
+use crate::{Error, Result};
 
 /// An iRacing SDK header.
 #[repr(C)]
@@ -59,7 +59,7 @@ impl Header {
         let mut buffer = [0u8; Self::WIRE_SIZE];
 
         reader.read_exact(&mut buffer).map_err(|e| {
-            IRacingSDKError::parse_error(
+            Error::parse(
                 "Header reading",
                 format!("Failed to read {} header bytes: {}", Header::WIRE_SIZE, e),
             )
@@ -444,7 +444,7 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            IRacingSDKError::Parse { .. } => {}
+            Error::Parse { .. } => {}
             other => panic!("Expected Parse error, got {:?}", other),
         }
     }
@@ -453,9 +453,6 @@ mod tests {
     fn header_validation_rejects_unsupported_version() {
         let mut header = valid_live_header();
         header.version = 999;
-        assert!(matches!(
-            header.validate(),
-            Err(IRacingSDKError::Version { .. })
-        ));
+        assert!(matches!(header.validate(), Err(Error::Version { .. })));
     }
 }

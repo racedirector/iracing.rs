@@ -31,6 +31,11 @@
 //! ```no_run
 //! use iracing_sdk_derive::IRacingTelemetryFrame;
 //!
+//! fn session_dq_scoring_invalid(bits: iracing_sdk::BitField) -> bool {
+//!     iracing_sdk::irsdk::SessionFlags::from(bits)
+//!         .has_disqualification_scoring_invalid()
+//! }
+//!
 //! #[derive(IRacingTelemetryFrame, Debug)]
 //! struct CarData {
 //!     #[field_name = "Speed"]
@@ -51,13 +56,13 @@
 //!
 //!     #[bitfield(
 //!         name = "SessionFlags",
-//!         has = "iracing_sdk::SessionFlags::GREEN.bits()"
+//!         has = "iracing_sdk::irsdk::SessionFlags::GREEN.bits()"
 //!     )]
 //!     is_green: bool,
 //!
 //!     #[bitfield_map(
 //!         name = "SessionFlags",
-//!         decoder = "iracing_sdk::session_dq_scoring_invalid"
+//!         decoder = "session_dq_scoring_invalid"
 //!     )]
 //!     dq_scoring_invalid: bool,
 //! }

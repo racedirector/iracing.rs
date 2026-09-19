@@ -32,10 +32,7 @@ impl SessionInfoPayload<'_> {
             .split(|&byte| byte == b'\n')
             .filter(|line| !line.trim_ascii().is_empty() && !line.trim_ascii().starts_with(b"#"));
 
-        if lines
-            .find(|line| line.trim_ascii_end() == b"WeekendInfo:")
-            .is_none()
-        {
+        if !lines.any(|line| line.trim_ascii_end() == b"WeekendInfo:") {
             return SessionInfoEncoding::Unknown;
         }
 

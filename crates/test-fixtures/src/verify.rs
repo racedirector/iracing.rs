@@ -8,11 +8,8 @@
 use std::{fs, io::Cursor, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
-use iracing_sdk::{
-    SchemaProvider,
-    ibt::IbtReader,
-    irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType},
-};
+use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType};
+use iracing_sdk::{SchemaProvider, ibt::IbtReader};
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 

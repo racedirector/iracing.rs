@@ -2,16 +2,16 @@
 //! Deterministic IBT fixture generation and verification for this workspace.
 //!
 //! This unpublished crate owns the canonical generated files under
-//! `test-data/ibt` and `test-data/session-yaml`. It uses `iracing-sdk` as the
+//! `test-data/ibt` and `test-data/session-yaml`. It uses `iracing-irsdk` as the
 //! source of truth for SDK wire structures rather than duplicating their
 //! layouts.
 //!
 //! # Layout invariants
 //!
-//! An IBT fixture begins with a 112-byte [`iracing_sdk::irsdk::Header`], followed
-//! by a 32-byte [`iracing_sdk::irsdk::DiskSubHeader`]. The complete IBT preamble
+//! An IBT fixture begins with a 112-byte [`iracing_irsdk::Header`], followed
+//! by a 32-byte [`iracing_irsdk::DiskSubHeader`]. The complete IBT preamble
 //! is therefore 144 bytes, which is also the first variable-header offset. Each
-//! [`iracing_sdk::irsdk::VariableHeader`] is 144 bytes. Session YAML follows the
+//! [`iracing_irsdk::VariableHeader`] is 144 bytes. Session YAML follows the
 //! variable-header array, and fixed-size telemetry frames follow the YAML.
 //!
 //! The distinction between the 112-byte main header and 144-byte IBT preamble is

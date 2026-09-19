@@ -2,7 +2,7 @@ use std::io::Read;
 use type_layout::TypeLayout;
 
 use super::WireType;
-use crate::{IRacingSDKError, Result};
+use crate::{Error, Result};
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
@@ -55,7 +55,7 @@ impl DiskSubHeader {
         let mut buffer = [0u8; Self::WIRE_SIZE];
 
         reader.read_exact(&mut buffer).map_err(|e| {
-            IRacingSDKError::parse_error(
+            Error::parse(
                 "Header reading",
                 format!("Failed to read {} header bytes: {}", Self::WIRE_SIZE, e),
             )
