@@ -14,7 +14,7 @@ This companion to [the IBT specification](ibt-spec.md) records evidence from the
 | `profile_medium` | 10 | 1,584 | 1,893 | 64 | 24 |
 | `profile_large` | 13 | 2,016 | 2,317 | 96 | 48 |
 
-All nine have SDK version 2, `tickRate = 60`, `status = 1`, `numBuf = 1`, `sessionInfoUpdate = 0`, and `varHeaderOffset = 144`. Variable headers precede session text without a gap; frames start at the end of session text. Each frame region has no partial tail, and its computed frame count equals `sessionRecordCount`. These files do not exercise session-before-variables, gaps, absent regions, partial frames, or mismatched record counts.
+All nine have SDK version 2, `tickRate = 60`, `status = 1`, `numBuf = 1`, `sessionInfoUpdate = 0`, and `varHeaderOffset = 144`. Variable headers precede session text without a gap; frames start at the latest metadata end (the end of session text in every capture). Each frame region has no partial tail, and its EOF-derived complete-frame count equals `sessionRecordCount`. These files therefore corroborate the compatibility rule but do not prove all legal region orderings. They do not exercise session-before-variables, gaps, absent regions, partial frames, or mismatched record counts.
 
 The six real captures set `varBuf[0].bufOffset` to the computed frame start. The generated fixtures set it to zero. Real `varBuf[0].tickCount` values do not equal final record counts. Five real captures have non-UTF-8 session bytes and no `Encoding` declaration. Interlagos declares `Encoding: UTF8` and is valid UTF-8. The generated sessions are ASCII without an encoding declaration. Real sessions start with `---` and end with `...\n`; generated ones omit those markers.
 

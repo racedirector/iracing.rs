@@ -7,6 +7,68 @@ use crate::{
     irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType},
 };
 use anyhow::{Context, Result, ensure};
+use std::{collections::BTreeSet, fs, path::PathBuf};
+
+fn representative_ibt_paths() -> Result<Vec<PathBuf>> {
+    let test_data = crate::test_utils::get_test_data_dir()
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let mut paths = BTreeSet::new();
+
+    for directory in [test_data.clone(), test_data.join("ibt")] {
+        for entry in fs::read_dir(directory)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|extension| extension == "ibt") {
+                paths.insert(path);
+            }
+        }
+    }
+
+    Ok(paths.into_iter().collect())
+}
+
+#[test]
+fn representative_fixtures_follow_frame_region_semantics() -> Result<()> {
+    let paths = representative_ibt_paths()?;
+    ensure!(!paths.is_empty(), "Expected representative IBT fixtures");
+
+    for path in paths {
+        let mut reader = std::io::BufReader::new(
+            fs::File::open(&path).with_context(|| format!("Opening {}", path.display()))?,
+        );
+        let source_len = usize::try_from(reader.get_ref().metadata()?.len())?;
+        let header = Header::try_from_reader(&mut reader)?;
+        let disk_header = DiskSubHeader::try_from_reader(&mut reader)?;
+        let variable_end = VariableHeaderRegion::try_from(&header)?
+            .checked_range(source_len)?
+            .end;
+        let session_region = crate::SessionInfoRegion::try_from(&header)?;
+        let frame_start = if session_region.is_valid() {
+            variable_end.max(session_region.checked_range(source_len)?.end)
+        } else {
+            variable_end
+        };
+        let frame_size = usize::try_from(header.buffer_length)?;
+        let telemetry_bytes = source_len
+            .checked_sub(frame_start)
+            .with_context(|| format!("Frame start exceeds source length for {}", path.display()))?;
+
+        ensure!(frame_size > 0, "{} has zero frame size", path.display());
+        assert_eq!(
+            telemetry_bytes % frame_size,
+            0,
+            "{} has a partial trailing frame",
+            path.display()
+        );
+        assert_eq!(
+            telemetry_bytes / frame_size,
+            usize::try_from(disk_header.record_count)?,
+            "{} record_count disagrees with EOF-derived frame count",
+            path.display()
+        );
+    }
+
+    Ok(())
+}
 
 #[test]
 fn test_generated_fixture_headers_match_manifest() -> Result<()> {
