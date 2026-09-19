@@ -20,7 +20,10 @@ pub struct DiskSubHeader {
     pub end_time: f64,
     /// Number of laps completed during the recorded session.
     pub lap_count: i32,
-    /// Total number of telemetry frames (records) in the file.
+    /// Writer-reported number of telemetry records in a finalized file.
+    ///
+    /// Readers should use this as a consistency check. Frame bounds come from
+    /// the validated metadata regions, frame size, and physical file length.
     pub record_count: i32,
 }
 

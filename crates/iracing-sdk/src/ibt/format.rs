@@ -7,11 +7,17 @@
 //!
 //! IBT (iRacing Binary Telemetry) files contain recorded telemetry data from iRacing sessions:
 //!
-//! 1. **Main Header** (144 bytes) - `irsdk_header` compatible structure
+//! 1. **Main Header** (112 bytes) - `irsdk_header` compatible structure
 //! 2. **Disk Sub-Header** (32 bytes) - IBT-specific metadata with timing and record counts
 //! 3. **Session Info** - YAML session configuration (optional)
 //! 4. **Variable Headers** - Array of variable definitions
 //! 5. **Frame Data** - Sequential telemetry samples
+//!
+//! Region offsets are absolute. The telemetry region begins after the latest
+//! advertised metadata-region end; its complete-frame count is derived from
+//! physical EOF and the frame size. The disk sub-header's record count is a
+//! consistency check, not an alternate source of frame bounds. See the
+//! repository's `docs/ibt-spec.md` for the evidence and compatibility rules.
 //!
 //! ## Performance Characteristics
 //!
