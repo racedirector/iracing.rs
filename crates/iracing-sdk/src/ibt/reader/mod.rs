@@ -67,10 +67,13 @@ impl Seek for IbtSource {
 }
 
 /// IBT file reader for cross-platform replay.
+///
+/// After construction and between successful frame operations, the source
+/// cursor is positioned at
+/// `frame_data_start + current_frame * frame_size`. Metadata access uses owned
+/// snapshots and does not disturb that cursor.
 pub struct IbtReader {
     source: IbtSource,
-    source_len: u64,
-    current_position: u64,
     path: Option<PathBuf>,
 
     header: Header,
@@ -82,6 +85,7 @@ pub struct IbtReader {
     current_frame: usize,
     total_frames: usize,
     frame_data_start: u64,
+    frame_size: usize,
 }
 
 impl IbtReader {
@@ -157,6 +161,15 @@ impl IbtReader {
             None
         };
 
+        source
+            .seek(SeekFrom::Start(frame_data_start))
+            .map_err(|error| {
+                IRacingSDKError::parse_error(
+                    "Frame data seek",
+                    format!("Failed to seek to first frame at {frame_data_start}: {error}"),
+                )
+            })?;
+
         // Calculate total frames based on remaining file data with bounds checking
         let remaining_bytes = source_len.checked_sub(frame_data_start).ok_or_else(|| {
             IRacingSDKError::parse_error(
@@ -194,8 +207,6 @@ impl IbtReader {
 
         Ok(IbtReader {
             source,
-            source_len,
-            current_position: frame_data_start,
             path,
             header,
             disk_header,
@@ -203,6 +214,7 @@ impl IbtReader {
             current_frame: 0,
             total_frames,
             frame_data_start,
+            frame_size,
             // variable_headers_region,
             session_info,
         })
@@ -348,7 +360,7 @@ impl IbtReader {
 
         // Calculate position for frame with checked arithmetic
         let requested_frame = frame_number;
-        let frame_size = u64::try_from(self.header.buffer_length).map_err(|_| {
+        let frame_size = u64::try_from(self.frame_size).map_err(|_| {
             IRacingSDKError::parse_error(
                 "Frame seek",
                 "Frame size cannot be represented as a source offset",
@@ -372,7 +384,14 @@ impl IbtReader {
                 details: "Frame position calculation overflowed".to_string(),
             })?;
 
-        self.current_position = frame_offset;
+        self.source
+            .seek(SeekFrom::Start(frame_offset))
+            .map_err(|error| {
+                IRacingSDKError::parse_error(
+                    "Frame seek",
+                    format!("Failed to seek to frame {requested_frame}: {error}"),
+                )
+            })?;
         self.current_frame = requested_frame;
         Ok(())
     }
@@ -393,55 +412,37 @@ impl IbtReader {
             return Ok(None);
         }
 
-        // Handle IBT files with no telemetry data
-        if self.header.buffer_length == 0 {
-            return Ok(None);
-        }
-
-        let frame_size = usize::try_from(self.header.buffer_length)
-            .map_err(|_| IRacingSDKError::parse_error("Frame reading", "Invalid frame size"))?;
-        let start_pos = self.current_position;
-        let frame_size_u64 = u64::try_from(frame_size).map_err(|_| {
+        let frame_size_u64 = u64::try_from(self.frame_size).map_err(|_| {
             IRacingSDKError::parse_error(
                 "Frame reading",
                 "Frame size cannot be represented as a source offset",
             )
         })?;
-        let end_pos = start_pos.checked_add(frame_size_u64).ok_or_else(|| {
-            IRacingSDKError::parse_error("Frame reading", "Frame end calculation overflowed")
-        })?;
-
-        if end_pos > self.source_len {
-            return Err(IRacingSDKError::Parse {
-                context: "Frame reading".to_string(),
-                details: format!(
-                    "Frame {} extends beyond data bounds ({} > {})",
-                    self.current_frame, end_pos, self.source_len
-                ),
-            });
-        }
-
-        self.source
-            .seek(SeekFrom::Start(start_pos))
-            .map_err(|error| {
-                IRacingSDKError::parse_error(
-                    "Frame seek",
-                    format!("Failed to seek to frame {}: {error}", self.current_frame),
-                )
-            })?;
-        let mut frame_data = vec![0; frame_size];
-        self.source.read_exact(&mut frame_data).map_err(|error| {
+        let frame_number = u64::try_from(self.current_frame).map_err(|_| {
             IRacingSDKError::parse_error(
                 "Frame reading",
-                format!("Failed to read frame {}: {error}", self.current_frame),
+                "Frame number cannot be represented as a source offset",
             )
         })?;
+        let frame_offset = frame_number
+            .checked_mul(frame_size_u64)
+            .and_then(|offset| self.frame_data_start.checked_add(offset))
+            .ok_or_else(|| {
+                IRacingSDKError::parse_error("Frame reading", "Frame position overflowed")
+            })?;
+        let mut frame_data = vec![0; self.frame_size];
+        if let Err(error) = self.source.read_exact(&mut frame_data) {
+            let _ = self.source.seek(SeekFrom::Start(frame_offset));
+            return Err(IRacingSDKError::parse_error(
+                "Frame reading",
+                format!("Failed to read frame {}: {error}", self.current_frame),
+            ));
+        }
         let tick_count = self.current_frame as u32;
         let session_version = self.header.session_info_update as u32;
 
         // Advance to next frame
         self.current_frame += 1;
-        self.current_position = end_pos;
 
         Ok(Some((frame_data, tick_count, session_version)))
     }
@@ -524,6 +525,41 @@ mod tests {
             reader.session_yaml().as_deref(),
             Some(expected_yaml.as_str())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn source_cursor_tracks_the_next_logical_frame() -> Result<()> {
+        let mut reader = IbtReader::open(fixture_path()?)?;
+        assert_source_cursor(&mut reader)?;
+
+        reader
+            .read_next_frame()?
+            .context("fixture should contain a first frame")?;
+        assert_source_cursor(&mut reader)?;
+
+        let target = reader.total_frames() / 2;
+        reader.seek_to_frame(target)?;
+        assert_source_cursor(&mut reader)?;
+
+        let position_before_metadata = reader.source.stream_position()?;
+        reader
+            .session_yaml()
+            .context("fixture should contain session metadata")?;
+        assert_eq!(reader.source.stream_position()?, position_before_metadata);
+
+        reader
+            .read_next_frame()?
+            .context("fixture should contain the sought frame")?;
+        assert_source_cursor(&mut reader)?;
+        Ok(())
+    }
+
+    fn assert_source_cursor(reader: &mut IbtReader) -> Result<()> {
+        let frame = u64::try_from(reader.current_frame)?;
+        let frame_size = u64::try_from(reader.frame_size)?;
+        let expected = reader.frame_data_start + frame * frame_size;
+        assert_eq!(reader.source.stream_position()?, expected);
         Ok(())
     }
 
