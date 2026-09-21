@@ -161,10 +161,25 @@ an active iRacing session.
 
 The benchmark workflow executes every deterministic Criterion target plus the
 allocation diagnostic. Relevant pull requests and pushes to `main` use
-Criterion's quick mode as a runtime smoke test. A weekly schedule and manual
-`full` dispatch use normal statistical sampling and retain Criterion reports as
-workflow artifacts for 14 days. Use manual `quick` dispatches for inexpensive
-ad-hoc validation.
+Criterion's quick mode as a runtime smoke test. Quick results are not statistical
+regression evidence. A separate pull-request job runs `ibt_reader_performance`
+with normal statistical sampling at the PR's base SHA and head SHA on the same
+runner. It saves the base measurements as a Criterion baseline, compares the
+head against it, and puts Criterion's estimates, confidence intervals, p-values,
+and assessments in the job summary. This comparison is informational: measured
+slowdowns do not fail the PR. Its full Criterion report is retained as a workflow
+artifact for 14 days.
+
+The comparison job warns when the benchmark definition, support code, checked-in
+recordings, fixture generator, or relevant Cargo configuration differs between
+revisions. In that case, the reported delta may describe different experiments
+and should not be interpreted as a reader performance change without review.
+Even with identical inputs, shared-runner load and filesystem cache warmth can
+affect the measurements; repeat a surprising result before drawing conclusions.
+
+A weekly schedule and manual `full` dispatch still run normal statistical
+sampling for all deterministic Criterion targets and retain their reports for
+14 days. Use manual `quick` dispatches for inexpensive ad-hoc validation.
 
 ## Comparing results
 

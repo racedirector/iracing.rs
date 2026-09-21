@@ -4,9 +4,13 @@ on:
   pull_request:
     paths:
       - ".github/workflows/benchmarks.yml"
+      - ".cargo/config.toml"
+      - ".gitattributes"
       - "Cargo.lock"
       - "Cargo.toml"
+      - "crates/iracing-irsdk/**"
       - "crates/iracing-sdk/**"
+      - "crates/test-fixtures/**"
       - "test-data/**"
   push:
     branches:
@@ -76,6 +80,145 @@ jobs:
         with:
           name: criterion-${{ matrix.benchmark }}-${{ github.run_id }}
           path: target/criterion
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ibt-reader-comparison:
+    name: ibt_reader_performance (PR base vs head)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Both checkouts use this target directory so Criterion's named baseline
+      # survives the revision switch. Cargo rebuilds changed sources as needed.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/ibt-reader-target
+    steps:
+      - name: Checkout PR base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: pr-base
+          lfs: true
+
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr-head
+          lfs: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check benchmark inputs and LFS fixtures
+        shell: bash
+        run: |
+          for checkout in pr-base pr-head; do
+            for fixture in \
+              'test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt' \
+              'test-data/ibt/b_mustang_bristol_race.ibt'; do
+              if [[ ! -f "$checkout/$fixture" || $(wc -c < "$checkout/$fixture") -lt 1000000 ]]; then
+                echo "Missing or unhydrated IBT fixture: $checkout/$fixture" >&2
+                exit 1
+              fi
+            done
+          done
+
+          # Flag changes to the experiment or its inputs. Reader implementation
+          # changes are expected; these paths affect comparability of the runs.
+          for input in \
+            crates/iracing-sdk/benches/ibt_reader_performance.rs \
+            crates/iracing-sdk/benches/support \
+            crates/test-fixtures/src \
+            'test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt' \
+            test-data/ibt/b_mustang_bristol_race.ibt \
+            test-data/ibt/manifest.json \
+            .gitattributes \
+            .cargo/config.toml \
+            Cargo.toml \
+            Cargo.lock \
+            crates/iracing-sdk/Cargo.toml; do
+            if [[ -d "pr-base/$input" || -d "pr-head/$input" ]]; then
+              if ! diff -qr "pr-base/$input" "pr-head/$input" >/dev/null; then
+                echo "$input" >> "$RUNNER_TEMP/ibt-changed-inputs.txt"
+              fi
+            elif ! cmp -s "pr-base/$input" "pr-head/$input"; then
+              echo "$input" >> "$RUNNER_TEMP/ibt-changed-inputs.txt"
+            fi
+          done
+
+      - name: Measure PR base
+        working-directory: pr-base
+        shell: bash
+        run: |
+          rm -rf "$CARGO_TARGET_DIR/criterion"
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-base.log"
+
+      - name: Compare PR head with base
+        id: compare
+        working-directory: pr-head
+        shell: bash
+        run: |
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-head.log"
+
+      - name: Summarize comparison
+        if: always()
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          COMPARISON_OUTCOME: ${{ steps.compare.outcome }}
+        run: |
+          {
+            echo '## IBT reader benchmark: PR base vs head'
+            echo
+            echo "Base: \`$BASE_SHA\` · Head: \`$HEAD_SHA\`"
+            echo
+            echo 'Statistically sampled on the same runner. Results are informational; a measured slowdown does not fail this PR.'
+            echo
+            if [[ "$COMPARISON_OUTCOME" != success ]]; then
+              echo '> **Comparison incomplete:** The benchmark did not finish. Check the failed step before interpreting any partial output below.'
+              echo
+            fi
+            if [[ -s "$RUNNER_TEMP/ibt-changed-inputs.txt" ]]; then
+              echo '> **Comparability warning:** Benchmark definitions, fixtures, generation code, or build inputs differ between revisions. The reported deltas may not measure the same experiment.'
+              echo
+              echo 'Changed inputs:'
+              sed 's/^/- `/' "$RUNNER_TEMP/ibt-changed-inputs.txt" | sed 's/$/`/'
+              echo
+            fi
+            if [[ -s "$RUNNER_TEMP/ibt-head.log" ]]; then
+              echo '### Criterion comparison (head vs base)'
+              echo
+              echo 'Criterion reports time estimates, percentage change with confidence interval, p-value, and its own improvement/regression assessment for each case.'
+              echo
+              echo '```text'
+              cat "$RUNNER_TEMP/ibt-head.log"
+              echo '```'
+              echo
+            else
+              echo 'The head comparison did not complete. Check the job log and artifact.'
+              echo
+            fi
+            if [[ -s "$RUNNER_TEMP/ibt-base.log" ]]; then
+              echo '<details><summary>Base measurements</summary>'
+              echo
+              echo '```text'
+              cat "$RUNNER_TEMP/ibt-base.log"
+              echo '```'
+              echo '</details>'
+              echo
+            fi
+            echo "Full Criterion report: workflow artifact \`criterion-ibt-reader-comparison-${{ github.run_id }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Criterion report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-ibt-reader-comparison-${{ github.run_id }}
+          path: ${{ github.workspace }}/ibt-reader-target/criterion
           if-no-files-found: ignore
           retention-days: 14
 
