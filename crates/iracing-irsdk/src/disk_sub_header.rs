@@ -49,8 +49,7 @@ impl DiskSubHeader {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if `reader` cannot supply the required
-    /// [`Self::WIRE_SIZE`] bytes.
+    /// Returns a parse error if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         Self::read_from_io(reader).map_err(|error| {
             crate::Error::parse(

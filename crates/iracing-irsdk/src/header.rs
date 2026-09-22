@@ -54,8 +54,7 @@ impl Header {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if `reader` cannot supply the required
-    /// [`Self::WIRE_SIZE`] bytes.
+    /// Returns a parse error if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         Self::read_from_io(reader).map_err(|error| {
             crate::Error::parse(
@@ -186,10 +185,12 @@ impl Header {
     }
 
     fn validate_variable_offset(&self) -> Result<()> {
+        const VARIABLE_HEADER_SIZE: i32 = size_of::<VariableHeader>() as i32;
+
         if self.variable_header_offset > 0 && self.variable_count > 0 {
             let variable_bytes = self
                 .variable_count
-                .checked_mul(size_of::<VariableHeader>().try_into().unwrap())
+                .checked_mul(VARIABLE_HEADER_SIZE)
                 .ok_or_else(|| header_validation_error("Variable header array size overflows"))?;
 
             self.variable_header_offset

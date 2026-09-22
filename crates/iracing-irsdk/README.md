@@ -8,10 +8,13 @@ without the file parsing, shared-memory transport, session parsing, schema, or
 streaming layers provided by `iracing-sdk`.
 
 ```rust
-use iracing_irsdk::{Header, VariableHeader, VariableType, WireType};
+use std::mem::size_of;
 
-assert_eq!(Header::WIRE_SIZE, 112);
-assert_eq!(VariableHeader::WIRE_SIZE, 144);
+use iracing_irsdk::{Header, VariableHeader, VariableType};
+use zerocopy::FromBytes;
+
+assert_eq!(size_of::<Header>(), 112);
+assert_eq!(size_of::<VariableHeader>(), 144);
 assert_eq!(VariableType::Double.byte_size(), Some(8));
 ```
 
