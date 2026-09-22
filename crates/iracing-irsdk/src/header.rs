@@ -1,16 +1,17 @@
 use std::io::Read;
 use type_layout::TypeLayout;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{
-    StatusField, VariableBuffer, VariableHeader, WireType,
+    StatusField, VariableBuffer, VariableHeader,
     constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
     error::{header_validation_error, mismatched_version_error},
 };
-use crate::{Error, Result};
+use crate::Result;
 
 /// An iRacing SDK header.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, TypeLayout)]
+#[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct Header {
     /// API version
     pub version: i32,
@@ -53,19 +54,14 @@ impl Header {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if `reader` cannot supply the required
-    /// [`Self::WIRE_SIZE`] bytes.
+    /// Returns a parse error if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        let mut buffer = [0u8; Self::WIRE_SIZE];
-
-        reader.read_exact(&mut buffer).map_err(|e| {
-            Error::parse(
-                "Header reading",
-                format!("Failed to read {} header bytes: {}", Header::WIRE_SIZE, e),
+        Self::read_from_io(reader).map_err(|error| {
+            crate::Error::parse(
+                "Disk Header reading",
+                format!("Failed to read disk header: {error}"),
             )
-        })?;
-
-        Self::read_from_bytes(&buffer)
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -189,10 +185,12 @@ impl Header {
     }
 
     fn validate_variable_offset(&self) -> Result<()> {
+        const VARIABLE_HEADER_SIZE: i32 = size_of::<VariableHeader>() as i32;
+
         if self.variable_header_offset > 0 && self.variable_count > 0 {
             let variable_bytes = self
                 .variable_count
-                .checked_mul(VariableHeader::WIRE_SIZE as i32)
+                .checked_mul(VARIABLE_HEADER_SIZE)
                 .ok_or_else(|| header_validation_error("Variable header array size overflows"))?;
 
             self.variable_header_offset
@@ -309,11 +307,10 @@ impl Header {
     }
 }
 
-unsafe impl WireType for Header {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error;
     use std::mem::{align_of, offset_of};
 
     fn valid_live_header() -> Header {
@@ -399,7 +396,7 @@ mod tests {
 
     #[test]
     fn header_layout_matches_iracing_abi() {
-        assert_eq!(Header::WIRE_SIZE, 112);
+        assert_eq!(size_of::<Header>(), 112);
 
         assert_eq!(align_of::<Header>(), 4);
 
@@ -422,9 +419,9 @@ mod tests {
     #[test]
     fn header_wire_round_trip() {
         let header = valid_live_header();
-        let mut bytes = Vec::new();
-        header.write_to(&mut bytes).unwrap();
-        let decoded = Header::read_from_bytes(&bytes).unwrap();
+        let bytes = header.as_bytes();
+
+        let decoded = Header::read_from_bytes(bytes).unwrap();
         assert_eq!(decoded.version, header.version);
         assert_eq!(decoded.status, header.status);
         assert_eq!(

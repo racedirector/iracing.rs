@@ -28,7 +28,7 @@ or commands.
 - Session YAML immediately follows the variable-header array; frames immediately
   follow the YAML.
 
-Derive sizes from `WireType::WIRE_SIZE`. Never redefine SDK wire sizes as
+Derive sizes from `size_of` on the SDK's zerocopy wire types. Never redefine SDK wire sizes as
 independent numeric constants, and never equate the 112-byte header with the
 144-byte IBT preamble.
 
@@ -80,7 +80,7 @@ shared-memory fixtures.
   actionable.
 - The final drift check is deliberately scoped to `test-data/ibt` and
   `test-data/session-yaml`.
-- Encoding assumes little-endian targets because `WireType` uses native object
+- Encoding assumes little-endian targets because `IntoBytes::as_bytes` uses native object
   representation. Add explicit endian conversion before supporting big-endian
   systems.
 
@@ -96,4 +96,3 @@ shared-memory fixtures.
 For intentional generated-byte changes, also run
 `cargo test-fixtures check --no-drift-check`, inspect the resulting diff and
 hashes, and then run the full workspace quality gate before handoff.
-

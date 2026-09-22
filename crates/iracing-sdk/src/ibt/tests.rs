@@ -4,7 +4,7 @@ use super::format::extract_variable_schema;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
     VariableHeaderRegion, VariableInfo,
-    irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType},
+    irsdk::{DiskSubHeader, Header, VariableHeader, VariableType},
 };
 use anyhow::{Context, Result, ensure};
 use std::{collections::BTreeSet, fs, path::PathBuf};
@@ -75,18 +75,18 @@ fn test_generated_fixture_headers_match_manifest() -> Result<()> {
     use crate::irsdk::StatusField;
 
     let manifest = load_fixture_manifest()?;
-    assert_eq!(manifest.layout.live_header_prefix_size, Header::WIRE_SIZE);
+    assert_eq!(manifest.layout.live_header_prefix_size, size_of::<Header>());
     assert_eq!(
         manifest.layout.ibt_header_size,
-        Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE
+        size_of::<Header>() + size_of::<DiskSubHeader>()
     );
     assert_eq!(
         manifest.layout.disk_sub_header_size,
-        DiskSubHeader::WIRE_SIZE
+        size_of::<DiskSubHeader>()
     );
     assert_eq!(
         manifest.layout.variable_header_size,
-        VariableHeader::WIRE_SIZE
+        size_of::<VariableHeader>()
     );
 
     for fixture in &manifest.fixtures {
@@ -108,7 +108,7 @@ fn test_generated_fixture_headers_match_manifest() -> Result<()> {
 
         assert_eq!(
             fixture.disk_sub_header_offset,
-            header.variable_header_offset - DiskSubHeader::WIRE_SIZE as i32
+            header.variable_header_offset - size_of::<DiskSubHeader>() as i32
         );
         assert_eq!(disk_header.start_date, fixture.disk_header.start_date);
         assert!((disk_header.start_time - fixture.disk_header.start_time).abs() < f64::EPSILON);

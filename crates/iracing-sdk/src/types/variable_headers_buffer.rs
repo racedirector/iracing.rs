@@ -1,4 +1,5 @@
-use crate::irsdk::{VariableHeader, WireType};
+use crate::irsdk::VariableHeader;
+use zerocopy::FromBytes;
 
 /// Exact, owned snapshot of a variable-header region advertised by an SDK header.
 ///
@@ -18,16 +19,16 @@ impl VariableHeadersBuffer {
     /// Takes ownership of a region checked and read in full by a source adapter.
     /// The bytes must contain exactly the advertised number of complete headers.
     pub(crate) fn from_owned_checked_region(bytes: Vec<u8>) -> Self {
-        debug_assert_eq!(bytes.len() % VariableHeader::WIRE_SIZE, 0);
+        debug_assert_eq!(bytes.len() % size_of::<VariableHeader>(), 0);
         Self { bytes }
     }
 
     /// Iterates over the wire headers represented by this exact snapshot.
     pub fn iter_headers(&self) -> impl ExactSizeIterator<Item = VariableHeader> + '_ {
-        let (chunks, _) = self.bytes.as_chunks::<{ VariableHeader::WIRE_SIZE }>();
+        let (chunks, _) = self.bytes.as_chunks::<{ size_of::<VariableHeader>() }>();
 
         chunks
             .iter()
-            .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })
+            .map(|bytes| VariableHeader::read_from_bytes(bytes).expect("fixed-size header chunk"))
     }
 }

@@ -8,8 +8,9 @@
 use std::{fs, io::Cursor, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
-use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, WireType};
+use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType};
 use iracing_sdk::{SchemaProvider, ibt::IbtReader};
+use zerocopy::FromBytes;
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 
@@ -42,21 +43,21 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
         manifest_path.display()
     );
     ensure!(
-        manifest.layout.live_header_prefix_size == Header::WIRE_SIZE,
+        manifest.layout.live_header_prefix_size == size_of::<Header>(),
         "manifest main header size is {}, expected {}",
         manifest.layout.live_header_prefix_size,
-        Header::WIRE_SIZE
+        size_of::<Header>()
     );
     ensure!(
-        manifest.layout.disk_sub_header_size == DiskSubHeader::WIRE_SIZE,
+        manifest.layout.disk_sub_header_size == size_of::<DiskSubHeader>(),
         "manifest disk header size is invalid"
     );
     ensure!(
-        manifest.layout.ibt_header_size == Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE,
+        manifest.layout.ibt_header_size == size_of::<Header>() + size_of::<DiskSubHeader>(),
         "manifest IBT preamble size is invalid"
     );
     ensure!(
-        manifest.layout.variable_header_size == VariableHeader::WIRE_SIZE,
+        manifest.layout.variable_header_size == size_of::<VariableHeader>(),
         "manifest variable header size is invalid"
     );
 
@@ -81,20 +82,20 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             .with_context(|| format!("decoding disk sub-header in {}", path.display()))?;
 
         ensure!(
-            fixture.disk_sub_header_offset == Header::WIRE_SIZE as i32,
+            fixture.disk_sub_header_offset == size_of::<Header>() as i32,
             "{} disk sub-header offset must be {}",
             path.display(),
-            Header::WIRE_SIZE
+            size_of::<Header>()
         );
         ensure!(
-            fixture.var_header_offset == (Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE) as i32,
+            fixture.var_header_offset == (size_of::<Header>() + size_of::<DiskSubHeader>()) as i32,
             "{} variable headers must begin at byte {}",
             path.display(),
-            Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE
+            size_of::<Header>() + size_of::<DiskSubHeader>()
         );
         ensure!(
             fixture.disk_sub_header_offset
-                == fixture.var_header_offset - DiskSubHeader::WIRE_SIZE as i32,
+                == fixture.var_header_offset - size_of::<DiskSubHeader>() as i32,
             "{} disk offset does not follow var_header_offset - disk_size",
             path.display()
         );
@@ -127,7 +128,8 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
         );
 
         let variables_start = fixture.var_header_offset as usize;
-        let variables_end = variables_start + fixture.num_vars as usize * VariableHeader::WIRE_SIZE;
+        let variables_end =
+            variables_start + fixture.num_vars as usize * size_of::<VariableHeader>();
         ensure!(
             variables_end == fixture.session_info_offset as usize,
             "{} session info must immediately follow variable headers",
@@ -139,10 +141,12 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             path.display()
         );
         for (index, expected) in fixture.required_variables.iter().enumerate() {
-            let start = variables_start + index * VariableHeader::WIRE_SIZE;
+            let start = variables_start + index * size_of::<VariableHeader>();
             let variable =
-                VariableHeader::read_from_bytes(&data[start..start + VariableHeader::WIRE_SIZE])
-                    .with_context(|| format!("decoding variable {index} in {}", path.display()))?;
+                VariableHeader::read_from_bytes(&data[start..start + size_of::<VariableHeader>()])
+                    .map_err(|error| {
+                        anyhow::anyhow!("decoding variable {index} in {}: {error}", path.display())
+                    })?;
             variable
                 .validate()
                 .with_context(|| format!("validating variable {index} in {}", path.display()))?;

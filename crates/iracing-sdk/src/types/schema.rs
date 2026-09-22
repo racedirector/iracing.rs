@@ -253,8 +253,10 @@ fn storage_type_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
 
 #[cfg(test)]
 mod tests {
+    use zerocopy::IntoBytes;
+
     use super::*;
-    use crate::{irsdk::VariableType as IRSDKVariableType, irsdk::WireType};
+    use crate::irsdk::VariableType as IRSDKVariableType;
 
     struct TestProvider {
         schema: VariableSchema,
@@ -353,9 +355,9 @@ mod tests {
             "m/s",
         )
         .unwrap();
-        let mut bytes = Vec::new();
-        header.write_to(&mut bytes).unwrap();
-        let headers = VariableHeadersBuffer::from_checked_region(&bytes);
+
+        let bytes = header.as_bytes();
+        let headers = VariableHeadersBuffer::from_checked_region(bytes);
 
         let schema = VariableSchema::from_headers(&headers, 8).unwrap();
 

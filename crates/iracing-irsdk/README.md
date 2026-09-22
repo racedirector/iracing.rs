@@ -8,16 +8,27 @@ without the file parsing, shared-memory transport, session parsing, schema, or
 streaming layers provided by `iracing-sdk`.
 
 ```rust
-use iracing_irsdk::{Header, VariableHeader, VariableType, WireType};
+use std::mem::size_of;
 
-assert_eq!(Header::WIRE_SIZE, 112);
-assert_eq!(VariableHeader::WIRE_SIZE, 144);
+use iracing_irsdk::{Header, VariableHeader, VariableType};
+use zerocopy::FromBytes;
+
+assert_eq!(size_of::<Header>(), 112);
+assert_eq!(size_of::<VariableHeader>(), 144);
 assert_eq!(VariableType::Double.byte_size(), Some(8));
 ```
 
 `iracing-sdk` depends on this crate and re-exports it through its existing
 `iracing_sdk::irsdk` module. Applications already using that namespace do not
 need to change their imports.
+
+`WireType::read_from_bytes` copies an exact-size wire value from any byte
+alignment. `Header::try_from_reader` and `DiskSubHeader::try_from_reader` read
+one owned value from a stream; `WireType::write_to` writes its bytes. These
+operations use derive-checked `zerocopy` traits and do not validate SDK field
+values. Call `validate`, `validate_live`, or `validate_ibt` as appropriate after
+decoding. The SDK format is little-endian; these native-layout copies require a
+little-endian target and do not swap bytes.
 
 ## Boundary
 

@@ -46,10 +46,10 @@ session_info_end..EOF                        fixed-size telemetry frames
 
 Important distinctions:
 
-- `Header::WIRE_SIZE` is always **112 bytes**.
-- `DiskSubHeader::WIRE_SIZE` is **32 bytes**.
+- `size_of::<Header>()` is always **112 bytes**.
+- `size_of::<DiskSubHeader>()` is **32 bytes**.
 - The complete IBT preamble is therefore **144 bytes**.
-- `VariableHeader::WIRE_SIZE` is **144 bytes**, and the first variable header
+- `size_of::<VariableHeader>()` is **144 bytes**, and the first variable header
   begins at offset 144—not 112.
 - The disk sub-header begins at offset 112 and must satisfy
   `disk_sub_header_offset == var_header_offset - disk_sub_header_size`.
@@ -83,7 +83,7 @@ intentional and structurally valid.
 
 ## Generator and verifier boundaries
 
-The generator uses `iracing-irsdk` constructors and `WireType::write_to` for
+The generator uses `iracing-irsdk` constructors and `IntoBytes::as_bytes` for
 `Header`, `DiskSubHeader`, and `VariableHeader`. Telemetry scalar values are
 written explicitly in little-endian form. The complete artifact set is built
 in memory before filesystem writes begin.
@@ -101,7 +101,7 @@ Manifest paths must be repository-relative and cannot contain parent-directory
 components. This prevents a malformed manifest from escaping the supplied
 repository root.
 
-`WireType` encoding follows the SDK's little-endian/native-layout contract.
+`IntoBytes::as_bytes` encoding follows the SDK's little-endian/native-layout contract.
 All currently supported workspace and CI targets are little-endian. Do not
 claim big-endian support without adding explicit byte-order encoding.
 

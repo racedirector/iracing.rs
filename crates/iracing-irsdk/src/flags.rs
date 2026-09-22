@@ -22,6 +22,10 @@ use type_layout::TypeLayout;
     TypeLayout,
     serde::Serialize,
     serde::Deserialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 pub struct StatusField {

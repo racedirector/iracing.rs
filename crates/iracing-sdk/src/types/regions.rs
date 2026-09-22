@@ -1,6 +1,6 @@
 use crate::{
     IRacingSDKError, Result, SessionInfoBuffer, VariableHeadersBuffer,
-    irsdk::{Header, VariableHeader, WireType},
+    irsdk::{Header, VariableHeader},
 };
 use std::ops::Range;
 
@@ -252,7 +252,7 @@ impl TryFrom<&Header> for VariableHeaderRegion {
         })?;
 
         let length = count
-            .checked_mul(VariableHeader::WIRE_SIZE)
+            .checked_mul(size_of::<VariableHeader>())
             .ok_or_else(|| {
                 IRacingSDKError::parse_error(
                     "VariableHeaderRegion::try_from",
@@ -271,14 +271,15 @@ impl TryFrom<&Header> for VariableHeaderRegion {
 mod tests {
     use super::{SessionInfoRegion, VariableHeaderRegion, checked_range};
     use crate::{
-        irsdk::{Header, VariableHeader, WireType},
+        irsdk::{Header, VariableHeader},
         types::regions::ByteRegion,
     };
+    use zerocopy::FromZeros;
 
     #[test]
     fn session_region_rejects_negative_header_fields() {
         for (offset, length) in [(-1, 1), (1, -1)] {
-            let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+            let mut header = Header::new_zeroed();
             header.session_info_offset = offset;
             header.session_info_length = length;
             assert!(SessionInfoRegion::try_from(&header).is_err());
@@ -287,7 +288,7 @@ mod tests {
 
     #[test]
     fn session_region_copies_only_advertised_bytes() {
-        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        let mut header = Header::new_zeroed();
         header.session_info_offset = 4;
         header.session_info_length = 7;
         let region = SessionInfoRegion::try_from(&header).unwrap();
@@ -311,7 +312,7 @@ mod tests {
 
     #[test]
     fn variable_header_region_rejects_negative_count() {
-        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        let mut header = Header::new_zeroed();
         header.variable_count = -1;
 
         assert!(VariableHeaderRegion::try_from(&header).is_err());
@@ -319,7 +320,7 @@ mod tests {
 
     #[test]
     fn variable_header_region_rejects_negative_offset() {
-        let mut header = Header::read_from_bytes(&[0; Header::WIRE_SIZE]).unwrap();
+        let mut header = Header::new_zeroed();
         header.variable_header_offset = -1;
 
         assert!(VariableHeaderRegion::try_from(&header).is_err());
@@ -359,15 +360,15 @@ mod tests {
         let region = VariableHeaderRegion {
             region: ByteRegion {
                 offset: 4,
-                length: VariableHeader::WIRE_SIZE,
+                length: size_of::<VariableHeader>(),
             },
             count: 1,
         };
-        let source = vec![0; 4 + VariableHeader::WIRE_SIZE];
+        let source = vec![0; 4 + size_of::<VariableHeader>()];
 
         assert_eq!(
             region.bytes(&source).unwrap().len(),
-            VariableHeader::WIRE_SIZE
+            size_of::<VariableHeader>()
         );
         assert_eq!(region.buffer(&source).unwrap().iter_headers().len(), 1);
     }
@@ -377,7 +378,7 @@ mod tests {
         let region = VariableHeaderRegion {
             region: ByteRegion {
                 offset: 4,
-                length: VariableHeader::WIRE_SIZE,
+                length: size_of::<VariableHeader>(),
             },
             count: 1,
         };
@@ -385,28 +386,4 @@ mod tests {
         assert!(region.bytes(&[0; 4]).is_err());
         assert!(region.buffer(&[0; 4]).is_err());
     }
-
-    // #[test]
-    // fn session_info_region_extracts_bytes_and_owned_buffer() {
-    //     let region = SessionInfoRegion {
-    //         offset: 4,
-    //         length: 7,
-    //     };
-    //     let source = b"skipSession";
-
-    //     assert_eq!(region.bytes(source).unwrap(), b"Session");
-    //     let session: String = region.buffer(source).unwrap().into();
-    //     assert_eq!(session, "Session");
-    // }
-
-    // #[test]
-    // fn session_info_region_rejects_short_source() {
-    //     let region = SessionInfoRegion {
-    //         offset: 4,
-    //         length: 7,
-    //     };
-
-    //     assert!(region.bytes(b"short").is_err());
-    //     assert!(region.buffer(b"short").is_err());
-    // }
 }

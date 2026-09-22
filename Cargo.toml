@@ -34,6 +34,8 @@ thiserror = "2.0.16"
 tokio = { version = "1", features = ["rt", "macros"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+type-layout = "0.2.0"
+zerocopy = { version = "0.8.48", features = ["derive", "std"] }
 
 [workspace.lints.rust]
 rust_2018_idioms = "warn"

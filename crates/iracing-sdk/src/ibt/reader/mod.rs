@@ -34,7 +34,7 @@ use super::format::extract_variable_schema;
 use crate::{
     ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
     VariableSchema,
-    irsdk::{DiskSubHeader, Header, WireType},
+    irsdk::{DiskSubHeader, Header},
     types::{IRacingSessionString, SessionInfoRegion},
 };
 use std::{
@@ -126,8 +126,8 @@ impl IbtReader {
         // Parse disk sub-header (note: may be corrupted, but we'll try)
         let disk_header = DiskSubHeader::try_from_reader(&mut source)?;
 
-        let preamble_end =
-            u64::try_from(Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE).map_err(|_| {
+        let preamble_end = u64::try_from(size_of::<Header>() + size_of::<DiskSubHeader>())
+            .map_err(|_| {
                 IRacingSDKError::parse_error(
                     "IBT layout",
                     "Preamble size cannot be represented as a source offset",
@@ -542,14 +542,14 @@ mod tests {
     #[test]
     fn truncated_main_header_is_rejected() -> Result<()> {
         let bytes = fixture_bytes()?;
-        assert!(IbtReader::from_bytes(bytes[..Header::WIRE_SIZE - 1].to_vec()).is_err());
+        assert!(IbtReader::from_bytes(bytes[..size_of::<Header>() - 1].to_vec()).is_err());
         Ok(())
     }
 
     #[test]
     fn truncated_disk_sub_header_is_rejected() -> Result<()> {
         let bytes = fixture_bytes()?;
-        let preamble_size = Header::WIRE_SIZE + DiskSubHeader::WIRE_SIZE;
+        let preamble_size = size_of::<Header>() + size_of::<DiskSubHeader>();
         assert!(IbtReader::from_bytes(bytes[..preamble_size - 1].to_vec()).is_err());
         Ok(())
     }
@@ -609,7 +609,7 @@ mod tests {
     #[test]
     fn advisory_record_count_does_not_define_frame_bounds() -> Result<()> {
         let mut bytes = fixture_bytes()?;
-        write_i32(&mut bytes, Header::WIRE_SIZE + 28, i32::MAX);
+        write_i32(&mut bytes, size_of::<Header>() + 28, i32::MAX);
         let reader = IbtReader::from_bytes(bytes)?;
         assert_ne!(reader.total_frames(), i32::MAX as usize);
         Ok(())

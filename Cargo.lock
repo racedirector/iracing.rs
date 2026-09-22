@@ -998,6 +998,7 @@ dependencies = [
  "serde_yaml_ng",
  "thiserror",
  "type-layout",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1041,6 +1042,7 @@ dependencies = [
  "type-layout",
  "windows",
  "windows-core",
+ "zerocopy",
 ]
 
 [[package]]
@@ -2156,6 +2158,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "zerocopy",
 ]
 
 [[package]]

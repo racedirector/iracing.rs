@@ -73,12 +73,13 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::irsdk::{Header, WireType};
+    use crate::irsdk::Header;
     use std::io::Cursor;
+    use zerocopy::FromZeros;
 
     #[test]
     fn empty_variable_region_preserves_frame_size() -> Result<()> {
-        let header = Header::read_from_bytes(&[0; Header::WIRE_SIZE])?;
+        let header = Header::new_zeroed();
         let region = VariableHeaderRegion::try_from(&header)?;
         let mut reader = Cursor::new([]);
         let frame_size = 64;
