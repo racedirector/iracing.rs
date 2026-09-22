@@ -1,6 +1,6 @@
 //! Variable data parsing trait and implementations
 use super::{BitField, VariableInfo};
-use crate::{irsdk::VariableType, parse_utils::decode_variable_type};
+use crate::parse_utils::decode_variable_type;
 
 /// Trait for types that can be parsed from binary telemetry data.
 pub trait VarData: Sized {
@@ -8,25 +8,28 @@ pub trait VarData: Sized {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self>;
 }
 
-// Implement VarData for basic types
+/// irsdk::VariableType::Float
 impl VarData for f32 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         decode_variable_type!(data, info, Float, f32::from_le_bytes)
     }
 }
 
+/// irsdk::VariableType::Integer
 impl VarData for i32 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         decode_variable_type!(data, info, Integer, i32::from_le_bytes)
     }
 }
 
+/// irsdk::VariableType::Bool
 impl VarData for bool {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         decode_variable_type!(data, info, Boolean, |[byte]| byte != 0)
     }
 }
 
+/// irsdk::VariableType::BitField
 impl VarData for BitField {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         decode_variable_type!(data, info, BitField, |bytes| {
@@ -35,22 +38,14 @@ impl VarData for BitField {
     }
 }
 
-// Additional VarData implementations for all iRacing SDK types
+/// irsdk::VariableType::Character
 impl VarData for u8 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        if !matches!(info.data_type, VariableType::Character) {
-            return Err(crate::IRacingSDKError::type_conversion(
-                "Character",
-                info.data_type,
-            ));
-        }
-
-        data.get(info.offset)
-            .copied()
-            .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))
+        decode_variable_type!(data, info, Character, |[byte]| byte)
     }
 }
 
+/// irsdk::VariableType::Double
 impl VarData for f64 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
         decode_variable_type!(data, info, Double, f64::from_le_bytes)
@@ -95,7 +90,8 @@ impl<T: VarData> VarData for Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::IRacingSDKError;
+    use crate::{IRacingSDKError, irsdk::VariableType};
+    use std::fmt::Debug;
 
     fn variable_info(data_type: VariableType, offset: usize) -> VariableInfo {
         VariableInfo {
@@ -121,6 +117,21 @@ mod tests {
             T::from_bytes(&[], &variable_info(data_type, 3)),
             Err(IRacingSDKError::Memory { offset: 3, .. })
         ));
+    }
+
+    fn assert_array_pair<T: VarData + Debug + PartialEq>(
+        data_type: VariableType,
+        first: &[u8],
+        second: &[u8],
+        expected: [T; 2],
+    ) {
+        let mut data = vec![0xAA];
+        data.extend_from_slice(first);
+        data.extend_from_slice(second);
+
+        let mut info = variable_info(data_type, 1);
+        info.count = 2;
+        assert_eq!(Vec::<T>::from_bytes(&data, &info).unwrap(), expected);
     }
 
     #[test]
@@ -168,6 +179,7 @@ mod tests {
         assert_type_conversion::<bool>(VariableType::Character);
         assert_type_conversion::<BitField>(VariableType::Integer);
         assert_type_conversion::<f64>(VariableType::Float);
+        assert_type_conversion::<u8>(VariableType::Integer);
     }
 
     #[test]
@@ -177,19 +189,83 @@ mod tests {
         assert_memory::<bool>(VariableType::Boolean);
         assert_memory::<BitField>(VariableType::BitField);
         assert_memory::<f64>(VariableType::Double);
+        assert_memory::<u8>(VariableType::Character);
     }
 
     #[test]
-    fn u8_accepts_character_and_checks_type_before_reading() {
+    fn character_decoding_preserves_raw_byte_values() {
         assert_eq!(
-            u8::from_bytes(&[0, 42], &variable_info(VariableType::Character, 1)).unwrap(),
-            42
+            u8::from_bytes(&[0xAA, 0], &variable_info(VariableType::Character, 1)).unwrap(),
+            0
         );
         assert_eq!(
-            u8::from_bytes(&[0, b'x'], &variable_info(VariableType::Character, 1)).unwrap(),
-            b'x'
+            u8::from_bytes(&[0xAA, 0xFF], &variable_info(VariableType::Character, 1)).unwrap(),
+            0xFF
         );
-        assert_memory::<u8>(VariableType::Character);
-        assert_type_conversion::<u8>(VariableType::Integer);
+    }
+
+    #[test]
+    fn arrays_decode_every_storage_type_at_a_nonzero_offset() {
+        assert_array_pair(VariableType::Character, &[0], &[0xFF], [0_u8, 0xFF]);
+        assert_array_pair(VariableType::Boolean, &[0], &[2], [false, true]);
+        assert_array_pair(
+            VariableType::Integer,
+            &(-2_i32).to_le_bytes(),
+            &0x1234_5678_i32.to_le_bytes(),
+            [-2_i32, 0x1234_5678],
+        );
+        assert_array_pair(
+            VariableType::Float,
+            &(-1.5_f32).to_le_bytes(),
+            &10.25_f32.to_le_bytes(),
+            [-1.5_f32, 10.25_f32],
+        );
+        assert_array_pair(
+            VariableType::Double,
+            &(-1.5_f64).to_le_bytes(),
+            &10.25_f64.to_le_bytes(),
+            [-1.5_f64, 10.25_f64],
+        );
+        assert_array_pair(
+            VariableType::BitField,
+            &0x8000_0000_u32.to_le_bytes(),
+            &0x1234_5678_u32.to_le_bytes(),
+            [BitField::new(0x8000_0000), BitField::new(0x1234_5678)],
+        );
+    }
+
+    #[test]
+    fn arrays_report_type_mismatch_and_later_element_bounds_errors() {
+        let mut info = variable_info(VariableType::Integer, 1);
+        info.count = 2;
+        assert!(matches!(
+            Vec::<u8>::from_bytes(&[], &info),
+            Err(IRacingSDKError::TypeConversion { .. })
+        ));
+
+        info.data_type = VariableType::Character;
+        assert!(matches!(
+            Vec::<u8>::from_bytes(&[0xAA, 42], &info),
+            Err(IRacingSDKError::Memory { offset: 2, .. })
+        ));
+
+        info.data_type = VariableType::Float;
+        let mut truncated = vec![0xAA];
+        truncated.extend_from_slice(&1.5_f32.to_le_bytes());
+        truncated.extend_from_slice(&[0, 0]);
+        assert!(matches!(
+            Vec::<f32>::from_bytes(&truncated, &info),
+            Err(IRacingSDKError::Memory { offset: 5, .. })
+        ));
+    }
+
+    #[test]
+    fn zero_count_array_is_empty_but_invalid_storage_type_is_rejected() {
+        let mut info = variable_info(VariableType::Character, usize::MAX);
+        info.count = 0;
+        assert!(Vec::<u8>::from_bytes(&[], &info).unwrap().is_empty());
+
+        info.data_type = VariableType::ElementTypeCount;
+        assert!(Vec::<u8>::from_bytes(&[], &info).is_err());
     }
 }

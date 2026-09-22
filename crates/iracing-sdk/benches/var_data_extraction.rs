@@ -10,6 +10,11 @@
 //! - `array_extraction` decodes three captured 72-element `CarIdx` arrays into
 //!   fresh `Vec<f32>`, `Vec<i32>`, and `Vec<bool>` outputs. Element throughput
 //!   includes allocation, decoding, and destruction of each vector.
+//! - `all_var_data_types` covers scalar and array extraction for every concrete `VarData`
+//!   implementation, including `u8`, SDK enums, bitmasks, and both storage
+//!   forms of `IncidentFlags`. Each array contains four valid elements. These
+//!   cases use small independent buffers because the captured schema does not
+//!   contain every SDK type or array shape.
 //! - `bitfield_operations/bitfield_extraction` decodes `SessionFlags`; the
 //!   remaining bitfield cases operate on an already decoded [`BitField`].
 //! - `bounds_checking` compares successful scalar decoding with deliberately
@@ -38,12 +43,22 @@
 
 mod support;
 
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{
+    BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
+    measurement::WallTime,
+};
 use iracing_sdk::{
-    irsdk::VariableType,
+    VariableInfo,
+    irsdk::{
+        BroadcastMessage, CameraState, CameraSwitchFocusMode, CarLeftRight, ChatCommandMode,
+        EngineWarnings, ForceFeedbackCommandMode, IncidentFlags, PaceFlags, PaceMode,
+        PitCommandMode, PitServiceFlags, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode,
+        ReplaySearchMode, ReplayStateMode, SessionFlags, SessionState, TelemetryCommandMode,
+        TrackLocation, TrackSurface, TrackWetness, VariableType, VideoCaptureMode,
+    },
     types::{BitField, VarData},
 };
-use std::hint::black_box;
+use std::{fmt::Debug, hint::black_box};
 
 /// Load deterministic full-frame data and variable info for benchmarking.
 fn load_test_data() -> (Vec<u8>, iracing_sdk::VariableSchema) {
@@ -162,6 +177,168 @@ fn bench_array_extraction(c: &mut Criterion) {
     group.finish();
 }
 
+/// Register both extraction forms for one concrete `VarData` implementation.
+/// The leading byte makes the offset nonzero; setup and sentinel checks are
+/// outside the timed operations.
+fn bench_type<T: VarData + Clone + Debug + PartialEq>(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    name: &str,
+    data_type: VariableType,
+    element: &[u8],
+    expected: T,
+) {
+    const COUNT: usize = 4;
+    assert_eq!(element.len(), data_type.byte_size().unwrap());
+
+    let mut data = vec![0xA5];
+    for _ in 0..COUNT {
+        data.extend_from_slice(element);
+    }
+    let scalar_info = VariableInfo {
+        name: name.to_owned(),
+        data_type,
+        offset: 1,
+        count: 1,
+        count_as_time: false,
+        units: String::new(),
+        description: String::new(),
+    };
+    let array_info = VariableInfo {
+        count: COUNT,
+        ..scalar_info.clone()
+    };
+
+    assert_eq!(T::from_bytes(&data, &scalar_info).unwrap(), expected);
+    assert_eq!(
+        Vec::<T>::from_bytes(&data, &array_info).unwrap(),
+        vec![expected; COUNT]
+    );
+
+    group.throughput(Throughput::Elements(1));
+    group.bench_function(BenchmarkId::new("scalar", name), |b| {
+        b.iter(|| black_box(T::from_bytes(black_box(&data), black_box(&scalar_info)).unwrap()))
+    });
+    group.throughput(Throughput::Elements(COUNT as u64));
+    group.bench_function(BenchmarkId::new("array_4", name), |b| {
+        b.iter(|| {
+            black_box(Vec::<T>::from_bytes(black_box(&data), black_box(&array_info)).unwrap())
+        })
+    });
+}
+
+/// Exercise every concrete `VarData` type as a scalar and through `Vec<T>`.
+fn bench_all_var_data_types(c: &mut Criterion) {
+    let mut group = c.benchmark_group("all_var_data_types");
+
+    bench_type(&mut group, "u8", VariableType::Character, &[42], 42_u8);
+    bench_type(&mut group, "bool", VariableType::Boolean, &[2], true);
+    bench_type(
+        &mut group,
+        "i32",
+        VariableType::Integer,
+        &1_i32.to_le_bytes(),
+        1_i32,
+    );
+    bench_type(
+        &mut group,
+        "f32",
+        VariableType::Float,
+        &0.5_f32.to_le_bytes(),
+        0.5_f32,
+    );
+    bench_type(
+        &mut group,
+        "f64",
+        VariableType::Double,
+        &0.5_f64.to_le_bytes(),
+        0.5_f64,
+    );
+    bench_type(
+        &mut group,
+        "BitField",
+        VariableType::BitField,
+        &1_u32.to_le_bytes(),
+        BitField::new(1),
+    );
+
+    macro_rules! enum_case {
+        ($type:ty, $raw:expr, $expected:expr) => {
+            bench_type::<$type>(
+                &mut group,
+                stringify!($type),
+                VariableType::Integer,
+                &($raw as i32).to_le_bytes(),
+                $expected,
+            );
+        };
+    }
+
+    // The values are declared SDK enum discriminants, including signed and
+    // sparse domains. Broadcast enums have no corresponding telemetry fields.
+    enum_case!(BroadcastMessage, 1, BroadcastMessage::CameraSwitchNumber);
+    enum_case!(
+        CameraSwitchFocusMode,
+        -2,
+        CameraSwitchFocusMode::FocusAtLeader
+    );
+    enum_case!(CarLeftRight, 1, CarLeftRight::Clear);
+    enum_case!(ChatCommandMode, 1, ChatCommandMode::BeginChat);
+    enum_case!(
+        ForceFeedbackCommandMode,
+        0,
+        ForceFeedbackCommandMode::MaxForce
+    );
+    enum_case!(PaceMode, 1, PaceMode::DoubleFileStart);
+    enum_case!(PitCommandMode, 1, PitCommandMode::WindshieldTearoff);
+    enum_case!(PitServiceStatus, 100, PitServiceStatus::TooFarLeft);
+    enum_case!(ReloadTexturesMode, 1, ReloadTexturesMode::CarIndex);
+    enum_case!(ReplayPositionMode, 1, ReplayPositionMode::Current);
+    enum_case!(ReplaySearchMode, 1, ReplaySearchMode::ToEnd);
+    enum_case!(ReplayStateMode, 0, ReplayStateMode::EraseTape);
+    enum_case!(SessionState, 4, SessionState::Racing);
+    enum_case!(TelemetryCommandMode, 1, TelemetryCommandMode::Start);
+    enum_case!(TrackLocation, -1, TrackLocation::NotInWorld);
+    enum_case!(TrackSurface, 27, TrackSurface::AstroturfMaterial);
+    enum_case!(TrackWetness, 1, TrackWetness::Dry);
+    enum_case!(VideoCaptureMode, 1, VideoCaptureMode::StartVideoCapture);
+
+    macro_rules! bitmask_case {
+        ($type:ty, $expected:expr) => {
+            bench_type::<$type>(
+                &mut group,
+                stringify!($type),
+                VariableType::BitField,
+                &1_u32.to_le_bytes(),
+                $expected,
+            );
+        };
+    }
+
+    bitmask_case!(CameraState, CameraState::IS_SESSION_SCREEN);
+    bitmask_case!(EngineWarnings, EngineWarnings::WATER_TEMP_WARNING);
+    bitmask_case!(PaceFlags, PaceFlags::END_OF_LINE);
+    bitmask_case!(PitServiceFlags, PitServiceFlags::LEFT_FRONT_TIRE_CHANGE);
+    bitmask_case!(SessionFlags, SessionFlags::CHECKERED);
+
+    const INCIDENT: u32 = 0x8000_0408;
+    bench_type(
+        &mut group,
+        "IncidentFlags_bitfield",
+        VariableType::BitField,
+        &INCIDENT.to_le_bytes(),
+        IncidentFlags::from_bits(INCIDENT),
+    );
+    bench_type(
+        &mut group,
+        "IncidentFlags_integer",
+        VariableType::Integer,
+        &INCIDENT.to_le_bytes(),
+        IncidentFlags::from_bits(INCIDENT),
+    );
+
+    group.finish();
+}
+
 /// Separate bitfield decoding cost from operations on an existing value.
 fn bench_bitfield_operations(c: &mut Criterion) {
     let (data, schema) = load_test_data();
@@ -249,6 +426,7 @@ criterion_group!(
     benches,
     bench_scalar_extraction,
     bench_array_extraction,
+    bench_all_var_data_types,
     bench_bitfield_operations,
     bench_bounds_checking
 );
