@@ -6,7 +6,7 @@ different targets are not interchangeable measurements of “frame latency.”
 
 | Target | Measures | Does not measure |
 | --- | --- | --- |
-| `var_data_extraction` | Individual scalar, array, bitfield, and bounds-error operations | Whole-frame or delivery-pipeline cost |
+| `var_data_extraction` | Every `VarData` scalar and `Vec<T>` extraction (including SDK enums and flags), captured 72-element arrays, bitfield operations, and bounds errors | Whole-frame or delivery-pipeline cost |
 | `frame_construction` | Byte-buffer ownership, `FramePacket` construction, `Arc` cloning, and tick operations | Telemetry decoding or acquisition |
 | `adapter_performance` | Dynamic lookup and typed adapter construction from a prepared packet | Provider, connection, or subscription work |
 | `aggregate_frame_parsing` | Fresh owned outputs for all variables, a representative consumer, and all scalars | Frame acquisition or end-to-end delivery |
