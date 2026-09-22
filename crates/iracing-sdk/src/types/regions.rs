@@ -32,6 +32,7 @@ impl ByteRegion {
     /// # Errors
     ///
     /// Returns a parse error if the end offset overflows `usize`.
+    #[inline]
     pub fn as_checked_range(&self) -> Result<Range<usize>> {
         let offset = self.offset;
         let length = self.length;

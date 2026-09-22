@@ -8,7 +8,8 @@
 //! The type system maps directly to iRacing SDK structures:
 //! - [`VariableSchema`] describes the structure of telemetry variables with O(1) lookup
 //! - [`irsdk::VariableType`](crate::irsdk::VariableType) maps to iRacing's `irsdk_VarType` enum with size information
-//! - [`VarData`] trait provides type-safe parsing from binary telemetry data
+//! - [`VariableInfo`] checks frame ranges and decodes typed telemetry values
+//! - [`VarData`] converts checked bytes into Rust values
 //! - [`BitField`] handles iRacing's bitfield variables with flag operations
 //!
 //! ## Performance Characteristics
@@ -20,7 +21,7 @@
 //! ## Usage Example
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, irsdk::VariableType};
+//! use iracing_sdk::{VariableInfo, VariableSchema, irsdk::VariableType};
 //! use std::collections::HashMap;
 //!
 //! // Create a schema for RPM data
@@ -40,7 +41,7 @@
 //!
 //! // Parse RPM value
 //! let rpm_info = schema.get_variable("RPM").expect("RPM variable");
-//! let rpm: f32 = f32::from_bytes(&frame, rpm_info)?;
+//! let rpm: f32 = rpm_info.decode(&frame)?;
 //! assert!((rpm - 4500.0).abs() < 1.0); // Allow for floating point precision
 //! # Ok::<(), iracing_sdk::IRacingSDKError>(())
 //! ```

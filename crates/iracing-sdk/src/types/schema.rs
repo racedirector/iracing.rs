@@ -11,7 +11,7 @@ use crate::{
     parse_utils,
 };
 
-use super::variable_headers_buffer::VariableHeadersBuffer;
+use super::{regions::ByteRegion, variable_headers_buffer::VariableHeadersBuffer};
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -47,10 +47,109 @@ pub struct VariableInfo {
 }
 
 impl VariableInfo {
+    #[inline]
     pub(crate) fn storage_byte_size(&self) -> Result<usize> {
         self.data_type.byte_size().ok_or_else(|| {
             schema_validation_error("ElementTypeCount cannot describe a telemetry variable")
         })
+    }
+
+    /// Derive this variable's byte span relative to the start of a telemetry frame.
+    ///
+    /// The span includes every element of an array. Offset zero is valid for
+    /// telemetry variables, unlike the header-advertised regions that use
+    /// [`ByteRegion::is_valid`]. The returned region does not establish that a
+    /// particular frame contains these bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the type is not an SDK storage type or the total
+    /// byte length overflows `usize`.
+    #[inline]
+    pub fn region(&self) -> Result<ByteRegion> {
+        let length = self
+            .count
+            .checked_mul(self.storage_byte_size()?)
+            .ok_or_else(|| IRacingSDKError::memory_access_error(self.offset))?;
+        Ok(ByteRegion {
+            offset: self.offset,
+            length,
+        })
+    }
+
+    /// Check whether this variable can be decoded as `T` without reading a frame.
+    #[inline]
+    pub fn validate_as<T: crate::VarData>(&self) -> Result<()> {
+        self.region()?
+            .as_checked_range()
+            .map_err(|_| IRacingSDKError::memory_access_error(self.offset))?;
+        if !T::accepts_type(self.data_type) {
+            return Err(IRacingSDKError::type_conversion(
+                T::expected_type(),
+                self.data_type,
+            ));
+        }
+        if !T::IS_ARRAY && self.count != 1 {
+            return Err(IRacingSDKError::type_conversion(
+                "a scalar variable with count 1",
+                format!("count {}", self.count),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Return this variable's complete byte range from a telemetry frame.
+    /// The first incomplete element's offset is reported for truncated arrays.
+    #[inline]
+    pub fn bytes_in<'a>(&self, frame: &'a [u8]) -> Result<&'a [u8]> {
+        let region = self.region()?;
+        if self.count == 0 {
+            return Ok(&[]);
+        }
+
+        let range = region
+            .as_checked_range()
+            .map_err(|_| IRacingSDKError::memory_access_error(self.offset))?;
+        if range.end > frame.len() {
+            let size = self.storage_byte_size()?;
+            let complete = frame.len().saturating_sub(self.offset) / size;
+            return Err(IRacingSDKError::memory_access_error(
+                self.offset + complete * size,
+            ));
+        }
+        Ok(&frame[range])
+    }
+
+    /// Decode this variable from a frame as a scalar or owned array.
+    #[inline]
+    pub fn decode<T: crate::VarData>(&self, frame: &[u8]) -> Result<T> {
+        if !T::accepts_type(self.data_type) {
+            return Err(IRacingSDKError::type_conversion(
+                T::expected_type(),
+                self.data_type,
+            ));
+        }
+
+        if T::IS_ARRAY {
+            return T::decode_value(self.bytes_in(frame)?, self.data_type);
+        }
+
+        if self.count != 1 {
+            return Err(IRacingSDKError::type_conversion(
+                "a scalar variable with count 1",
+                format!("count {}", self.count),
+            ));
+        }
+        // The matching VarData implementation supplies the wire width here;
+        // avoid recomputing the full variable extent for a single element.
+        let end = self
+            .offset
+            .checked_add(T::ELEMENT_SIZE)
+            .ok_or_else(|| IRacingSDKError::memory_access_error(self.offset))?;
+        let bytes = frame
+            .get(self.offset..end)
+            .ok_or_else(|| IRacingSDKError::memory_access_error(self.offset))?;
+        T::decode_value(bytes, self.data_type)
     }
 }
 
@@ -171,10 +270,10 @@ impl VariableSchema {
 
             // Validate that variable fits within frame
             let end_offset = var_info
-                .storage_byte_size()?
-                .checked_mul(var_info.count)
-                .and_then(|size| var_info.offset.checked_add(size))
-                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
+                .region()?
+                .as_checked_range()
+                .map(|range| range.end)
+                .map_err(|_| schema_validation_error("Variable extent overflows usize"))?;
             if end_offset > self.frame_size {
                 return Err(IRacingSDKError::memory_access_error(var_info.offset));
             }
@@ -266,6 +365,82 @@ mod tests {
         fn schema(&self) -> &VariableSchema {
             &self.schema
         }
+    }
+
+    #[test]
+    fn variable_region_uses_frame_relative_offset_and_full_array_width() {
+        // Both layouts come from the same live variable-schema snapshot.
+        let session_time = VariableInfo {
+            name: "SessionTime".into(),
+            data_type: IRSDKVariableType::Double,
+            offset: 0,
+            count: 1,
+            count_as_time: false,
+            units: "s".into(),
+            description: "Seconds since session start".into(),
+        };
+        let car_idx_lap_dist_pct = VariableInfo {
+            name: "CarIdxLapDistPct".into(),
+            data_type: IRSDKVariableType::Float,
+            offset: 788,
+            count: 72,
+            count_as_time: false,
+            units: "%".into(),
+            description: "Percentage distance around lap by car index".into(),
+        };
+        let frame = [0_u8; 8587];
+
+        assert_eq!(
+            session_time.region().unwrap(),
+            ByteRegion {
+                offset: 0,
+                length: 8,
+            }
+        );
+        assert_eq!(
+            car_idx_lap_dist_pct.region().unwrap(),
+            ByteRegion {
+                offset: 788,
+                length: 288,
+            }
+        );
+        assert_eq!(session_time.bytes_in(&frame).unwrap(), &frame[0..8]);
+        assert_eq!(
+            car_idx_lap_dist_pct.bytes_in(&frame).unwrap(),
+            &frame[788..1076]
+        );
+        let variables = HashMap::from([
+            (session_time.name.clone(), session_time),
+            (car_idx_lap_dist_pct.name.clone(), car_idx_lap_dist_pct),
+        ]);
+        assert!(VariableSchema::new(variables, frame.len()).is_ok());
+    }
+
+    #[test]
+    fn variable_region_rejects_invalid_type_and_extent_overflow() {
+        let mut info = VariableInfo {
+            name: "SessionTime".into(),
+            data_type: IRSDKVariableType::Double,
+            offset: 0,
+            count: 1,
+            count_as_time: false,
+            units: "s".into(),
+            description: "Seconds since session start".into(),
+        };
+
+        info.data_type = IRSDKVariableType::ElementTypeCount;
+        assert!(info.region().is_err());
+
+        info.data_type = IRSDKVariableType::Double;
+        info.count = usize::MAX;
+        assert!(info.region().is_err());
+        assert!(info.validate_as::<Vec<f64>>().is_err());
+
+        info.count = 1;
+        info.offset = usize::MAX;
+        assert!(info.region().unwrap().as_checked_range().is_err());
+        assert!(info.validate_as::<f64>().is_err());
+        assert!(info.bytes_in(&[]).is_err());
     }
 
     #[test]

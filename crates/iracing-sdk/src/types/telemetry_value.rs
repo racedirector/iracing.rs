@@ -46,22 +46,34 @@ impl TelemetryValue {
     /// Returns an error if the metadata does not describe an SDK storage type,
     /// its extent overflows, or the requested bytes are outside `data`.
     pub fn decode(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        info.storage_byte_size()?;
+        let bytes = info.bytes_in(data)?;
         match info.count {
             0 => Ok(Self::Array(Vec::new())),
-            1 => Self::decode_scalar(data, info),
-            _ => Self::decode_array(data, info),
+            1 => Self::decode_scalar(bytes, info.data_type),
+            _ => Self::decode_array(bytes, info.data_type),
         }
     }
 
-    fn decode_scalar(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        match info.data_type {
-            VariableType::Character => u8::from_bytes(data, info).map(Self::Char),
-            VariableType::BitField => BitField::from_bytes(data, info).map(Self::BitField),
-            VariableType::Boolean => bool::from_bytes(data, info).map(Self::Bool),
-            VariableType::Integer => i32::from_bytes(data, info).map(Self::Int32),
-            VariableType::Float => f32::from_bytes(data, info).map(Self::Float32),
-            VariableType::Double => f64::from_bytes(data, info).map(Self::Float64),
+    fn decode_scalar(bytes: &[u8], data_type: VariableType) -> Result<Self> {
+        match data_type {
+            VariableType::Character => {
+                <u8 as VarData>::decode_value(bytes, data_type).map(Self::Char)
+            }
+            VariableType::BitField => {
+                <BitField as VarData>::decode_value(bytes, data_type).map(Self::BitField)
+            }
+            VariableType::Boolean => {
+                <bool as VarData>::decode_value(bytes, data_type).map(Self::Bool)
+            }
+            VariableType::Integer => {
+                <i32 as VarData>::decode_value(bytes, data_type).map(Self::Int32)
+            }
+            VariableType::Float => {
+                <f32 as VarData>::decode_value(bytes, data_type).map(Self::Float32)
+            }
+            VariableType::Double => {
+                <f64 as VarData>::decode_value(bytes, data_type).map(Self::Float64)
+            }
             VariableType::ElementTypeCount => Err(IRacingSDKError::parse_error(
                 "TelemetryValue::decode",
                 "ElementTypeCount is not a storage type",
@@ -69,23 +81,16 @@ impl TelemetryValue {
         }
     }
 
-    fn decode_array(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        let element_size = info.storage_byte_size()?;
-        let mut values = Vec::with_capacity(info.count);
-        let mut element_info = info.clone();
-        element_info.count = 1;
-
-        for index in 0..info.count {
-            let offset_delta = index
-                .checked_mul(element_size)
-                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
-
-            element_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
-
-            values.push(Self::decode_scalar(data, &element_info)?);
+    fn decode_array(bytes: &[u8], data_type: VariableType) -> Result<Self> {
+        let element_size = data_type.byte_size().ok_or_else(|| {
+            IRacingSDKError::parse_error(
+                "TelemetryValue::decode_array",
+                "invalid telemetry storage type",
+            )
+        })?;
+        let mut values = Vec::with_capacity(bytes.len() / element_size);
+        for chunk in bytes.chunks_exact(element_size) {
+            values.push(Self::decode_scalar(chunk, data_type)?);
         }
 
         Ok(Self::Array(values))

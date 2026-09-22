@@ -26,7 +26,7 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+//! use iracing_sdk::{SchemaProvider, ibt::IbtReader};
 //!
 //! fn main() -> iracing_sdk::Result<()> {
 //!     let mut reader = IbtReader::open("telemetry.ibt")?;
@@ -40,7 +40,7 @@
 //!         .clone();
 //!
 //!     while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
-//!         let speed_mps = f32::from_bytes(&frame, &speed_info)?;
+//!         let speed_mps: f32 = speed_info.decode(&frame)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
 //!

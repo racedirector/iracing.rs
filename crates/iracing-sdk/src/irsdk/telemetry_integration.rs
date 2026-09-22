@@ -8,13 +8,23 @@ use iracing_irsdk::{
     TrackWetness, VideoCaptureMode,
 };
 
-use crate::{IRacingSDKError, VarData, VariableInfo};
+use crate::{IRacingSDKError, VarData, irsdk::VariableType};
 
 macro_rules! impl_enum_var_data {
     ($($type:ty),+ $(,)?) => {$ (
         impl VarData for $type {
-            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                let raw = <i32 as VarData>::from_bytes(data, info)?;
+            const ELEMENT_SIZE: usize = 4;
+
+            fn accepts_type(data_type: VariableType) -> bool {
+                data_type == VariableType::Integer
+            }
+
+            fn expected_type() -> &'static str {
+                "Integer"
+            }
+
+            fn decode_value(bytes: &[u8], data_type: VariableType) -> crate::Result<Self> {
+                let raw = <i32 as VarData>::decode_value(bytes, data_type)?;
                 Self::try_from(raw).map_err(|raw| {
                     IRacingSDKError::parse_error(
                         concat!("unknown ", stringify!($type), " value"),
@@ -50,12 +60,18 @@ impl_enum_var_data!(
 macro_rules! impl_bitmask_var_data {
     ($($type:ty),+ $(,)?) => {$ (
         impl VarData for $type {
-            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                if info.data_type != iracing_irsdk::VariableType::BitField {
-                    return Err(IRacingSDKError::type_conversion("BitField", info.data_type));
-                }
+            const ELEMENT_SIZE: usize = 4;
 
-                <BitField as VarData>::from_bytes(data, info).map(Self::from)
+            fn accepts_type(data_type: VariableType) -> bool {
+                data_type == VariableType::BitField
+            }
+
+            fn expected_type() -> &'static str {
+                "BitField"
+            }
+
+            fn decode_value(bytes: &[u8], data_type: VariableType) -> crate::Result<Self> {
+                <BitField as VarData>::decode_value(bytes, data_type).map(Self::from)
             }
         }
     )+};
@@ -70,16 +86,25 @@ impl_bitmask_var_data!(
 );
 
 impl VarData for IncidentFlags {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        match info.data_type {
-            iracing_irsdk::VariableType::BitField => {
-                <BitField as VarData>::from_bytes(data, info).map(Self::from)
+    const ELEMENT_SIZE: usize = 4;
+
+    fn accepts_type(data_type: VariableType) -> bool {
+        matches!(data_type, VariableType::BitField | VariableType::Integer)
+    }
+
+    fn expected_type() -> &'static str {
+        "BitField or Int32"
+    }
+
+    fn decode_value(bytes: &[u8], data_type: VariableType) -> crate::Result<Self> {
+        match data_type {
+            VariableType::BitField => {
+                <BitField as VarData>::decode_value(bytes, data_type).map(Self::from)
             }
-            iracing_irsdk::VariableType::Integer => {
-                <i32 as VarData>::from_bytes(data, info).map(|value| Self::from(value as u32))
-            }
+            VariableType::Integer => <i32 as VarData>::decode_value(bytes, data_type)
+                .map(|value| Self::from(value as u32)),
             actual => Err(IRacingSDKError::type_conversion(
-                "BitField or Int32",
+                Self::expected_type(),
                 actual,
             )),
         }
@@ -89,7 +114,7 @@ impl VarData for IncidentFlags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iracing_irsdk::VariableType;
+    use crate::VariableInfo;
 
     fn variable_info(data_type: VariableType) -> VariableInfo {
         VariableInfo {
@@ -131,5 +156,32 @@ mod tests {
                 IncidentFlags::from_bytes(&RAW.to_le_bytes(), &variable_info(data_type)).unwrap();
             assert_eq!(decoded.bits(), RAW);
         }
+    }
+
+    #[test]
+    fn sdk_enum_and_flag_arrays_decode_from_checked_chunks() {
+        let mut enum_info = variable_info(VariableType::Integer);
+        enum_info.count = 2;
+        let mut enum_bytes = Vec::new();
+        enum_bytes.extend_from_slice(&i32::from(SessionState::Racing).to_le_bytes());
+        enum_bytes.extend_from_slice(&i32::from(SessionState::Racing).to_le_bytes());
+        assert_eq!(
+            enum_info.decode::<Vec<SessionState>>(&enum_bytes).unwrap(),
+            vec![SessionState::Racing; 2]
+        );
+
+        let mut flags_info = variable_info(VariableType::BitField);
+        flags_info.count = 2;
+        let flags_bytes = [
+            SessionFlags::GREEN.bits().to_le_bytes(),
+            SessionFlags::CHECKERED.bits().to_le_bytes(),
+        ]
+        .concat();
+        assert_eq!(
+            flags_info
+                .decode::<Vec<SessionFlags>>(&flags_bytes)
+                .unwrap(),
+            vec![SessionFlags::GREEN, SessionFlags::CHECKERED]
+        );
     }
 }

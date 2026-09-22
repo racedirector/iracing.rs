@@ -225,7 +225,6 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
 
             fn adapt(packet: &::iracing_sdk::types::FramePacket, validation: &::iracing_sdk::adapters::AdapterValidation) -> Self {
                 use ::iracing_sdk::adapters::FieldExtraction;
-                use ::iracing_sdk::VarData;
                 let data = packet.data.as_ref();
 
                 Self {
@@ -1205,7 +1204,7 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
 /// Generate the struct-field assignment token stream for a telemetry-backed field that falls back to the Rust type's `Default` when the variable is absent or decoding fails.
 ///
 /// The produced tokens initialize the named field by indexing the adapter validation's extraction plan at `index` and:
-/// - If the plan contains a `FieldExtraction::WithDefault` with `Some(var_info)`, attempts to decode the bytes using `<FieldType as VarData>::from_bytes`. On successful decode the decoded value is used; on decode error a one-time `tracing::warn!` is emitted and `<FieldType as Default>::default()` is used.
+/// - If the plan contains a `FieldExtraction::WithDefault` with `Some(var_info)`, attempts to decode the bytes using `var_info.decode::<FieldType>`. On successful decode the decoded value is used; on decode error a one-time `tracing::warn!` is emitted and `<FieldType as Default>::default()` is used.
 /// - If `var_info` is `None` or the plan entry is missing/other variant, uses `<FieldType as Default>::default()`.
 ///
 /// # Parameters
@@ -1242,7 +1241,7 @@ fn generate_type_default_assignment(
             match validation.extraction_plan.get(#index_lit) {
                 Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
                     if let Some(var_info) = var_info {
-                        match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                        match var_info.decode::<#field_type>(&data) {
                             Ok(value) => value,
                             Err(_e) => {
                                 static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1274,7 +1273,7 @@ fn generate_type_default_assignment(
 /// The generated code will:
 /// - Look up the field's extraction plan entry at `index`.
 /// - If a `var_info` is present, attempt to decode the bytes into `field_type` via
-///   `<field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info)`.
+///   `var_info.decode::<field_type>(&data)`.
 /// - On successful decode, return the decoded value.
 /// - On decode error, emit a one-time `tracing::warn!` annotated with `field_name` and the
 ///   observed telemetry type, then evaluate and return `default_expr`.
@@ -1321,7 +1320,7 @@ fn generate_with_default_assignment(
             match validation.extraction_plan.get(#index_lit) {
                 Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
                     if let Some(var_info) = var_info {
-                        match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                        match var_info.decode::<#field_type>(&data) {
                             Ok(value) => value,
                             Err(_e) => {
                                 static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1351,7 +1350,7 @@ fn generate_with_default_assignment(
 ///
 /// The produced code reads the adapter's extraction plan at `index`, expects a
 /// `FieldExtraction::Optional { var_info, .. }` entry, and:
-/// - if `var_info` is `Some`, decodes bytes with `<inner_type as VarData>::from_bytes(&data, var_info)` and returns `Some(value)` on success;
+/// - if `var_info` is `Some`, decodes bytes with `var_info.decode::<inner_type>(&data)` and returns `Some(value)` on success;
 /// - on decode error, emits a one-time `tracing::warn!` (including the field name, expected Rust type, actual telemetry type, and the error) and yields `None`;
 /// - if `var_info` is `None` or the plan entry is missing/unexpected, yields `None`.
 ///
@@ -1397,7 +1396,7 @@ fn generate_optional_assignment(
             match validation.extraction_plan.get(#index_lit) {
                 Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
                     if let Some(var_info) = var_info {
-                        match <#inner_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                        match var_info.decode::<#inner_type>(&data) {
                             Ok(value) => Some(value),
                             Err(_e) => {
                                 static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1427,7 +1426,7 @@ fn generate_optional_assignment(
 ///
 /// This produces code that reads the extraction plan at `index`, expects a
 /// `FieldExtraction::Required { name, var_info }` entry, decodes the variable
-/// with `<T as VarData>::from_bytes(&data, var_info)`, returns the decoded
+/// with `var_info.decode::<T>(&data)`, returns the decoded
 /// value on success and panics on decode errors or if the plan entry is missing
 /// or of an unexpected variant.
 ///
@@ -1448,7 +1447,7 @@ fn generate_optional_assignment(
 /// // my_field: {
 /// //     match validation.extraction_plan.get(3) {
 /// //         Some(::iracing_sdk::adapters::FieldExtraction::Required { name, var_info }) => {
-/// //             match <MyType as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+/// //             match var_info.decode::<MyType>(&data) {
 /// //                 Ok(value) => value,
 /// //                 Err(err) => panic!("Failed to decode critical field '{}' during adapt: {err:?}", name),
 /// //             }
@@ -1470,7 +1469,7 @@ fn generate_critical_assignment(
         #field_ident: {
             match validation.extraction_plan.get(#index_lit) {
                 Some(::iracing_sdk::adapters::FieldExtraction::Required { name, var_info }) => {
-                    match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                    match var_info.decode::<#field_type>(&data) {
                         Ok(value) => value,
                         Err(err) => panic!("Failed to decode critical field '{}' during adapt: {err:?}", name),
                     }
@@ -1532,7 +1531,7 @@ fn generate_bitfield_has_assignment(
                 match validation.extraction_plan.get(#index_lit) {
                     Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
                         if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                            match var_info.decode::<::iracing_sdk::BitField>(&data) {
                                 Ok(bits) => Some(bits.has_flag(#mask_expr)),
                                 Err(_e) => {
                                     static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1564,14 +1563,14 @@ fn generate_bitfield_has_assignment(
             #field_ident: {
                 match validation.extraction_plan.get(#index_lit) {
                     Some(::iracing_sdk::adapters::FieldExtraction::Required { var_info, .. }) => {
-                        match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                        match var_info.decode::<::iracing_sdk::BitField>(&data) {
                             Ok(bits) => bits.has_flag(#mask_expr),
                             Err(err) => panic!("Failed to decode critical bitfield during adapt: {err:?}"),
                         }
                     }
                     Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
                         if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                            match var_info.decode::<::iracing_sdk::BitField>(&data) {
                                 Ok(bits) => bits.has_flag(#mask_expr),
                                 Err(_e) => {
                                     static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1639,7 +1638,7 @@ fn generate_bitfield_map_assignment(
                 match validation.extraction_plan.get(#index_lit) {
                     Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
                         if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                            match var_info.decode::<::iracing_sdk::BitField>(&data) {
                                 Ok(bits) => Some((#decoder_expr)(bits)),
                                 Err(_e) => {
                                     static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -1671,14 +1670,14 @@ fn generate_bitfield_map_assignment(
             #field_ident: {
                 match validation.extraction_plan.get(#index_lit) {
                     Some(::iracing_sdk::adapters::FieldExtraction::Required { var_info, .. }) => {
-                        match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                        match var_info.decode::<::iracing_sdk::BitField>(&data) {
                             Ok(bits) => (#decoder_expr)(bits),
                             Err(err) => panic!("Failed to decode critical bitfield during adapt: {err:?}"),
                         }
                     }
                     Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
                         if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
+                            match var_info.decode::<::iracing_sdk::BitField>(&data) {
                                 Ok(bits) => (#decoder_expr)(bits),
                                 Err(_e) => {
                                     static WARNED: ::std::sync::Once = ::std::sync::Once::new();
@@ -2003,7 +2002,7 @@ mod tests {
 
         assert!(rendered.contains("FieldExtraction :: Optional"));
         assert!(rendered.contains("Some"));
-        assert!(rendered.contains("from_bytes"));
+        assert!(rendered.contains("decode :: < f32 >"));
         assert!(rendered.contains("\"Speed\""));
     }
 

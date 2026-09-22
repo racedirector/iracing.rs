@@ -163,6 +163,12 @@ struct IncidentRow {
     incidents: IncidentFlags,
 }
 
+#[derive(IRacingTelemetryFrame, Debug, PartialEq)]
+struct ArrayRow {
+    #[field_name = "CarIdxLapDistPct"]
+    lap_dist_pct: Vec<f32>,
+}
+
 #[test]
 fn derive_supports_generic_structs() {
     let schema = Arc::new(make_schema(&[("Speed", VariableType::Float, 0)], 4));
@@ -250,6 +256,34 @@ fn validate_schema_rejects_incompatible_required_fields() {
         }
         other => panic!("unexpected error: {other:?}"),
     }
+}
+
+#[test]
+fn derived_array_reads_all_elements_and_scalar_binding_rejects_array_shape() {
+    let mut array_info = make_variable_info("CarIdxLapDistPct", VariableType::Float, 0);
+    array_info.count = 2;
+    let schema = Arc::new(
+        VariableSchema::new(HashMap::from([(array_info.name.clone(), array_info)]), 8).unwrap(),
+    );
+    let mut data = Vec::new();
+    data.extend_from_slice(&0.25_f32.to_le_bytes());
+    data.extend_from_slice(&0.75_f32.to_le_bytes());
+    let packet = make_packet(Arc::clone(&schema), data);
+
+    let validation = ArrayRow::validate_schema(&schema).unwrap();
+    assert_eq!(
+        ArrayRow::adapt(&packet, &validation).lap_dist_pct,
+        vec![0.25, 0.75]
+    );
+
+    let mut speed_info = make_variable_info("Speed", VariableType::Float, 0);
+    speed_info.count = 2;
+    let scalar_schema =
+        VariableSchema::new(HashMap::from([("Speed".into(), speed_info)]), 8).unwrap();
+    assert!(matches!(
+        CriticalRow::validate_schema(&scalar_schema),
+        Err(IRacingSDKError::Parse { .. })
+    ));
 }
 
 #[test]

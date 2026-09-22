@@ -27,7 +27,8 @@ pub trait FrameAdapter: Sized {
     /// This method runs at 60Hz and must be extremely efficient:
     /// - Uses direct memory access with pre-validated offsets
     /// - No HashMap lookups or string operations
-    /// - All field existence and type checks already performed
+    /// - Field mappings and compatibility were checked during validation;
+    ///   frame reads defensively check their byte ranges and metadata
     ///
     /// # Performance Target
     /// Must complete in <1ms for typical adapter with 10-20 fields.

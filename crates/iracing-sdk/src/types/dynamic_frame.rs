@@ -25,7 +25,7 @@ impl DynamicFrame {
     /// Returns None if the variable is missing or type conversion fails.
     pub fn get<T: VarData>(&self, name: &str) -> Option<T> {
         let info = self.variable(name)?;
-        T::from_bytes(self.data.as_ref(), info).ok()
+        info.decode::<T>(self.data.as_ref()).ok()
     }
 
     /// Look up a variable as `f32`, or `None` if missing or the wrong type.

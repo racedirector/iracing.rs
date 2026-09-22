@@ -9,12 +9,12 @@
 //! The adapter system follows a "fail-fast, run-fast" principle:
 //! - All field mapping errors are caught at connection time with helpful suggestions
 //! - Runtime extraction has zero HashMap lookups and minimal overhead (<1ms target)
-//! - Type safety is enforced through integration with the existing VarData trait
+//! - Type compatibility is checked from metadata during schema validation
 //!
 //! # Example Usage
 //!
 //! ```rust
-//! use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, VarData, VariableSchema};
+//! use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, FramePacket, IRacingSDKError, VariableSchema};
 //!
 //! // Manual adapter implementation
 //! struct CarData {
@@ -52,7 +52,7 @@
 //!             .index_of("Gear")
 //!             .and_then(|idx| validation.extraction_plan.get(idx))
 //!             .and_then(|field| field.var_info())
-//!             .and_then(|info| i32::from_bytes(packet.data.as_ref(), info).ok());
+//!             .and_then(|info| info.decode::<i32>(packet.data.as_ref()).ok());
 //!
 //!         Self { speed, rpm, gear }
 //!     }

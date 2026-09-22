@@ -81,7 +81,7 @@ Defined in `.cargo/config.toml` for convenience:
 ## Development Notes
 
 - **Platform gates**: Live shared-memory support, broadcast commands, and some codegen binaries are Windows-only. Keep new APIs behind `#[cfg(windows)]` and align `package.metadata.dist.bin.*.targets` with the code.
-- **Telemetry decoding**: Always use `VarData::from_bytes` and related helpers; frame data is little-endian and manual decoding tends to drift from the authoritative implementation.
+- **Telemetry decoding**: Use `VariableInfo::decode` for typed reads; it checks the frame range and delegates little-endian value conversion to `VarData`.
 - **Session parsing**: Parse provider-supplied YAML with `SessionInfo::parse`. The telemetry session policies handle live version changes and parse IBT session data once.
 - **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
 - **Schema discovery**: When new fields appear, run `cargo session discover ibt --path <FILE.ibt>` (or `discover live` on Windows) and incorporate the results back into `iracing-sdk` to improve typings.

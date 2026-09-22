@@ -14,9 +14,9 @@ Disk variable headers are parsed from `.ibt` files. Live variable headers are
 discovered from Windows shared memory. Both become `VariableSchema` containing
 named `VariableInfo` entries and a frame size.
 
-Consumers should resolve fields through the schema and decode through `VarData`
-or `TelemetryValue`. This keeps type sizes, arrays, bitfields, bounds, and
-little-endian conversion centralized.
+Consumers resolve fields through the schema and call `VariableInfo::decode`
+for typed reads. `VariableInfo` checks type, shape, and frame bounds; `VarData`
+converts the checked bytes. `TelemetryValue` serves dynamic reads and writers.
 
 The live header/variable discovery modules are Windows-gated. The resulting
 schema and frame types are platform-neutral.

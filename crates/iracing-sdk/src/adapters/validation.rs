@@ -99,13 +99,13 @@ impl AdapterValidation {
         if let Some(index) = self.index_of(name)
             && let Some(entry) = self.extraction_plan.get(index)
             && let Some(var_info) = entry.var_info()
-            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
+            && let Ok(value) = var_info.decode::<T>(data)
         {
             return value;
         }
 
         if let Some(var_info) = packet.schema.get_variable(name)
-            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
+            && let Ok(value) = var_info.decode::<T>(data)
         {
             return value;
         }
@@ -116,14 +116,13 @@ impl AdapterValidation {
 
 /// Determine whether a schema variable is incompatible with a target `VarData` type.
 ///
-/// This probes type compatibility by calling `<T as VarData>::from_bytes(&[], var_info)`,
-/// which performs type checks without requiring a real frame buffer.
+/// Checks the variable metadata directly, without attempting a frame decode.
 ///
 /// # Returns
 ///
-/// - `Ok(None)` if the variable can be mapped to `T` (including when the probe hits a memory/bounds condition).
+/// - `Ok(None)` if the variable can be mapped to `T`.
 /// - `Ok(Some(details))` if the probe fails with a type-conversion error; `details` contains the diagnostic message.
-/// - `Err(err)` for any other error encountered while probing.
+/// - `Err(err)` for invalid schema metadata.
 ///
 /// # Examples
 ///
@@ -146,8 +145,8 @@ pub fn telemetry_type_mismatch_details<T>(var_info: &VariableInfo) -> crate::Res
 where
     T: crate::VarData,
 {
-    match <T as crate::VarData>::from_bytes(&[], var_info) {
-        Ok(_) | Err(IRacingSDKError::Memory { .. }) => Ok(None),
+    match var_info.validate_as::<T>() {
+        Ok(()) => Ok(None),
         Err(IRacingSDKError::TypeConversion { details }) => Ok(Some(details)),
         Err(err) => Err(err),
     }

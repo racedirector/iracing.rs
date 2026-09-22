@@ -36,9 +36,10 @@ buffers.
 units, and description. Schema construction is the boundary at which ranges
 should be validated.
 
-Telemetry is little-endian. `VarData::from_bytes` and `TelemetryValue::decode`
-are the authoritative decoding paths; consumers should not reproduce byte
-slicing or discriminant handling.
+Telemetry is little-endian. `VariableInfo::decode` handles typed reads by
+checking the variable's byte range once and passing checked bytes to `VarData`.
+`TelemetryValue::decode` shares the range check for dynamic reads and writers.
+Consumers should not reproduce byte slicing or discriminant handling.
 
 ## `FramePacket`
 
@@ -244,7 +245,7 @@ Invariants:
 
 - required schema mismatches fail during validation;
 - per-frame adaptation should avoid schema hash-map lookup;
-- decoding goes through `VarData`;
+- typed decoding goes through `VariableInfo::decode` and `VarData`;
 - `DynamicFrame` is for flexibility, not the default hot-path design.
 
 ## Rate limiting

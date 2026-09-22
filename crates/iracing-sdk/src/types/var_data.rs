@@ -1,88 +1,135 @@
-//! Variable data parsing trait and implementations
+//! Conversion of checked telemetry bytes into Rust values.
 use super::{BitField, VariableInfo};
-use crate::parse_utils::decode_variable_type;
+use crate::{IRacingSDKError, irsdk::VariableType};
 
-/// Trait for types that can be parsed from binary telemetry data.
+/// Converts one validated telemetry variable into a Rust value.
+///
+/// [`VariableInfo`] owns type and layout validation. Implementations here only
+/// interpret the checked bytes, including the SDK's little-endian encoding.
 pub trait VarData: Sized {
-    /// Parse this type from binary data at the given offset.
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self>;
-}
+    /// Width of one element in the SDK wire format. This must be nonzero and
+    /// match every storage type accepted by [`Self::accepts_type`].
+    const ELEMENT_SIZE: usize;
 
-/// irsdk::VariableType::Float
-impl VarData for f32 {
+    /// Whether this type can represent the SDK storage type.
+    fn accepts_type(data_type: VariableType) -> bool;
+
+    /// Storage type expected in type-conversion diagnostics.
+    fn expected_type() -> &'static str;
+
+    /// Whether this type represents every element of a variable.
+    const IS_ARRAY: bool = false;
+
+    /// Convert a checked variable slice. `data_type` is needed by types that
+    /// accept more than one wire representation.
+    fn decode_value(bytes: &[u8], data_type: VariableType) -> crate::Result<Self>;
+
+    /// Decode a variable from a frame using its metadata.
+    #[inline]
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, Float, f32::from_le_bytes)
+        info.decode(data)
     }
 }
 
-/// irsdk::VariableType::Integer
-impl VarData for i32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, Integer, i32::from_le_bytes)
-    }
+#[inline]
+fn fixed_bytes<const N: usize>(bytes: &[u8]) -> crate::Result<[u8; N]> {
+    bytes.try_into().map_err(|_| {
+        IRacingSDKError::parse_error("VarData::decode_value", "unexpected telemetry byte width")
+    })
 }
 
-/// irsdk::VariableType::Bool
-impl VarData for bool {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, Boolean, |[byte]| byte != 0)
-    }
+macro_rules! impl_primitive {
+    ($type:ty, $variant:ident, $size:expr, $decode:expr) => {
+        impl VarData for $type {
+            const ELEMENT_SIZE: usize = $size;
+
+            #[inline]
+            fn accepts_type(data_type: VariableType) -> bool {
+                data_type == VariableType::$variant
+            }
+
+            fn expected_type() -> &'static str {
+                stringify!($variant)
+            }
+
+            #[inline]
+            fn decode_value(bytes: &[u8], _data_type: VariableType) -> crate::Result<Self> {
+                ($decode)(bytes)
+            }
+        }
+    };
 }
 
-/// irsdk::VariableType::BitField
+// Keep the wire width in one place per implementation; VariableInfo checks
+// the corresponding VariableType before these functions are called.
+impl_primitive!(f32, Float, 4, |bytes| -> crate::Result<f32> {
+    Ok(f32::from_le_bytes(fixed_bytes::<4>(bytes)?))
+});
+impl_primitive!(i32, Integer, 4, |bytes| -> crate::Result<i32> {
+    Ok(i32::from_le_bytes(fixed_bytes::<4>(bytes)?))
+});
+impl_primitive!(bool, Boolean, 1, |bytes| -> crate::Result<bool> {
+    Ok(fixed_bytes::<1>(bytes)?[0] != 0)
+});
+impl_primitive!(u8, Character, 1, |bytes| -> crate::Result<u8> {
+    Ok(fixed_bytes::<1>(bytes)?[0])
+});
+impl_primitive!(f64, Double, 8, |bytes| -> crate::Result<f64> {
+    Ok(f64::from_le_bytes(fixed_bytes::<8>(bytes)?))
+});
+
 impl VarData for BitField {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, BitField, |bytes| {
-            BitField(u32::from_le_bytes(bytes))
-        })
+    const ELEMENT_SIZE: usize = 4;
+
+    #[inline]
+    fn accepts_type(data_type: VariableType) -> bool {
+        data_type == VariableType::BitField
+    }
+
+    fn expected_type() -> &'static str {
+        "BitField"
+    }
+
+    #[inline]
+    fn decode_value(bytes: &[u8], _data_type: VariableType) -> crate::Result<Self> {
+        Ok(BitField::new(u32::from_le_bytes(fixed_bytes::<4>(bytes)?)))
     }
 }
 
-/// irsdk::VariableType::Character
-impl VarData for u8 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, Character, |[byte]| byte)
-    }
-}
-
-/// irsdk::VariableType::Double
-impl VarData for f64 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        decode_variable_type!(data, info, Double, f64::from_le_bytes)
-    }
-}
-
-// Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        let element_size = info.storage_byte_size()?;
-        if info.count == 0 {
-            return Ok(Vec::new());
+    const ELEMENT_SIZE: usize = T::ELEMENT_SIZE;
+
+    const IS_ARRAY: bool = true;
+
+    fn accepts_type(data_type: VariableType) -> bool {
+        T::accepts_type(data_type)
+    }
+
+    fn expected_type() -> &'static str {
+        T::expected_type()
+    }
+
+    #[inline]
+    fn decode_value(bytes: &[u8], data_type: VariableType) -> crate::Result<Self> {
+        let size = T::ELEMENT_SIZE;
+        if size == 0 {
+            return Err(IRacingSDKError::parse_error(
+                "VarData::decode_value",
+                "telemetry element width must be nonzero",
+            ));
+        }
+        let chunks = bytes.chunks_exact(size);
+        if !chunks.remainder().is_empty() {
+            return Err(IRacingSDKError::parse_error(
+                "VarData::decode_value",
+                "array byte length is not a multiple of its element width",
+            ));
         }
 
-        let mut result = Vec::with_capacity(info.count);
-
-        // Clone the variable info and set the count to 1.
-        let mut var_info = info.clone();
-        // Set the count to 1 to represent a single item within the array.
-        var_info.count = 1;
-
-        for i in 0..info.count {
-            // Check the offset of the item
-            let offset_delta = i
-                .checked_mul(element_size)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
-
-            // Set the offset
-            var_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
-
-            // Parse the variable and store it in the result.
-            result.push(T::from_bytes(data, &var_info)?);
+        let mut result = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            result.push(T::decode_value(chunk, data_type)?);
         }
-
         Ok(result)
     }
 }
@@ -265,7 +312,38 @@ mod tests {
         info.count = 0;
         assert!(Vec::<u8>::from_bytes(&[], &info).unwrap().is_empty());
 
+        info.data_type = VariableType::Float;
+        assert!(matches!(
+            info.validate_as::<Vec<u8>>(),
+            Err(IRacingSDKError::TypeConversion { .. })
+        ));
+
         info.data_type = VariableType::ElementTypeCount;
         assert!(Vec::<u8>::from_bytes(&[], &info).is_err());
+    }
+
+    #[test]
+    fn metadata_validation_checks_type_and_scalar_shape_without_frame_data() {
+        let mut info = variable_info(VariableType::Float, 1);
+        info.count = 2;
+        assert!(info.validate_as::<Vec<f32>>().is_ok());
+        assert!(matches!(
+            info.validate_as::<f32>(),
+            Err(IRacingSDKError::TypeConversion { .. })
+        ));
+        assert!(matches!(
+            info.validate_as::<Vec<i32>>(),
+            Err(IRacingSDKError::TypeConversion { .. })
+        ));
+    }
+
+    #[test]
+    fn invalid_array_extent_fails_before_allocating_an_output() {
+        let mut info = variable_info(VariableType::Float, 0);
+        info.count = usize::MAX;
+        assert!(matches!(
+            info.decode::<Vec<f32>>(&[]),
+            Err(IRacingSDKError::Memory { offset: 0, .. })
+        ));
     }
 }
