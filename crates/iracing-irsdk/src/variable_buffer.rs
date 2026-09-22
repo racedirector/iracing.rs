@@ -1,19 +1,9 @@
-#[cfg(test)]
-use super::WireType;
 use type_layout::TypeLayout;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// iRacing variable buffer information
 #[repr(C)]
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    TypeLayout,
-    zerocopy::FromBytes,
-    zerocopy::IntoBytes,
-    zerocopy::KnownLayout,
-    zerocopy::Immutable,
-)]
+#[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct VariableBuffer {
     /// Tick count when buffer was written
     pub tick_count: i32,
@@ -40,11 +30,11 @@ impl VariableBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::mem::{align_of, offset_of};
+    use std::mem::{align_of, offset_of, size_of};
 
     #[test]
     fn variable_buffer_layout_matches_iracing_abi() {
-        assert_eq!(VariableBuffer::WIRE_SIZE, 16);
+        assert_eq!(size_of::<VariableBuffer>(), 16);
 
         assert_eq!(align_of::<VariableBuffer>(), 4);
 
@@ -57,9 +47,9 @@ mod tests {
     #[test]
     fn variable_buffer_wire_round_trip() {
         let buffer = VariableBuffer::new(10, 20, 9);
-        let mut bytes = Vec::new();
-        buffer.write_to(&mut bytes).unwrap();
-        let decoded = VariableBuffer::read_from_bytes(&bytes).unwrap();
+        let bytes = buffer.as_bytes();
+
+        let decoded = VariableBuffer::read_from_bytes(bytes).unwrap();
         assert_eq!(decoded.tick_count, 10);
         assert_eq!(decoded.buffer_offset, 20);
         assert_eq!(decoded.tick_count_begin, 9);

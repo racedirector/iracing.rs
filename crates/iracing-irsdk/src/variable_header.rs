@@ -1,11 +1,10 @@
 use type_layout::TypeLayout;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::parse_utils::nul_terminated_bytes;
 use crate::{Error, Result};
 
 use super::VariableType;
-#[cfg(test)]
-use super::WireType;
 use super::{
     constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING},
     error::variable_header_validation_error,
@@ -13,16 +12,7 @@ use super::{
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    TypeLayout,
-    zerocopy::FromBytes,
-    zerocopy::IntoBytes,
-    zerocopy::KnownLayout,
-    zerocopy::Immutable,
-)]
+#[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct VariableHeader {
     /// Variable type (irsdk_VarType enum)
     pub variable_type: i32,
@@ -163,7 +153,7 @@ mod tests {
 
     #[test]
     fn variable_header_layout_matches_iracing_abi() {
-        assert_eq!(VariableHeader::WIRE_SIZE, 144);
+        assert_eq!(size_of::<VariableHeader>(), 144);
         assert_eq!(align_of::<VariableHeader>(), 4);
 
         assert_eq!(offset_of!(VariableHeader, variable_type), 0);
@@ -210,10 +200,10 @@ mod tests {
             "m/s",
         )
         .unwrap();
-        let mut bytes = Vec::new();
-        header.write_to(&mut bytes).unwrap();
 
-        assert_eq!(bytes.len(), VariableHeader::WIRE_SIZE);
+        let bytes = header.as_bytes();
+
+        assert_eq!(bytes.len(), size_of::<VariableHeader>());
         assert_eq!(&bytes[0..4], &4i32.to_le_bytes());
         assert_eq!(&bytes[4..8], &8i32.to_le_bytes());
         assert_eq!(&bytes[13..16], &[0; 3]);

@@ -1,7 +1,7 @@
 use std::io::Read;
 use type_layout::TypeLayout;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use super::WireType;
 use crate::Result;
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
@@ -10,16 +10,7 @@ use crate::Result;
 /// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
 /// metadata specific to `.ibt` replay files.
 #[repr(C)]
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    TypeLayout,
-    zerocopy::FromBytes,
-    zerocopy::IntoBytes,
-    zerocopy::KnownLayout,
-    zerocopy::Immutable,
-)]
+#[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct DiskSubHeader {
     /// Unix timestamp (`time_t`) of the session start date.
     pub start_date: i64,
@@ -61,18 +52,25 @@ impl DiskSubHeader {
     /// Returns a parse error if `reader` cannot supply the required
     /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::read_from_reader(reader, "Disk sub-header")
+        Self::read_from_io(reader).map_err(|error| {
+            crate::Error::parse(
+                "Disk sub-header reading",
+                format!("Failed to read disk sub-header: {error}"),
+            )
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use zerocopy::{FromBytes, IntoBytes};
+
     use super::*;
-    use std::mem::{align_of, offset_of};
+    use std::mem::{align_of, offset_of, size_of};
 
     #[test]
     fn disk_sub_header_layout_matches_iracing_abi() {
-        assert_eq!(DiskSubHeader::WIRE_SIZE, 32);
+        assert_eq!(size_of::<DiskSubHeader>(), 32);
         assert_eq!(align_of::<DiskSubHeader>(), 8);
 
         assert_eq!(offset_of!(DiskSubHeader, start_date), 0);
@@ -85,9 +83,9 @@ mod tests {
     #[test]
     fn disk_sub_header_wire_round_trip() {
         let header = DiskSubHeader::new(123, 1.5, 2.5, 3, 4);
-        let mut bytes = Vec::new();
-        header.write_to(&mut bytes).unwrap();
-        let decoded = DiskSubHeader::read_from_bytes(&bytes).unwrap();
+        let bytes = header.as_bytes();
+
+        let decoded = DiskSubHeader::read_from_bytes(bytes).unwrap();
         assert_eq!(decoded.start_date, 123);
         assert_eq!(decoded.start_time, 1.5);
         assert_eq!(decoded.end_time, 2.5);

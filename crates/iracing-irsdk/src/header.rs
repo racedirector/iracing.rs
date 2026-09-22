@@ -1,8 +1,9 @@
 use std::io::Read;
 use type_layout::TypeLayout;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{
-    StatusField, VariableBuffer, VariableHeader, WireType,
+    StatusField, VariableBuffer, VariableHeader,
     constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
     error::{header_validation_error, mismatched_version_error},
 };
@@ -10,16 +11,7 @@ use crate::Result;
 
 /// An iRacing SDK header.
 #[repr(C)]
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    TypeLayout,
-    zerocopy::FromBytes,
-    zerocopy::IntoBytes,
-    zerocopy::KnownLayout,
-    zerocopy::Immutable,
-)]
+#[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct Header {
     /// API version
     pub version: i32,
@@ -65,7 +57,12 @@ impl Header {
     /// Returns a parse error if `reader` cannot supply the required
     /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::read_from_reader(reader, "Header")
+        Self::read_from_io(reader).map_err(|error| {
+            crate::Error::parse(
+                "Disk Header reading",
+                format!("Failed to read disk header: {error}"),
+            )
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -192,7 +189,7 @@ impl Header {
         if self.variable_header_offset > 0 && self.variable_count > 0 {
             let variable_bytes = self
                 .variable_count
-                .checked_mul(VariableHeader::WIRE_SIZE as i32)
+                .checked_mul(size_of::<VariableHeader>().try_into().unwrap())
                 .ok_or_else(|| header_validation_error("Variable header array size overflows"))?;
 
             self.variable_header_offset
@@ -398,7 +395,7 @@ mod tests {
 
     #[test]
     fn header_layout_matches_iracing_abi() {
-        assert_eq!(Header::WIRE_SIZE, 112);
+        assert_eq!(size_of::<Header>(), 112);
 
         assert_eq!(align_of::<Header>(), 4);
 
@@ -421,9 +418,9 @@ mod tests {
     #[test]
     fn header_wire_round_trip() {
         let header = valid_live_header();
-        let mut bytes = Vec::new();
-        header.write_to(&mut bytes).unwrap();
-        let decoded = Header::read_from_bytes(&bytes).unwrap();
+        let bytes = header.as_bytes();
+
+        let decoded = Header::read_from_bytes(bytes).unwrap();
         assert_eq!(decoded.version, header.version);
         assert_eq!(decoded.status, header.status);
         assert_eq!(

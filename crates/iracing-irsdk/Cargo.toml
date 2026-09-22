@@ -19,8 +19,8 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
-type-layout = "0.2.0"
-zerocopy = { version = "0.8.48", features = ["derive", "std"] }
+type-layout = { workspace = true }
+zerocopy = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

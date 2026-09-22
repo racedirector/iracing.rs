@@ -1,6 +1,6 @@
 //! Deterministic construction of session YAML, IBT bytes, and the manifest.
 //!
-//! SDK structure sizes come from [`WireType::WIRE_SIZE`]. The module keeps the
+//! SDK structure sizes come from `size_of` on zerocopy wire types. The module keeps the
 //! 112-byte main header separate from the 144-byte composite IBT preamble to
 //! prevent variable headers from overlapping the disk sub-header.
 
@@ -8,11 +8,12 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Result, ensure};
 use iracing_irsdk::{
-    DiskSubHeader, Header, StatusField, VariableBuffer, VariableHeader, VariableType, WireType,
+    DiskSubHeader, Header, StatusField, VariableBuffer, VariableHeader, VariableType,
 };
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use sha2::{Digest, Sha256};
+use zerocopy::IntoBytes;
 
 use crate::{
     GenerationReport,
@@ -23,9 +24,9 @@ use crate::{
 };
 
 /// Size of the SDK header common to live and recorded telemetry.
-const MAIN_HEADER_SIZE: usize = Header::WIRE_SIZE;
+const MAIN_HEADER_SIZE: usize = size_of::<Header>();
 /// Size of the metadata present only in recorded IBT files.
-const DISK_HEADER_SIZE: usize = DiskSubHeader::WIRE_SIZE;
+const DISK_HEADER_SIZE: usize = size_of::<DiskSubHeader>();
 /// Offset at which the first variable header begins in generated IBT files.
 const IBT_PREAMBLE_SIZE: usize = MAIN_HEADER_SIZE + DISK_HEADER_SIZE;
 
@@ -94,8 +95,8 @@ struct Artifact {
 ///
 /// # Errors
 ///
-/// Returns an error for invalid profile geometry, SDK wire construction or
-/// encoding failures, manifest serialization failures, and filesystem errors.
+/// Returns an error for invalid profile geometry, SDK wire construction,
+/// manifest serialization failures, and filesystem errors.
 pub(crate) fn generate(repo_root: &Path) -> Result<GenerationReport> {
     let profiles = profiles();
     let mut artifacts = Vec::with_capacity(profiles.len() * 2 + 1);
@@ -126,7 +127,7 @@ pub(crate) fn generate(repo_root: &Path) -> Result<GenerationReport> {
             live_header_prefix_size: MAIN_HEADER_SIZE,
             ibt_header_size: IBT_PREAMBLE_SIZE,
             disk_sub_header_size: DISK_HEADER_SIZE,
-            variable_header_size: VariableHeader::WIRE_SIZE,
+            variable_header_size: size_of::<VariableHeader>(),
             disk_sub_header_offset_rule: "var_header_offset - disk_sub_header_size".to_owned(),
         },
         fixtures,
@@ -175,11 +176,11 @@ fn session_yaml(profile: &Profile) -> String {
 /// # Errors
 ///
 /// Returns an error if the profile is invalid, counts or offsets do not fit SDK
-/// integer fields, a wire header cannot be constructed/encoded, or the final
+/// integer fields, a wire header cannot be constructed, or the final
 /// byte length disagrees with the calculated geometry.
 fn build_ibt(profile: &Profile, yaml: &[u8]) -> Result<Vec<u8>> {
     validate_profile(profile)?;
-    let variable_headers_len = profile.variables.len() * VariableHeader::WIRE_SIZE;
+    let variable_headers_len = profile.variables.len() * size_of::<VariableHeader>();
     let session_info_offset = IBT_PREAMBLE_SIZE + variable_headers_len;
     let end_time = profile.start_time + profile.frame_count as f64 / f64::from(profile.tick_rate);
     let buffers = [VariableBuffer::new(0, 0, 0); Header::MAX_BUFFERS];
@@ -208,13 +209,11 @@ fn build_ibt(profile: &Profile, yaml: &[u8]) -> Result<Vec<u8>> {
 
     let expected_len = session_info_offset + yaml.len() + profile.frame_count * profile.frame_size;
     let mut bytes = Vec::with_capacity(expected_len);
-    header
-        .write_to(&mut bytes)
-        .context("encoding main header")?;
-    disk.write_to(&mut bytes)
-        .context("encoding disk sub-header")?;
+
+    bytes.extend_from_slice(header.as_bytes());
+    bytes.extend_from_slice(disk.as_bytes());
     for variable in &profile.variables {
-        VariableHeader::new(
+        let variable_header = VariableHeader::new(
             variable.data_type,
             variable.offset,
             variable.count,
@@ -222,9 +221,9 @@ fn build_ibt(profile: &Profile, yaml: &[u8]) -> Result<Vec<u8>> {
             variable.name,
             variable.description,
             variable.units,
-        )?
-        .write_to(&mut bytes)
-        .context("encoding variable header")?;
+        )
+        .with_context(|| format!("constructing variable header {}", variable.name))?;
+        bytes.extend_from_slice(variable_header.as_bytes());
     }
     bytes.extend_from_slice(yaml);
     let mut random = ChaCha8Rng::seed_from_u64(profile.seed);
@@ -383,7 +382,7 @@ fn manifest_fixture(
         session_info_update: 0,
         session_info_len: yaml.len() as i32,
         session_info_offset: (IBT_PREAMBLE_SIZE
-            + profile.variables.len() * VariableHeader::WIRE_SIZE)
+            + profile.variables.len() * size_of::<VariableHeader>())
             as i32,
         num_buf: 1,
         disk_header: IbtDiskHeaderManifest {

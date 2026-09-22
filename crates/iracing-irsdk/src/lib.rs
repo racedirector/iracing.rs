@@ -23,7 +23,6 @@ mod error;
 mod header;
 mod variable_buffer;
 mod variable_header;
-mod wire_type;
 
 pub use bitfield::BitField;
 pub use broadcast::*;
@@ -35,4 +34,3 @@ pub use telemetry::*;
 pub use variable_buffer::VariableBuffer;
 pub use variable_header::VariableHeader;
 pub use variable_type::VariableType;
-pub use wire_type::WireType;
