@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(&bytes[4..8], &8i32.to_le_bytes());
         assert_eq!(&bytes[13..16], &[0; 3]);
         assert_eq!(&bytes[16..22], b"Speed\0");
-        assert_eq!(VariableHeader::read_from_bytes(&bytes).unwrap().offset, 8);
+        assert_eq!(VariableHeader::read_from_bytes(bytes).unwrap().offset, 8);
     }
 
     #[test]
