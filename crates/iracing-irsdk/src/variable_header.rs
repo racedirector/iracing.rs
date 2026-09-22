@@ -4,15 +4,25 @@ use crate::parse_utils::nul_terminated_bytes;
 use crate::{Error, Result};
 
 use super::VariableType;
+#[cfg(test)]
+use super::WireType;
 use super::{
     constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING},
     error::variable_header_validation_error,
-    wire_type::WireType,
 };
 
 /// iRacing variable header structure matching the C SDK layout
 #[repr(C)]
-#[derive(Debug, Clone, Copy, TypeLayout)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    TypeLayout,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
 pub struct VariableHeader {
     /// Variable type (irsdk_VarType enum)
     pub variable_type: i32,
@@ -145,8 +155,6 @@ fn fixed_ascii<const N: usize>(field: &'static str, value: &str) -> Result<[u8; 
     bytes[..value.len()].copy_from_slice(value.as_bytes());
     Ok(bytes)
 }
-
-unsafe impl WireType for VariableHeader {}
 
 #[cfg(test)]
 mod tests {

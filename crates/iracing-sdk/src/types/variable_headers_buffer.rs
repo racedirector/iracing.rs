@@ -28,6 +28,6 @@ impl VariableHeadersBuffer {
 
         chunks
             .iter()
-            .map(|bytes| unsafe { VariableHeader::read_from_bytes_unchecked(bytes) })
+            .map(|bytes| VariableHeader::read_from_bytes(bytes).expect("fixed-size header chunk"))
     }
 }

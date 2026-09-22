@@ -998,6 +998,7 @@ dependencies = [
  "serde_yaml_ng",
  "thiserror",
  "type-layout",
+ "zerocopy",
 ]
 
 [[package]]

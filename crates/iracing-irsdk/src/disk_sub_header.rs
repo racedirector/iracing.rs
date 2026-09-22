@@ -2,7 +2,7 @@ use std::io::Read;
 use type_layout::TypeLayout;
 
 use super::WireType;
-use crate::{Error, Result};
+use crate::Result;
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
@@ -10,7 +10,16 @@ use crate::{Error, Result};
 /// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
 /// metadata specific to `.ibt` replay files.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, TypeLayout)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    TypeLayout,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
 pub struct DiskSubHeader {
     /// Unix timestamp (`time_t`) of the session start date.
     pub start_date: i64,
@@ -52,20 +61,9 @@ impl DiskSubHeader {
     /// Returns a parse error if `reader` cannot supply the required
     /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        let mut buffer = [0u8; Self::WIRE_SIZE];
-
-        reader.read_exact(&mut buffer).map_err(|e| {
-            Error::parse(
-                "Header reading",
-                format!("Failed to read {} header bytes: {}", Self::WIRE_SIZE, e),
-            )
-        })?;
-
-        Self::read_from_bytes(&buffer)
+        Self::read_from_reader(reader, "Disk sub-header")
     }
 }
-
-unsafe impl WireType for DiskSubHeader {}
 
 #[cfg(test)]
 mod tests {

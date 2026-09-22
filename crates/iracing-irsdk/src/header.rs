@@ -6,11 +6,20 @@ use super::{
     constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
     error::{header_validation_error, mismatched_version_error},
 };
-use crate::{Error, Result};
+use crate::Result;
 
 /// An iRacing SDK header.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, TypeLayout)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    TypeLayout,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
 pub struct Header {
     /// API version
     pub version: i32,
@@ -56,16 +65,7 @@ impl Header {
     /// Returns a parse error if `reader` cannot supply the required
     /// [`Self::WIRE_SIZE`] bytes.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        let mut buffer = [0u8; Self::WIRE_SIZE];
-
-        reader.read_exact(&mut buffer).map_err(|e| {
-            Error::parse(
-                "Header reading",
-                format!("Failed to read {} header bytes: {}", Header::WIRE_SIZE, e),
-            )
-        })?;
-
-        Self::read_from_bytes(&buffer)
+        Self::read_from_reader(reader, "Header")
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -309,11 +309,10 @@ impl Header {
     }
 }
 
-unsafe impl WireType for Header {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Error;
     use std::mem::{align_of, offset_of};
 
     fn valid_live_header() -> Header {

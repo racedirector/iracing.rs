@@ -1,9 +1,19 @@
+#[cfg(test)]
 use super::WireType;
 use type_layout::TypeLayout;
 
 /// iRacing variable buffer information
 #[repr(C)]
-#[derive(Debug, Clone, Copy, TypeLayout)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    TypeLayout,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
 pub struct VariableBuffer {
     /// Tick count when buffer was written
     pub tick_count: i32,
@@ -26,8 +36,6 @@ impl VariableBuffer {
         }
     }
 }
-
-unsafe impl WireType for VariableBuffer {}
 
 #[cfg(test)]
 mod tests {
