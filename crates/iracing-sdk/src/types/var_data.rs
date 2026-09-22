@@ -1,6 +1,6 @@
 //! Variable data parsing trait and implementations
 use super::{BitField, VariableInfo};
-use crate::irsdk::VariableType;
+use crate::{irsdk::VariableType, parse_utils::decode_variable_type};
 
 /// Trait for types that can be parsed from binary telemetry data.
 pub trait VarData: Sized {
@@ -8,44 +8,28 @@ pub trait VarData: Sized {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self>;
 }
 
-macro_rules! read_fixed {
-    ($data:expr, $info:expr, $variant:ident, $decode:expr $(,)?) => {{
-        const EXPECTED: VariableType = VariableType::$variant;
-
-        read_fixed_impl::<
-            {
-                match EXPECTED.byte_size() {
-                    Some(size) => size,
-                    None => panic!("expected storage type"),
-                }
-            },
-            _,
-        >($data, $info, EXPECTED, $decode)
-    }};
-}
-
 // Implement VarData for basic types
 impl VarData for f32 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        read_fixed!(data, info, Float, f32::from_le_bytes)
+        decode_variable_type!(data, info, Float, f32::from_le_bytes)
     }
 }
 
 impl VarData for i32 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        read_fixed!(data, info, Integer, i32::from_le_bytes)
+        decode_variable_type!(data, info, Integer, i32::from_le_bytes)
     }
 }
 
 impl VarData for bool {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        read_fixed!(data, info, Boolean, |[byte]| byte != 0)
+        decode_variable_type!(data, info, Boolean, |[byte]| byte != 0)
     }
 }
 
 impl VarData for BitField {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        read_fixed!(data, info, BitField, |bytes| {
+        decode_variable_type!(data, info, BitField, |bytes| {
             BitField(u32::from_le_bytes(bytes))
         })
     }
@@ -69,7 +53,7 @@ impl VarData for u8 {
 
 impl VarData for f64 {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        read_fixed!(data, info, Double, f64::from_le_bytes)
+        decode_variable_type!(data, info, Double, f64::from_le_bytes)
     }
 }
 
@@ -106,32 +90,6 @@ impl<T: VarData> VarData for Vec<T> {
 
         Ok(result)
     }
-}
-
-#[inline]
-fn read_fixed_impl<const SIZE: usize, T>(
-    data: &[u8],
-    info: &VariableInfo,
-    expected: VariableType,
-    decode: impl FnOnce([u8; SIZE]) -> T,
-) -> crate::Result<T> {
-    // Validate we have the right data type
-    if info.data_type != expected {
-        return Err(crate::IRacingSDKError::type_conversion(
-            expected,
-            info.data_type,
-        ));
-    }
-
-    // Read the bytes
-    let bytes = data
-        .get(info.offset..)
-        .and_then(|remaining| remaining.first_chunk::<SIZE>())
-        .copied()
-        .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
-
-    // Decode and return
-    Ok(decode(bytes))
 }
 
 #[cfg(test)]
