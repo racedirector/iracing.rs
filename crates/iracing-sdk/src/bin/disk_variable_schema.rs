@@ -13,9 +13,9 @@
 //! disk-variable-schema --ibt-path <FILE.ibt> --output-path <SCHEMA.yml>
 //! ```
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use iracing_sdk::SchemaProvider;
+use iracing_sdk::VariableSchema;
 use iracing_sdk::ibt::IbtReader;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
@@ -56,9 +56,14 @@ pub fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader
     // ------------------------------------------------------------
-    let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
+    let mut reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
 
-    let variable_schema = reader.schema().clone();
+    let variable_schema = match reader.variable_headers_snapshot()? {
+        Some(snapshot) => VariableSchema::from_snapshot(snapshot, reader.layout().frame_size())
+            .map_err(|error| anyhow!("Could not create variable schema from snapshot: {error}")),
+        None => Err(anyhow!("No variable headers snapshot")),
+    }?;
+
     let schema = schemars::schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;

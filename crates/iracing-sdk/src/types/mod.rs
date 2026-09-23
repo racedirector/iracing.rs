@@ -45,9 +45,14 @@
 //! # Ok::<(), iracing_sdk::IRacingSDKError>(())
 //! ```
 
+#[macro_use]
+mod macros;
+
 mod dynamic_frame;
 mod frame;
+mod ibt;
 mod iracing_session_string;
+
 mod regions;
 mod schema;
 mod session_info_buffer;
@@ -59,6 +64,7 @@ mod variable_headers_buffer;
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
+pub use ibt::IbtLayout;
 pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::*;
@@ -67,7 +73,7 @@ pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInf
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_headers_buffer::VariableHeadersBuffer;
+pub use variable_headers_buffer::VariableHeadersSnapshot;
 
 #[cfg(test)]
 mod tests {

@@ -69,7 +69,7 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo test-fixtures` | `cargo run -p test-fixtures --` | Generate, verify, and drift-check deterministic fixtures. |
 | `cargo ibt-to-csv` | `cargo run -p iracing-sdk --bin ibt-to-csv --` | Convert `.ibt` telemetry to CSV. |
 | `cargo session snapshot ibt` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- snapshot ibt --path <FILE.ibt>` | Extract session YAML from `.ibt`. |
-| `cargo broadcast-cli` | `cargo run -p iracing-sdk --bin broadcast-cli --` | Send iRacing broadcast commands (Windows). |
+| `cargo broadcast` | `cargo run -p iracing-sdk --bin broadcast --` | Send iRacing broadcast commands (Windows). |
 | `cargo session schema type` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- schema type` | Emit baseline session schema. |
 | `cargo session schema ibt` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin session -- schema ibt` | Generate session schema from an IBT recording. |
 | `cargo variable-schema` | `cargo run -p iracing-sdk --features codegen,schema-discovery --bin variable-schema --` | Emit baseline variable schema. |

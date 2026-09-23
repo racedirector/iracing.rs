@@ -35,13 +35,13 @@
 
 ## Examples & Binaries
 
-- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo session`, `cargo broadcast-cli`; they map to bins in this crate.
+- `.cargo/config.toml` exposes aliases like `cargo ibt-to-csv`, `cargo session`, `cargo broadcast`, and the curated example names; they map to targets in this crate.
 - Use `cargo session schema type`, `cargo session schema ibt --path ./session.ibt`, `cargo session discover ibt --path ./session.ibt`, and `cargo session snapshot ibt --path ./session.ibt` for session schemas, discovery, and snapshots; `schema live`, `discover live`, and `snapshot live` require Windows. Output defaults to stdout; use `--output <file>` for a file. The alias enables `codegen,schema-discovery`.
-- Keep cross-platform examples (`disk-position`, `adapter-disk-position`, `enum-bitfields-disk`) runnable on non-Windows machines.
+- Keep cross-platform examples (`ibt-read-frame`, `manual-frame-adapter`, `ibt-subscribe`, and `enum-bitfields-ibt`) runnable on non-Windows machines.
 - Keep adapter examples importing from `iracing_sdk`; derive examples should rely on the `derive` feature re-export from this crate.
 
 ## Testing & Fixtures
 
 - Integration tests rely on `.ibt` fixtures from `test-data/ibt/`; use helpers in `test_utils` (`require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hard-coded paths.
 - For hand-built schemas, session data, frames, and benchmark inputs, start with the generated catalog in `../../docs/reference/README.md` instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult `primitives-schema.yml` for enum/bitflag domains.
-- Benchmarks require `cargo bench -p iracing-sdk --features benchmark`.
+- Criterion benchmarks and diagnostics require `cargo bench -p iracing-sdk --features benchmark`; all public target names are kebab-case.

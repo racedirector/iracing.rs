@@ -1,3 +1,7 @@
+use crate::IRacingSDKError;
+use std::mem::size_of;
+use windows::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, VirtualQuery};
+
 /// Convert string to null-terminated wide string for Windows APIs
 pub fn wide_string(s: &str) -> Vec<u16> {
     use std::ffi::OsStr;
@@ -48,4 +52,24 @@ pub fn pad_car_number(s: &str) -> u16 {
     } else {
         num
     }
+}
+
+fn mapped_view_len(base: NonNull<u8>) -> Result<usize> {
+    let mut info = MEMORY_BASIC_INFORMATION::default();
+
+    let written = unsafe {
+        VirtualQuery(
+            Some(base.as_ptr().cast()),
+            &mut info,
+            size_of::<MEMORY_BASIC_INFORMATION>(),
+        )
+    };
+
+    if written == 0 {
+        let error = windows::core::Error::from_thread();
+
+        return Err(IRacingSDKError::windows_api_error("VirtualQuery", error));
+    }
+
+    Ok(info.RegionSize)
 }

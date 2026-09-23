@@ -47,13 +47,11 @@ jobs:
       fail-fast: false
       matrix:
         benchmark:
-          - adapter_performance
-          - aggregate_frame_parsing
-          - telemetry_delivery_e2e
-          - subscriber_fanout
-          - frame_construction
-          - var_data_extraction
-          - ibt_reader_performance
+          - adapter-performance
+          - aggregate-frame-parsing
+          - telemetry-delivery
+          - var-data-extraction
+          - ibt-reader-performance
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -84,7 +82,7 @@ jobs:
           retention-days: 14
 
   ibt-reader-comparison:
-    name: ibt_reader_performance (PR base vs head)
+    name: ibt-reader-performance (PR base vs head)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -153,14 +151,14 @@ jobs:
         shell: bash
         run: |
           rm -rf "$CARGO_TARGET_DIR/criterion"
-          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-base.log"
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt-reader-performance -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-base.log"
 
       - name: Compare PR head with base
         id: compare
         working-directory: pr-head
         shell: bash
         run: |
-          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-head.log"
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt-reader-performance -- --baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-head.log"
 
       - name: Summarize comparison
         if: always()
@@ -230,7 +228,8 @@ jobs:
       fail-fast: false
       matrix:
         benchmark:
-          - telemetry_delivery_allocations
+          - telemetry-diagnostics
+          - ibt-reader-memory
     steps:
       - name: Checkout
         uses: actions/checkout@v7

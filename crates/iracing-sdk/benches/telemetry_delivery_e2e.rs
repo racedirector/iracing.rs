@@ -40,9 +40,8 @@
 //!   survive latest-value coalescing.
 //! - `throughput/ondemand_acknowledged` releases one frame and waits for every
 //!   subscriber to request and receive it before advancing to the next frame.
-//! - `latency_diagnostics` separately records provider-timestamp-to-consumer
-//!   elapsed time and prints p50, p95, and p99 values. Its Criterion-visible
-//!   `completed` case is only a marker; it is not the latency measurement.
+//! - `backpressure/ondemand_slow_ack` adds deterministic subscriber-side work
+//!   before acknowledging each on-demand frame.
 //!
 //! `iter_custom` is used so case construction and orderly task shutdown can be
 //! excluded explicitly. Assertions after timing verify the provider performed
@@ -59,7 +58,7 @@
 //! Run this target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench telemetry_delivery_e2e
+//! cargo bench -p iracing-sdk --features benchmark --bench telemetry-delivery
 //! ```
 
 mod support;
@@ -68,12 +67,11 @@ use std::{hint::black_box, sync::Arc, time::Instant};
 
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use support::{
-    telemetry_pipeline::{LatestCase, OnDemandCase, percentile},
+    telemetry_pipeline::{LatestCase, OnDemandCase},
     workloads::TimedConsumerFrame47,
 };
 
 const SUBSCRIBERS: [usize; 3] = [1, 4, 16];
-const LATENCY_FRAMES: usize = 2_048;
 const BURST_SIZE: usize = 8;
 
 /// Build the single-threaded runtime used consistently by every workload.
@@ -247,135 +245,8 @@ fn bench_on_demand_slow_ack(c: &mut Criterion) {
     group.finish();
 }
 
-/// Print percentile diagnostics calculated from explicit latency samples.
-fn print_latency(label: &str, subscribers: usize, samples: &mut [u64]) {
-    let p50 = percentile(samples, 0.50);
-    let p95 = percentile(samples, 0.95);
-    let p99 = percentile(samples, 0.99);
-    println!(
-        "telemetry_e2e latency policy={label} subscribers={subscribers} samples={} p50_ns={p50} p95_ns={p95} p99_ns={p99}",
-        samples.len()
-    );
-}
-
-/// Collect latency samples outside Criterion's throughput measurements.
-fn latency_diagnostics(c: &mut Criterion) {
-    let fixture = support::full_frame_fixture();
-    let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
-    let runtime = runtime();
-
-    for subscribers in SUBSCRIBERS {
-        let mut latest = {
-            let _runtime_guard = runtime.enter();
-            LatestCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
-                subscribers,
-                Some(LATENCY_FRAMES),
-            )
-        };
-        let latest_times = Arc::clone(latest.times.as_ref().expect("latest timestamps"));
-        let mut latest_samples = Vec::with_capacity(LATENCY_FRAMES * subscribers);
-        runtime.block_on(latest.consume_paced(LATENCY_FRAMES, |frame| {
-            black_box(&frame.frame_marker());
-            latest_samples.push(latest_times.elapsed_nanos(frame.tick));
-        }));
-        print_latency("latest_paced", subscribers, &mut latest_samples);
-        runtime.block_on(latest.shutdown());
-
-        let mut replay = {
-            let _runtime_guard = runtime.enter();
-            OnDemandCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
-                subscribers,
-                Some(LATENCY_FRAMES),
-            )
-        };
-        let replay_times = Arc::clone(replay.times.as_ref().expect("replay timestamps"));
-        let mut replay_samples = Vec::with_capacity(LATENCY_FRAMES * subscribers);
-        runtime.block_on(replay.consume_acknowledged(LATENCY_FRAMES, |frame| {
-            black_box(&frame.frame_marker());
-            replay_samples.push(replay_times.elapsed_nanos(frame.tick));
-        }));
-        print_latency("ondemand_acknowledged", subscribers, &mut replay_samples);
-        runtime.block_on(replay.shutdown());
-    }
-
-    // Keep a Criterion-visible marker for diagnostic execution without timing
-    // timestamp collection as a throughput result.
-    c.bench_function("telemetry_e2e/latency_diagnostics/completed", |b| {
-        b.iter(|| black_box(()))
-    });
-}
-
-fn delivery_diagnostics(c: &mut Criterion) {
-    const BURSTS: usize = 64;
-    const REPLAY_FRAMES: usize = BURSTS * BURST_SIZE;
-
-    let fixture = support::full_frame_fixture();
-    let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
-    let runtime = runtime();
-
-    for subscribers in SUBSCRIBERS {
-        let mut latest = {
-            let _runtime_guard = runtime.enter();
-            LatestCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
-                subscribers,
-                None,
-            )
-        };
-        let mut latest_deliveries = 0_usize;
-        runtime.block_on(latest.consume_bursts(BURSTS, BURST_SIZE, |_| {
-            latest_deliveries += 1;
-        }));
-        let produced = latest
-            .source
-            .reads
-            .load(std::sync::atomic::Ordering::Relaxed);
-        let replaced = produced * subscribers - latest_deliveries;
-        println!(
-            "telemetry_e2e delivery policy=latest_burst_8 subscribers={subscribers} produced={produced} delivered={latest_deliveries} replaced={replaced} dropped=0 blocked=0"
-        );
-        runtime.block_on(latest.shutdown());
-
-        let mut replay = {
-            let _runtime_guard = runtime.enter();
-            OnDemandCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
-                subscribers,
-                None,
-            )
-        };
-        let mut replay_deliveries = 0_usize;
-        runtime.block_on(replay.consume_acknowledged(REPLAY_FRAMES, |_| {
-            replay_deliveries += 1;
-        }));
-        let produced = replay
-            .source
-            .reads
-            .load(std::sync::atomic::Ordering::Relaxed);
-        println!(
-            "telemetry_e2e delivery policy=ondemand_acknowledged subscribers={subscribers} produced={produced} delivered={replay_deliveries} replaced=0 dropped=0 blocked_ack_barriers={}",
-            REPLAY_FRAMES.saturating_sub(1)
-        );
-        runtime.block_on(replay.shutdown());
-    }
-
-    c.bench_function("telemetry_e2e/delivery_diagnostics/completed", |b| {
-        b.iter(|| black_box(()))
-    });
-}
-
 criterion_group!(
     benches,
-    delivery_diagnostics,
-    latency_diagnostics,
     bench_latest_paced,
     bench_latest_burst,
     bench_on_demand,

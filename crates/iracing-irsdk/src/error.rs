@@ -64,3 +64,7 @@ impl Error {
         }
     }
 }
+
+pub(super) fn variable_header_validation_error(details: impl Into<String>) -> Error {
+    Error::parse("Variable header validation", details)
+}

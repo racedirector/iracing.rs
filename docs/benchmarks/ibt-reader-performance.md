@@ -1,15 +1,18 @@
 # IBT reader performance baseline
 
 This report establishes the timing baseline for the IBT storage refactor in
-issue #84. The benchmark target is intentionally checked in before the implementation
-changes so the same cases and timed boundaries can be run on both revisions.
+issue #84. The benchmark target was checked in before the implementation
+changes to establish this historical baseline. The current target preserves
+the open and sequential-replay boundaries. Its random-access case now reads
+each selected owned frame, so that result is not directly comparable with the
+seek-only row below.
 
 ## Reproduce
 
 Run only the focused reader target from the repository root:
 
 ```text
-cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
+cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-performance
 ```
 
 Do not substitute the complete benchmark suite when comparing the reader
@@ -46,8 +49,8 @@ making replay and random seek perform actual file IO. Compare those tradeoffs;
 do not treat every higher timing as a regression independently of the memory
 objective.
 
-Construction and seek setup for the replay/seek groups is outside those timed
-routines. Replay includes allocation and copying of each returned owned frame.
-The seek group does not read a frame after positioning. Retained heap and page
-cache behavior are outside this timing target and require the separate #91
-measurement.
+Construction and seek setup for the historical replay/seek groups was outside
+those timed routines. Replay included allocation and copying of each returned
+owned frame. The historical seek group did not read a frame after positioning;
+the current random-access case does. Retained heap and page cache behavior are
+outside this timing target and require the separate memory diagnostic.

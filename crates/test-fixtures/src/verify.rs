@@ -9,7 +9,10 @@ use std::{fs, io::Cursor, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
 use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType};
-use iracing_sdk::{SchemaProvider, ibt::IbtReader};
+use iracing_sdk::{
+    SchemaProvider, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
+};
+use zerocopy::FromBytes;
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 
@@ -74,6 +77,7 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
         let mut cursor = Cursor::new(data.as_slice());
         let header = Header::try_from_reader(&mut cursor)
             .with_context(|| format!("decoding main header in {}", path.display()))?;
+
         let disk = DiskSubHeader::try_from_reader(&mut cursor)
             .with_context(|| format!("decoding disk sub-header in {}", path.display()))?;
 
@@ -207,28 +211,32 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             yaml_path.display()
         );
 
-        let mut reader = IbtReader::from_bytes(data)
+        let reader = IbtReader::from_bytes(data)
             .with_context(|| format!("opening {} through IbtReader", path.display()))?;
+
+        let mut provider = IbtProvider::from_reader(reader)?;
+        let schema = provider.schema();
+
         ensure!(
-            reader.total_frames() == fixture.num_frames,
+            provider.total_frames() == fixture.num_frames,
             "{} reader frame count mismatch",
             path.display()
         );
         ensure!(
-            reader.schema().variable_count() == fixture.num_vars as usize,
+            schema.variable_count() == fixture.num_vars as usize,
             "{} reader variable count mismatch",
             path.display()
         );
         for expected in &fixture.required_variables {
             ensure!(
-                reader.schema().get_variable(&expected.name).is_some(),
+                schema.get_variable(&expected.name).is_some(),
                 "{} reader schema is missing {}",
                 path.display(),
                 expected.name
             );
         }
         let mut read_frames = 0usize;
-        while reader.read_next_frame()?.is_some() {
+        while futures::executor::block_on(provider.next_frame())?.is_some() {
             read_frames += 1;
         }
         ensure!(

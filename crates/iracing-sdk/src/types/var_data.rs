@@ -72,13 +72,25 @@ impl<T: VarData> VarData for Vec<T> {
             // Check the offset of the item
             let offset_delta = i
                 .checked_mul(element_size)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+                .ok_or_else(|| {
+                    crate::IRacingSDKError::parse_error(
+                        "VarData::from_bytes",
+                        format!(
+                            "Array element {i} offset calculation overflows usize for element size {element_size}"
+                        ),
+                    )
+                })?;
 
             // Set the offset
-            var_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+            var_info.offset = info.offset.checked_add(offset_delta).ok_or_else(|| {
+                crate::IRacingSDKError::parse_error(
+                    "VarData::from_bytes",
+                    format!(
+                        "Variable offset {} + element offset {offset_delta} overflows usize",
+                        info.offset
+                    ),
+                )
+            })?;
 
             // Parse the variable and store it in the result.
             result.push(T::from_bytes(data, &var_info)?);

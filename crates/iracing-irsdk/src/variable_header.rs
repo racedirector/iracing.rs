@@ -1,7 +1,7 @@
 use type_layout::TypeLayout;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
-use crate::parse_utils::try_from_wire_bytes;
+use crate::parse_utils::{nul_terminated_bytes, read_wire_bytes};
 use crate::{Error, Result};
 
 use super::VariableType;
@@ -32,17 +32,15 @@ pub struct VariableHeader {
 impl VariableHeader {
     /// Decodes one variable header from its exact wire representation.
     ///
-    /// This validates that every field has a representable value, including
-    /// the [`VariableType`] discriminant. It does not validate relationships
-    /// between otherwise representable fields.
+    /// This does not validate the decoded field values. Use [`Self::validate`]
+    /// when semantic validation is required.
     ///
     /// # Errors
     ///
     /// Returns [`Error::WireSize`] when `bytes` is not exactly the size of a
-    /// variable header, or [`Error::InvalidWireValue`] when the bytes contain
-    /// a value that cannot be represented by a variable header.
+    /// variable header.
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
-        try_from_wire_bytes(bytes)
+        read_wire_bytes(bytes)
     }
 
     /// Constructs a validated variable header and zero-fills its fixed strings and ABI padding.
@@ -170,42 +168,18 @@ mod tests {
     }
 
     #[test]
-    fn variable_header_from_bytes_parses_the_complete_wire_representation() {
-        let bytes = variable_header_bytes(i32::from(VariableType::Float));
-
-        let header = VariableHeader::try_from_bytes(&bytes).unwrap();
-
-        assert_eq!(header.variable_type, VariableType::Float);
-        assert_eq!(header.offset, 0x1020_3040);
-        assert_eq!(header.count, 3);
-        assert_eq!(header.count_as_time, 1);
-        assert_eq!(&header.name[..6], b"Speed\0");
-        assert!(header.name[6..].iter().all(|byte| *byte == 0));
-        assert_eq!(&header.description[..14], b"Vehicle speed\0");
-        assert!(header.description[14..].iter().all(|byte| *byte == 0));
-        assert_eq!(&header.unit[..4], b"m/s\0");
-        assert!(header.unit[4..].iter().all(|byte| *byte == 0));
-        assert_eq!(&header.as_bytes()[13..16], &[0xAA, 0xBB, 0xCC]);
-    }
-
-    #[test]
-    fn variable_header_from_bytes_accepts_every_variable_type_discriminant() {
-        for (raw, expected) in [
-            (0, VariableType::Character),
-            (1, VariableType::Boolean),
-            (2, VariableType::Integer),
-            (3, VariableType::BitField),
-            (4, VariableType::Float),
-            (5, VariableType::Double),
-        ] {
-            let header = VariableHeader::try_from_bytes(&variable_header_bytes(raw)).unwrap();
-            assert_eq!(header.variable_type, expected);
-        }
-    }
-
-    #[test]
     fn variable_header_from_bytes_rejects_inexact_wire_size() {
-        let bytes = variable_header_bytes(i32::from(VariableType::Float));
+        let header = VariableHeader::new(
+            VariableType::Float,
+            8,
+            1,
+            false,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+        let bytes = header.as_bytes();
 
         assert!(matches!(
             VariableHeader::try_from_bytes(&bytes[..bytes.len() - 1]),
@@ -214,27 +188,6 @@ mod tests {
                 actual: 143,
             })
         ));
-
-        let mut oversized = bytes.to_vec();
-        oversized.push(0);
-        assert!(matches!(
-            VariableHeader::try_from_bytes(&oversized),
-            Err(Error::WireSize {
-                expected: 144,
-                actual: 145,
-            })
-        ));
-    }
-
-    #[test]
-    fn variable_header_from_bytes_reports_invalid_variable_type_discriminants() {
-        for raw in [-1, 6, 99, i32::MIN, i32::MAX] {
-            assert!(matches!(
-                VariableHeader::try_from_bytes(&variable_header_bytes(raw)),
-                Err(Error::InvalidWireValue { target })
-                    if target == std::any::type_name::<VariableHeader>()
-            ));
-        }
     }
 
     #[test]

@@ -1,21 +1,23 @@
-# SDK benchmarks
+# SDK performance suite
 
-These Criterion targets answer different performance questions. Choose the
-narrowest target that matches the behavior under investigation; results from
-different targets are not interchangeable measurements of “frame latency.”
+The performance targets are split by intent. Criterion benchmarks answer stable,
+repeatable performance questions. Diagnostics report allocation, memory, or live
+environment observations and must not be interpreted as Criterion regressions.
+
+All public target names use kebab-case. The Rust source filenames remain
+snake_case by convention.
+
+## Criterion benchmarks
 
 | Target | Measures | Does not measure |
 | --- | --- | --- |
-| `var_data_extraction` | Every `VarData` scalar and `Vec<T>` extraction (including SDK enums and flags), captured 72-element arrays, bitfield operations, and bounds errors | Whole-frame or delivery-pipeline cost |
-| `frame_construction` | Byte-buffer ownership, `FramePacket` construction, `Arc` cloning, and tick operations | Telemetry decoding or acquisition |
-| `adapter_performance` | Dynamic lookup and typed adapter construction from a prepared packet | Provider, connection, or subscription work |
-| `aggregate_frame_parsing` | Fresh owned outputs for all variables, a representative consumer, and all scalars | Frame acquisition or end-to-end delivery |
-| `telemetry_delivery_e2e` | Deterministic in-process provider-to-adapted-subscriber delivery | IBT I/O, Windows shared memory, or simulator pacing |
-| `subscriber_fanout` | One shared SDK stream with service-side fan-out versus one SDK stream per client, using heterogeneous requested-field projections | WS/gRPC serialization, sockets, client backpressure, or network I/O |
-| `live_frame_latency` | Manual live subscriptions with a running simulator | Stable, deterministic CI performance |
-| `ibt_reader_measurement` | File-backed versus legacy-equivalent in-memory IBT construction, retained application heap, and sequential replay throughput | Kernel/filesystem page cache, cross-machine performance, or zero-copy frame cost |
+| `var-data-extraction` | Representative captured scalar decoding and fresh 72-element typed arrays | Exhaustive type correctness, bounds errors, or whole-frame cost |
+| `adapter-performance` | Dynamic lookup and 5-, 20-, and 47-field typed adapter construction from a prepared packet | Provider, connection, or subscription work |
+| `aggregate-frame-parsing` | Fresh owned outputs for all variables, a representative consumer, and all scalars | Frame acquisition or delivery |
+| `telemetry-delivery` | Deterministic provider-to-adapted-subscriber delivery, coalescing, and acknowledgement backpressure | IBT I/O, Windows shared memory, or simulator pacing |
+| `ibt-reader-performance` | File opening, sequential replay, and deterministic random frame access | Retained heap or cross-machine filesystem comparisons |
 
-Run all compile-safe targets with:
+Compile the full suite with:
 
 ```text
 cargo bench -p iracing-sdk --features benchmark --no-run
@@ -27,167 +29,79 @@ Run one target with:
 cargo bench -p iracing-sdk --features benchmark --bench <target>
 ```
 
-The source-level documentation at the top of each benchmark defines its setup
-and timed boundaries, allocation behavior, throughput unit, and interpretation
-limits.
+The source-level documentation at the top of each target defines its setup,
+timed boundary, throughput unit, and interpretation limits.
 
-## IBT reader performance
+### IBT reader performance
 
-`ibt_reader_performance` is a storage-layer benchmark whose cases and timed
-boundaries are intended to remain stable across reader implementations. It uses
-checked-in 5.9 MB and 142.6 MB recordings and measures construction, full
-sequential replay, and batches of 1,024 deterministic random seeks.
-
-Run this target alone before and after a reader change:
-
-```text
-cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
-```
+`ibt-reader-performance` uses checked-in 5.9 MB and 142.6 MB recordings. Its
+case names and timed boundaries are intended to remain stable across reader
+implementations so pull requests can compare their base and head revisions.
 
 Construction includes the implementation's normal file-opening and metadata
-work. Sequential reader construction and random-seek reader construction occur
-outside their timed routines. Filesystem cache state is not controlled, so
-compare revisions on the same machine and interpret results as warm-cache local
-performance. Retained heap is intentionally measured separately so allocator
-instrumentation does not perturb these timings.
+work. Sequential and random-access reader construction occurs outside the timed
+routine. Filesystem cache state is not controlled, so compare revisions on the
+same machine and repeat surprising results.
 
-## Captured-schema fixture
+### Captured-schema decoding
 
-Cross-platform decoding and construction targets use the checked-in live-schema
-capture to generate deterministic, type-correct bytes. Frame size, offsets, and
-aggregate variable counts belong to that capture and may change with an iRacing
-build. Fixture generation, schema validation, metadata ordering, and sentinel
-checks happen before timed loops unless a target explicitly documents otherwise.
+`var-data-extraction`, `adapter-performance`, and `aggregate-frame-parsing` use
+the checked-in live variable-schema capture to create deterministic, type-correct
+bytes. Fixture generation, schema validation, lookups, and sentinel checks occur
+before timing.
 
-The fixture provides a realistic layout, not recorded driving values. A result
-therefore describes work on a prepared in-memory frame on the benchmark machine;
-it is not automatically an end-to-end live telemetry result.
+The fixture is a realistic layout, not recorded driving data. Exhaustive enum,
+bitfield, missing-field, default-value, and bounds behavior is covered by tests
+rather than by microbenchmarks.
 
-## Deterministic delivery pipeline
+### Deterministic delivery
 
-`telemetry_delivery_e2e` requires neither iRacing nor Windows shared memory. Its
-controlled provider copies the full fixture into a new `FramePacket`, passes it
-through a production delivery policy, and adapts it into the shared 47-field
-consumer at 1, 4, and 16 subscribers.
+`telemetry-delivery` requires neither iRacing nor Windows shared memory. Its
+controlled provider copies the fixture into a `FramePacket`, passes it through
+the production delivery policy, and adapts it into a shared 47-field consumer.
 
-`latest_paced` releases one source frame only after every benchmark subscriber
-has consumed the previous latest snapshot. Its Criterion elements are completed
-subscriber adaptations, so dividing by the subscriber count gives source-frame
-throughput.
+- `latest-paced` releases a source frame after every subscriber consumes the
+  previous latest snapshot.
+- `latest-burst-8` offers eight frames before subscribers consume the latest;
+  replaced versions are intentional.
+- `ondemand-acknowledged` preserves every frame and advances after every active
+  subscriber acknowledges its prior frame.
+- `ondemand-slow-ack` deterministically withholds the last acknowledgement to
+  exercise shared-cursor backpressure.
 
-`latest_burst_8` offers eight source updates before subscribers consume the
-latest snapshot. Seven versions per burst are intentionally replaced. Its
-configured elements count offered source frames multiplied by subscribers; they
-do not represent the smaller number of adapted outputs that survive coalescing.
+Runtime construction, validation, subscriptions, and shutdown remain outside
+the reported duration.
 
-`ondemand_acknowledged` preserves every frame and advances only after all active
-subscriptions poll again to acknowledge their prior frame. Its elements are
-completed subscriber adaptations.
+## Diagnostics
 
-`ondemand_slow_ack` polls every fast subscriber once, deterministically
-withholds the final subscriber's acknowledgement, and only then permits that
-subscriber to release the shared cursor. It uses logical polling gates rather
-than wall-clock sleeps.
+| Target | Reports | Interpretation limit |
+| --- | --- | --- |
+| `telemetry-diagnostics` | Allocation counts, delivery latency percentiles, and replacement/acknowledgement counts | Allocator and timestamp instrumentation perturb the hot path |
+| `ibt-reader-memory` | Retained and peak application heap for file-backed and legacy-equivalent in-memory readers | Excludes kernel/filesystem page cache |
+| `live-telemetry-diagnostic` | Live cadence, inter-arrival percentiles, and skipped/coalesced ticks | Requires Windows and an active simulator; results are environment-dependent |
 
-The latency diagnostic timestamps immediately before the provider copies the
-fixture into a packet and samples after the adapter reaches a subscriber. It
-prints p50, p95, and p99 nanoseconds separately from Criterion throughput runs
-because timestamp collection perturbs the fast path. The Criterion `completed`
-case is only an execution marker, not the latency measurement.
+Run a deterministic diagnostic with the same `cargo bench --bench <target>`
+form. `live-telemetry-diagnostic` is compile-only in hosted CI and should be run
+manually on Windows.
 
-`telemetry_delivery_allocations` is a separate diagnostic executable using a
-current-thread runtime and counting global allocator. It reports allocations
-and allocated bytes per source frame and subscriber delivery; those values are
-not timing results because allocator instrumentation perturbs the hot path.
-
-Runtime creation, schema validation, subscription construction, and task
-spawning occur before each reported duration. Cancellation and joining occur
-after elapsed time is captured.
-
-## Subscriber fan-out
-
-`subscriber_fanout` compares two service architectures while holding projection
-work constant. Every simulated client receives a fresh owned projection of 12
-scalar fields. The field plans rotate through the captured schema so clients do
-not all request the same variables, and all schema lookup happens before timing.
-
-`shared_stream` creates one SDK `DynamicFrame` subscription and projects that
-frame once for every client. `stream_per_client` creates one SDK subscription
-per client, consumes every subscription for each source frame, and then applies
-the corresponding projection. Both cases use production latest-value delivery
-and a current-thread Tokio runtime.
-
-Criterion measures 1 through 512 clients. A separate diagnostic exponentially
-scales farther and reports average source-frame time, source frames per second,
-and utilization of a 60 Hz frame budget. The diagnostic is useful for locating
-the order of magnitude where synchronous, fully drained fan-out stops keeping
-up; use the Criterion cases for statistically sampled comparisons.
-
-Projection vectors are fresh output values suitable for later serialization,
-but serialization, protocol framing, network writes, per-client queues, slow
-clients, and multi-threaded service scheduling are outside the measured
-boundary.
-
-## IBT reader storage measurement
-
-`ibt_reader_measurement` is a one-pass diagnostic rather than a Criterion
-statistical benchmark. It selects the smallest and largest real recordings of
-at least 1 MiB under `test-data`, then reports two modes for each:
-
-- `file` calls `IbtReader::open(path)`;
-- `memory_baseline` reproduces the old ownership model with `fs::read(path)`
-  followed by `IbtReader::from_bytes(bytes)`.
-
-The tracking allocator reports heap bytes retained when construction returns
-and peak additional heap during construction. The diagnostic asserts that the
-file-backed reader retains less than half the recording length while the
-baseline retains at least the recording length. These are application-heap
-measurements. They do not include kernel/filesystem page cache, and replay
-timing remains sensitive to cache warmth and machine load.
-
-## Manual live benchmark
-
-`live_frame_latency` is Windows-only and requires an active iRacing session.
-Several cases await source-paced frames, so results include simulator cadence,
-Tokio scheduling, and operating-system wake-up behavior. Follow the target’s
-module documentation before interpreting or comparing its output.
+`ibt-reader-memory` asserts that the file-backed reader retains less than half
+the recording length while the in-memory baseline retains at least the source
+length. It also reports sequential replay throughput, but that timing remains
+sensitive to filesystem cache warmth and machine load.
 
 ## CI coverage
 
-The quality workflow compiles every benchmark target on Ubuntu and Windows for
-each pull request and push to `main`. This includes `live_frame_latency`, which
-is compile-only in hosted CI because meaningful execution requires Windows and
-an active iRacing session.
+The quality workflow compiles every benchmark and diagnostic target on Ubuntu
+and Windows. The benchmark workflow quick-runs all deterministic Criterion
+targets for relevant pull requests and pushes, then runs the two deterministic
+diagnostics separately.
 
-The benchmark workflow executes every deterministic Criterion target plus the
-allocation diagnostic. Relevant pull requests and pushes to `main` use
-Criterion's quick mode as a runtime smoke test. Quick results are not statistical
-regression evidence. A separate pull-request job runs `ibt_reader_performance`
-with normal statistical sampling at the PR's base SHA and head SHA on the same
-runner. It saves the base measurements as a Criterion baseline, compares the
-head against it, and puts Criterion's estimates, confidence intervals, p-values,
-and assessments in the job summary. This comparison is informational: measured
-slowdowns do not fail the PR. Its full Criterion report is retained as a workflow
-artifact for 14 days.
+Weekly and manually requested full runs use normal Criterion sampling. Pull
+requests also compare `ibt-reader-performance` at the base and head revisions on
+the same runner. The comparison is informational; changed definitions, fixtures,
+generation code, or Cargo inputs reduce comparability and are reported in the
+workflow summary.
 
-The comparison job warns when the benchmark definition, support code, checked-in
-recordings, fixture generator, or relevant Cargo configuration differs between
-revisions. In that case, the reported delta may describe different experiments
-and should not be interpreted as a reader performance change without review.
-Even with identical inputs, shared-runner load and filesystem cache warmth can
-affect the measurements; repeat a surprising result before drawing conclusions.
-
-A weekly schedule and manual `full` dispatch still run normal statistical
-sampling for all deterministic Criterion targets and retain their reports for
-14 days. Use manual `quick` dispatches for inexpensive ad-hoc validation.
-
-## Comparing results
-
-- Compare like-for-like case names, schema revisions, build profiles, machines,
-  and allocation policies.
-- Treat Criterion throughput according to the unit documented by that case;
-  backing-frame bytes are not valid throughput for a selected-field workload.
-- Distinguish additional work caused by schema growth from slower normalized
-  decoder performance.
-- Performance values are reports, not correctness thresholds or proof that an
-  implementation is optimally tuned.
+Use Criterion results only for like-for-like case names, fixture revisions,
+build profiles, machines, and allocation policies. Performance reports are not
+correctness thresholds.

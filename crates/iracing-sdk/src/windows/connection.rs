@@ -5,7 +5,7 @@
 
 use crate::{
     ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
+    SessionInfoRegion, VariableHeadersRegion, VariableHeadersSnapshot, VariableInfo,
     irsdk::{
         Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
@@ -235,7 +235,7 @@ impl Connection {
 
         let region = SessionInfoRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())
+            .filter(|r| !r.is_empty())
             .map(|r| r.as_region())?;
 
         let session_info_bytes = self.bytes_at_region(region);
@@ -262,16 +262,22 @@ impl Connection {
     /// Copies the variable-header region advertised by the live header.
     ///
     /// Returns `None` when the header advertises no usable region.
-    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
+    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersSnapshot> {
         let header = self.header();
 
-        let region = VariableHeaderRegion::try_from(header)
+        let region = VariableHeadersRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())?;
+            .filter(|r| !r.is_empty())?;
 
         let variable_header_bytes = self.bytes_at_region(region.as_region());
 
-        VariableHeadersBuffer::try_from_region_bytes(variable_header_bytes, region.count()).ok()
+        Some(
+            VariableHeadersSnapshot::try_from_region_bytes(
+                variable_header_bytes.into(),
+                region.count(),
+            )
+            .ok()?,
+        )
     }
 
     /// Decodes all variable definitions from a copied variable-header region.
@@ -306,8 +312,8 @@ impl Connection {
 impl ByteParser for Connection {
     fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
         unsafe {
-            let bytes_ptr = self.base.as_ptr().add(region.offset);
-            std::slice::from_raw_parts(bytes_ptr, region.length)
+            let bytes_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(bytes_ptr, region.length())
         }
     }
 }

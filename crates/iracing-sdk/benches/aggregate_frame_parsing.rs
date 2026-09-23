@@ -7,7 +7,7 @@
 //! and materializes newly owned Rust outputs, as a telemetry consumer would do
 //! once frame data is available.
 //!
-//! This complements `var_data_extraction.rs`, which measures individual value
+//! This complements `var-data-extraction`, which measures individual value
 //! decodes. Aggregate measurements include traversal, result construction,
 //! output allocation, and output destruction across a realistic workload.
 //!
@@ -62,7 +62,7 @@
 //! Run this target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench aggregate_frame_parsing
+//! cargo bench -p iracing-sdk --features benchmark --bench aggregate-frame-parsing
 //! ```
 
 mod support;

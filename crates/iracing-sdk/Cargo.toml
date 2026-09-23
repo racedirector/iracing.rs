@@ -8,6 +8,9 @@ homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 build = "build.rs"
+autobins = false
+autoexamples = false
+autobenches = false
 
 [package.metadata.docs.rs]
 all-features = true
@@ -18,10 +21,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [package.metadata.dist]
 dist = true
 
-[package.metadata.dist.bin.broadcast-cli]
+[package.metadata.dist.bin.broadcast]
 targets = ["x86_64-pc-windows-msvc"]
 
-[package.metadata.dist.bin.live_to_csv]
+[package.metadata.dist.bin.live-to-csv]
 targets = ["x86_64-pc-windows-msvc"]
 
 [package.metadata.dist.bin.live-json-snapshot]
@@ -99,96 +102,82 @@ derive = ["dep:iracing-sdk-derive"]
 schema-discovery = []
 
 [[bench]]
-name = "adapter_performance"
+name = "adapter-performance"
+path = "benches/adapter_performance.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "aggregate_frame_parsing"
+name = "aggregate-frame-parsing"
+path = "benches/aggregate_frame_parsing.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "telemetry_delivery_e2e"
+name = "telemetry-delivery"
+path = "benches/telemetry_delivery_e2e.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "telemetry_delivery_allocations"
+name = "telemetry-diagnostics"
+path = "benches/telemetry_delivery_allocations.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "subscriber_fanout"
+name = "live-telemetry-diagnostic"
+path = "benches/live_frame_latency.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "frame_construction"
+name = "ibt-reader-performance"
+path = "benches/ibt_reader_performance.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "live_frame_latency"
+name = "ibt-reader-memory"
+path = "benches/ibt_reader_measurement.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "ibt_reader_performance"
-harness = false
-required-features = ["benchmark"]
-
-[[bench]]
-name = "ibt_reader_measurement"
-harness = false
-required-features = ["benchmark"]
-
-[[bench]]
-name = "var_data_extraction"
+name = "var-data-extraction"
+path = "benches/var_data_extraction.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[example]]
-name = "car-setup-observer"
-path = "examples/car_setup_observer.rs"
-
-[[example]]
-name = "disk-position"
+name = "ibt-read-frame"
 path = "examples/disk_position.rs"
 
 [[example]]
-name = "disk-position-derive"
-path = "examples/disk_position_derive.rs"
-required-features = ["derive"]
-
-[[example]]
-name = "live-position"
-path = "examples/live_position.rs"
-
-[[example]]
-name = "live-position-derive"
-path = "examples/live_position_derive.rs"
-required-features = ["derive"]
-
-[[example]]
-name = "adapter-disk-position"
+name = "manual-frame-adapter"
 path = "examples/adapter_disk_position.rs"
 
 [[example]]
-name = "adapter-live-position"
-path = "examples/adapter_live_position.rs"
+name = "ibt-subscribe"
+path = "examples/disk_position_derive_connection.rs"
+required-features = ["derive"]
 
 [[example]]
-name = "adapter-enum-bitfields-live"
-path = "examples/adapter_enum_bitfields_live.rs"
+name = "live-subscribe"
+path = "examples/live_position_derive_connection.rs"
+required-features = ["derive"]
 
 [[example]]
-name = "session-update-observer"
+name = "enum-bitfields-ibt"
+path = "examples/enum_bitfields_disk.rs"
+
+[[example]]
+name = "session-updates"
 path = "examples/session_update_observer.rs"
 
 [[bin]]
-name = "broadcast-cli"
-path = "src/bin/broadcast_cli.rs"
+name = "broadcast"
+path = "src/bin/broadcast.rs"
 
 [[bin]]
 name = "car-setup-schema"

@@ -10,7 +10,7 @@ From the repository root, with at least two real `.ibt` captures of 1 MiB or
 larger under `test-data`, run:
 
 ```text
-cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_measurement
+cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-memory
 ```
 
 The diagnostic automatically selects the smallest and largest qualifying

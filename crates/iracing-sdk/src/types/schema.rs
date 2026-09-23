@@ -6,12 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{
-    IRacingSDKError, Result,
+    IRacingSDKError, Result, VariableHeadersSnapshot,
     irsdk::{VariableHeader, VariableType as IRSDKVariableType},
     parse_utils,
 };
-
-use super::variable_headers_buffer::VariableHeadersBuffer;
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -131,11 +129,22 @@ impl VariableSchema {
         })
     }
 
+    /// Constructs a schema from an exact decoded snapshot of SDK variable headers.
+    pub fn from_snapshot(
+        snapshot: VariableHeadersSnapshot,
+        frame_size: usize,
+    ) -> crate::Result<Self> {
+        Self::from_headers(snapshot.as_slice(), frame_size)
+    }
+
     /// Constructs a schema from an exact snapshot of SDK variable headers.
-    pub fn from_headers(headers: &VariableHeadersBuffer, frame_size: usize) -> crate::Result<Self> {
+    pub(crate) fn from_headers(
+        headers: &[VariableHeader],
+        frame_size: usize,
+    ) -> crate::Result<Self> {
         let mut variables = HashMap::with_capacity(headers.len());
 
-        for header in headers.iter() {
+        for header in headers {
             let variable = VariableInfo::try_from(header)?;
 
             if variable.name.is_empty() {
@@ -153,6 +162,51 @@ impl VariableSchema {
         }
 
         Self::new(variables, frame_size)
+    }
+
+    /// Validates variable names, counts, storage types, and frame bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a map key differs from its variable name, a count
+    /// is zero, the type is not an SDK storage type, or a variable's byte extent
+    /// overflows or exceeds the frame size.
+    pub fn validate(&self) -> crate::Result<()> {
+        for (name, var_info) in &self.variables {
+            // Validate variable count
+            if var_info.count == 0 {
+                return Err(schema_validation_error(format!(
+                    "Variable '{}' has count of 0",
+                    name
+                )));
+            }
+
+            // Validate variable name matches info name
+            if var_info.name != *name {
+                return Err(schema_validation_error(format!(
+                    "Variable map key '{}' doesn't match info name '{}'",
+                    name, var_info.name
+                )));
+            }
+
+            // Validate that variable fits within frame
+            let end_offset = var_info
+                .storage_byte_size()?
+                .checked_mul(var_info.count)
+                .and_then(|size| var_info.offset.checked_add(size))
+                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
+            if end_offset > self.frame_size {
+                return Err(IRacingSDKError::parse_error(
+                    "VariableSchema::validate",
+                    format!(
+                        "Variable '{name}' ends at byte {end_offset}, beyond frame size {}",
+                        self.frame_size
+                    ),
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     /// Get variable info by name (O(1) lookup).
@@ -228,7 +282,7 @@ mod tests {
     use zerocopy::IntoBytes;
 
     use super::*;
-    use crate::irsdk::VariableType as IRSDKVariableType;
+    use crate::{VariableHeadersSnapshot, irsdk::VariableType as IRSDKVariableType};
 
     struct TestProvider {
         schema: VariableSchema,
@@ -316,9 +370,9 @@ mod tests {
         .unwrap();
 
         let bytes = header.as_bytes();
-        let headers = VariableHeadersBuffer::try_from_region_bytes(bytes, 1).unwrap();
+        let snapshot = VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 1).unwrap();
 
-        let schema = VariableSchema::from_headers(&headers, 8).unwrap();
+        let schema = VariableSchema::from_snapshot(snapshot, 8).unwrap();
 
         let speed = schema.get_variable("Speed").unwrap();
         assert_eq!(speed.offset, 4);

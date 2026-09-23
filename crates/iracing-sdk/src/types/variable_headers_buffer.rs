@@ -1,23 +1,23 @@
 use crate::{IRacingSDKError, Result, irsdk::VariableHeader};
 
 /// Exact, owned snapshot of decoded SDK variable-header records.
-///
-/// Construction validates that the source contains exactly the advertised
-/// number of complete records. Semantic validation of individual headers
-/// remains the responsibility of later wire-to-domain conversion.
-#[derive(Debug, Clone)]
-pub struct VariableHeadersBuffer {
+pub struct VariableHeadersSnapshot {
     headers: Vec<VariableHeader>,
 }
 
-impl VariableHeadersBuffer {
+impl VariableHeadersSnapshot {
     /// Decodes exactly `expected_count` headers from a complete region snapshot.
-    pub(crate) fn try_from_region_bytes(bytes: &[u8], expected_count: usize) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error when the byte length contains a partial header or
+    /// the number of complete headers differs from `expected_count`.
+    pub fn try_from_region_bytes(bytes: Vec<u8>, expected_count: usize) -> Result<Self> {
         let (chunks, []) = bytes.as_chunks::<{ size_of::<VariableHeader>() }>() else {
             return Err(IRacingSDKError::parse_error(
-                "VariableHeadersBuffer",
+                "VariableHeadersSnapshot",
                 format!(
-                    "variable-header region length {} is not divisible by record size {}",
+                    "`bytes` length {} is not divisible by VariableHeader size {}",
                     bytes.len(),
                     size_of::<VariableHeader>(),
                 ),
@@ -26,9 +26,9 @@ impl VariableHeadersBuffer {
 
         if chunks.len() != expected_count {
             return Err(IRacingSDKError::parse_error(
-                "VariableHeadersBuffer",
+                "VariableHeadersSnapshot",
                 format!(
-                    "expected {expected_count} variable headers, but decoded {}",
+                    "expected {expected_count} headers, but found {}",
                     chunks.len(),
                 ),
             ));
@@ -36,8 +36,11 @@ impl VariableHeadersBuffer {
 
         let headers = chunks
             .iter()
-            .map(|bytes| VariableHeader::try_from_bytes(bytes).map_err(IRacingSDKError::from))
-            .collect::<Result<Vec<_>>>()?;
+            .map(|bytes| {
+                VariableHeader::read_from_bytes(bytes)
+                    .expect("Chunk is exactly size_of::<VariableHeader>()")
+            })
+            .collect();
 
         Ok(Self { headers })
     }
@@ -47,14 +50,14 @@ impl VariableHeadersBuffer {
         &self.headers
     }
 
-    /// Iterates over the decoded headers.
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = &VariableHeader> {
-        self.headers.iter()
-    }
-
     /// Returns the number of decoded headers.
     pub fn len(&self) -> usize {
         self.headers.len()
+    }
+
+    /// Iterates over the decoded headers.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &VariableHeader> {
+        self.headers.iter()
     }
 
     /// Returns whether the snapshot contains no headers.
@@ -66,66 +69,170 @@ impl VariableHeadersBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::irsdk::VariableType;
+    use crate::irsdk::VariableType as IRSDKVariableType;
     use zerocopy::IntoBytes;
 
-    fn header(name: &str, offset: i32) -> VariableHeader {
-        VariableHeader::new(
-            VariableType::Float,
-            offset,
+    #[test]
+    fn zero_variable_header_snapshot_from_bytes() {
+        let headers: Vec<VariableHeader> = vec![];
+
+        let bytes = headers.as_bytes();
+
+        assert!(VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 0).is_ok());
+    }
+
+    #[test]
+    fn single_variable_header_snapshot_from_bytes() {
+        let headers = [VariableHeader::new(
+            IRSDKVariableType::Float,
+            4,
             1,
             false,
-            name,
-            "Test variable",
-            "unit",
+            "Speed",
+            "Vehicle speed",
+            "m/s",
         )
-        .unwrap()
+        .unwrap()];
+
+        let bytes = headers.as_bytes();
+
+        let snapshot_result = VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 1);
+        assert!(snapshot_result.is_ok());
+        let snapshot = snapshot_result.unwrap();
+        assert_eq!(snapshot.headers.len(), 1);
     }
 
     #[test]
-    fn accepts_zero_headers() {
-        let snapshot = VariableHeadersBuffer::try_from_region_bytes(&[], 0).unwrap();
+    fn many_variable_header_snapshot_from_bytes() {
+        let headers = [
+            VariableHeader::new(
+                IRSDKVariableType::Float,
+                4,
+                1,
+                false,
+                "Speed",
+                "Vehicle speed",
+                "m/s",
+            )
+            .unwrap(),
+            VariableHeader::new(
+                IRSDKVariableType::Boolean,
+                8,
+                1,
+                false,
+                "PlayerIsInCar",
+                "Current player is in car",
+                "",
+            )
+            .unwrap(),
+            VariableHeader::new(
+                IRSDKVariableType::Float,
+                9,
+                1,
+                false,
+                "Speed",
+                "Vehicle speed",
+                "m/s",
+            )
+            .unwrap(),
+        ];
 
-        assert!(snapshot.is_empty());
-        assert_eq!(snapshot.iter().len(), 0);
+        let bytes = headers.as_bytes();
+        let snapshot_result = VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 3);
+        assert!(snapshot_result.is_ok());
+        let snapshot = snapshot_result.unwrap();
+        assert_eq!(snapshot.headers.len(), 3);
     }
 
     #[test]
-    fn accepts_one_header() {
-        let headers = [header("Speed", 4)];
-        let snapshot = VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 1).unwrap();
+    fn too_many_variable_header_snapshot_from_bytes() {
+        let headers = [
+            VariableHeader::new(
+                IRSDKVariableType::Float,
+                4,
+                1,
+                false,
+                "Speed",
+                "Vehicle speed",
+                "m/s",
+            )
+            .unwrap(),
+            VariableHeader::new(
+                IRSDKVariableType::Boolean,
+                8,
+                1,
+                false,
+                "PlayerIsInCar",
+                "Current player is in car",
+                "",
+            )
+            .unwrap(),
+            VariableHeader::new(
+                IRSDKVariableType::Float,
+                9,
+                1,
+                false,
+                "Speed",
+                "Vehicle speed",
+                "m/s",
+            )
+            .unwrap(),
+        ];
 
-        assert_eq!(snapshot.len(), 1);
-        assert_eq!(snapshot.as_slice()[0].offset, 4);
+        let bytes = headers.as_bytes();
+        let snapshot_result = VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 2);
+        assert!(snapshot_result.is_err());
     }
 
     #[test]
-    fn accepts_multiple_headers() {
-        let headers = [header("Speed", 4), header("RPM", 8)];
-        let snapshot = VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 2).unwrap();
+    fn not_enough_variable_header_snapshot_from_bytes() {
+        let headers = [
+            VariableHeader::new(
+                IRSDKVariableType::Float,
+                4,
+                1,
+                false,
+                "Speed",
+                "Vehicle speed",
+                "m/s",
+            )
+            .unwrap(),
+            VariableHeader::new(
+                IRSDKVariableType::Boolean,
+                8,
+                1,
+                false,
+                "PlayerIsInCar",
+                "Current player is in car",
+                "",
+            )
+            .unwrap(),
+        ];
 
-        assert_eq!(snapshot.len(), 2);
+        let bytes = headers.as_bytes();
+        let snapshot_result = VariableHeadersSnapshot::try_from_region_bytes(bytes.into(), 3);
+        assert!(snapshot_result.is_err());
     }
 
     #[test]
-    fn rejects_partial_trailing_record() {
-        let mut bytes = header("Speed", 4).as_bytes().to_vec();
-        bytes.push(0);
+    fn trailing_bytes_snapshot_from_bytes() {
+        let mut bytes = vec![];
 
-        assert!(VariableHeadersBuffer::try_from_region_bytes(&bytes, 1).is_err());
-    }
+        let headers = VariableHeader::new(
+            IRSDKVariableType::Float,
+            4,
+            1,
+            false,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
 
-    #[test]
-    fn rejects_extra_complete_record() {
-        let headers = [header("Speed", 4), header("RPM", 8)];
+        bytes.extend_from_slice(headers.as_bytes());
+        bytes.extend_from_slice(&[1, 2, 3]);
 
-        assert!(VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 1).is_err());
-    }
-
-    #[test]
-    fn rejects_fewer_records_than_advertised() {
-        let headers = [header("Speed", 4)];
-
-        assert!(VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 2).is_err());
+        let snapshot_result = VariableHeadersSnapshot::try_from_region_bytes(bytes, 1);
+        assert!(snapshot_result.is_err());
     }
 }

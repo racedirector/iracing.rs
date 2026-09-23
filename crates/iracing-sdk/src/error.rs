@@ -273,11 +273,14 @@ impl IRacingSDKError {
         Self::File { path, source }
     }
 
-    /// Helper constructor for memory access errors.
-    pub fn memory_access_error(offset: usize) -> Self {
+    /// Helper constructor for memory access errors with an underlying cause.
+    pub fn memory_access_error<E>(offset: usize, source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         Self::Memory {
             offset,
-            source: None,
+            source: Some(Box::new(source)),
         }
     }
 
@@ -375,7 +378,10 @@ mod tests {
                 // Property: Error conversions work for all generated error variants
 
                 // Test various error variant creations
-                let memory_err = IRacingSDKError::memory_access_error(offset);
+                let memory_err = IRacingSDKError::memory_access_error(
+                    offset,
+                    std::io::Error::other("generated memory access failure"),
+                );
 
                 // Property: All variants should be constructible and display correctly
                 prop_assert!(!memory_err.to_string().is_empty());
@@ -508,8 +514,15 @@ mod tests {
         let conn_error = IRacingSDKError::connection_failed("test");
         assert!(matches!(conn_error, IRacingSDKError::Connection { .. }));
 
-        let mem_error = IRacingSDKError::memory_access_error(0x1000);
-        assert!(matches!(mem_error, IRacingSDKError::Memory { .. }));
+        let mem_error = IRacingSDKError::memory_access_error(
+            0x1000,
+            std::io::Error::other("test memory access failure"),
+        );
+        assert!(matches!(&mem_error, IRacingSDKError::Memory { .. }));
+        assert_eq!(
+            std::error::Error::source(&mem_error).map(ToString::to_string),
+            Some("test memory access failure".to_owned())
+        );
 
         let schema_error =
             IRacingSDKError::schema_validation_error("version mismatch", Some(2), Some(1));
@@ -566,7 +579,10 @@ mod tests {
     fn recovery_methods_work() {
         // Test that recovery methods provide actionable guidance
         let connection_error = IRacingSDKError::connection_failed("test");
-        let memory_error = IRacingSDKError::memory_access_error(0x1000);
+        let memory_error = IRacingSDKError::memory_access_error(
+            0x1000,
+            std::io::Error::other("test memory access failure"),
+        );
         let version_error = IRacingSDKError::Version {
             expected: 2,
             found: 1,

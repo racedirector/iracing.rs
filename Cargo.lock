@@ -2150,6 +2150,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "futures",
  "iracing-irsdk",
  "iracing-sdk",
  "rand",
