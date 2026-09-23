@@ -2,7 +2,10 @@ use std::io::Read;
 use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use crate::Result;
+use crate::{
+    Result,
+    parse_utils::{read_wire_bytes, read_wire_bytes_from_io},
+};
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
@@ -45,24 +48,29 @@ impl DiskSubHeader {
         }
     }
 
+    /// Decodes one complete IBT disk sub-header from its exact wire representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::WireSize`] when `bytes` is not exactly the size
+    /// of an IBT disk sub-header.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
+
     /// Reads and decodes one complete IBT disk sub-header from `reader`.
     ///
     /// # Errors
     ///
     /// Returns a parse error if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::read_from_io(reader).map_err(|error| {
-            crate::Error::parse(
-                "Disk sub-header reading",
-                format!("Failed to read disk sub-header: {error}"),
-            )
-        })
+        read_wire_bytes_from_io(reader)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use zerocopy::{FromBytes, IntoBytes};
+    use zerocopy::IntoBytes;
 
     use super::*;
     use std::mem::{align_of, offset_of, size_of};
@@ -84,11 +92,25 @@ mod tests {
         let header = DiskSubHeader::new(123, 1.5, 2.5, 3, 4);
         let bytes = header.as_bytes();
 
-        let decoded = DiskSubHeader::read_from_bytes(bytes).unwrap();
+        let decoded = DiskSubHeader::try_from_bytes(bytes).unwrap();
         assert_eq!(decoded.start_date, 123);
         assert_eq!(decoded.start_time, 1.5);
         assert_eq!(decoded.end_time, 2.5);
         assert_eq!(decoded.lap_count, 3);
         assert_eq!(decoded.record_count, 4);
+    }
+
+    #[test]
+    fn disk_sub_header_from_bytes_rejects_inexact_wire_size() {
+        let header = DiskSubHeader::new(123, 1.5, 2.5, 3, 4);
+        let bytes = header.as_bytes();
+
+        assert!(matches!(
+            DiskSubHeader::try_from_bytes(&bytes[..bytes.len() - 1]),
+            Err(crate::Error::WireSize {
+                expected: 32,
+                actual: 31,
+            })
+        ));
     }
 }

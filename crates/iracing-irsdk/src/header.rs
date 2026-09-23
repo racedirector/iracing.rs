@@ -2,12 +2,8 @@ use std::io::Read;
 use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use super::{
-    StatusField, VariableBuffer, VariableHeader,
-    constants::{IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS, IRSDK_VER as IRSDK_VERSION},
-    error::{header_validation_error, mismatched_version_error},
-};
-use crate::Result;
+use super::{StatusField, VariableBuffer, constants::IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS};
+use crate::{Result, parse_utils::read_wire_bytes};
 
 /// An iRacing SDK header.
 #[repr(C)]
@@ -47,8 +43,18 @@ pub struct Header {
 impl Header {
     /// The max number of buffers that can be found in the buffers array.
     pub const MAX_BUFFERS: usize = IRSDK_MAX_BUFFERS;
-    const MAX_LIVE_VARIABLES: i32 = 5_000;
-    const MAX_LIVE_BUFFER_LENGTH: i32 = 10_000_000;
+
+    /// Decodes one complete SDK header from its exact wire representation.
+    ///
+    /// This does not validate the decoded field values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::WireSize`] when `bytes` is not exactly the size
+    /// of an SDK header.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
 
     /// Reads and decodes one complete SDK header from `reader`.
     ///
@@ -58,7 +64,7 @@ impl Header {
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         Self::read_from_io(reader).map_err(|error| {
             crate::Error::parse(
-                "Disk Header reading",
+                "Header::try_from_reader",
                 format!("Failed to read disk header: {error}"),
             )
         })
@@ -67,8 +73,7 @@ impl Header {
     #[allow(clippy::too_many_arguments)]
     /// Constructs a header value, filling the ABI padding automatically.
     ///
-    /// This does not validate field values; use [`Self::validate_live`] or
-    /// [`Self::validate_ibt`] for the intended source.
+    /// This does not validate field values.
     pub fn new(
         version: i32,
         status: StatusField,
@@ -103,199 +108,7 @@ impl Header {
     }
 }
 
-/// Validation utilities
 impl Header {
-    /// Performs general validation on the header for common corruption indicators and
-    /// invalid values.
-    pub fn validate(&self) -> Result<()> {
-        // Check that core fields are not equal to 0
-        if self.version == 0
-            && self.status.bits() == 0
-            && self.tick_rate == 0
-            && self.variable_count == 0
-            && self.buffer_length == 0
-        {
-            return Err(header_validation_error("Header appears to be all zeros"));
-        }
-
-        // Check SDK version
-        if self.version != IRSDK_VERSION {
-            return Err(mismatched_version_error(self.version as u32));
-        }
-
-        // Sanity check for negative values
-
-        // Check for negative variable count
-        if self.variable_count < 0 {
-            return Err(header_validation_error(
-                "Number of variables cannot be negative",
-            ));
-        }
-
-        // Validate offset fields are non-negative (defensive correctness)
-        if self.session_info_offset < 0 {
-            return Err(header_validation_error(
-                "Session info offset cannot be negative",
-            ));
-        }
-
-        if self.session_info_length < 0 {
-            return Err(header_validation_error(
-                "Session info length cannot be negative",
-            ));
-        }
-
-        self.validate_session_offset()?;
-
-        if self.variable_header_offset < 0 {
-            return Err(header_validation_error(
-                "Variable header offset cannot be negative",
-            ));
-        }
-
-        self.validate_variable_offset()?;
-
-        if self.tick_rate < 0 || self.session_info_length < -1 {
-            return Err(header_validation_error(
-                "Header contains invalid negative values",
-            ));
-        }
-
-        if self.buffer_length < 0 {
-            return Err(header_validation_error("Buffer length cannot be negative"));
-        }
-
-        Ok(())
-    }
-
-    fn validate_session_offset(&self) -> Result<()> {
-        if self.session_info_offset > 0
-            && self.session_info_length > 0
-            && self
-                .session_info_offset
-                .checked_add(self.session_info_length)
-                .is_none()
-        {
-            return Err(header_validation_error(
-                "Session info offset + length causes overflow",
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn validate_variable_offset(&self) -> Result<()> {
-        const VARIABLE_HEADER_SIZE: i32 = size_of::<VariableHeader>() as i32;
-
-        if self.variable_header_offset > 0 && self.variable_count > 0 {
-            let variable_bytes = self
-                .variable_count
-                .checked_mul(VARIABLE_HEADER_SIZE)
-                .ok_or_else(|| header_validation_error("Variable header array size overflows"))?;
-
-            self.variable_header_offset
-                .checked_add(variable_bytes)
-                .ok_or_else(|| {
-                    header_validation_error("Variable header offset + length causes overflow")
-                })?;
-        }
-
-        Ok(())
-    }
-
-    /// Performs validation on the header for common live corruption indicators and invalid
-    /// values.
-    pub fn validate_live(&self) -> Result<()> {
-        self.validate()?;
-
-        if !(1..=1_000).contains(&self.tick_rate) {
-            return Err(header_validation_error(format!(
-                "Expected tick rate in 1..=1000, found {}",
-                self.tick_rate
-            )));
-        }
-
-        if self.variable_count > Self::MAX_LIVE_VARIABLES {
-            return Err(header_validation_error(format!(
-                "Number of variables exceeds live limit of {}",
-                Self::MAX_LIVE_VARIABLES
-            )));
-        }
-
-        if self.buffer_count < 3 || self.buffer_count > 4 {
-            return Err(header_validation_error(format!(
-                "Expected 3-4 buffers, found {}",
-                self.buffer_count
-            )));
-        }
-
-        if self.buffer_length <= 0 || self.buffer_length > Self::MAX_LIVE_BUFFER_LENGTH {
-            return Err(header_validation_error(format!(
-                "Expected buffer length in 1..={}, found {}",
-                Self::MAX_LIVE_BUFFER_LENGTH,
-                self.buffer_length,
-            )));
-        }
-
-        if usize::from(self.current_buffer) >= self.buffer_count as usize {
-            return Err(header_validation_error(format!(
-                "Current buffer index {} is outside buffer count {}",
-                self.current_buffer, self.buffer_count
-            )));
-        }
-
-        for (index, buffer) in self.buffers[..self.buffer_count as usize]
-            .iter()
-            .enumerate()
-        {
-            if buffer.buffer_offset < 0 {
-                return Err(header_validation_error(format!(
-                    "Buffer {index} offset cannot be negative"
-                )));
-            }
-
-            buffer
-                .buffer_offset
-                .checked_add(self.buffer_length)
-                .ok_or_else(|| {
-                    header_validation_error(format!(
-                        "Buffer {index} offset + length causes overflow"
-                    ))
-                })?;
-        }
-
-        Ok(())
-    }
-
-    /// Performs validation on the header for common disk corruption indicators and invalid
-    /// values.
-    pub fn validate_ibt(&self) -> Result<()> {
-        self.validate()?;
-
-        // !!!: These may be relevant in the common validation
-        if self.buffer_length > 100_000_000 {
-            return Err(header_validation_error(
-                "Buffer length is unreasonably large",
-            ));
-        }
-
-        if self.variable_count > 10_000 {
-            return Err(header_validation_error(
-                "Number of variables is unreasonably large",
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Returns whether this header passes the common checks in [`Self::validate`].
-    ///
-    /// This performs validation on every call and does not apply the additional
-    /// live or IBT checks.
-    pub fn is_valid(&self) -> bool {
-        self.validate().is_ok()
-    }
-
     /// Indicates whether the header is connected.
     pub fn is_connected(&self) -> bool {
         self.status.contains(StatusField::CONNECTED)
@@ -310,7 +123,7 @@ impl Header {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Error;
+    use crate::{Error, constants::IRSDK_VER as IRSDK_VERSION};
     use std::mem::{align_of, offset_of};
 
     fn valid_live_header() -> Header {
@@ -334,64 +147,6 @@ mod tests {
                 VariableBuffer::new(7, 44_000, 7),
             ],
         )
-    }
-
-    #[test]
-    fn live_header_validation_accepts_valid_layout() {
-        valid_live_header().validate_live().unwrap();
-    }
-
-    #[test]
-    fn live_header_validation_rejects_invalid_scalar_fields() {
-        let mut header = valid_live_header();
-        header.tick_rate = 0;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.tick_rate = 1_001;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.variable_count = Header::MAX_LIVE_VARIABLES + 1;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.buffer_length = 0;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.buffer_length = Header::MAX_LIVE_BUFFER_LENGTH + 1;
-        assert!(header.validate_live().is_err());
-    }
-
-    #[test]
-    fn live_header_validation_rejects_invalid_buffer_layout() {
-        let mut header = valid_live_header();
-        header.buffer_count = 2;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.current_buffer = 4;
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.buffers[1] = VariableBuffer::new(9, -1, 9);
-        assert!(header.validate_live().is_err());
-
-        let mut header = valid_live_header();
-        header.buffers[1] = VariableBuffer::new(9, i32::MAX, 9);
-        assert!(header.validate_live().is_err());
-    }
-
-    #[test]
-    fn common_header_validation_rejects_offset_overflow() {
-        let mut header = valid_live_header();
-        header.session_info_offset = i32::MAX;
-        assert!(header.validate().is_err());
-
-        let mut header = valid_live_header();
-        header.variable_header_offset = i32::MAX;
-        assert!(header.validate().is_err());
     }
 
     #[test]
@@ -421,7 +176,7 @@ mod tests {
         let header = valid_live_header();
         let bytes = header.as_bytes();
 
-        let decoded = Header::read_from_bytes(bytes).unwrap();
+        let decoded = Header::try_from_bytes(bytes).unwrap();
         assert_eq!(decoded.version, header.version);
         assert_eq!(decoded.status, header.status);
         assert_eq!(
@@ -433,6 +188,21 @@ mod tests {
             header.buffers[1].buffer_offset
         );
     }
+
+    #[test]
+    fn header_from_bytes_rejects_inexact_wire_size() {
+        let header = valid_live_header();
+        let bytes = header.as_bytes();
+
+        assert!(matches!(
+            Header::try_from_bytes(&bytes[..bytes.len() - 1]),
+            Err(Error::WireSize {
+                expected: 112,
+                actual: 111,
+            })
+        ));
+    }
+
     #[test]
     fn header_reader_rejects_truncated_input() {
         let truncated_data = vec![0u8; 10];
@@ -444,12 +214,5 @@ mod tests {
             Error::Parse { .. } => {}
             other => panic!("Expected Parse error, got {:?}", other),
         }
-    }
-
-    #[test]
-    fn header_validation_rejects_unsupported_version() {
-        let mut header = valid_live_header();
-        header.version = 999;
-        assert!(matches!(header.validate(), Err(Error::Version { .. })));
     }
 }

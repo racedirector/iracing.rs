@@ -2,8 +2,6 @@
 
 use thiserror::Error;
 
-use crate::constants::IRSDK_VER;
-
 /// Result type for wire-contract operations.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -58,17 +56,6 @@ impl Error {
             field,
             reason: reason.into(),
         }
-    }
-}
-
-pub(super) fn header_validation_error(details: impl Into<String>) -> Error {
-    Error::parse("Header validation", details)
-}
-
-pub(super) fn mismatched_version_error(actual: u32) -> Error {
-    Error::Version {
-        expected: IRSDK_VER as u32,
-        found: actual,
     }
 }
 

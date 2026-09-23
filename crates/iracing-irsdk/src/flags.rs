@@ -7,6 +7,7 @@
 //! `has_all` tests for every bit in a mask.
 
 use super::macros::sdk_bitmask;
+use crate::{Result, parse_utils::read_wire_bytes};
 use type_layout::TypeLayout;
 
 /// `irsdk_StatusField`, stored in `irsdk_header::status` as an `int`.
@@ -35,6 +36,18 @@ pub struct StatusField {
 impl StatusField {
     /// `irsdk_stConnected`.
     pub const CONNECTED: Self = Self { bits: 1 };
+
+    /// Decodes one SDK status field from its exact wire representation.
+    ///
+    /// Unknown status bits are preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::WireSize`] when `bytes` is not exactly the size
+    /// of a status field.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
 
     /// Represents the disconnected/empty state.
     pub const fn empty() -> Self {
@@ -563,6 +576,22 @@ impl schemars::JsonSchema for IncidentFlags {
 mod tests {
     use super::*;
     use crate::BitField;
+    use zerocopy::IntoBytes;
+
+    #[test]
+    fn status_field_decodes_exact_wire_bytes() {
+        let status = StatusField::from_bits(StatusField::CONNECTED.bits() | 0x4000_0000);
+        let decoded = StatusField::try_from_bytes(status.as_bytes()).unwrap();
+
+        assert_eq!(decoded, status);
+        assert!(matches!(
+            StatusField::try_from_bytes(&status.as_bytes()[..3]),
+            Err(crate::Error::WireSize {
+                expected: 4,
+                actual: 3,
+            })
+        ));
+    }
 
     #[test]
     fn bitmask_macro_provides_the_existing_structural_api() {

@@ -1,6 +1,8 @@
 use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
+use crate::{Result, parse_utils::read_wire_bytes};
+
 /// iRacing variable buffer information
 #[repr(C)]
 #[derive(Debug, Clone, Copy, TypeLayout, FromBytes, IntoBytes, KnownLayout, Immutable)]
@@ -16,6 +18,16 @@ pub struct VariableBuffer {
 }
 
 impl VariableBuffer {
+    /// Decodes one variable-buffer descriptor from its exact wire representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::WireSize`] when `bytes` is not exactly the size
+    /// of a variable-buffer descriptor.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
+
     /// Convenience constructor. Automatically inserts padding.
     pub fn new(tick_count: i32, buffer_offset: i32, tick_count_begin: i32) -> Self {
         Self {
@@ -49,9 +61,23 @@ mod tests {
         let buffer = VariableBuffer::new(10, 20, 9);
         let bytes = buffer.as_bytes();
 
-        let decoded = VariableBuffer::read_from_bytes(bytes).unwrap();
+        let decoded = VariableBuffer::try_from_bytes(bytes).unwrap();
         assert_eq!(decoded.tick_count, 10);
         assert_eq!(decoded.buffer_offset, 20);
         assert_eq!(decoded.tick_count_begin, 9);
+    }
+
+    #[test]
+    fn variable_buffer_from_bytes_rejects_inexact_wire_size() {
+        let buffer = VariableBuffer::new(10, 20, 9);
+        let bytes = buffer.as_bytes();
+
+        assert!(matches!(
+            VariableBuffer::try_from_bytes(&bytes[..bytes.len() - 1]),
+            Err(crate::Error::WireSize {
+                expected: 16,
+                actual: 15,
+            })
+        ));
     }
 }

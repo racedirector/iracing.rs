@@ -75,9 +75,6 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
         let mut cursor = Cursor::new(data.as_slice());
         let header = Header::try_from_reader(&mut cursor)
             .with_context(|| format!("decoding main header in {}", path.display()))?;
-        header
-            .validate_ibt()
-            .with_context(|| format!("validating main header in {}", path.display()))?;
         let disk = DiskSubHeader::try_from_reader(&mut cursor)
             .with_context(|| format!("decoding disk sub-header in {}", path.display()))?;
 

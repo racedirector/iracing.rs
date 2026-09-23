@@ -1,7 +1,7 @@
 use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use crate::parse_utils::nul_terminated_bytes;
+use crate::parse_utils::{nul_terminated_bytes, read_wire_bytes};
 use crate::{Error, Result};
 
 use super::VariableType;
@@ -33,6 +33,19 @@ pub struct VariableHeader {
 }
 
 impl VariableHeader {
+    /// Decodes one variable header from its exact wire representation.
+    ///
+    /// This does not validate the decoded field values. Use [`Self::validate`]
+    /// when semantic validation is required.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::WireSize`] when `bytes` is not exactly the size of a
+    /// variable header.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
+
     /// Constructs a validated variable header and zero-fills its fixed strings and ABI padding.
     ///
     /// # Errors
@@ -208,7 +221,30 @@ mod tests {
         assert_eq!(&bytes[4..8], &8i32.to_le_bytes());
         assert_eq!(&bytes[13..16], &[0; 3]);
         assert_eq!(&bytes[16..22], b"Speed\0");
-        assert_eq!(VariableHeader::read_from_bytes(bytes).unwrap().offset, 8);
+        assert_eq!(VariableHeader::try_from_bytes(bytes).unwrap().offset, 8);
+    }
+
+    #[test]
+    fn variable_header_from_bytes_rejects_inexact_wire_size() {
+        let header = VariableHeader::new(
+            VariableType::Float,
+            8,
+            1,
+            false,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+        let bytes = header.as_bytes();
+
+        assert!(matches!(
+            VariableHeader::try_from_bytes(&bytes[..bytes.len() - 1]),
+            Err(Error::WireSize {
+                expected: 144,
+                actual: 143,
+            })
+        ));
     }
 
     #[test]

@@ -135,11 +135,7 @@ fn print_live_header(wait: bool, timeout_ms: Option<u64>, poll_interval: Duratio
 
     let header = connection.header();
 
-    println!(
-        "Parsed live header:\nIs valid: {}\n{:#?}",
-        header.validate_live().is_ok(),
-        header
-    );
+    println!("Parsed live header:\n{:#?}", header);
 
     Ok(())
 }
@@ -158,12 +154,7 @@ fn print_ibt_header(path: PathBuf) -> Result<()> {
     let sub_header = DiskSubHeader::try_from_reader(&mut reader)
         .with_context(|| format!("Parsing sub header from {}", path.display()))?;
 
-    println!(
-        "Parsed IBT header:\nIs valid: {}\n{:#?}\n{:#?}",
-        header.is_valid(),
-        header,
-        sub_header
-    );
+    println!("Parsed IBT header:\n{:#?}\n{:#?}", header, sub_header);
 
     Ok(())
 }
