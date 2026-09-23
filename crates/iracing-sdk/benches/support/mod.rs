@@ -197,8 +197,7 @@ fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
 fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
     for info in ordered_variables(schema) {
         for index in 0..info.count {
-            let offset =
-                info.offset + index * info.data_type.byte_size().expect("validated storage type");
+            let offset = info.offset + index * info.data_type.byte_size();
             let value = (index as u32).wrapping_add(1);
 
             match info.data_type {
