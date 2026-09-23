@@ -26,20 +26,29 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+//! use iracing_sdk::{VarData, VariableSchema, ibt::IbtReader};
 //!
 //! fn main() -> iracing_sdk::Result<()> {
 //!     let mut reader = IbtReader::open("telemetry.ibt")?;
-//!     let speed_info = reader
-//!         .schema()
+//!     let frame_size = reader.layout().frame_size();
+//!     let frame_count = reader.layout().frame_count();
+//!     let headers = reader.variable_headers_snapshot()?.ok_or_else(|| {
+//!         iracing_sdk::IRacingSDKError::parse_error(
+//!             "schema lookup",
+//!             "recording contains no variable headers",
+//!         )
+//!     })?;
+//!     let schema = VariableSchema::from_snapshot(headers, frame_size)?;
+//!     let speed_info = schema
 //!         .get_variable("Speed")
-//!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-//!             context: "schema lookup".to_string(),
-//!             details: "missing Speed variable".to_string(),
-//!         })?
+//!         .ok_or_else(|| iracing_sdk::IRacingSDKError::parse_error(
+//!             "schema lookup",
+//!             "missing Speed variable",
+//!         ))?
 //!         .clone();
 //!
-//!     while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
+//!     for index in 0..frame_count {
+//!         let frame = reader.frame(index)?;
 //!         let speed_mps = f32::from_bytes(&frame, &speed_info)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
