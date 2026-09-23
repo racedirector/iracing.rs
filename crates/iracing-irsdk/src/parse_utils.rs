@@ -24,8 +24,10 @@ pub(crate) fn try_from_wire_bytes<T: TryFromBytes>(bytes: &[u8]) -> Result<T> {
 }
 
 pub(crate) fn read_wire_bytes_from_io<T: FromBytes, R: Read>(reader: &mut R) -> Result<T> {
-    T::read_from_io(reader).map_err(|_| Error::WireSize {
-        expected: 1,
-        actual: 1,
+    T::read_from_io(reader).map_err(|error| {
+        Error::parse(
+            type_name::<T>(),
+            format!("Failed to read {} wire bytes: {error}", size_of::<T>()),
+        )
     })
 }
