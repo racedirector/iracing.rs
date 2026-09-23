@@ -5,7 +5,7 @@
 
 use crate::{
     ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
+    SessionInfoRegion, VariableHeadersBuffer, VariableHeadersRegion, VariableInfo,
     irsdk::{
         Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
@@ -306,8 +306,8 @@ impl Connection {
 impl ByteParser for Connection {
     fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
         unsafe {
-            let bytes_ptr = self.base.as_ptr().add(region.offset);
-            std::slice::from_raw_parts(bytes_ptr, region.length)
+            let bytes_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(bytes_ptr, region.length())
         }
     }
 }
