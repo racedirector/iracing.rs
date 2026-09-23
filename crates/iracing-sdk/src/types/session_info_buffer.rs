@@ -89,6 +89,7 @@ impl SessionInfoBuffer {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn from_checked_region(bytes: &[u8]) -> Self {
         Self {
             bytes: bytes.to_vec(),

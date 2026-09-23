@@ -10,6 +10,10 @@ struct Args {
     /// Directory where numbered session info YAML files should be written.
     #[arg(short = 'o', long)]
     output_dir: Option<std::path::PathBuf>,
+
+    /// Emit only car-setup revisions instead of every session-info revision.
+    #[arg(long)]
+    car_setup_only: bool,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -27,11 +31,9 @@ async fn main() -> Result<()> {
         use anyhow::anyhow;
 
         tracing::warn!(
-            "session-update-observer is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+            "session-updates is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
         );
-        Err(anyhow!(
-            "session-update-observer is only supported on Windows"
-        ))
+        Err(anyhow!("session-updates is only supported on Windows"))
     }
 
     #[cfg(windows)]
@@ -41,7 +43,10 @@ async fn main() -> Result<()> {
         use iracing_sdk::{LiveConnection, WindowsConnection, providers::live::LiveProvider};
         use std::{fs, thread, time::Duration};
 
-        let Args { output_dir } = Args::parse();
+        let Args {
+            output_dir,
+            car_setup_only,
+        } = Args::parse();
 
         if let Some(output_dir) = &output_dir {
             fs::create_dir_all(output_dir).with_context(|| {
@@ -71,26 +76,48 @@ async fn main() -> Result<()> {
         let connection = LiveConnection::builder().with_provider(provider).build()?;
         let mut stream = Box::pin(connection.session_updates());
         let mut previous_session_info = None;
+        let mut previous_setup_update = None;
         let mut update_index = 0usize;
 
         while let Some(session) = stream.next().await {
-            let changed = previous_session_info
-                .as_deref()
-                .is_none_or(|previous_value| previous_value != session.as_ref());
+            let setup_update = session.car_setup.as_ref().map(|setup| setup.update_count);
+            let changed = if car_setup_only {
+                setup_update.is_some() && setup_update != previous_setup_update
+            } else {
+                previous_session_info
+                    .as_deref()
+                    .is_none_or(|previous_value| previous_value != session.as_ref())
+            };
 
             if changed {
+                let serialized = if car_setup_only {
+                    serde_yaml_ng::to_string(
+                        session
+                            .car_setup
+                            .as_ref()
+                            .expect("a car-setup update is required when this branch is selected"),
+                    )?
+                } else {
+                    serde_yaml_ng::to_string(session.as_ref())?
+                };
+
                 if let Some(output_dir) = &output_dir {
-                    let output_path = output_dir.join(format!("session_info_{update_index}.yaml"));
-                    let session_yaml = serde_yaml_ng::to_string(session.as_ref())?;
-                    fs::write(&output_path, session_yaml).with_context(|| {
-                        format!("failed to write session info to {}", output_path.display())
+                    let stem = if car_setup_only {
+                        "car_setup"
+                    } else {
+                        "session_info"
+                    };
+                    let output_path = output_dir.join(format!("{stem}_{update_index}.yaml"));
+                    fs::write(&output_path, serialized).with_context(|| {
+                        format!("failed to write {stem} to {}", output_path.display())
                     })?;
-                    tracing::info!(path = %output_path.display(), "Wrote session info");
+                    tracing::info!(path = %output_path.display(), kind = stem, "Wrote update");
                     update_index += 1;
                 } else {
-                    tracing::info!("{session:?}");
+                    print!("{serialized}");
                 }
 
+                previous_setup_update = setup_update;
                 previous_session_info = Some(session);
             }
         }

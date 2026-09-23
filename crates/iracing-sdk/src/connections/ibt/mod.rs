@@ -175,10 +175,14 @@ mod tests {
             .expect("generated IBT fixture should be available for connection tests");
         let mut data = std::fs::read(path).expect("fixture should be readable");
         let reader = crate::ibt::IbtReader::from_bytes(data.clone())?;
-        assert!(frame_count <= reader.total_frames());
+        let total_frames = reader.layout().frame_count();
+        let frame_size = reader.layout().frame_size();
 
-        let frames_to_remove = reader.total_frames() - frame_count;
-        data.truncate(data.len() - frames_to_remove * reader.schema().frame_size);
+        assert!(frame_count <= total_frames);
+
+        let frames_to_remove = total_frames - frame_count;
+        data.truncate(data.len() - frames_to_remove * frame_size);
+
         Ok(data)
     }
 
@@ -299,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn one_frame_is_delivered_after_start() -> Result<()> {
         let reader = crate::ibt::IbtReader::from_bytes(fixture_with_frame_count(1)?)?;
-        let provider = IbtProvider::from_reader(reader);
+        let provider = IbtProvider::from_reader(reader)?;
         let connection = IbtConnection::from_provider(provider).await?;
 
         let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
@@ -315,7 +319,7 @@ mod tests {
     #[tokio::test]
     async fn eof_before_first_frame_returns_promptly() -> Result<()> {
         let reader = crate::ibt::IbtReader::from_bytes(fixture_with_frame_count(0)?)?;
-        let provider = IbtProvider::from_reader(reader);
+        let provider = IbtProvider::from_reader(reader)?;
         let started_at = Instant::now();
 
         let connection = IbtConnection::from_provider(provider).await?;

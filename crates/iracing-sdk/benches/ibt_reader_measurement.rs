@@ -3,7 +3,7 @@
 //! Run with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_measurement
+//! cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-memory
 //! ```
 //!
 //! The `file` mode uses [`IbtReader::open`]. The `memory_baseline` mode models
@@ -13,12 +13,14 @@
 //!
 //! Retained and peak bytes are application-heap allocations observed through
 //! the global allocator. They exclude kernel/filesystem page cache and include
-//! schema, session metadata, paths, and allocator-visible standard-library
-//! state retained by construction. Timing is sensitive to filesystem cache and
-//! machine load; compare results only on the same machine and revision.
+//! any allocator-visible state retained by reader construction. The file mode
+//! retains a file handle and the validated fixed layout without a source-sized
+//! heap buffer; the memory baseline retains the complete source buffer. Timing
+//! is sensitive to filesystem cache and machine load; compare results only on
+//! the same machine and revision.
 
 use anyhow::{Context, Result, ensure};
-use iracing_sdk::{SchemaProvider, ibt::IbtReader};
+use iracing_sdk::ibt::IbtReader;
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     fs,
@@ -134,16 +136,17 @@ fn measure(
     TRACK_PEAK.store(false, Ordering::SeqCst);
     let retained_heap = LIVE_BYTES.load(Ordering::SeqCst).saturating_sub(before);
     let peak_open_heap = PEAK_BYTES.load(Ordering::SeqCst).saturating_sub(before);
-    let frame_size = reader.schema().frame_size;
-    let frame_count = reader.total_frames();
+    let frame_size = reader.layout().frame_size();
+    let frame_count = reader.layout().frame_count();
 
     let replay_started = Instant::now();
     let mut replay_bytes = 0u64;
-    while let Some((frame, tick, session_version)) = reader.read_next_frame()? {
+    for frame_index in 0..frame_count {
+        let frame = reader.frame(frame_index)?;
         replay_bytes = replay_bytes
             .checked_add(u64::try_from(frame.len())?)
             .context("replay byte count overflowed")?;
-        black_box((frame, tick, session_version));
+        black_box((frame, frame_index));
     }
     let replay_time = replay_started.elapsed();
 

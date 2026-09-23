@@ -1,13 +1,14 @@
 //! Performance baseline for the public [`IbtReader`] storage API.
 //!
-//! This target is intentionally compatible with both the complete-file reader
-//! and the file-backed reader. Keep its case names and timed boundaries stable
-//! so Criterion can compare results across the storage refactor.
+//! This target measures the current file-backed reader. Its open and sequential
+//! replay cases retain the historical case names used for the storage refactor.
+//! The random-access case now reads each selected owned frame; unlike the old
+//! seek-only case, it is not directly comparable with that historical result.
 //!
 //! Run only this focused target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
+//! cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-performance
 //! ```
 //!
 //! # Timed boundaries
@@ -15,15 +16,14 @@
 //! - `ibt_reader_open` includes opening the path, reading whatever the reader
 //!   implementation requires, parsing metadata, and dropping the reader.
 //! - `ibt_reader_sequential_replay` constructs the reader outside the timed
-//!   routine, then reads every owned frame through `read_next_frame()`.
+//!   routine, then reads every owned frame by increasing index.
 //! - `ibt_provider_sequential_replay` constructs the replay provider outside
 //!   the timed routine, then requests frames through `Provider::next_frame()`.
 //! - `ibt_connection_sequential_replay` constructs the public disk connection
 //!   and one dynamic-frame subscription outside the timed routine, then starts
 //!   and drains the coordinated replay stream.
-//! - `ibt_reader_random_seek` constructs the reader outside the timed routine,
-//!   then performs 1,024 deterministic `seek_to_frame()` calls. It does not
-//!   read frames after seeking.
+//! - `ibt_reader_random_access` constructs the reader outside the timed
+//!   routine, then reads 1,024 owned frames at deterministic random indices.
 //!
 //! Results include normal operating-system filesystem behavior and may be
 //! affected by a warm page cache. Compare revisions on the same machine with
@@ -37,14 +37,14 @@ use iracing_sdk::{
 };
 use std::{hint::black_box, path::PathBuf, time::Duration, time::Instant};
 
-const RANDOM_SEEKS_PER_ITERATION: usize = 1_024;
+const RANDOM_READS_PER_ITERATION: usize = 1_024;
 
 struct Recording {
     name: &'static str,
     path: PathBuf,
-    file_size: u64,
     replay_bytes: u64,
     frame_count: usize,
+    frame_size: u64,
 }
 
 impl Recording {
@@ -52,13 +52,10 @@ impl Recording {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join(relative_path);
-        let file_size = std::fs::metadata(&path)
-            .unwrap_or_else(|error| panic!("could not stat {}: {error}", path.display()))
-            .len();
         let reader = IbtReader::open(&path)
             .unwrap_or_else(|error| panic!("could not open {}: {error}", path.display()));
-        let frame_count = reader.total_frames();
-        let frame_size = u64::try_from(reader.header().buffer_length)
+        let frame_count = reader.layout().frame_count();
+        let frame_size = u64::try_from(reader.layout().frame_size())
             .expect("validated IBT frame size should fit u64");
         let replay_bytes = frame_size
             .checked_mul(u64::try_from(frame_count).expect("frame count should fit u64"))
@@ -67,9 +64,9 @@ impl Recording {
         Self {
             name,
             path,
-            file_size,
             replay_bytes,
             frame_count,
+            frame_size,
         }
     }
 }
@@ -91,7 +88,6 @@ fn bench_open(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for recording in recordings() {
-        group.throughput(Throughput::Bytes(recording.file_size));
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
             &recording.path,
@@ -120,11 +116,16 @@ fn bench_sequential_replay(c: &mut Criterion) {
             &recording.path,
             |b, path| {
                 b.iter_batched(
-                    || IbtReader::open(path).expect("fixture should open"),
-                    |mut reader| {
-                        while let Some(frame) =
-                            reader.read_next_frame().expect("fixture frame should read")
-                        {
+                    || {
+                        let reader = IbtReader::open(path).expect("fixture should open");
+                        let frame_count = reader.layout().frame_count();
+                        (reader, frame_count)
+                    },
+                    |(mut reader, frame_count)| {
+                        for frame_index in 0..frame_count {
+                            let frame = reader
+                                .frame(black_box(frame_index))
+                                .expect("fixture frame should read");
                             black_box(frame);
                         }
                     },
@@ -224,19 +225,26 @@ fn bench_connection_sequential_replay(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_random_seek(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ibt_reader_random_seek");
+fn bench_random_access(c: &mut Criterion) {
+    let mut group = c.benchmark_group("ibt_reader_random_access");
     group.sample_size(20);
     group.warm_up_time(Duration::from_secs(1));
     group.measurement_time(Duration::from_secs(5));
-    group.throughput(Throughput::Elements(RANDOM_SEEKS_PER_ITERATION as u64));
 
     for recording in recordings() {
-        let positions: Vec<_> = (0..RANDOM_SEEKS_PER_ITERATION)
+        let positions: Vec<_> = (0..RANDOM_READS_PER_ITERATION)
             .map(|index| {
                 index.wrapping_mul(1_103_515_245).wrapping_add(12_345) % recording.frame_count
             })
             .collect();
+        let bytes_per_iteration = recording
+            .frame_size
+            .checked_mul(
+                u64::try_from(RANDOM_READS_PER_ITERATION)
+                    .expect("random-read count should fit u64"),
+            )
+            .expect("random-read byte count should fit u64");
+        group.throughput(Throughput::Bytes(bytes_per_iteration));
 
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
@@ -246,11 +254,11 @@ fn bench_random_seek(c: &mut Criterion) {
                     || IbtReader::open(path).expect("fixture should open"),
                     |mut reader| {
                         for &position in positions {
-                            reader
-                                .seek_to_frame(black_box(position))
-                                .expect("fixture seek should succeed");
+                            let frame = reader
+                                .frame(black_box(position))
+                                .expect("fixture frame should read");
+                            black_box(frame);
                         }
-                        black_box(reader.current_frame())
                     },
                     BatchSize::LargeInput,
                 );
@@ -267,6 +275,6 @@ criterion_group!(
     bench_sequential_replay,
     bench_provider_sequential_replay,
     bench_connection_sequential_replay,
-    bench_random_seek
+    bench_random_access
 );
 criterion_main!(benches);
