@@ -122,9 +122,9 @@ impl VariableSchema {
 
     /// Constructs a schema from an exact snapshot of SDK variable headers.
     pub fn from_headers(headers: &VariableHeadersBuffer, frame_size: usize) -> crate::Result<Self> {
-        let mut variables = HashMap::with_capacity(headers.iter_headers().len());
+        let mut variables = HashMap::with_capacity(headers.len());
 
-        for header in headers.iter_headers() {
+        for header in headers.iter() {
             let variable = VariableInfo::try_from(header)?;
 
             if variable.name.is_empty() {
@@ -357,7 +357,7 @@ mod tests {
         .unwrap();
 
         let bytes = header.as_bytes();
-        let headers = VariableHeadersBuffer::from_checked_region(bytes);
+        let headers = VariableHeadersBuffer::try_from_region_bytes(bytes, 1).unwrap();
 
         let schema = VariableSchema::from_headers(&headers, 8).unwrap();
 
