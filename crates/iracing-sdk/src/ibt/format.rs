@@ -65,7 +65,7 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
         )
     })?;
 
-    let headers = VariableHeadersBuffer::from_owned_checked_region(bytes);
+    let headers = VariableHeadersBuffer::try_from_region_bytes(&bytes, region.count())?;
 
     VariableSchema::from_headers(&headers, frame_size)
 }

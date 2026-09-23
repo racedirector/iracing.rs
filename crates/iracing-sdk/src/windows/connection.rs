@@ -270,14 +270,11 @@ impl Connection {
 
         let region = VariableHeaderRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())
-            .map(|r| r.region)?;
+            .filter(|r| r.is_valid())?;
 
-        let variable_header_bytes = self.bytes_at_region(region);
+        let variable_header_bytes = self.bytes_at_region(region.as_region());
 
-        Some(VariableHeadersBuffer::from_checked_region(
-            variable_header_bytes,
-        ))
+        VariableHeadersBuffer::try_from_region_bytes(variable_header_bytes, region.count()).ok()
     }
 
     /// Decodes all variable definitions from a copied variable-header region.
@@ -293,7 +290,7 @@ impl Connection {
             _ => return Ok(Vec::new()),
         };
 
-        buffer.iter_headers().map(VariableInfo::try_from).collect()
+        buffer.iter().map(VariableInfo::try_from).collect()
     }
 
     /// Validate initial connection

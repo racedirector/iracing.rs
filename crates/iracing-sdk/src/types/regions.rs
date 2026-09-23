@@ -208,12 +208,11 @@ impl VariableHeaderRegion {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if the region's end offset overflows `usize` or
-    /// the region extends beyond `source`.
+    /// Returns a parse error if the region's end offset overflows `usize`, the
+    /// region extends beyond `source`, or the bytes do not decode to exactly
+    /// the advertised number of complete variable headers.
     pub fn buffer(&self, source: &[u8]) -> Result<VariableHeadersBuffer> {
-        Ok(VariableHeadersBuffer::from_checked_region(
-            self.bytes(source)?,
-        ))
+        VariableHeadersBuffer::try_from_region_bytes(self.bytes(source)?, self.count)
     }
 
     /// Returns whether the header advertised a nonzero variable-header region.
@@ -370,7 +369,7 @@ mod tests {
             region.bytes(&source).unwrap().len(),
             size_of::<VariableHeader>()
         );
-        assert_eq!(region.buffer(&source).unwrap().iter_headers().len(), 1);
+        assert_eq!(region.buffer(&source).unwrap().iter().len(), 1);
     }
 
     #[test]
@@ -385,5 +384,19 @@ mod tests {
 
         assert!(region.bytes(&[0; 4]).is_err());
         assert!(region.buffer(&[0; 4]).is_err());
+    }
+
+    #[test]
+    fn variable_header_region_checks_advertised_count_during_buffer_construction() {
+        let region = VariableHeaderRegion {
+            region: ByteRegion {
+                offset: 0,
+                length: size_of::<VariableHeader>(),
+            },
+            count: 2,
+        };
+        let source = vec![0; size_of::<VariableHeader>()];
+
+        assert!(region.buffer(&source).is_err());
     }
 }
