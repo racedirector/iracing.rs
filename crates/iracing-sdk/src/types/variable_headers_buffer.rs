@@ -1,5 +1,4 @@
 use crate::{IRacingSDKError, Result, irsdk::VariableHeader};
-use zerocopy::FromBytes;
 
 /// Exact, owned snapshot of decoded SDK variable-header records.
 ///
@@ -37,14 +36,7 @@ impl VariableHeadersBuffer {
 
         let headers = chunks
             .iter()
-            .map(|bytes| {
-                VariableHeader::read_from_bytes(bytes).map_err(|error| {
-                    IRacingSDKError::parse_error(
-                        "VariableHeadersBuffer",
-                        format!("failed to decode a complete variable header: {error}"),
-                    )
-                })
-            })
+            .map(|bytes| VariableHeader::try_from_bytes(bytes).map_err(IRacingSDKError::from))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self { headers })

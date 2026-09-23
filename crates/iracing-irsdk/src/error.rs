@@ -17,6 +17,12 @@ pub enum Error {
         /// Number of bytes supplied.
         actual: usize,
     },
+    /// A byte buffer has the correct size but is not a valid value of the target type.
+    #[error("Invalid wire value for {target}")]
+    InvalidWireValue {
+        /// Rust wire type that rejected the bytes.
+        target: &'static str,
+    },
     /// The SDK header version does not match the supported version.
     #[error("SDK version mismatch: expected {expected}, found {found}")]
     Version {
@@ -57,8 +63,4 @@ impl Error {
             reason: reason.into(),
         }
     }
-}
-
-pub(super) fn variable_header_validation_error(details: impl Into<String>) -> Error {
-    Error::parse("Variable header validation", details)
 }

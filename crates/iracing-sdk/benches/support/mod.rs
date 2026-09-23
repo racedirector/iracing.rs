@@ -64,10 +64,6 @@ pub fn full_frame_fixture() -> FullFrameFixture {
         .next()
         .unwrap_or_else(|| panic!("{} contains no schema examples", schema_path.display()));
 
-    schema
-        .validate()
-        .unwrap_or_else(|error| panic!("invalid live variable schema: {error}"));
-
     let mut data = vec![0; schema.frame_size];
     populate_frame(&mut data, &schema);
 
@@ -188,7 +184,6 @@ fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
     let integer = (index as u32).wrapping_add(1);
 
     match data_type {
-        VariableType::ElementTypeCount => unreachable!("validated storage type"),
         VariableType::Character => TelemetryValue::Char(integer as u8),
         VariableType::Integer => TelemetryValue::Int32(integer as i32),
         VariableType::Float => TelemetryValue::Float32(index as f32 + 0.5),
@@ -208,7 +203,6 @@ fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
             let value = (index as u32).wrapping_add(1);
 
             match info.data_type {
-                VariableType::ElementTypeCount => unreachable!("validated storage type"),
                 VariableType::Character => data[offset] = value as u8,
                 VariableType::Integer => {
                     data[offset..offset + 4].copy_from_slice(&(value as i32).to_le_bytes());

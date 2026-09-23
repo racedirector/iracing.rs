@@ -62,10 +62,6 @@ impl TelemetryValue {
             VariableType::Integer => i32::from_bytes(data, info).map(Self::Int32),
             VariableType::Float => f32::from_bytes(data, info).map(Self::Float32),
             VariableType::Double => f64::from_bytes(data, info).map(Self::Float64),
-            VariableType::ElementTypeCount => Err(IRacingSDKError::parse_error(
-                "TelemetryValue::decode",
-                "ElementTypeCount is not a storage type",
-            )),
         }
     }
 

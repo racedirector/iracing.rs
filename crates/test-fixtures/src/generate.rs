@@ -408,7 +408,6 @@ fn manifest_variable(variable: &Variable) -> IbtVariableManifest {
             VariableType::BitField => "BitField",
             VariableType::Float => "Float32",
             VariableType::Double => "Float64",
-            VariableType::ElementTypeCount => unreachable!("profile validation rejects sentinel"),
         }
         .to_owned(),
         offset: variable.offset as usize,

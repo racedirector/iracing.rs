@@ -151,10 +151,6 @@ mod tests {
                 prop_assert!(end_offset <= schema.frame_size);
                 prop_assert!(var_info.count > 0);
             }
-
-            // Validation should pass
-            let validation_result = schema.validate();
-            prop_assert!(validation_result.is_ok());
         }
 
         #[test]
@@ -169,7 +165,6 @@ mod tests {
             prop_assert!(size <= 8);
 
             match var_type {
-                VariableType::ElementTypeCount => unreachable!(),
                 VariableType::Character | VariableType::Boolean => {
                     prop_assert_eq!(size, 1);
                 },

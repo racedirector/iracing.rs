@@ -10,7 +10,6 @@ use std::{fs, io::Cursor, path::Path};
 use anyhow::{Context, Result, bail, ensure};
 use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType};
 use iracing_sdk::{SchemaProvider, ibt::IbtReader};
-use zerocopy::FromBytes;
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 
@@ -140,13 +139,11 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
         for (index, expected) in fixture.required_variables.iter().enumerate() {
             let start = variables_start + index * size_of::<VariableHeader>();
             let variable =
-                VariableHeader::read_from_bytes(&data[start..start + size_of::<VariableHeader>()])
+                VariableHeader::try_from_bytes(&data[start..start + size_of::<VariableHeader>()])
                     .map_err(|error| {
-                        anyhow::anyhow!("decoding variable {index} in {}: {error}", path.display())
-                    })?;
-            variable
-                .validate()
-                .with_context(|| format!("validating variable {index} in {}", path.display()))?;
+                    anyhow::anyhow!("decoding variable {index} in {}: {error}", path.display())
+                })?;
+
             ensure!(
                 c_string(&variable.name) == expected.name,
                 "{} variable {index} name mismatch",
@@ -166,7 +163,7 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
                 ),
             };
             ensure!(
-                variable.variable_type()? == expected_type,
+                variable.variable_type == expected_type,
                 "{} variable {} data type mismatch",
                 path.display(),
                 expected.name
