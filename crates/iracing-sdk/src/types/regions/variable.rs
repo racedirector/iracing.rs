@@ -1,4 +1,4 @@
-use iracing_irsdk::{VariableHeader, VariableType};
+use iracing_irsdk::VariableHeader;
 use std::ops::Range;
 
 use crate::{IRacingSDKError, Result, VariableInfo};
@@ -52,21 +52,16 @@ impl TryFrom<&VariableHeader> for VariableRegion {
             )
         })?;
 
-        let size = VariableType::try_from(value.variable_type)
-            .map_err(|_| {
+        let length = value
+            .variable_type
+            .byte_size()
+            .checked_mul(count)
+            .ok_or_else(|| {
                 IRacingSDKError::parse_error(
                     "VariableRegion::try_from",
-                    format!("Could not convert {} to VariableType", value.variable_type),
+                    "Variable region size calculation overflowed",
                 )
-            })?
-            .byte_size();
-
-        let length = size.checked_mul(count).ok_or_else(|| {
-            IRacingSDKError::parse_error(
-                "VariableRegion::try_from",
-                "Variable region size calculation overflowed",
-            )
-        })?;
+            })?;
 
         Ok(Self {
             region: ByteRegion::new(offset, length)?,
