@@ -5,10 +5,24 @@ use std::fmt;
 #[cfg(feature = "codegen")]
 use schemars::{JsonSchema, Schema, json_schema};
 use serde::{Deserialize, Serialize};
+use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
 /// Variable kinds advertised by an iRacing SDK variable header.
 #[repr(i32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Immutable,
+    KnownLayout,
+    TryFromBytes,
+    IntoBytes,
+)]
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
 pub enum VariableType {
     /// `irsdk_char`.
@@ -28,8 +42,6 @@ pub enum VariableType {
     /// `irsdk_double`.
     #[serde(alias = "Float64")]
     Double = 5,
-    /// `irsdk_ETCount` is an array bound, not a variable kind.
-    ElementTypeCount = 6,
 }
 
 impl fmt::Display for VariableType {
@@ -40,22 +52,15 @@ impl fmt::Display for VariableType {
 
 impl VariableType {
     /// Exact contents of `irsdk_VarTypeBytes`.
-    pub const BYTE_SIZES: [usize; Self::ElementTypeCount as usize] = [1, 1, 4, 4, 4, 8];
+    pub const BYTE_SIZES: [usize; 6usize] = [1, 1, 4, 4, 4, 8];
 
-    /// Returns the SDK byte width, excluding the `irsdk_ETCount` sentinel.
-    pub const fn byte_size(self) -> Option<usize> {
+    /// Returns the SDK byte width for this variable type.
+    pub const fn byte_size(self) -> usize {
         match self {
-            Self::Character => Some(1),
-            Self::Boolean => Some(1),
-            Self::Integer | Self::BitField | Self::Float => Some(4),
-            Self::Double => Some(8),
-            Self::ElementTypeCount => None,
+            Self::Character | Self::Boolean => 1,
+            Self::Integer | Self::BitField | Self::Float => 4,
+            Self::Double => 8,
         }
-    }
-
-    /// Returns whether this value can describe telemetry storage.
-    pub const fn is_storage_type(self) -> bool {
-        !matches!(self, Self::ElementTypeCount)
     }
 }
 
@@ -70,7 +75,6 @@ impl TryFrom<i32> for VariableType {
             3 => Ok(Self::BitField),
             4 => Ok(Self::Float),
             5 => Ok(Self::Double),
-            6 => Ok(Self::ElementTypeCount),
             raw => Err(raw),
         }
     }
@@ -90,9 +94,6 @@ impl From<VariableType> for Schema {
             VariableType::Boolean => "boolean",
             VariableType::Integer | VariableType::BitField => "integer",
             VariableType::Float | VariableType::Double => "number",
-            VariableType::ElementTypeCount => {
-                return false.into();
-            }
         };
 
         json_schema!({
@@ -129,20 +130,17 @@ mod tests {
     #[test]
     fn values_and_sizes_match_the_sdk() {
         assert_eq!(i32::from(VariableType::Character), 0);
-        assert_eq!(i32::from(VariableType::ElementTypeCount), 6);
         assert_eq!(VariableType::BYTE_SIZES, [1, 1, 4, 4, 4, 8]);
-        assert_eq!(VariableType::Double.byte_size(), Some(8));
-        assert_eq!(VariableType::ElementTypeCount.byte_size(), None);
-        assert!(!VariableType::ElementTypeCount.is_storage_type());
+        assert_eq!(VariableType::Double.byte_size(), 8);
     }
 
     #[test]
     fn variable_type_size_returns_correct_values() {
-        assert_eq!(VariableType::Character.byte_size().unwrap(), 1);
-        assert_eq!(VariableType::Boolean.byte_size().unwrap(), 1);
-        assert_eq!(VariableType::Integer.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::Float.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::BitField.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::Double.byte_size().unwrap(), 8);
+        assert_eq!(VariableType::Character.byte_size(), 1);
+        assert_eq!(VariableType::Boolean.byte_size(), 1);
+        assert_eq!(VariableType::Integer.byte_size(), 4);
+        assert_eq!(VariableType::Float.byte_size(), 4);
+        assert_eq!(VariableType::BitField.byte_size(), 4);
+        assert_eq!(VariableType::Double.byte_size(), 8);
     }
 }

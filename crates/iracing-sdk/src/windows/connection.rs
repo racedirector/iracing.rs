@@ -106,9 +106,6 @@ impl Connection {
             last_tick_count: i32::MAX,
         };
 
-        // Validate the connection
-        connection.validate_connection()?;
-
         tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
         tracing::debug!("Successfully connected to iRacing shared memory");
 
@@ -291,21 +288,6 @@ impl Connection {
         };
 
         buffer.iter().map(VariableInfo::try_from).collect()
-    }
-
-    /// Validate initial connection
-    fn validate_connection(&self) -> Result<()> {
-        let header = self.header();
-        header.validate_live()?;
-
-        tracing::debug!(
-            ver = header.version,
-            num_vars = header.variable_count,
-            num_buf = header.buffer_count,
-            "Validated iRacing header"
-        );
-
-        Ok(())
     }
 
     /// Find the buffer with the highest tick count

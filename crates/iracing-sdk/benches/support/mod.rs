@@ -64,10 +64,6 @@ pub fn full_frame_fixture() -> FullFrameFixture {
         .next()
         .unwrap_or_else(|| panic!("{} contains no schema examples", schema_path.display()));
 
-    schema
-        .validate()
-        .unwrap_or_else(|error| panic!("invalid live variable schema: {error}"));
-
     let mut data = vec![0; schema.frame_size];
     populate_frame(&mut data, &schema);
 
@@ -128,7 +124,6 @@ pub fn verify_full_frame(packet: &FramePacket, variables: &[&VariableInfo]) {
         let byte_len = info
             .data_type
             .byte_size()
-            .expect("validated storage type")
             .checked_mul(info.count)
             .unwrap_or_else(|| {
                 panic!(
@@ -188,7 +183,6 @@ fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
     let integer = (index as u32).wrapping_add(1);
 
     match data_type {
-        VariableType::ElementTypeCount => unreachable!("validated storage type"),
         VariableType::Character => TelemetryValue::Char(integer as u8),
         VariableType::Integer => TelemetryValue::Int32(integer as i32),
         VariableType::Float => TelemetryValue::Float32(index as f32 + 0.5),
@@ -203,12 +197,10 @@ fn expected_scalar(data_type: VariableType, index: usize) -> TelemetryValue {
 fn populate_frame(data: &mut [u8], schema: &VariableSchema) {
     for info in ordered_variables(schema) {
         for index in 0..info.count {
-            let offset =
-                info.offset + index * info.data_type.byte_size().expect("validated storage type");
+            let offset = info.offset + index * info.data_type.byte_size();
             let value = (index as u32).wrapping_add(1);
 
             match info.data_type {
-                VariableType::ElementTypeCount => unreachable!("validated storage type"),
                 VariableType::Character => data[offset] = value as u8,
                 VariableType::Integer => {
                     data[offset..offset + 4].copy_from_slice(&(value as i32).to_le_bytes());

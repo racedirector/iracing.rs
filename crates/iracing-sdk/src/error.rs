@@ -137,6 +137,13 @@ pub enum IRacingSDKError {
         /// Number of bytes supplied.
         actual: usize,
     },
+
+    /// A byte buffer has the correct size but is not a valid value of the target type.
+    #[error("Invalid wire value for {target}")]
+    InvalidWireValue {
+        /// Rust wire type that rejected the bytes.
+        target: &'static str,
+    },
 }
 
 impl From<iracing_irsdk::Error> for IRacingSDKError {
@@ -145,6 +152,7 @@ impl From<iracing_irsdk::Error> for IRacingSDKError {
             iracing_irsdk::Error::WireSize { expected, actual } => {
                 Self::WireSize { expected, actual }
             }
+            iracing_irsdk::Error::InvalidWireValue { target } => Self::InvalidWireValue { target },
             iracing_irsdk::Error::Version { expected, found } => Self::Version { expected, found },
             iracing_irsdk::Error::Parse { context, details } => Self::Parse { context, details },
             iracing_irsdk::Error::InvalidConfiguration { field, reason } => {
@@ -176,6 +184,7 @@ impl IRacingSDKError {
             Self::SchemaValidation { .. } => false,
             Self::InvalidConfiguration { .. } => false,
             Self::WireSize { .. } => false,
+            Self::InvalidWireValue { .. } => false,
         }
     }
 
@@ -245,6 +254,9 @@ impl IRacingSDKError {
                 "Provide a supported nonzero configuration value",
             ],
             Self::WireSize { .. } => vec!["Contact the maintainer"],
+            Self::InvalidWireValue { .. } => {
+                vec!["Verify the source data is intact and uses a supported iRacing SDK format"]
+            }
         }
     }
 
@@ -534,6 +546,20 @@ mod tests {
         // Runtime check: Error trait is implemented
         let error = IRacingSDKError::connection_failed("test");
         let _: &dyn std::error::Error = &error;
+    }
+
+    #[test]
+    fn wire_validity_conversion_preserves_the_domain_error() {
+        let error = IRacingSDKError::from(iracing_irsdk::Error::InvalidWireValue {
+            target: "iracing_irsdk::VariableHeader",
+        });
+
+        assert!(matches!(
+            error,
+            IRacingSDKError::InvalidWireValue {
+                target: "iracing_irsdk::VariableHeader"
+            }
+        ));
     }
 
     #[test]

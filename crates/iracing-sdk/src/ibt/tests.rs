@@ -115,8 +115,6 @@ fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         assert!((disk_header.end_time - fixture.disk_header.end_time).abs() < f64::EPSILON);
         assert_eq!(disk_header.lap_count, fixture.disk_header.lap_count);
         assert_eq!(disk_header.record_count, fixture.disk_header.record_count);
-
-        header.validate()?;
     }
 
     Ok(())

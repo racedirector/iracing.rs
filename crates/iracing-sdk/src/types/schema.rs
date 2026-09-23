@@ -46,14 +46,6 @@ pub struct VariableInfo {
     pub description: String,
 }
 
-impl VariableInfo {
-    pub(crate) fn storage_byte_size(&self) -> Result<usize> {
-        self.data_type.byte_size().ok_or_else(|| {
-            schema_validation_error("ElementTypeCount cannot describe a telemetry variable")
-        })
-    }
-}
-
 impl TryFrom<&VariableHeader> for VariableInfo {
     type Error = IRacingSDKError;
 
@@ -75,7 +67,7 @@ impl TryFrom<&VariableHeader> for VariableInfo {
                 )
             })?,
             count_as_time: value.count_as_time != 0,
-            data_type: value.variable_type()?,
+            data_type: value.variable_type,
         })
     }
 }
@@ -102,22 +94,41 @@ pub struct VariableSchema {
 }
 
 impl VariableSchema {
-    /// Returns an empty schema.
-    pub fn empty() -> Self {
-        Self {
-            variables: HashMap::new(),
-            frame_size: 0,
-        }
-    }
-
     /// Create a new VariableSchema with validation.
     pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> crate::Result<Self> {
-        let schema = Self {
+        for (name, var_info) in &variables {
+            // Validate variable count
+            if var_info.count == 0 {
+                return Err(schema_validation_error(format!(
+                    "Variable '{}' has count of 0",
+                    name
+                )));
+            }
+
+            // Validate variable name matches info name
+            if var_info.name != *name {
+                return Err(schema_validation_error(format!(
+                    "Variable map key '{}' doesn't match info name '{}'",
+                    name, var_info.name
+                )));
+            }
+
+            // Validate that variable fits within frame
+            let end_offset = var_info
+                .data_type
+                .byte_size()
+                .checked_mul(var_info.count)
+                .and_then(|size| var_info.offset.checked_add(size))
+                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
+            if end_offset > frame_size {
+                return Err(IRacingSDKError::memory_access_error(var_info.offset));
+            }
+        }
+
+        Ok(Self {
             variables,
             frame_size,
-        };
-        schema.validate()?;
-        Ok(schema)
+        })
     }
 
     /// Constructs a schema from an exact snapshot of SDK variable headers.
@@ -142,45 +153,6 @@ impl VariableSchema {
         }
 
         Self::new(variables, frame_size)
-    }
-
-    /// Validates variable names, counts, storage types, and frame bounds.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a map key differs from its variable name, a count
-    /// is zero, the type is not an SDK storage type, or a variable's byte extent
-    /// overflows or exceeds the frame size.
-    pub fn validate(&self) -> crate::Result<()> {
-        for (name, var_info) in &self.variables {
-            // Validate variable count
-            if var_info.count == 0 {
-                return Err(schema_validation_error(format!(
-                    "Variable '{}' has count of 0",
-                    name
-                )));
-            }
-
-            // Validate variable name matches info name
-            if var_info.name != *name {
-                return Err(schema_validation_error(format!(
-                    "Variable map key '{}' doesn't match info name '{}'",
-                    name, var_info.name
-                )));
-            }
-
-            // Validate that variable fits within frame
-            let end_offset = var_info
-                .storage_byte_size()?
-                .checked_mul(var_info.count)
-                .and_then(|size| var_info.offset.checked_add(size))
-                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
-            if end_offset > self.frame_size {
-                return Err(IRacingSDKError::memory_access_error(var_info.offset));
-            }
-        }
-
-        Ok(())
     }
 
     /// Get variable info by name (O(1) lookup).
@@ -269,9 +241,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_sentinel_and_overflowing_metadata() {
-        use crate::{TelemetryValue, VarData};
-        let mut header = VariableHeader::new(
+    fn rejects_overflowing_metadata() {
+        let header = VariableHeader::new(
             IRSDKVariableType::Float,
             0,
             1,
@@ -282,18 +253,6 @@ mod tests {
         )
         .unwrap();
         let mut info = VariableInfo::try_from(&header).unwrap();
-        header.variable_type = 6;
-        assert!(VariableInfo::try_from(&header).is_err());
-        info.data_type = IRSDKVariableType::ElementTypeCount;
-        for count in [0, 1, 2] {
-            info.count = count;
-            assert!(TelemetryValue::decode(&[], &info).is_err());
-            assert!(Vec::<f32>::from_bytes(&[], &info).is_err());
-            assert!(
-                VariableSchema::new(HashMap::from([("Speed".into(), info.clone())]), 4).is_err()
-            );
-        }
-        info.data_type = IRSDKVariableType::Float;
         info.count = usize::MAX;
         assert!(
             VariableSchema::new(HashMap::from([("Speed".into(), info.clone())]), usize::MAX)

@@ -55,7 +55,8 @@ impl VarData for f64 {
 // Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        let element_size = info.storage_byte_size()?;
+        let element_size = info.data_type.byte_size();
+
         if info.count == 0 {
             return Ok(Vec::new());
         }
@@ -260,12 +261,9 @@ mod tests {
     }
 
     #[test]
-    fn zero_count_array_is_empty_but_invalid_storage_type_is_rejected() {
+    fn zero_count_array_is_empty() {
         let mut info = variable_info(VariableType::Character, usize::MAX);
         info.count = 0;
         assert!(Vec::<u8>::from_bytes(&[], &info).unwrap().is_empty());
-
-        info.data_type = VariableType::ElementTypeCount;
-        assert!(Vec::<u8>::from_bytes(&[], &info).is_err());
     }
 }

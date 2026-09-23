@@ -2,8 +2,6 @@
 
 use thiserror::Error;
 
-use crate::constants::IRSDK_VER;
-
 /// Result type for wire-contract operations.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -18,6 +16,12 @@ pub enum Error {
         expected: usize,
         /// Number of bytes supplied.
         actual: usize,
+    },
+    /// A byte buffer has the correct size but is not a valid value of the target type.
+    #[error("Invalid wire value for {target}")]
+    InvalidWireValue {
+        /// Rust wire type that rejected the bytes.
+        target: &'static str,
     },
     /// The SDK header version does not match the supported version.
     #[error("SDK version mismatch: expected {expected}, found {found}")]
@@ -59,19 +63,4 @@ impl Error {
             reason: reason.into(),
         }
     }
-}
-
-pub(super) fn header_validation_error(details: impl Into<String>) -> Error {
-    Error::parse("Header validation", details)
-}
-
-pub(super) fn mismatched_version_error(actual: u32) -> Error {
-    Error::Version {
-        expected: IRSDK_VER as u32,
-        found: actual,
-    }
-}
-
-pub(super) fn variable_header_validation_error(details: impl Into<String>) -> Error {
-    Error::parse("Variable header validation", details)
 }

@@ -115,12 +115,7 @@ impl Serialize for SerializableTelemetryValue<'_> {
     {
         match self.0 {
             TelemetryValue::Char(value) => serializer.serialize_char(char::from(*value)),
-            TelemetryValue::Int8(value) => serializer.serialize_i8(*value),
-            TelemetryValue::UInt8(value) => serializer.serialize_u8(*value),
-            TelemetryValue::Int16(value) => serializer.serialize_i16(*value),
-            TelemetryValue::UInt16(value) => serializer.serialize_u16(*value),
             TelemetryValue::Int32(value) => serializer.serialize_i32(*value),
-            TelemetryValue::UInt32(value) => serializer.serialize_u32(*value),
             TelemetryValue::Float32(value) => serializer.serialize_f32(*value),
             TelemetryValue::Float64(value) => serializer.serialize_f64(*value),
             TelemetryValue::Bool(value) => serializer.serialize_bool(*value),
@@ -262,12 +257,7 @@ mod tests {
     fn telemetry_values_use_native_json_representations() {
         let cases = [
             (TelemetryValue::Char(b'R'), serde_json::json!("R")),
-            (TelemetryValue::Int8(-1), serde_json::json!(-1)),
-            (TelemetryValue::UInt8(2), serde_json::json!(2)),
-            (TelemetryValue::Int16(-3), serde_json::json!(-3)),
-            (TelemetryValue::UInt16(4), serde_json::json!(4)),
             (TelemetryValue::Int32(-5), serde_json::json!(-5)),
-            (TelemetryValue::UInt32(6), serde_json::json!(6)),
             (TelemetryValue::Float32(7.5), serde_json::json!(7.5)),
             (TelemetryValue::Float64(8.5), serde_json::json!(8.5)),
             (TelemetryValue::Bool(true), serde_json::json!(true)),

@@ -121,7 +121,6 @@ impl IbtReader {
 
         // Parse IBT header
         let header = Header::try_from_reader(&mut source)?;
-        header.validate_ibt()?;
 
         // Parse disk sub-header (note: may be corrupted, but we'll try)
         let disk_header = DiskSubHeader::try_from_reader(&mut source)?;
@@ -980,7 +979,7 @@ mod tests {
 
         if let Some(speed) = schema.get_variable("Speed") {
             ensure!(
-                speed.offset + speed.data_type.byte_size().unwrap() * speed.count <= data.len(),
+                speed.offset + speed.data_type.byte_size() * speed.count <= data.len(),
                 "Speed variable must fit within the frame buffer"
             );
         }
