@@ -55,12 +55,11 @@ impl VariableType {
     pub const BYTE_SIZES: [usize; 6usize] = [1, 1, 4, 4, 4, 8];
 
     /// Returns the SDK byte width for this variable type.
-    pub const fn byte_size(self) -> Option<usize> {
+    pub const fn byte_size(self) -> usize {
         match self {
-            Self::Character => Some(1),
-            Self::Boolean => Some(1),
-            Self::Integer | Self::BitField | Self::Float => Some(4),
-            Self::Double => Some(8),
+            Self::Character | Self::Boolean => 1,
+            Self::Integer | Self::BitField | Self::Float => 4,
+            Self::Double => 8,
         }
     }
 }
@@ -132,16 +131,16 @@ mod tests {
     fn values_and_sizes_match_the_sdk() {
         assert_eq!(i32::from(VariableType::Character), 0);
         assert_eq!(VariableType::BYTE_SIZES, [1, 1, 4, 4, 4, 8]);
-        assert_eq!(VariableType::Double.byte_size(), Some(8));
+        assert_eq!(VariableType::Double.byte_size(), 8);
     }
 
     #[test]
     fn variable_type_size_returns_correct_values() {
-        assert_eq!(VariableType::Character.byte_size().unwrap(), 1);
-        assert_eq!(VariableType::Boolean.byte_size().unwrap(), 1);
-        assert_eq!(VariableType::Integer.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::Float.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::BitField.byte_size().unwrap(), 4);
-        assert_eq!(VariableType::Double.byte_size().unwrap(), 8);
+        assert_eq!(VariableType::Character.byte_size(), 1);
+        assert_eq!(VariableType::Boolean.byte_size(), 1);
+        assert_eq!(VariableType::Integer.byte_size(), 4);
+        assert_eq!(VariableType::Float.byte_size(), 4);
+        assert_eq!(VariableType::BitField.byte_size(), 4);
+        assert_eq!(VariableType::Double.byte_size(), 8);
     }
 }

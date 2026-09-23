@@ -123,7 +123,7 @@ mod tests {
             // Adjust variable offsets to ensure they fit within frame_size
             for (name, mut var_info) in variables.into_iter() {
                 // Ensure offset is within reasonable bounds for the frame size
-                let max_size = var_info.data_type.byte_size().unwrap() * var_info.count;
+                let max_size = var_info.data_type.byte_size() * var_info.count;
                 if max_size < frame_size {
                     var_info.offset %= frame_size - max_size;
                 } else {
@@ -147,7 +147,7 @@ mod tests {
 
             // All variable offsets should be reasonable
             for var_info in schema.variables.values() {
-                let end_offset = var_info.offset + (var_info.data_type.byte_size().unwrap() * var_info.count);
+                let end_offset = var_info.offset + (var_info.data_type.byte_size() * var_info.count);
                 prop_assert!(end_offset <= schema.frame_size);
                 prop_assert!(var_info.count > 0);
             }
@@ -160,7 +160,7 @@ mod tests {
             VariableType::Boolean, VariableType::BitField
         ])) {
             // VariableType size calculations correct for all enum variants
-            let size = var_type.byte_size().unwrap();
+            let size = var_type.byte_size();
             prop_assert!(size > 0);
             prop_assert!(size <= 8);
 

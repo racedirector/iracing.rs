@@ -55,7 +55,8 @@ impl VarData for f64 {
 // Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        let element_size = info.storage_byte_size()?;
+        let element_size = info.data_type.byte_size();
+
         if info.count == 0 {
             return Ok(Vec::new());
         }

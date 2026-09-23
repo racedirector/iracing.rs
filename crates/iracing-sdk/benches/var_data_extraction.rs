@@ -188,7 +188,7 @@ fn bench_type<T: VarData + Clone + Debug + PartialEq>(
     expected: T,
 ) {
     const COUNT: usize = 4;
-    assert_eq!(element.len(), data_type.byte_size().unwrap());
+    assert_eq!(element.len(), data_type.byte_size());
 
     let mut data = vec![0xA5];
     for _ in 0..COUNT {

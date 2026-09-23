@@ -59,12 +59,7 @@ impl CsvTelemetryWriter {
     fn append_value(row: &mut Vec<String>, value: TelemetryValue) {
         match value {
             TelemetryValue::Char(value) => row.push(char::from(value).to_string()),
-            TelemetryValue::Int8(value) => row.push(value.to_string()),
-            TelemetryValue::UInt8(value) => row.push(value.to_string()),
-            TelemetryValue::Int16(value) => row.push(value.to_string()),
-            TelemetryValue::UInt16(value) => row.push(value.to_string()),
             TelemetryValue::Int32(value) => row.push(value.to_string()),
-            TelemetryValue::UInt32(value) => row.push(value.to_string()),
             TelemetryValue::Float32(value) => row.push(value.to_string()),
             TelemetryValue::Float64(value) => row.push(value.to_string()),
             TelemetryValue::Bool(value) => row.push(value.to_string()),
@@ -161,7 +156,7 @@ mod tests {
         CsvTelemetryWriter::append_value(&mut row, TelemetryValue::Bool(true));
         CsvTelemetryWriter::append_value(
             &mut row,
-            TelemetryValue::Array(vec![TelemetryValue::UInt32(2), TelemetryValue::UInt32(3)]),
+            TelemetryValue::Array(vec![TelemetryValue::Int32(2), TelemetryValue::Int32(3)]),
         );
 
         assert_eq!(row, vec!["10", "true", "2", "3"]);

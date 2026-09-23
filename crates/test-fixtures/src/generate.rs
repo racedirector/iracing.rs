@@ -252,10 +252,7 @@ fn validate_profile(profile: &Profile) -> Result<()> {
         profile.name
     );
     for variable in &profile.variables {
-        let width = variable
-            .data_type
-            .byte_size()
-            .context("variable uses non-storage type")?;
+        let width = variable.data_type.byte_size();
         let end = usize::try_from(variable.offset).context("negative variable offset")?
             + width * usize::try_from(variable.count).context("negative variable count")?;
         ensure!(

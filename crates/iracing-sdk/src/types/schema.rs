@@ -46,14 +46,6 @@ pub struct VariableInfo {
     pub description: String,
 }
 
-impl VariableInfo {
-    pub(crate) fn storage_byte_size(&self) -> Result<usize> {
-        self.data_type.byte_size().ok_or_else(|| {
-            schema_validation_error("ElementTypeCount cannot describe a telemetry variable")
-        })
-    }
-}
-
 impl TryFrom<&VariableHeader> for VariableInfo {
     type Error = IRacingSDKError;
 
@@ -123,7 +115,8 @@ impl VariableSchema {
 
             // Validate that variable fits within frame
             let end_offset = var_info
-                .storage_byte_size()?
+                .data_type
+                .byte_size()
                 .checked_mul(var_info.count)
                 .and_then(|size| var_info.offset.checked_add(size))
                 .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;

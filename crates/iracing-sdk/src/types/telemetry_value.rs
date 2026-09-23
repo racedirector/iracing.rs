@@ -11,18 +11,8 @@ use crate::{BitField, IRacingSDKError, Result, VarData, VariableInfo, irsdk::Var
 pub enum TelemetryValue {
     /// An 8-bit character value (`irsdk_char`).
     Char(u8),
-    /// An 8-bit signed integer.
-    Int8(i8),
-    /// An 8-bit unsigned integer.
-    UInt8(u8),
-    /// A 16-bit signed integer.
-    Int16(i16),
-    /// A 16-bit unsigned integer.
-    UInt16(u16),
     /// A 32-bit signed integer (`irsdk_int`).
     Int32(i32),
-    /// A 32-bit unsigned integer.
-    UInt32(u32),
     /// A 32-bit IEEE 754 floating-point value (`irsdk_float`).
     Float32(f32),
     /// A 64-bit IEEE 754 floating-point value (`irsdk_double`).
@@ -46,7 +36,6 @@ impl TelemetryValue {
     /// Returns an error if the metadata does not describe an SDK storage type,
     /// its extent overflows, or the requested bytes are outside `data`.
     pub fn decode(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        info.storage_byte_size()?;
         match info.count {
             0 => Ok(Self::Array(Vec::new())),
             1 => Self::decode_scalar(data, info),
@@ -66,7 +55,7 @@ impl TelemetryValue {
     }
 
     fn decode_array(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        let element_size = info.storage_byte_size()?;
+        let element_size = info.data_type.byte_size();
         let mut values = Vec::with_capacity(info.count);
         let mut element_info = info.clone();
         element_info.count = 1;

@@ -124,7 +124,6 @@ pub fn verify_full_frame(packet: &FramePacket, variables: &[&VariableInfo]) {
         let byte_len = info
             .data_type
             .byte_size()
-            .expect("validated storage type")
             .checked_mul(info.count)
             .unwrap_or_else(|| {
                 panic!(
