@@ -50,7 +50,6 @@ jobs:
           - adapter-performance
           - aggregate-frame-parsing
           - telemetry-delivery
-          - telemetry-diagnostics
           - ibt-reader-performance
           - ibt-reader-memory
           - var-data-extraction
@@ -230,7 +229,7 @@ jobs:
       fail-fast: false
       matrix:
         benchmark:
-          - telemetry_delivery_allocations
+          - telemetry-diagnostics
     steps:
       - name: Checkout
         uses: actions/checkout@v7
