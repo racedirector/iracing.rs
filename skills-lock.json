@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "rust-api-design": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-api-design/SKILL.md",
+      "computedHash": "d47bb239d34f8b96a045cc091521d69998b93853a4b6b2693e055e199cf61371"
+    },
+    "rust-code-review": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-code-review/SKILL.md",
+      "computedHash": "d0fdf26308e4ce9a4c6b149ea760939c3492b35990e119fdeb4e6a68bb3acbba"
+    },
+    "rust-concurrency": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-concurrency/SKILL.md",
+      "computedHash": "3e850d12539e159f5b27b9f79e4c9190be2126835e80bfabdc0c86ecf260d6cf"
+    },
+    "rust-dependencies": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-dependencies/SKILL.md",
+      "computedHash": "71b734bbb667dd2d34efdeb857f9974a077b7f012298ce5e3d0637034190ae40"
+    },
+    "rust-semver": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-semver/SKILL.md",
+      "computedHash": "5791e392e6c55a44306f1b562eecf8153d3570d517880798562d030359e01676"
+    },
+    "rust-unsafe-ffi": {
+      "source": "full-stack-skills/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-unsafe-ffi/SKILL.md",
+      "computedHash": "572daef429a1271eaf81e4a989a08268be94c2a0152ef6cf3a1e6d7781981751"
+    }
+  }
+}
