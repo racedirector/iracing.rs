@@ -16,6 +16,11 @@
 //!   implementation requires, parsing metadata, and dropping the reader.
 //! - `ibt_reader_sequential_replay` constructs the reader outside the timed
 //!   routine, then reads every owned frame through `read_next_frame()`.
+//! - `ibt_provider_sequential_replay` constructs the replay provider outside
+//!   the timed routine, then requests frames through `Provider::next_frame()`.
+//! - `ibt_connection_sequential_replay` constructs the public disk connection
+//!   and one dynamic-frame subscription outside the timed routine, then starts
+//!   and drains the coordinated replay stream.
 //! - `ibt_reader_random_seek` constructs the reader outside the timed routine,
 //!   then performs 1,024 deterministic `seek_to_frame()` calls. It does not
 //!   read frames after seeking.
@@ -26,8 +31,11 @@
 //! retained heap; the #84 measurement layer records that separately.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use iracing_sdk::ibt::IbtReader;
-use std::{hint::black_box, path::PathBuf, time::Duration};
+use futures::StreamExt;
+use iracing_sdk::{
+    DynamicFrame, IbtConnection, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
+};
+use std::{hint::black_box, path::PathBuf, time::Duration, time::Instant};
 
 const RANDOM_SEEKS_PER_ITERATION: usize = 1_024;
 
@@ -129,6 +137,93 @@ fn bench_sequential_replay(c: &mut Criterion) {
     group.finish();
 }
 
+fn runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("benchmark runtime should build")
+}
+
+fn bench_provider_sequential_replay(c: &mut Criterion) {
+    let runtime = runtime();
+    let mut group = c.benchmark_group("ibt_provider_sequential_replay");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(5));
+
+    for recording in recordings() {
+        group.throughput(Throughput::Bytes(recording.replay_bytes));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(recording.name),
+            &recording.path,
+            |b, path| {
+                b.iter_batched(
+                    || IbtProvider::open(path).expect("fixture provider should open"),
+                    |mut provider| {
+                        runtime.block_on(async {
+                            while let Some(frame) = provider
+                                .next_frame()
+                                .await
+                                .expect("fixture provider frame should read")
+                            {
+                                black_box(frame);
+                            }
+                        });
+                    },
+                    BatchSize::LargeInput,
+                );
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_connection_sequential_replay(c: &mut Criterion) {
+    let runtime = runtime();
+    let mut group = c.benchmark_group("ibt_connection_sequential_replay");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_secs(1));
+    group.measurement_time(Duration::from_secs(5));
+
+    for recording in recordings() {
+        group.throughput(Throughput::Bytes(recording.replay_bytes));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(recording.name),
+            &recording.path,
+            |b, path| {
+                b.iter_custom(|iterations| {
+                    let mut elapsed = Duration::ZERO;
+                    for _ in 0..iterations {
+                        elapsed += runtime.block_on(async {
+                            let connection = IbtConnection::builder()
+                                .with_path(path.clone())
+                                .build()
+                                .await
+                                .expect("fixture connection should open");
+                            let mut frames = Box::pin(
+                                connection
+                                    .subscribe::<DynamicFrame>()
+                                    .expect("fixture subscription should validate"),
+                            );
+
+                            let started = Instant::now();
+                            connection.start().expect("fixture replay should start");
+                            while let Some(frame) = frames.next().await {
+                                black_box(frame);
+                            }
+                            started.elapsed()
+                        });
+                    }
+                    elapsed
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 fn bench_random_seek(c: &mut Criterion) {
     let mut group = c.benchmark_group("ibt_reader_random_seek");
     group.sample_size(20);
@@ -170,6 +265,8 @@ criterion_group!(
     benches,
     bench_open,
     bench_sequential_replay,
+    bench_provider_sequential_replay,
+    bench_connection_sequential_replay,
     bench_random_seek
 );
 criterion_main!(benches);

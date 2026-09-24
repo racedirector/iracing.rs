@@ -160,7 +160,7 @@ jobs:
         working-directory: pr-head
         shell: bash
         run: |
-          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-head.log"
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --baseline-lenient pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-head.log"
 
       - name: Summarize comparison
         if: always()
@@ -189,9 +189,9 @@ jobs:
               echo
             fi
             if [[ -s "$RUNNER_TEMP/ibt-head.log" ]]; then
-              echo '### Criterion comparison (head vs base)'
+              echo '### Criterion results (head vs base where available)'
               echo
-              echo 'Criterion reports time estimates, percentage change with confidence interval, p-value, and its own improvement/regression assessment for each case.'
+              echo 'Existing benchmark IDs are compared against the PR base. New benchmark IDs are measured without a baseline and become comparable after they land on the base branch.'
               echo
               echo '```text'
               cat "$RUNNER_TEMP/ibt-head.log"
