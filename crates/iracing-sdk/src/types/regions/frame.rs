@@ -60,7 +60,7 @@ impl TryFrom<(&VariableBuffer, &Header)> for FrameRegion {
         let length = usize::try_from(header.buffer_length).map_err(|_| {
             IRacingSDKError::parse_error(
                 "FrameRegion::try_from",
-                format!("Could not convert {} to usize", buffer.buffer_offset),
+                format!("Could not convert buffer_length {} to usize", header.buffer_length),
             )
         })?;
 
