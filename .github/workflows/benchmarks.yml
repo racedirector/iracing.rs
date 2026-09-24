@@ -152,7 +152,7 @@ jobs:
         shell: bash
         run: |
           rm -rf "$CARGO_TARGET_DIR/criterion"
-          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt-reader-performance -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-base.log"
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench ibt_reader_performance -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/ibt-base.log"
 
       - name: Compare PR head with base
         id: compare
