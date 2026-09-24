@@ -77,12 +77,20 @@ async fn main() -> Result<()> {
         let mut stream = Box::pin(connection.session_updates());
         let mut previous_session_info = None;
         let mut previous_setup_update = None;
+        let mut previous_session_num = None;
         let mut update_index = 0usize;
 
         while let Some(session) = stream.next().await {
             let setup_update = session.car_setup.as_ref().map(|setup| setup.update_count);
+            let current_session_num = session.session_info.current_session_num;
+            if car_setup_only && setup_update.is_none() {
+                previous_setup_update = None;
+            }
+
             let changed = if car_setup_only {
-                setup_update.is_some() && setup_update != previous_setup_update
+                setup_update.is_some()
+                    && (setup_update != previous_setup_update
+                        || previous_session_num != Some(current_session_num))
             } else {
                 previous_session_info
                     .as_deref()
@@ -118,6 +126,7 @@ async fn main() -> Result<()> {
                 }
 
                 previous_setup_update = setup_update;
+                previous_session_num = Some(current_session_num);
                 previous_session_info = Some(session);
             }
         }
