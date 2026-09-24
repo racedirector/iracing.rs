@@ -232,7 +232,7 @@ impl IbtReader {
     ///
     /// Returns `Ok(None)` when the header advertises no variable headers. A
     /// present region is copied and decoded into an owned
-    /// [`VariableHeadersSnapshot`] on every call. Schema construction and
+    /// [`VariableHeadersBuffer`] on every call. Schema construction and
     /// semantic validation remain higher-level responsibilities.
     ///
     /// # Errors
