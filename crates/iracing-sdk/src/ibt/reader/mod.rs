@@ -591,7 +591,7 @@ mod tests {
 
         if let Some(speed) = schema.get_variable("Speed") {
             ensure!(
-                speed.offset + speed.data_type.byte_size().unwrap() * speed.count <= data.len(),
+                speed.offset + speed.data_type.byte_size() * speed.count <= data.len(),
                 "Speed variable must fit within the frame buffer"
             );
         }
