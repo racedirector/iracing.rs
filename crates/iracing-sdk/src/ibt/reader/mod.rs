@@ -165,7 +165,7 @@ impl IbtReader {
 
         let bytes = self.bytes_at_region(self.session_info_region.as_region());
 
-        Some(SessionInfoBuffer::from_checked_region(bytes))
+        Some(SessionInfoBuffer::from_owned_checked_region(bytes.to_vec()))
     }
 
     /// Returns decoded session-information text with invalid control characters removed.
