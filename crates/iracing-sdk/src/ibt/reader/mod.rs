@@ -146,10 +146,8 @@ impl IbtReader {
 
         // SAFETY: The mapping is read-only. Callers must not truncate or mutate
         // the IBT file while the reader is alive.
-        let mapped = unsafe { Mmap::map(&file) }.map_err(|source| IRacingSDKError::File {
-            path,
-            source,
-        })?;
+        let mapped =
+            unsafe { Mmap::map(&file) }.map_err(|source| IRacingSDKError::File { path, source })?;
 
         Self::from_source(IbtSource::Mapped(Cursor::new(mapped)))
     }
