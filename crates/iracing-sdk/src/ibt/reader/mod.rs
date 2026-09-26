@@ -35,8 +35,8 @@
 //!
 //! ## Performance Notes
 //!
-//! - [`IbtReader::open`] retains a file handle, the fixed headers, and the
-//!   validated layout; it does not load the recording into memory.
+//! - [`IbtReader::open`] retains a read-only memory mapping, the fixed headers,
+//!   and the validated layout; it does not eagerly copy the recording into heap memory.
 //! - [`IbtReader::from_bytes`] retains the caller-supplied byte vector.
 //! - Each metadata snapshot and frame read allocates only its returned owned
 //!   buffer, apart from temporary decoding storage used by variable headers.
@@ -47,6 +47,7 @@ use crate::{
     ByteRegion, IRacingSDKError, IbtLayout, Result, SessionInfoBuffer, VariableHeadersBuffer,
     irsdk::{DiskSubHeader, Header},
 };
+use memmap2::Mmap;
 use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom},
@@ -54,15 +55,15 @@ use std::{
 };
 
 enum IbtSource {
-    File(File),
-    Memory(Cursor<Vec<u8>>),
+    Mapped(Cursor<Mmap>),
+    Owned(Cursor<Vec<u8>>),
 }
 
 impl Read for IbtSource {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
         match self {
-            Self::File(source) => source.read(buffer),
-            Self::Memory(source) => source.read(buffer),
+            Self::Mapped(source) => source.read(buffer),
+            Self::Owned(source) => source.read(buffer),
         }
     }
 }
@@ -70,8 +71,8 @@ impl Read for IbtSource {
 impl Seek for IbtSource {
     fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
         match self {
-            Self::File(source) => source.seek(position),
-            Self::Memory(source) => source.seek(position),
+            Self::Mapped(source) => source.seek(position),
+            Self::Owned(source) => source.seek(position),
         }
     }
 }
@@ -79,16 +80,8 @@ impl Seek for IbtSource {
 impl IbtSource {
     fn len(&self) -> Result<u64> {
         match self {
-            Self::File(source) => Ok(source
-                .metadata()
-                .map_err(|error| {
-                    IRacingSDKError::parse_error(
-                        "IbtSource::len",
-                        format!("Could not determine length of file: {error}"),
-                    )
-                })?
-                .len()),
-            Self::Memory(source) => Ok(source.get_ref().len() as u64),
+            Self::Mapped(source) => Ok(source.get_ref().len() as u64),
+            Self::Owned(source) => Ok(source.get_ref().len() as u64),
         }
     }
 
@@ -151,7 +144,12 @@ impl IbtReader {
             source,
         })?;
 
-        Self::from_source(IbtSource::File(file))
+        // SAFETY: The mapping is read-only. Callers must not truncate or mutate
+        // the IBT file while the reader is alive.
+        let mapped =
+            unsafe { Mmap::map(&file) }.map_err(|source| IRacingSDKError::File { path, source })?;
+
+        Self::from_source(IbtSource::Mapped(Cursor::new(mapped)))
     }
 
     /// Takes ownership of in-memory `.ibt` data and validates its binary layout.
@@ -164,7 +162,7 @@ impl IbtReader {
     /// Returns an error when the fixed headers cannot be read or their
     /// advertised layout is invalid for the supplied buffer length.
     pub fn from_bytes<B: Into<Vec<u8>>>(data: B) -> Result<Self> {
-        Self::from_source(IbtSource::Memory(Cursor::new(data.into())))
+        Self::from_source(IbtSource::Owned(Cursor::new(data.into())))
     }
 
     fn from_source(mut source: IbtSource) -> Result<Self> {
