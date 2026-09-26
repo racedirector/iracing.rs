@@ -49,7 +49,6 @@ use crate::{
 };
 use memmap2::Mmap;
 use std::{
-    fs::File,
     io::{Cursor, Read, Seek, SeekFrom},
     path::Path,
 };
