@@ -1,9 +1,9 @@
 //! Cross-module compatibility checks against the generated IBT fixture manifest.
 
-use super::format::extract_variable_schema;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
-    VariableHeaderRegion, VariableInfo,
+    VariableInfo, VariableSchema,
+    ibt::IbtReader,
     irsdk::{DiskSubHeader, Header, VariableHeader, VariableType},
 };
 use anyhow::{Context, Result, ensure};
@@ -32,36 +32,33 @@ fn representative_fixtures_follow_frame_region_semantics() -> Result<()> {
     ensure!(!paths.is_empty(), "Expected representative IBT fixtures");
 
     for path in paths {
-        let mut reader = std::io::BufReader::new(
-            fs::File::open(&path).with_context(|| format!("Opening {}", path.display()))?,
-        );
-        let source_len = usize::try_from(reader.get_ref().metadata()?.len())?;
-        let header = Header::try_from_reader(&mut reader)?;
-        let disk_header = DiskSubHeader::try_from_reader(&mut reader)?;
-        let variable_end = VariableHeaderRegion::try_from(&header)?
-            .checked_range(source_len)?
-            .end;
-        let session_region = crate::SessionInfoRegion::try_from(&header)?;
-        let frame_start = if session_region.is_valid() {
-            variable_end.max(session_region.checked_range(source_len)?.end)
-        } else {
-            variable_end
-        };
-        let frame_size = usize::try_from(header.buffer_length)?;
-        let telemetry_bytes = source_len
-            .checked_sub(frame_start)
-            .with_context(|| format!("Frame start exceeds source length for {}", path.display()))?;
+        let source_len = usize::try_from(fs::metadata(&path)?.len())?;
+        let reader = IbtReader::open(&path)
+            .with_context(|| format!("Opening and validating {}", path.display()))?;
+        let layout = reader.layout();
+        let frames = layout.frames();
 
-        ensure!(frame_size > 0, "{} has zero frame size", path.display());
         assert_eq!(
-            telemetry_bytes % frame_size,
+            layout.frame_data_start(),
+            layout.metadata().end(),
+            "{} frame data does not begin after metadata",
+            path.display()
+        );
+        assert_eq!(
+            frames.end(),
+            source_len,
+            "{} frame region does not extend to EOF",
+            path.display()
+        );
+        assert_eq!(
+            frames.len() % layout.frame_size(),
             0,
             "{} has a partial trailing frame",
             path.display()
         );
         assert_eq!(
-            telemetry_bytes / frame_size,
-            usize::try_from(disk_header.record_count)?,
+            layout.frame_count(),
+            usize::try_from(reader.disk_header().record_count)?,
             "{} record_count disagrees with EOF-derived frame count",
             path.display()
         );
@@ -180,13 +177,13 @@ fn test_generated_fixture_variables_match_manifest() -> Result<()> {
 
     for fixture in &manifest.fixtures {
         let path = fixture.fixture_path()?;
-        let mut reader = std::io::BufReader::new(
-            std::fs::File::open(&path).with_context(|| format!("Opening {}", path.display()))?,
-        );
-        let header = Header::try_from_reader(&mut reader)?;
-        let region = VariableHeaderRegion::try_from(&header)?;
-        let frame_size = usize::try_from(header.buffer_length)?;
-        let schema = extract_variable_schema(&mut reader, &region, frame_size)?;
+        let mut reader = IbtReader::open(&path)
+            .with_context(|| format!("Opening and validating {}", path.display()))?;
+        let frame_size = reader.layout().frame_size();
+        let snapshot = reader
+            .variable_headers_snapshot()?
+            .with_context(|| format!("Fixture {} has no variable headers", fixture.name))?;
+        let schema = VariableSchema::from_snapshot(snapshot, frame_size)?;
 
         assert_eq!(schema.frame_size, fixture.frame_size);
         assert_eq!(schema.variable_count(), fixture.num_vars as usize);

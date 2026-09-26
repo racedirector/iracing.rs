@@ -12,14 +12,11 @@
 //!
 //! - `dynamic_frame/adapt` measures creation of a dynamic view by cloning the
 //!   packet's shared data and schema handles; it does not decode every value.
-//! - The remaining `dynamic_frame` cases measure by-name hits and misses on an
-//!   existing view. The array hit creates a fresh `Vec<f32>` per iteration.
+//! - The remaining `dynamic_frame` cases measure representative scalar and
+//!   array lookups on an existing view. The array case creates a fresh
+//!   `Vec<f32>` per iteration.
 //! - `derived_adapters` compares fresh typed output construction for adapters
 //!   containing 5, 20, and 47 fields. Their validation plans are prepared once.
-//! - `optional_fields` compares a fully populated validation plan with one in
-//!   which four optional variables are absent.
-//! - `missing_fields/type_defaults_5_fields` measures the adapter's fallback
-//!   behavior against an intentionally empty schema.
 //!
 //! Assertions before the timed loops verify that captured variables exist and
 //! produce the expected deterministic values. Timed outputs are passed to
@@ -36,7 +33,7 @@
 //! Run this target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench adapter_performance
+//! cargo bench -p iracing-sdk --features benchmark --bench adapter-performance
 //! ```
 
 #![allow(dead_code)] // JUSTIFICATION: Benchmark frame structs are exercised through generated adapters; fields stay unread by the harness.
@@ -49,7 +46,6 @@ use iracing_sdk::{
     adapters::{AdapterValidation, FrameAdapter},
     types::FramePacket,
 };
-use std::collections::HashMap;
 use std::hint::black_box;
 use std::sync::Arc;
 use support::workloads::ConsumerFrame47;
@@ -125,25 +121,6 @@ struct MediumFrame {
     velocity_z: f32,
 }
 
-// Adapter testing optional fields overhead
-#[derive(IRacingTelemetryFrame, Debug, Clone)]
-struct OptionalFieldsFrame {
-    #[field_name = "Speed"]
-    speed: f32,
-
-    #[field_name = "Gear"]
-    gear: Option<i32>,
-
-    #[field_name = "FuelLevel"]
-    fuel: Option<f32>,
-
-    #[field_name = "FuelLevelPct"]
-    fuel_pct: Option<f32>,
-
-    #[field_name = "WaterTemp"]
-    water_temp: Option<f32>,
-}
-
 /// Get a deterministic packet with the captured full live-frame layout.
 fn get_test_frame() -> (FramePacket, Arc<VariableSchema>) {
     let fixture = support::full_frame_fixture();
@@ -194,10 +171,6 @@ fn bench_dynamic_frame(c: &mut Criterion) {
     assert_eq!(frame.f32("Speed"), Some(0.5));
     let lap_dist: Option<Vec<f32>> = frame.get("CarIdxLapDistPct");
     assert_eq!(lap_dist.as_ref().map(Vec::len), Some(72));
-    assert_eq!(frame.f32("BenchmarkMissingScalar"), None);
-    let missing_array: Option<Vec<f32>> = frame.get("BenchmarkMissingArray");
-    assert_eq!(missing_array, None);
-
     group.bench_function("scalar_hit", |b| {
         b.iter(|| {
             let speed = black_box(frame.f32("Speed"));
@@ -205,24 +178,10 @@ fn bench_dynamic_frame(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("scalar_miss", |b| {
-        b.iter(|| {
-            let value = black_box(frame.f32("BenchmarkMissingScalar"));
-            black_box(value)
-        })
-    });
-
     group.bench_function("array_hit_72", |b| {
         b.iter(|| {
             let lap_dist: Option<Vec<f32>> = black_box(frame.get("CarIdxLapDistPct"));
             black_box(lap_dist)
-        })
-    });
-
-    group.bench_function("array_miss", |b| {
-        b.iter(|| {
-            let value: Option<Vec<f32>> = black_box(frame.get("BenchmarkMissingArray"));
-            black_box(value)
         })
     });
 
@@ -262,86 +221,5 @@ fn bench_derived_adapters(c: &mut Criterion) {
     group.finish();
 }
 
-/// Compare present and missing optional-field extraction plans.
-fn bench_optional_fields(c: &mut Criterion) {
-    let (packet, schema) = get_test_frame();
-
-    let mut group = c.benchmark_group("optional_fields");
-
-    let present_validation = require_complete_validation::<OptionalFieldsFrame>(&schema, 5);
-    let present_frame = OptionalFieldsFrame::adapt(&packet, &present_validation);
-    assert!(present_frame.gear.is_some());
-    assert!(present_frame.fuel.is_some());
-    assert!(present_frame.fuel_pct.is_some());
-    assert!(present_frame.water_temp.is_some());
-
-    group.bench_function("all_present", |b| {
-        b.iter(|| {
-            let frame =
-                OptionalFieldsFrame::adapt(black_box(&packet), black_box(&present_validation));
-            black_box(frame)
-        })
-    });
-
-    let mut missing_schema = schema.as_ref().clone();
-    for name in ["Gear", "FuelLevel", "FuelLevelPct", "WaterTemp"] {
-        missing_schema.variables.remove(name);
-    }
-    let missing_schema = Arc::new(missing_schema);
-    let missing_packet = FramePacket::new(
-        packet.data.to_vec(),
-        packet.tick,
-        packet.session_version,
-        Arc::clone(&missing_schema),
-    );
-    let missing_validation = OptionalFieldsFrame::validate_schema(&missing_schema).unwrap();
-    let missing_frame = OptionalFieldsFrame::adapt(&missing_packet, &missing_validation);
-    assert!(missing_frame.gear.is_none());
-    assert!(missing_frame.fuel.is_none());
-    assert!(missing_frame.fuel_pct.is_none());
-    assert!(missing_frame.water_temp.is_none());
-
-    group.bench_function("all_missing", |b| {
-        b.iter(|| {
-            let frame = OptionalFieldsFrame::adapt(
-                black_box(&missing_packet),
-                black_box(&missing_validation),
-            );
-            black_box(frame)
-        })
-    });
-
-    group.finish();
-}
-
-/// Measure required-field type defaults against an intentionally empty schema.
-fn bench_type_defaults(c: &mut Criterion) {
-    let (packet, _) = get_test_frame();
-    let schema = Arc::new(VariableSchema::new(HashMap::new(), packet.data.len()).unwrap());
-    let packet = FramePacket::new(
-        packet.data.to_vec(),
-        packet.tick,
-        packet.session_version,
-        Arc::clone(&schema),
-    );
-    let validation = SmallFrame::validate_schema(&schema).unwrap();
-    let frame = SmallFrame::adapt(&packet, &validation);
-    assert_eq!(frame.speed, 0.0);
-    assert_eq!(frame.gear, 0);
-
-    c.bench_function("missing_fields/type_defaults_5_fields", |b| {
-        b.iter(|| {
-            let frame = SmallFrame::adapt(black_box(&packet), black_box(&validation));
-            black_box(frame)
-        })
-    });
-}
-
-criterion_group!(
-    benches,
-    bench_dynamic_frame,
-    bench_derived_adapters,
-    bench_optional_fields,
-    bench_type_defaults
-);
+criterion_group!(benches, bench_dynamic_frame, bench_derived_adapters);
 criterion_main!(benches);

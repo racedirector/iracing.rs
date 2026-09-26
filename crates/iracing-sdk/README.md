@@ -50,20 +50,29 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader}
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+use iracing_sdk::{VarData, VariableSchema, ibt::IbtReader};
 
 fn main() -> iracing_sdk::Result<()> {
     let mut reader = IbtReader::open("telemetry.ibt")?;
-    let speed_info = reader
-        .schema()
+    let frame_size = reader.layout().frame_size();
+    let frame_count = reader.layout().frame_count();
+    let headers = reader.variable_headers_snapshot()?.ok_or_else(|| {
+        iracing_sdk::IRacingSDKError::parse_error(
+            "schema lookup",
+            "recording contains no variable headers",
+        )
+    })?;
+    let schema = VariableSchema::from_snapshot(headers, frame_size)?;
+    let speed_info = schema
         .get_variable("Speed")
-        .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-            context: "schema lookup".to_string(),
-            details: "missing Speed variable".to_string(),
-        })?
+        .ok_or_else(|| iracing_sdk::IRacingSDKError::parse_error(
+            "schema lookup",
+            "missing Speed variable",
+        ))?
         .clone();
 
-    while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
+    for index in 0..frame_count {
+        let frame = reader.frame(index)?;
         let speed_mps = f32::from_bytes(&frame, &speed_info)?;
         let _speed_kph = speed_mps * 3.6;
     }
@@ -78,9 +87,9 @@ fn main() -> iracing_sdk::Result<()> {
 use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
 fn main() -> iracing_sdk::Result<()> {
-    let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(yaml) = reader.session_yaml() {
-        let session = SessionInfo::parse(&yaml)?;
+    let mut reader = IbtReader::open("telemetry.ibt")?;
+    if let Some(snapshot) = reader.session_info_snapshot()? {
+        let session = SessionInfo::try_from(snapshot)?;
         println!("Track: {}", session.weekend_info.track_display_name);
     }
     Ok(())
@@ -162,22 +171,24 @@ impl FrameAdapter for Row {
 | `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
 | `session schema live` and `session snapshot live` | No | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
+| `live-subscribe` example / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
 ## Examples and Binaries
 
 ### Examples
 
-- `disk-position`:
-  - `cargo run -p iracing-sdk --example disk-position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `live-position` (Windows only):
-  - `cargo run -p iracing-sdk --example live-position -- --csv-output-path .\\positions.csv`
-- `adapter_disk_position`:
-  - `cargo run -p iracing-sdk --example adapter_disk_position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `adapter_live_position` (Windows only):
-  - `cargo run -p iracing-sdk --example adapter_live_position -- --csv-output-path .\\positions.csv`
-- `adapter_enum_bitfields_live` (Windows only):
-  - `cargo run -p iracing-sdk --example adapter_enum_bitfields_live -- --max-frames 120`
+- `ibt-read-frame` — low-level random-access IBT reading:
+  - `cargo run -p iracing-sdk --example ibt-read-frame -- --ibt-path ./session.ibt --frame 0`
+- `manual-frame-adapter` — manual schema validation and typed extraction:
+  - `cargo run -p iracing-sdk --example manual-frame-adapter -- --ibt-path ./session.ibt --max-frames 5`
+- `ibt-subscribe` — high-level typed IBT subscription using the derive API:
+  - `cargo run -p iracing-sdk --example ibt-subscribe -- --ibt-path ./session.ibt --max-frames 5`
+- `enum-bitfields-ibt` — SDK enum and bitfield decoding:
+  - `cargo run -p iracing-sdk --example enum-bitfields-ibt -- --ibt-path ./session.ibt --max-frames 5`
+- `live-subscribe` — high-level typed live subscription (Windows only):
+  - `cargo run -p iracing-sdk --example live-subscribe -- --max-frames 120`
+- `session-updates` — observe live session revisions or only car-setup revisions (Windows only):
+  - `cargo run -p iracing-sdk --example session-updates -- [--car-setup-only] [--output-dir .\\sessions]`
 
 ### Binaries
 

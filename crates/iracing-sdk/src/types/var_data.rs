@@ -1,37 +1,37 @@
 //! Variable data parsing trait and implementations
 use super::{BitField, VariableInfo};
-use crate::parse_utils::decode_variable_type;
+use crate::{IRacingSDKError, Result, parse_utils::decode_variable_type};
 
 /// Trait for types that can be parsed from binary telemetry data.
 pub trait VarData: Sized {
     /// Parse this type from binary data at the given offset.
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self>;
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self>;
 }
 
 /// irsdk::VariableType::Float
 impl VarData for f32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Float, f32::from_le_bytes)
     }
 }
 
 /// irsdk::VariableType::Integer
 impl VarData for i32 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Integer, i32::from_le_bytes)
     }
 }
 
 /// irsdk::VariableType::Bool
 impl VarData for bool {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Boolean, |[byte]| byte != 0)
     }
 }
 
 /// irsdk::VariableType::BitField
 impl VarData for BitField {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, BitField, |bytes| {
             BitField(u32::from_le_bytes(bytes))
         })
@@ -40,21 +40,21 @@ impl VarData for BitField {
 
 /// irsdk::VariableType::Character
 impl VarData for u8 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Character, |[byte]| byte)
     }
 }
 
 /// irsdk::VariableType::Double
 impl VarData for f64 {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         decode_variable_type!(data, info, Double, f64::from_le_bytes)
     }
 }
 
 // Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
+    fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
         let element_size = info.data_type.byte_size();
 
         if info.count == 0 {
@@ -72,13 +72,25 @@ impl<T: VarData> VarData for Vec<T> {
             // Check the offset of the item
             let offset_delta = i
                 .checked_mul(element_size)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+                .ok_or_else(|| {
+                    IRacingSDKError::parse_error(
+                        "VarData::from_bytes",
+                        format!(
+                            "Array element {i} offset calculation overflows usize for element size {element_size}"
+                        ),
+                    )
+                })?;
 
             // Set the offset
-            var_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or(crate::IRacingSDKError::memory_access_error(info.offset))?;
+            var_info.offset = info.offset.checked_add(offset_delta).ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "VarData::from_bytes",
+                    format!(
+                        "Variable offset {} + element offset {offset_delta} overflows usize",
+                        info.offset
+                    ),
+                )
+            })?;
 
             // Parse the variable and store it in the result.
             result.push(T::from_bytes(data, &var_info)?);
@@ -91,7 +103,7 @@ impl<T: VarData> VarData for Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{IRacingSDKError, irsdk::VariableType};
+    use crate::irsdk::VariableType;
     use std::fmt::Debug;
 
     fn variable_info(data_type: VariableType, offset: usize) -> VariableInfo {

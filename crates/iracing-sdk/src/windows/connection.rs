@@ -5,7 +5,7 @@
 
 use crate::{
     ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeaderRegion, VariableHeadersBuffer, VariableInfo,
+    SessionInfoRegion, VariableHeadersBuffer, VariableHeadersRegion, VariableInfo,
     irsdk::{
         Header,
         constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
@@ -235,7 +235,6 @@ impl Connection {
 
         let region = SessionInfoRegion::try_from(header)
             .ok()
-            .filter(|r| r.is_valid())
             .map(|r| r.as_region())?;
 
         let session_info_bytes = self.bytes_at_region(region);
@@ -265,9 +264,7 @@ impl Connection {
     pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header();
 
-        let region = VariableHeaderRegion::try_from(header)
-            .ok()
-            .filter(|r| r.is_valid())?;
+        let region = VariableHeadersRegion::try_from(header).ok()?;
 
         let variable_header_bytes = self.bytes_at_region(region.as_region());
 
@@ -306,8 +303,8 @@ impl Connection {
 impl ByteParser for Connection {
     fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
         unsafe {
-            let bytes_ptr = self.base.as_ptr().add(region.offset);
-            std::slice::from_raw_parts(bytes_ptr, region.length)
+            let bytes_ptr = self.base.as_ptr().add(region.offset());
+            std::slice::from_raw_parts(bytes_ptr, region.len())
         }
     }
 }
