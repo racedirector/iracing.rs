@@ -46,6 +46,7 @@ clap = { workspace = true }
 csv = { workspace = true }
 encoding_rs = "0.8.35"
 futures = "0.3"
+memmap2 = "0.9.11"
 iracing-irsdk = { version = "0.1.0", path = "../iracing-irsdk" }
 iracing-sdk-derive = { version = "0.1.0", path = "../iracing-sdk-derive", optional = true }
 pin-project-lite = "0.2"
