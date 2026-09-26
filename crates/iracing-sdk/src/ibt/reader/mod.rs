@@ -35,8 +35,8 @@
 //!
 //! ## Performance Notes
 //!
-//! - [`IbtReader::open`] retains a read-only memory mapping, the fixed headers,
-//!   and the validated layout; it does not eagerly copy the recording into heap memory.
+//! - [`IbtReader::open`] eagerly loads the complete recording into owned memory,
+//!   matching the historical reader storage strategy used by PR #132.
 //! - [`IbtReader::from_bytes`] retains the caller-supplied byte vector.
 //! - Each metadata snapshot and frame read allocates only its returned owned
 //!   buffer, apart from temporary decoding storage used by variable headers.
@@ -55,6 +55,7 @@ use std::{
 };
 
 enum IbtSource {
+    #[allow(dead_code)]
     Mapped(Cursor<Mmap>),
     Owned(Cursor<Vec<u8>>),
 }
@@ -139,17 +140,12 @@ impl IbtReader {
     /// cannot be read, or its advertised layout is invalid for the file length.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let file = File::open(&path).map_err(|source| IRacingSDKError::File {
-            path: path.clone(),
+        let data = std::fs::read(&path).map_err(|source| IRacingSDKError::File {
+            path,
             source,
         })?;
 
-        // SAFETY: The mapping is read-only. Callers must not truncate or mutate
-        // the IBT file while the reader is alive.
-        let mapped =
-            unsafe { Mmap::map(&file) }.map_err(|source| IRacingSDKError::File { path, source })?;
-
-        Self::from_source(IbtSource::Mapped(Cursor::new(mapped)))
+        Self::from_source(IbtSource::Owned(Cursor::new(data)))
     }
 
     /// Takes ownership of in-memory `.ibt` data and validates its binary layout.
