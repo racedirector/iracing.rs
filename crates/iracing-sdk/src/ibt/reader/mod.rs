@@ -139,10 +139,7 @@ impl IbtReader {
     /// cannot be read, or its advertised layout is invalid for the file length.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let data = std::fs::read(&path).map_err(|source| IRacingSDKError::File {
-            path,
-            source,
-        })?;
+        let data = std::fs::read(&path).map_err(|source| IRacingSDKError::File { path, source })?;
 
         Self::from_source(IbtSource::Owned(Cursor::new(data)))
     }
