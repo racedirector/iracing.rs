@@ -35,8 +35,8 @@
 //!
 //! ## Performance Notes
 //!
-//! - [`IbtReader::open`] retains a file handle, the fixed headers, and the
-//!   validated layout; it does not load the recording into memory.
+//! - [`IbtReader::open`] retains a read-only memory mapping, the fixed headers,
+//!   and the validated layout; it does not eagerly copy the recording into heap memory.
 //! - [`IbtReader::from_bytes`] retains the caller-supplied byte vector.
 //! - Each metadata snapshot and frame read allocates only its returned owned
 //!   buffer, apart from temporary decoding storage used by variable headers.
