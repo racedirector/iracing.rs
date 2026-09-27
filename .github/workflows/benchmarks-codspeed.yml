@@ -1,0 +1,74 @@
+name: Deterministic benchmarks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/benchmarks-codspeed.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-irsdk/**"
+      - "crates/iracing-sdk/Cargo.toml"
+      - "crates/iracing-sdk/src/adapters/**"
+      - "crates/iracing-sdk/src/schema/**"
+      - "crates/iracing-sdk/src/telemetry/**"
+      - "crates/iracing-sdk/src/types/**"
+      - "crates/iracing-sdk/src/lib.rs"
+      - "crates/iracing-sdk/benches/adapter_performance.rs"
+      - "crates/iracing-sdk/benches/aggregate_frame_parsing.rs"
+      - "crates/iracing-sdk/benches/var_data_extraction.rs"
+      - "crates/iracing-sdk/benches/support/mod.rs"
+      - "crates/iracing-sdk/benches/support/workloads.rs"
+      - "docs/reference/live-variable-schema.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/benchmarks-codspeed.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-irsdk/**"
+      - "crates/iracing-sdk/Cargo.toml"
+      - "crates/iracing-sdk/src/adapters/**"
+      - "crates/iracing-sdk/src/schema/**"
+      - "crates/iracing-sdk/src/telemetry/**"
+      - "crates/iracing-sdk/src/types/**"
+      - "crates/iracing-sdk/src/lib.rs"
+      - "crates/iracing-sdk/benches/adapter_performance.rs"
+      - "crates/iracing-sdk/benches/aggregate_frame_parsing.rs"
+      - "crates/iracing-sdk/benches/var_data_extraction.rs"
+      - "crates/iracing-sdk/benches/support/mod.rs"
+      - "crates/iracing-sdk/benches/support/workloads.rs"
+      - "docs/reference/live-variable-schema.yml"
+  workflow_dispatch:
+
+jobs:
+  codspeed:
+    name: Deterministic microbenchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-codspeed
+        run: cargo install cargo-codspeed --version 5.0.2 --locked
+      - name: Build CodSpeed benchmarks
+        run: >
+          cargo codspeed build
+          -p iracing-sdk
+          --features benchmark
+          --bench var-data-extraction
+          --bench adapter-performance
+          --bench aggregate-frame-parsing
+      - name: Run CodSpeed benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: simulation
+          run: cargo codspeed run
