@@ -24,9 +24,10 @@
 //! - `ibt_reader_random_seek` constructs the reader outside the timed routine,
 //!   then performs 1,024 deterministic `frame(index)` calls, including frame I/O.
 //!
-//! Results include normal operating-system filesystem behavior and may be
-//! affected by a warm page cache. Compare revisions on the same machine with
-//! the same fixtures and build profile. These timing benchmarks do not measure
+//! Fixtures are sequentially prewarmed through plain file reads before each
+//! timed case. Results are warm-cache local storage measurements, not cold-open
+//! latency. Compare revisions on the same machine with the same fixtures and
+//! build profile. These timing benchmarks do not measure
 //! retained heap; the #84 measurement layer records that separately.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -34,44 +35,12 @@ use futures::StreamExt;
 use iracing_sdk::{
     DynamicFrame, IbtConnection, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
 };
-use std::{hint::black_box, path::PathBuf, time::Duration, time::Instant};
+use std::{hint::black_box, time::Duration, time::Instant};
+
+mod support;
+use support::ibt::Recording;
 
 const RANDOM_SEEKS_PER_ITERATION: usize = 1_024;
-
-struct Recording {
-    name: &'static str,
-    path: PathBuf,
-    file_size: u64,
-    replay_bytes: u64,
-    frame_count: usize,
-}
-
-impl Recording {
-    fn load(name: &'static str, relative_path: &str) -> Self {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(relative_path);
-        let file_size = std::fs::metadata(&path)
-            .unwrap_or_else(|error| panic!("could not stat {}: {error}", path.display()))
-            .len();
-        let reader = IbtReader::open(&path)
-            .unwrap_or_else(|error| panic!("could not open {}: {error}", path.display()));
-        let frame_count = reader.layout().frame_count();
-        let frame_size = u64::try_from(reader.header().buffer_length)
-            .expect("validated IBT frame size should fit u64");
-        let replay_bytes = frame_size
-            .checked_mul(u64::try_from(frame_count).expect("frame count should fit u64"))
-            .expect("fixture replay byte count should fit u64");
-
-        Self {
-            name,
-            path,
-            file_size,
-            replay_bytes,
-            frame_count,
-        }
-    }
-}
 
 fn recordings() -> [Recording; 2] {
     [
@@ -90,6 +59,7 @@ fn bench_open(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for recording in recordings() {
+        recording.prewarm();
         group.throughput(Throughput::Bytes(recording.file_size));
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
@@ -113,6 +83,7 @@ fn bench_sequential_replay(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for recording in recordings() {
+        recording.prewarm();
         group.throughput(Throughput::Bytes(recording.replay_bytes));
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
@@ -149,6 +120,7 @@ fn bench_provider_sequential_replay(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for recording in recordings() {
+        recording.prewarm();
         group.throughput(Throughput::Bytes(recording.replay_bytes));
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
@@ -184,6 +156,7 @@ fn bench_connection_sequential_replay(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for recording in recordings() {
+        recording.prewarm();
         group.throughput(Throughput::Bytes(recording.replay_bytes));
         group.bench_with_input(
             BenchmarkId::from_parameter(recording.name),
@@ -229,6 +202,7 @@ fn bench_random_seek(c: &mut Criterion) {
     group.throughput(Throughput::Elements(RANDOM_SEEKS_PER_ITERATION as u64));
 
     for recording in recordings() {
+        recording.prewarm();
         let positions: Vec<_> = (0..RANDOM_SEEKS_PER_ITERATION)
             .map(|index| {
                 index.wrapping_mul(1_103_515_245).wrapping_add(12_345) % recording.frame_count

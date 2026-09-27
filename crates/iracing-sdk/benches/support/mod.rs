@@ -8,6 +8,7 @@
 //! session. Schema I/O, fixture construction, ordering, and verification are
 //! intended for benchmark setup rather than timed loops.
 
+pub mod ibt;
 pub mod telemetry_pipeline;
 pub mod workloads;
 
