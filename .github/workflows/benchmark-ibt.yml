@@ -1,0 +1,39 @@
+name: IBT reader comparison
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/benchmark-ibt.yml"
+      - ".github/workflows/criterion-compare.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-irsdk/**"
+      - "crates/iracing-sdk/Cargo.toml"
+      - "crates/iracing-sdk/src/ibt/**"
+      - "crates/iracing-sdk/src/types/ibt/**"
+      - "crates/iracing-sdk/src/types/regions/**"
+      - "crates/iracing-sdk/src/providers/ibt/**"
+      - "crates/iracing-sdk/src/connections/**"
+      - "crates/iracing-sdk/src/provider.rs"
+      - "crates/iracing-sdk/src/stream/**"
+      - "crates/iracing-sdk/src/adapters/**"
+      - "crates/iracing-sdk/benches/ibt_reader_performance.rs"
+      - "crates/iracing-sdk/benches/support/ibt.rs"
+      - "test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt"
+      - "test-data/ibt/b_mustang_bristol_race.ibt"
+
+jobs:
+  compare:
+    uses: ./.github/workflows/criterion-compare.yml
+    with:
+      benchmark: ibt-reader-performance
+      artifact-name: criterion-ibt-reader
+      minimum-fixture-bytes: 1048576
+      fixture-paths: |
+        test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt
+        test-data/ibt/b_mustang_bristol_race.ibt
+      experiment-paths: |
+        crates/iracing-sdk/benches/ibt_reader_performance.rs
+        crates/iracing-sdk/benches/support/ibt.rs
+        test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt
+        test-data/ibt/b_mustang_bristol_race.ibt
