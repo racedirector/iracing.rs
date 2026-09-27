@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
                     })?;
                     tracing::info!(path = %output_path.display(), "Wrote car setup");
                 } else {
-                    print!("{setup_yaml}");
+                    print!("---\n{setup_yaml}");
                 }
                 previous_setup_revision = Some(revision);
                 update_index += 1;
@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
                     })?;
                     tracing::info!(path = %output_path.display(), "Wrote session info");
                 } else {
-                    print!("{session_yaml}");
+                    print!("---\n{session_yaml}");
                 }
 
                 previous_session_info = Some(session);
