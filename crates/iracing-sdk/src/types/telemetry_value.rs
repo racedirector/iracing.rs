@@ -70,15 +70,10 @@ impl TelemetryValue {
                 )
             })?;
 
-            element_info.offset = info.offset.checked_add(offset_delta).ok_or_else(|| {
-                IRacingSDKError::parse_error(
-                    "TelemetryValue::decode_array",
-                    format!(
-                        "Variable offset {} + element offset {offset_delta} overflows usize",
-                        info.offset
-                    ),
-                )
-            })?;
+            element_info.offset = info
+                .offset
+                .checked_add(offset_delta)
+                .ok_or_else(|| IRacingSDKError::memory_invalid_input(info.offset, offset_delta))?;
 
             values.push(Self::decode_scalar(data, &element_info)?);
         }

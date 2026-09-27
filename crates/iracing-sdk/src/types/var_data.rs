@@ -82,15 +82,10 @@ impl<T: VarData> VarData for Vec<T> {
                 })?;
 
             // Set the offset
-            var_info.offset = info.offset.checked_add(offset_delta).ok_or_else(|| {
-                IRacingSDKError::parse_error(
-                    "VarData::from_bytes",
-                    format!(
-                        "Variable offset {} + element offset {offset_delta} overflows usize",
-                        info.offset
-                    ),
-                )
-            })?;
+            var_info.offset = info
+                .offset
+                .checked_add(offset_delta)
+                .ok_or_else(|| IRacingSDKError::memory_invalid_input(info.offset, offset_delta))?;
 
             // Parse the variable and store it in the result.
             result.push(T::from_bytes(data, &var_info)?);

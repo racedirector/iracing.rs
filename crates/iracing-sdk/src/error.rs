@@ -284,6 +284,28 @@ impl IRacingSDKError {
         }
     }
 
+    /// Helper constructor for memory-related usize overflow
+    pub fn memory_invalid_input(offset: usize, length: usize) -> Self {
+        Self::memory_access_error(
+            offset,
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("byte range offset {offset} + length {length} overflows usize"),
+            ),
+        )
+    }
+
+    /// Helper constructor for memory-related unexpected EOF
+    pub fn memory_unexpected_eof(offset: usize, end: usize, length: usize) -> Self {
+        IRacingSDKError::memory_access_error(
+            offset,
+            std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!("byte range {offset}..{end} exceeds buffer length {length}"),
+            ),
+        )
+    }
+
     /// Helper constructor for Windows API errors.
     #[cfg(windows)]
     pub fn windows_api_error(operation: impl Into<String>, source: core::Error) -> Self {

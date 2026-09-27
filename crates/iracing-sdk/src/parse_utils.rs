@@ -3,28 +3,12 @@
 use crate::{IRacingSDKError, Result, VariableInfo, irsdk::VariableType};
 
 pub(crate) fn bytes_at_size(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
-    let end = offset.checked_add(length).ok_or_else(|| {
-        IRacingSDKError::memory_access_error(
-            offset,
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("byte range offset {offset} + length {length} overflows usize"),
-            ),
-        )
-    })?;
+    let end = offset
+        .checked_add(length)
+        .ok_or_else(|| IRacingSDKError::memory_invalid_input(offset, length))?;
 
-    data.get(offset..end).ok_or_else(|| {
-        IRacingSDKError::memory_access_error(
-            offset,
-            std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "byte range {offset}..{end} exceeds buffer length {}",
-                    data.len()
-                ),
-            ),
-        )
-    })
+    data.get(offset..end)
+        .ok_or_else(|| IRacingSDKError::memory_unexpected_eof(offset, end, data.len()))
 }
 
 pub(crate) fn bytes_at<const SIZE: usize>(data: &[u8], offset: usize) -> Result<&[u8; SIZE]> {
