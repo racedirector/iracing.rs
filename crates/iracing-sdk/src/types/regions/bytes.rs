@@ -138,6 +138,7 @@ mod tests {
         assert_eq!(valid_region.length, 99);
     }
 
+    #[allow(clippy::reversed_empty_ranges)]
     #[test]
     fn try_from_range_rejects_end_preceding_start() {
         assert!(ByteRegion::try_from(12..11).is_err());

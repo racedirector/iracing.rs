@@ -288,7 +288,7 @@ impl IbtReader {
         source_len: u64,
         preamble_end: u64,
     ) -> Result<Option<(u64, u64)>> {
-        if region.len() == 0 {
+        if region.is_empty() {
             return Ok(None);
         }
 
