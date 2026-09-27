@@ -57,7 +57,13 @@ impl ByteRegion {
 
     /// Returns whether each region begins before the other region ends.
     pub fn overlaps(&self, other: Self) -> bool {
-        self.offset < other.end() && other.offset < self.end()
+        // Ensure self is not empty...
+        !self.is_empty()
+            // Other is not empty...
+            && !other.is_empty()
+            // Overlap
+            && self.offset < other.end()
+            && other.offset < self.end()
     }
 }
 

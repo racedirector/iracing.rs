@@ -262,7 +262,7 @@ impl Connection {
     pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
         let header = self.header();
 
-        let region = VariableHeadersRegion::try_from(header).ok()?;
+        let region = VariableHeadersRegion::try_from_header(header).ok()??;
 
         let variable_header_bytes = self.bytes_at_region(region.as_region());
 
