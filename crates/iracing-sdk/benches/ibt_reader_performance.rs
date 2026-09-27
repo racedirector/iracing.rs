@@ -21,7 +21,7 @@
 //! - `ibt_connection_sequential_replay` constructs the public disk connection
 //!   and one dynamic-frame subscription outside the timed routine, then starts
 //!   and drains the coordinated replay stream.
-//! - `ibt_reader_random_seek` constructs the reader outside the timed routine,
+//! - `ibt_reader_random_frame_read` constructs the reader outside the timed routine,
 //!   then performs 1,024 deterministic `frame(index)` calls, including frame I/O.
 //!
 //! Fixtures are sequentially prewarmed through plain file reads before each
@@ -194,8 +194,8 @@ fn bench_connection_sequential_replay(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_random_seek(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ibt_reader_random_seek");
+fn bench_random_frame_read(c: &mut Criterion) {
+    let mut group = c.benchmark_group("ibt_reader_random_frame_read");
     group.sample_size(20);
     group.warm_up_time(Duration::from_secs(1));
     group.measurement_time(Duration::from_secs(5));
@@ -239,6 +239,6 @@ criterion_group!(
     bench_sequential_replay,
     bench_provider_sequential_replay,
     bench_connection_sequential_replay,
-    bench_random_seek
+    bench_random_frame_read
 );
 criterion_main!(benches);
