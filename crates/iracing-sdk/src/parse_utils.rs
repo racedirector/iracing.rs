@@ -77,14 +77,18 @@ pub(crate) fn validate_metadata_region(
 
     let end = u64::try_from(region.end()).map_err(|_| {
         IRacingSDKError::parse_error(
-            "IBT metadata layout",
-            format!("{name} end cannot be represented as a source offset"),
+            "IBT region bounds",
+            "Region end cannot be represented as a source offset",
         )
     })?;
     if end > source_len {
         return Err(IRacingSDKError::parse_error(
-            "IBT metadata layout",
-            format!("{name} ends at {end}, beyond source length {source_len}",),
+            "IBT region bounds",
+            format!(
+                "Region {}..{} exceeds source length {source_len}",
+                region.offset(),
+                region.end(),
+            ),
         ));
     }
 

@@ -1,6 +1,4 @@
-use iracing_irsdk::{Header, VariableBuffer};
-
-use crate::{IRacingSDKError, Result};
+use crate::Result;
 
 use super::ByteRegion;
 
@@ -37,36 +35,5 @@ impl FrameRegion {
     /// Returns the exclusive source-relative end offset of the frame.
     pub fn end(self) -> usize {
         self.0.end()
-    }
-}
-
-impl TryFrom<(&VariableBuffer, &Header)> for FrameRegion {
-    type Error = IRacingSDKError;
-
-    /// Derives a frame region from a variable buffer and its SDK header.
-    ///
-    /// # Errors
-    ///
-    /// Returns a parse error if the advertised buffer offset or frame length
-    /// cannot be represented as `usize`, or if their sum overflows `usize`.
-    fn try_from((buffer, header): (&VariableBuffer, &Header)) -> Result<Self> {
-        let offset = usize::try_from(buffer.buffer_offset).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "FrameRegion::try_from",
-                format!("Could not convert {} to usize", buffer.buffer_offset),
-            )
-        })?;
-
-        let length = usize::try_from(header.buffer_length).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "FrameRegion::try_from",
-                format!(
-                    "Could not convert buffer_length {} to usize",
-                    header.buffer_length
-                ),
-            )
-        })?;
-
-        Self::new(offset, length)
     }
 }

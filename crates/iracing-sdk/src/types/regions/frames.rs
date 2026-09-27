@@ -123,20 +123,6 @@ impl FramesRegion {
     }
 }
 
-impl TryFrom<(ByteRegion, usize)> for FramesRegion {
-    type Error = IRacingSDKError;
-
-    /// Creates a frame region from a byte region and frame size.
-    ///
-    /// # Errors
-    ///
-    /// Returns a parse error if `frame_size` is zero or if the region contains
-    /// trailing bytes that do not form a complete frame.
-    fn try_from((region, frame_size): (ByteRegion, usize)) -> Result<Self> {
-        Self::new(region, frame_size)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,15 +147,15 @@ mod tests {
     }
 
     #[test]
-    fn frames_region_try_from_byte_region_and_size() {
+    fn frames_region_from_byte_region_and_size() {
         let valid_region = ByteRegion::try_from((0, 4)).unwrap();
 
         // Valid parsing
-        assert!(FramesRegion::try_from((valid_region, 2)).is_ok());
+        assert!(FramesRegion::new(valid_region, 2).is_ok());
         // Trailing bytes
-        assert!(FramesRegion::try_from((valid_region, 3)).is_err());
+        assert!(FramesRegion::new(valid_region, 3).is_err());
         // Invalid frame size
-        assert!(FramesRegion::try_from((valid_region, 0)).is_err());
+        assert!(FramesRegion::new(valid_region, 0).is_err());
     }
 
     #[test]

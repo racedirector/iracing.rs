@@ -16,7 +16,6 @@ use crate::{
 /// been accepted.
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct ParsedIbtHeader {
-    tick_rate: NonZeroUsize,
     session_info_offset: usize,
     session_info_length: usize,
     variable_header_offset: usize,
@@ -47,7 +46,7 @@ impl ParsedIbtHeader {
             ));
         }
 
-        let tick_rate = parse_positive_usize(
+        parse_positive_usize(
             "tick_rate",
             header.tick_rate,
             "ParsedIbtHeader::try_from_header",
@@ -85,7 +84,6 @@ impl ParsedIbtHeader {
             variable_header_offset,
             variable_count,
             frame_size,
-            tick_rate,
         })
     }
 
@@ -107,11 +105,6 @@ impl ParsedIbtHeader {
     /// Returns the parsed variable count.
     pub fn variable_count(&self) -> usize {
         self.variable_count
-    }
-
-    /// Returns the parsed tick rate
-    pub fn tick_rate(&self) -> NonZeroUsize {
-        self.tick_rate
     }
 
     /// Returns the parsed telemetry frame size.

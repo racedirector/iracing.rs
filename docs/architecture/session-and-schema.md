@@ -10,6 +10,16 @@ generation paths.
 
 ## Variable schema
 
+`IbtLayout` in `types/ibt` derives validated metadata and frame regions from a
+decoded `Header` and the complete source length. Its private `ParsedIbtHeader`
+validates signed fields before geometry is constructed. `MetadataRegions` lives
+alongside the other region value objects in `types/regions`; frame counts derive
+from physical bytes, not the disk sub-header record count. The layout performs
+no I/O, schema decoding, or playback management. `IbtReader` does not consume it
+yet; only metadata bounds validation is shared through `parse_utils`, preserving
+the reader's existing checks and diagnostics. Validation uses ordinary functions
+rather than a macro family.
+
 Disk variable headers are parsed from `.ibt` files. Live variable headers are
 discovered from Windows shared memory. Both become `VariableSchema` containing
 named `VariableInfo` entries and a frame size.

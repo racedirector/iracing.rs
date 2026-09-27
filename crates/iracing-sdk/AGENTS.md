@@ -10,6 +10,7 @@
 ## Key APIs & Layout
 
 - `ibt/`: `IbtReader` iterates `.ibt` telemetry; rely on `VariableSchema` and `VariableInfo` metadata instead of re-parsing frame bytes.
+- `types/ibt/`: `IbtLayout` validates physical byte geometry from `Header` and source length without I/O. `MetadataRegions` lives in `types/regions/`; `IbtReader` does not consume the layout yet. Keep shared validation in `parse_utils` and preserve existing reader diagnostics.
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
 - `schema/session/`: `SessionInfo::parse` deserializes decoded session YAML; the live telemetry session policy tracks `session_version`, while IBT parses its session once.
 - Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `VariableSchema` for variable metadata.

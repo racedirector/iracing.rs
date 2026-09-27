@@ -82,7 +82,7 @@ pub struct IbtReader {
     variable_schema: VariableSchema,
 
     session_info: Option<SessionInfoBuffer>,
-    // variable_headers_region: VariableHeaderRegion,
+
     current_frame: usize,
     total_frames: usize,
     frame_data_start: u64,
