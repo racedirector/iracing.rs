@@ -56,7 +56,7 @@ impl VariableHeadersRegion {
                 )
             })?;
 
-        if length == 0 {
+        if count == 0 {
             return Ok(None);
         }
 
@@ -114,13 +114,36 @@ impl TryFrom<&Header> for VariableHeadersRegion {
     /// Returns a parse error if the offset or count cannot be represented as
     /// `usize`, or if the count times the variable-header wire size overflows.
     fn try_from(value: &Header) -> Result<Self> {
-        match Self::try_from_header(value)? {
-            Some(region) => Ok(region),
-            None => Err(IRacingSDKError::parse_error(
+        let offset = usize::try_from(value.variable_header_offset).map_err(|_| {
+            IRacingSDKError::parse_error(
                 "VariableHeadersRegion::try_from",
-                "Header advertised empty variable headers region",
-            )),
-        }
+                format!(
+                    "Could not convert {} to usize",
+                    value.variable_header_offset
+                ),
+            )
+        })?;
+
+        let count = usize::try_from(value.variable_count).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "VariableHeadersRegion::try_from",
+                format!("Could not convert {} to usize", value.variable_count),
+            )
+        })?;
+
+        let length = count
+            .checked_mul(size_of::<VariableHeader>())
+            .ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "VariableHeadersRegion::try_from",
+                    "Variable headers size calculation overflowed".to_string(),
+                )
+            })?;
+
+        Ok(Self {
+            region: ByteRegion::new(offset, length)?,
+            count,
+        })
     }
 }
 
@@ -143,5 +166,32 @@ mod tests {
         header.variable_header_offset = -1;
 
         assert!(VariableHeadersRegion::try_from(&header).is_err());
+    }
+
+    #[test]
+    fn variable_header_region_rejects_size_overflow() {
+        let mut header = Header::new_zeroed();
+        header.variable_count = i32::MAX;
+
+        let result = VariableHeadersRegion::try_from(&header);
+
+        if size_of::<VariableHeader>() > (usize::MAX / i32::MAX as usize) {
+            assert!(result.is_err());
+        } else {
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn variable_header_region_reports_count_and_length() {
+        let mut header = Header::new_zeroed();
+        header.variable_header_offset = 128;
+        header.variable_count = 3;
+
+        let region = VariableHeadersRegion::try_from(&header).unwrap();
+
+        assert_eq!(region.count(), 3);
+        assert_eq!(region.offset(), 128);
+        assert_eq!(region.len(), 3 * size_of::<VariableHeader>());
     }
 }
