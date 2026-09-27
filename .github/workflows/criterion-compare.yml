@@ -1,0 +1,142 @@
+name: Same-runner Criterion comparison
+
+on:
+  workflow_call:
+    inputs:
+      benchmark:
+        required: true
+        type: string
+      artifact-name:
+        required: true
+        type: string
+      experiment-paths:
+        required: true
+        type: string
+      fixture-paths:
+        required: false
+        default: ""
+        type: string
+      minimum-fixture-bytes:
+        required: false
+        default: 0
+        type: number
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/comparison-target
+    steps:
+      - name: Checkout PR base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: pr-base
+          lfs: true
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr-head
+          lfs: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Validate fixtures and classify changes
+        shell: bash
+        env:
+          FIXTURE_PATHS: ${{ inputs.fixture-paths }}
+          MINIMUM_FIXTURE_BYTES: ${{ inputs.minimum-fixture-bytes }}
+          EXPERIMENT_PATHS: ${{ inputs.experiment-paths }}
+        run: |
+          while IFS= read -r fixture; do
+            [[ -z "$fixture" ]] && continue
+            for checkout in pr-base pr-head; do
+              path="$checkout/$fixture"
+              if [[ ! -f "$path" ]] || (( $(wc -c < "$path") < MINIMUM_FIXTURE_BYTES )); then
+                echo "Missing or unhydrated fixture: $path" >&2
+                exit 1
+              fi
+            done
+          done <<< "$FIXTURE_PATHS"
+
+          while IFS= read -r input; do
+            [[ -z "$input" ]] && continue
+            if [[ -d "pr-base/$input" || -d "pr-head/$input" ]]; then
+              diff -qr "pr-base/$input" "pr-head/$input" >/dev/null || echo "$input" >> "$RUNNER_TEMP/experiment-changed.txt"
+            else
+              cmp -s "pr-base/$input" "pr-head/$input" || echo "$input" >> "$RUNNER_TEMP/experiment-changed.txt"
+            fi
+          done <<< "$EXPERIMENT_PATHS"
+
+          for input in Cargo.toml Cargo.lock .cargo/config.toml crates/iracing-sdk/Cargo.toml; do
+            cmp -s "pr-base/$input" "pr-head/$input" || echo "$input" >> "$RUNNER_TEMP/build-changed.txt"
+          done
+          for source in crates/iracing-sdk/src crates/iracing-irsdk/src; do
+            if ! diff -qr "pr-base/$source" "pr-head/$source" >/dev/null; then
+              echo "$source/**" >> "$RUNNER_TEMP/build-changed.txt"
+            fi
+          done
+      - name: Clear prior Criterion data
+        shell: bash
+        run: rm -rf "$CARGO_TARGET_DIR/criterion"
+      - name: Measure PR base
+        working-directory: pr-base
+        shell: bash
+        env:
+          BENCHMARK: ${{ inputs.benchmark }}
+        run: |
+          set -o pipefail
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench "$BENCHMARK" -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/base.log"
+      - name: Compare PR head with base
+        id: compare
+        working-directory: pr-head
+        shell: bash
+        env:
+          BENCHMARK: ${{ inputs.benchmark }}
+        run: |
+          set -o pipefail
+          cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench "$BENCHMARK" -- --baseline-lenient pr-base --color never 2>&1 | tee "$RUNNER_TEMP/head.log"
+      - name: Summarize comparison
+        if: always()
+        shell: bash
+        env:
+          BENCHMARK: ${{ inputs.benchmark }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          COMPARISON_OUTCOME: ${{ steps.compare.outcome }}
+          ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        run: |
+          {
+            echo "## $BENCHMARK: PR base vs head"
+            echo
+            echo "Base: \`$BASE_SHA\` · Head: \`$HEAD_SHA\`"
+            echo
+            echo 'Measured on the same runner. Timing deltas are informational.'
+            if [[ "$COMPARISON_OUTCOME" != success ]]; then
+              echo '> **Comparison incomplete:** Inspect the job log before interpreting partial results.'
+            fi
+            if [[ -s "$RUNNER_TEMP/experiment-changed.txt" ]]; then
+              echo '> **Experiment changed:** benchmark definitions or workload inputs differ between base and head. Treat the reported timing deltas as diagnostic only; they may not represent the same experiment.'
+              sed 's/^/- `/' "$RUNNER_TEMP/experiment-changed.txt" | sed 's/$/`/'
+            fi
+            if [[ -s "$RUNNER_TEMP/build-changed.txt" ]]; then
+              echo 'Build inputs changed (these do not invalidate the experiment):'
+              sed 's/^/- `/' "$RUNNER_TEMP/build-changed.txt" | sed 's/$/`/'
+            fi
+            echo 'New benchmark IDs without a base are measured as unpaired baselines.'
+            echo '### Head results'
+            echo '```text'
+            if [[ -s "$RUNNER_TEMP/head.log" ]]; then cat "$RUNNER_TEMP/head.log"; else echo 'No head output'; fi
+            echo '```'
+            echo "Full report: workflow artifact \`$ARTIFACT_NAME\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Criterion report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ env.CARGO_TARGET_DIR }}/criterion
+          if-no-files-found: ignore
+          retention-days: 14
