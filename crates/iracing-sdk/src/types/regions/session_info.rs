@@ -1,5 +1,5 @@
 use super::ByteRegion;
-use crate::{IRacingSDKError, Result, irsdk::Header, types::layout::ParsedIbtHeader};
+use crate::{IRacingSDKError, Result, irsdk::Header, types::ibt::ParsedIbtHeader};
 
 /// Location and size of the session-information bytes advertised by an SDK header.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

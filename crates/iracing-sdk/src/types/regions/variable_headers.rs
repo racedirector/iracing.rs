@@ -1,7 +1,7 @@
 use iracing_irsdk::{Header, VariableHeader};
 
 use super::ByteRegion;
-use crate::{IRacingSDKError, Result, types::layout::ParsedIbtHeader};
+use crate::{IRacingSDKError, Result, types::ibt::ParsedIbtHeader};
 
 /// Location and size of the variable-header region advertised by a [`Header`].
 ///

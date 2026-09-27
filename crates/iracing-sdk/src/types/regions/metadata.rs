@@ -1,39 +1,12 @@
-use super::IBT_PREAMBLE_SIZE;
-
 use crate::{
     IRacingSDKError, Result,
     irsdk::Header,
-    types::{ByteRegion, SessionInfoRegion, VariableHeadersRegion, layout::ParsedIbtHeader},
+    parse_utils::validate_metadata_region,
+    types::{
+        SessionInfoRegion, VariableHeadersRegion,
+        ibt::{IBT_PREAMBLE_SIZE, ParsedIbtHeader},
+    },
 };
-
-fn validate_metadata_region(
-    name: &'static str,
-    region: ByteRegion,
-    source_len: usize,
-) -> Result<()> {
-    if region.offset() < IBT_PREAMBLE_SIZE {
-        return Err(IRacingSDKError::parse_error(
-            "IBT metadata layout",
-            format!(
-                "{name} starts at {}, before preamble end {}",
-                region.offset(),
-                IBT_PREAMBLE_SIZE
-            ),
-        ));
-    }
-
-    if region.end() > source_len {
-        return Err(IRacingSDKError::parse_error(
-            "IBT metadata layout",
-            format!(
-                "{name} ends at {}, beyond source length {source_len}",
-                region.end(),
-            ),
-        ));
-    }
-
-    Ok(())
-}
 
 /// Validated metadata regions that precede the telemetry frames in an IBT source.
 ///
@@ -102,12 +75,35 @@ impl MetadataRegions {
             ));
         }
 
+        let source_len_u64 = u64::try_from(source_len).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "MetadataRegions",
+                "source length cannot be represented as a source offset",
+            )
+        })?;
+        let preamble_end = u64::try_from(IBT_PREAMBLE_SIZE).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "MetadataRegions",
+                "IBT preamble size cannot be represented as a source offset",
+            )
+        })?;
+
         if let Some(region) = variable_headers {
-            validate_metadata_region("VariableHeaders", region.as_region(), source_len)?;
+            validate_metadata_region(
+                "VariableHeaders",
+                region.as_region(),
+                source_len_u64,
+                preamble_end,
+            )?;
         }
 
         if let Some(region) = session_info {
-            validate_metadata_region("SessionInfo", region.as_region(), source_len)?;
+            validate_metadata_region(
+                "SessionInfo",
+                region.as_region(),
+                source_len_u64,
+                preamble_end,
+            )?;
         }
 
         // Ensure the regions don't overlap

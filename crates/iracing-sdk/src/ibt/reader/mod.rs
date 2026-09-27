@@ -35,6 +35,7 @@ use crate::{
     ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeadersRegion,
     VariableSchema,
     irsdk::{DiskSubHeader, Header},
+    parse_utils::validate_metadata_region,
     types::{IRacingSessionString, SessionInfoRegion},
 };
 use std::{
@@ -134,7 +135,7 @@ impl IbtReader {
             })?;
 
         let variable_headers_region = VariableHeadersRegion::try_from(&header)?;
-        let variable_headers_bounds = Self::validate_metadata_region(
+        let variable_headers_bounds = validate_metadata_region(
             "Variable headers",
             variable_headers_region.as_region(),
             source_len,
@@ -158,7 +159,7 @@ impl IbtReader {
             extract_variable_schema(&mut source, &variable_headers_region, frame_size)?;
 
         let session_info_region = SessionInfoRegion::try_from(&header)?;
-        let session_info_bounds = Self::validate_metadata_region(
+        let session_info_bounds = validate_metadata_region(
             "Session info",
             session_info_region.as_region(),
             source_len,
@@ -280,33 +281,6 @@ impl IbtReader {
             ));
         }
         Ok(end)
-    }
-
-    fn validate_metadata_region(
-        name: &'static str,
-        region: ByteRegion,
-        source_len: u64,
-        preamble_end: u64,
-    ) -> Result<Option<(u64, u64)>> {
-        if region.is_empty() {
-            return Ok(None);
-        }
-
-        let start = u64::try_from(region.offset()).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "IBT metadata layout",
-                format!("{name} offset cannot be represented as a source offset"),
-            )
-        })?;
-        if start < preamble_end {
-            return Err(IRacingSDKError::parse_error(
-                "IBT metadata layout",
-                format!("{name} starts at {start}, before preamble end {preamble_end}"),
-            ));
-        }
-
-        let end = Self::validate_region(region, source_len)?;
-        Ok(Some((start, end)))
     }
 
     fn frame_offset(frame_data_start: u64, frame_number: u64, frame_size: usize) -> Result<u64> {

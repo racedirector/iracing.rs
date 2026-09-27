@@ -47,8 +47,8 @@
 
 mod dynamic_frame;
 mod frame;
+mod ibt;
 mod iracing_session_string;
-mod layout;
 mod regions;
 mod schema;
 mod session_info_buffer;
@@ -60,9 +60,9 @@ mod variable_headers_buffer;
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
+pub use ibt::IbtLayout;
 pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
-pub use layout::{IbtLayout, MetadataRegions};
 pub use regions::*;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
