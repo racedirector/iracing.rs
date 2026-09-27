@@ -27,7 +27,7 @@
 //! - O(1) schema validation after parsing
 
 use crate::{
-    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, types::VariableHeaderRegion,
+    IRacingSDKError, Result, VariableHeadersBuffer, VariableSchema, types::VariableHeadersRegion,
 };
 
 use std::io::{Read, Seek, SeekFrom};
@@ -35,7 +35,7 @@ use std::io::{Read, Seek, SeekFrom};
 /// Extract variable schema from IBT file headers
 pub(super) fn extract_variable_schema<R: Read + Seek>(
     reader: &mut R,
-    region: &VariableHeaderRegion,
+    region: &VariableHeadersRegion,
     frame_size: usize,
 ) -> Result<VariableSchema> {
     tracing::debug!(
@@ -43,7 +43,7 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
         region.count()
     );
 
-    let offset = region.region.offset;
+    let offset = region.as_region().offset();
 
     // Seek to the variable headers section and parse all variables
     reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| {
@@ -56,7 +56,7 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
         )
     })?;
 
-    let mut bytes = vec![0; region.region.length];
+    let mut bytes = vec![0; region.as_region().len()];
 
     reader.read_exact(&mut bytes).map_err(|e| {
         IRacingSDKError::parse_error(
@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn empty_variable_region_preserves_frame_size() -> Result<()> {
         let header = Header::new_zeroed();
-        let region = VariableHeaderRegion::try_from(&header)?;
+        let region = VariableHeadersRegion::try_from(&header)?;
         let mut reader = Cursor::new([]);
         let frame_size = 64;
 

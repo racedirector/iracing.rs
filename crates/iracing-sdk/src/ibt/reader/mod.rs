@@ -32,7 +32,7 @@
 
 use super::format::extract_variable_schema;
 use crate::{
-    ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeaderRegion,
+    ByteRegion, IRacingSDKError, Result, SchemaProvider, SessionInfoBuffer, VariableHeadersRegion,
     VariableSchema,
     irsdk::{DiskSubHeader, Header},
     types::{IRacingSessionString, SessionInfoRegion},
@@ -133,7 +133,7 @@ impl IbtReader {
                 )
             })?;
 
-        let variable_headers_region = VariableHeaderRegion::try_from(&header)?;
+        let variable_headers_region = VariableHeadersRegion::try_from(&header)?;
         let variable_headers_bounds = Self::validate_metadata_region(
             "Variable headers",
             variable_headers_region.as_region(),
@@ -262,8 +262,9 @@ impl IbtReader {
     }
 
     fn validate_region(region: ByteRegion, source_len: u64) -> Result<u64> {
-        let range = region.as_checked_range()?;
-        let end = u64::try_from(range.end).map_err(|_| {
+        let region_range = region.as_range();
+
+        let end = u64::try_from(region_range.end).map_err(|_| {
             IRacingSDKError::parse_error(
                 "IBT region bounds",
                 "Region end cannot be represented as a source offset",
@@ -274,7 +275,7 @@ impl IbtReader {
                 "IBT region bounds",
                 format!(
                     "Region {}..{} exceeds source length {source_len}",
-                    range.start, range.end
+                    region_range.start, region_range.end
                 ),
             ));
         }
@@ -287,11 +288,11 @@ impl IbtReader {
         source_len: u64,
         preamble_end: u64,
     ) -> Result<Option<(u64, u64)>> {
-        if region.length == 0 {
+        if region.len() == 0 {
             return Ok(None);
         }
 
-        let start = u64::try_from(region.offset).map_err(|_| {
+        let start = u64::try_from(region.offset()).map_err(|_| {
             IRacingSDKError::parse_error(
                 "IBT metadata layout",
                 format!("{name} offset cannot be represented as a source offset"),
@@ -332,7 +333,7 @@ impl IbtReader {
         region: ByteRegion,
     ) -> Result<Vec<u8>> {
         Self::validate_region(region, source_len)?;
-        let offset = u64::try_from(region.offset).map_err(|_| {
+        let offset = u64::try_from(region.offset()).map_err(|_| {
             IRacingSDKError::parse_error(
                 "IBT region read",
                 "Region offset cannot be represented as a source offset",
@@ -344,13 +345,13 @@ impl IbtReader {
                 format!("Failed to seek to offset {offset}: {error}"),
             )
         })?;
-        let mut bytes = vec![0; region.length];
+        let mut bytes = vec![0; region.len()];
         source.read_exact(&mut bytes).map_err(|error| {
             IRacingSDKError::parse_error(
                 "IBT region read",
                 format!(
                     "Failed to read {} bytes at offset {offset}: {error}",
-                    region.length
+                    region.len()
                 ),
             )
         })?;

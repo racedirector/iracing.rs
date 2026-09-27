@@ -1,9 +1,10 @@
 //! Cross-module compatibility checks against the generated IBT fixture manifest.
 
 use super::format::extract_variable_schema;
+use crate::SessionInfoRegion;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
-    VariableHeaderRegion, VariableInfo,
+    VariableHeadersRegion, VariableInfo,
     irsdk::{DiskSubHeader, Header, VariableHeader, VariableType},
 };
 use anyhow::{Context, Result, ensure};
@@ -38,15 +39,17 @@ fn representative_fixtures_follow_frame_region_semantics() -> Result<()> {
         let source_len = usize::try_from(reader.get_ref().metadata()?.len())?;
         let header = Header::try_from_reader(&mut reader)?;
         let disk_header = DiskSubHeader::try_from_reader(&mut reader)?;
-        let variable_end = VariableHeaderRegion::try_from(&header)?
-            .checked_range(source_len)?
-            .end;
-        let session_region = crate::SessionInfoRegion::try_from(&header)?;
-        let frame_start = if session_region.is_valid() {
-            variable_end.max(session_region.checked_range(source_len)?.end)
+        let headers_region = VariableHeadersRegion::try_from(&header)?;
+        let session_info_region = SessionInfoRegion::try_from_header(&header)?;
+
+        let variable_end = headers_region.end();
+
+        let frame_start = if let Some(session_region) = session_info_region {
+            variable_end.max(session_region.end())
         } else {
             variable_end
         };
+
         let frame_size = usize::try_from(header.buffer_length)?;
         let telemetry_bytes = source_len
             .checked_sub(frame_start)
@@ -184,7 +187,7 @@ fn test_generated_fixture_variables_match_manifest() -> Result<()> {
             std::fs::File::open(&path).with_context(|| format!("Opening {}", path.display()))?,
         );
         let header = Header::try_from_reader(&mut reader)?;
-        let region = VariableHeaderRegion::try_from(&header)?;
+        let region = VariableHeadersRegion::try_from(&header)?;
         let frame_size = usize::try_from(header.buffer_length)?;
         let schema = extract_variable_schema(&mut reader, &region, frame_size)?;
 
