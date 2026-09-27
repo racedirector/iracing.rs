@@ -1,22 +1,26 @@
-# IBT reader performance baseline
+# IBT reader performance methodology
 
-This report establishes the timing baseline for the IBT storage refactor in
-issue #84. The benchmark target is intentionally checked in before the implementation
-changes so the same cases and timed boundaries can be run on both revisions.
+This document defines the IBT reader timing experiment and preserves the
+pre-refactor snapshot from issue #84 as historical context. Current performance
+evidence comes from same-runner PR comparisons.
 
 ## Reproduce
 
 Run only the focused reader target from the repository root:
 
 ```text
-cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
+cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-performance
 ```
 
 Do not substitute the complete benchmark suite when comparing the reader
 implementation. Criterion data is written under `target/criterion` and can be
 retained between revisions for its automated change analysis.
 
-## Main baseline
+## Historical pre-refactor snapshot — 2026-09-19
+
+These values are preserved as historical evidence for the storage refactor.
+They are not the repository's current performance baseline. Current PR
+performance evidence comes from same-runner base/head workflow comparisons.
 
 Captured on 2026-09-19 from `main` commit `8bb0f94`, before the seekable-source
 implementation, using Rust 1.93.1 on arm64 macOS 26.5.1. Filesystem cache state
@@ -39,15 +43,29 @@ Values are Criterion point estimates. The complete confidence intervals were:
 
 ## Interpretation
 
-The baseline reader loads the complete recording during construction. Its
-subsequent replay and seek cases operate on retained memory, so the storage
-refactor is expected to improve construction time and retained heap while
-making replay and random seek perform actual file IO. Compare those tradeoffs;
-do not treat every higher timing as a regression independently of the memory
-objective.
+The historical baseline reader loaded the complete recording during construction. Its
+subsequent replay and seek cases operated on retained memory. The storage
+refactor changed that tradeoff; these point estimates should not be presented
+as current regression evidence.
 
-Construction and seek setup for the replay/seek groups is outside those timed
-routines. Replay includes allocation and copying of each returned owned frame.
-The seek group does not read a frame after positioning. Retained heap and page
-cache behavior are outside this timing target and require the separate #91
-measurement.
+In that historical experiment, construction and seek setup for replay/seek
+groups was outside the timed routines. Replay allocated and copied each owned
+frame; the seek case did not read a frame after positioning. Retained heap and
+page cache behavior were outside that timing target.
+
+## Current experiment
+
+`ibt_reader_open` includes reader construction and metadata parsing.
+`ibt_reader_sequential_replay`, `ibt_provider_sequential_replay`, and
+`ibt_connection_sequential_replay` preserve their original timed boundaries.
+`ibt_reader_random_frame_read` reads 1,024 deterministic indexed frames through
+the public reader API. The former `ibt_reader_random_seek` result is a different
+experiment; it originally measured cursor movement alone, and the reader no
+longer exposes a cursor-only seek API.
+
+Fixture size and frame count are derived from the wire preamble and file length
+without using the reader implementation. The benchmark reads each fixture
+sequentially with a plain file before timing every case. This establishes an
+explicit warm-cache local storage contract for both revisions; no cold-open
+disk latency or retained heap is measured. Timing evidence belongs in PR
+comparisons and their Criterion artifacts, not a mutable number in this file.

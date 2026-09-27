@@ -1,8 +1,8 @@
 //! Performance baseline for the public [`IbtReader`] storage API.
 //!
-//! Case names are retained across the reader/provider API migration. The random
-//! seek case now reads indexed frames because the reader no longer exposes a
-//! cursor-only seek operation; its timings are not comparable to that old case.
+//! Sequential case names are retained across the reader/provider API migration.
+//! The random-frame case uses direct indexed reads because the reader no longer
+//! exposes cursor-only seeking; it is not comparable to that old experiment.
 //!
 //! Run only this focused target with:
 //!
@@ -27,8 +27,8 @@
 //! Fixtures are sequentially prewarmed through plain file reads before each
 //! timed case. Results are warm-cache local storage measurements, not cold-open
 //! latency. Compare revisions on the same machine with the same fixtures and
-//! build profile. These timing benchmarks do not measure
-//! retained heap; the #84 measurement layer records that separately.
+//! build profile. These timing benchmarks do not measure retained heap; the
+//! #84 measurement layer records that separately.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::StreamExt;

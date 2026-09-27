@@ -23,7 +23,7 @@
 - `src/bin/`: CLI and schema-generation binaries; codegen binaries require the `codegen` feature, and discovery overlays require `schema-discovery`.
 - `examples/`: cross-platform disk examples plus Windows live/broadcast examples.
 - `tests/`: integration and derive macro regression tests.
-- `benches/`: Criterion benchmarks gated by the `benchmark` feature.
+- `benches/`: Criterion-compatible targets gated by `benchmark`; CodSpeed runs CPU targets, while delivery and IBT remain local wall-time Criterion.
 - `SessionInfoBuffer` bounds and decodes captured session bytes; `IRacingSessionString` removes invalid control characters before parsing. Keep that cleanup in the source path.
 
 - Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.

@@ -42,8 +42,8 @@ results across that API cutover are different experiments.
 
 Construction includes the implementation's normal file-opening and metadata
 work. Sequential and random-access reader construction occurs outside the timed
-routine. Filesystem cache state is not controlled, so compare revisions on the
-same machine and repeat surprising results.
+routine. Fixtures are prewarmed independently of the reader before timing. Compare
+revisions on the same machine and repeat surprising results.
 
 ### Captured-schema decoding
 
@@ -93,18 +93,30 @@ sensitive to filesystem cache warmth and machine load.
 
 ## CI coverage
 
-The quality workflow compiles every benchmark and diagnostic target on Ubuntu
-and Windows. The benchmark workflow quick-runs all deterministic Criterion
-targets for relevant pull requests and pushes, then runs the two deterministic
-diagnostics separately.
+| Target | Tier | CI interpretation |
+| --- | --- | --- |
+| `var-data-extraction` | B | CodSpeed simulation regression evidence |
+| `adapter-performance` | B | CodSpeed simulation regression evidence |
+| `aggregate-frame-parsing` | B | CodSpeed simulation regression evidence |
+| `telemetry-delivery` | C | Same-runner wall-time base/head comparison |
+| `ibt-reader-performance` | D | Same-runner warm-cache base/head comparison |
+| `telemetry-diagnostics` | E | Diagnostic and invariant checks only |
+| `ibt-reader-memory` | E | Diagnostic and invariant checks only |
+| `live-telemetry-diagnostic` | E | Manual live only; compile-only in hosted CI |
 
-Weekly and manually requested full runs use normal Criterion sampling. Pull
-requests also compare `ibt-reader-performance` at the base and head revisions on
-the same runner. The comparison is informational; changed definitions, fixtures,
-support code, generation code, or Cargo inputs reduce comparability and are
-reported in the workflow summary. Interpret base/head deltas as the same
-experiment only when those inputs and timed boundaries are equivalent.
+The quality workflow compiles all eight targets on Ubuntu and Windows.
+CodSpeed simulates the three deterministic CPU/in-memory targets for affected
+pull requests and main pushes. CodSpeed simulation and Criterion wall-time
+results are different measurement domains and must not be compared numerically.
 
-Use Criterion results only for like-for-like case names, fixture revisions,
-build profiles, machines, and allocation policies. Performance reports are not
-correctness thresholds.
+The delivery and IBT workflows compare base and head on the same runner for
+relevant pull requests. Timing deltas are informational, with no merge-blocking
+percentage threshold. Experiment input changes are warned about separately
+from production or build input changes. New benchmark IDs are unpaired until a
+base revision contains the same definition.
+
+IBT fixtures are sequentially read through plain file I/O before each timing
+case, outside its timed routine. These are warm-cache local measurements, not
+cold-open disk latency. The reader uses direct indexed frame access for the
+1,024-position random-frame case. The former cursor-only seek operation was
+removed with the reader API migration, so a seek-only benchmark is unavailable.
