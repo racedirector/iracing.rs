@@ -10,6 +10,207 @@ use crate::{
 use anyhow::{Context, Result, ensure};
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
+#[test]
+fn indexed_and_snapshot_reads_preserve_legacy_replay() -> Result<()> {
+    use crate::{SchemaProvider, ibt::IbtReader};
+    use zerocopy::IntoBytes;
+
+    for fixture in load_fixture_manifest()?.fixtures {
+        let path = fixture.fixture_path()?;
+        let bytes = fs::read(&path)?;
+        for mut reader in [
+            IbtReader::open(&path)?,
+            IbtReader::from_bytes(bytes.clone())?,
+        ] {
+            assert_eq!(reader.layout().frame_count(), reader.total_frames());
+            assert_eq!(reader.total_frames(), fixture.num_frames);
+            assert_eq!(reader.schema().frame_size, fixture.frame_size);
+            let first = reader.frame(0)?;
+            assert_eq!(reader.current_frame(), 0);
+            assert_eq!(reader.read_next_frame()?.unwrap().0, first);
+
+            let selected = reader.total_frames() / 2;
+            reader.seek_to_frame(selected)?;
+            for index in [reader.total_frames() - 1, 0, selected, 1] {
+                let start = reader.layout().frame_data_start() + index * fixture.frame_size;
+                assert_eq!(
+                    reader.frame(index)?,
+                    bytes[start..start + fixture.frame_size]
+                );
+                assert_eq!(reader.current_frame(), selected);
+            }
+            assert!(reader.frame(reader.total_frames()).is_err());
+            assert!(reader.frame(usize::MAX).is_err());
+
+            let session_region = reader
+                .layout()
+                .metadata()
+                .session_info()
+                .unwrap()
+                .as_region();
+            let session = reader.session_info_snapshot()?.unwrap();
+            assert_eq!(session.as_bytes(), &bytes[session_region.as_range()]);
+            let variable_region = *reader.layout().metadata().variable_headers().unwrap();
+            let headers = reader.variable_headers_snapshot()?.unwrap();
+            assert_eq!(headers.len(), variable_region.count());
+            assert_eq!(
+                headers.as_slice().as_bytes(),
+                &bytes[variable_region.as_region().as_range()]
+            );
+            assert_eq!(reader.current_frame(), selected);
+            let (frame, tick, version) = reader.read_next_frame()?.unwrap();
+            let start = reader.layout().frame_data_start() + selected * fixture.frame_size;
+            assert_eq!(frame, bytes[start..start + fixture.frame_size]);
+            assert_eq!(tick as usize, selected);
+            assert_eq!(version, reader.header().session_info_update as u32);
+            assert_eq!(reader.current_frame(), selected + 1);
+
+            reader.seek_to_frame(reader.total_frames() - 1)?;
+            reader.read_next_frame()?.unwrap();
+            reader.frame(0)?;
+            reader.session_info_snapshot()?;
+            assert!(reader.read_next_frame()?.is_none());
+            assert_eq!(reader.current_frame(), reader.total_frames());
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn absent_metadata_preserves_empty_legacy_schema_and_optional_snapshots() -> Result<()> {
+    use crate::{SchemaProvider, ibt::IbtReader};
+    use zerocopy::IntoBytes;
+
+    let bytes = fs::read(crate::test_utils::require_smallest_ibt_fixture()?)?;
+    let original = IbtReader::from_bytes(bytes.clone())?;
+    let preamble = size_of::<Header>() + size_of::<DiskSubHeader>();
+    for keep_variables in [false, true] {
+        for keep_session in [false, true] {
+            for keep_frames in [false, true] {
+                let mut header = Header::try_from_reader(&mut std::io::Cursor::new(&bytes))?;
+                let mut data = bytes[..preamble].to_vec();
+                header.variable_header_offset = 0;
+                header.variable_count = 0;
+                header.session_info_offset = 0;
+                header.session_info_length = 0;
+                if keep_variables {
+                    let region = original.layout().metadata().variable_headers().unwrap();
+                    header.variable_header_offset = i32::try_from(data.len())?;
+                    header.variable_count = i32::try_from(region.count())?;
+                    data.extend_from_slice(&bytes[region.as_region().as_range()]);
+                }
+                if keep_session {
+                    let region = original.layout().metadata().session_info().unwrap();
+                    header.session_info_offset = i32::try_from(data.len())?;
+                    header.session_info_length = i32::try_from(region.as_region().len())?;
+                    data.extend_from_slice(&bytes[region.as_region().as_range()]);
+                }
+                if keep_frames {
+                    data.extend_from_slice(
+                        &bytes[original.layout().frames().as_region().as_range()],
+                    );
+                }
+                data[..size_of::<Header>()].copy_from_slice(header.as_bytes());
+                let mut reader = IbtReader::from_bytes(data)?;
+                assert_eq!(
+                    reader.variable_headers_snapshot()?.is_some(),
+                    keep_variables
+                );
+                assert_eq!(
+                    reader.schema().variable_count(),
+                    if keep_variables {
+                        original.schema().variable_count()
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(reader.schema().frame_size, original.schema().frame_size);
+                assert_eq!(reader.session_info_snapshot()?.is_some(), keep_session);
+                assert_eq!(reader.session_info_buffer().is_some(), keep_session);
+                assert_eq!(reader.session_yaml().is_some(), keep_session);
+                assert_eq!(
+                    reader.total_frames(),
+                    if keep_frames {
+                        original.total_frames()
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(reader.current_frame(), 0);
+                assert_eq!(reader.read_next_frame()?.is_some(), keep_frames);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn fresh_snapshots_reread_source_but_leave_legacy_caches_owned() -> Result<()> {
+    use crate::{SchemaProvider, ibt::IbtReader};
+    use std::io::{Seek, SeekFrom, Write};
+    use zerocopy::IntoBytes;
+
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("snapshots.ibt");
+    fs::copy(crate::test_utils::require_smallest_ibt_fixture()?, &path)?;
+    let mut reader = IbtReader::open(&path)?;
+    let session = reader.session_info_snapshot()?.unwrap();
+    let headers = reader.variable_headers_snapshot()?.unwrap();
+    let session_region = reader
+        .layout()
+        .metadata()
+        .session_info()
+        .unwrap()
+        .as_region();
+    let variable_region = reader
+        .layout()
+        .metadata()
+        .variable_headers()
+        .unwrap()
+        .as_region();
+    let mut file = fs::OpenOptions::new().write(true).open(&path)?;
+    file.seek(SeekFrom::Start(u64::try_from(session_region.offset())?))?;
+    file.write_all(&vec![0; session_region.len()])?;
+    let mut changed_headers = headers.as_slice().as_bytes().to_vec();
+    // Change a description byte, preserving all wire and schema geometry.
+    let description = std::mem::offset_of!(VariableHeader, description);
+    changed_headers[description] = b'!';
+    file.seek(SeekFrom::Start(u64::try_from(variable_region.offset())?))?;
+    file.write_all(&changed_headers)?;
+    file.flush()?;
+
+    assert!(
+        reader
+            .session_info_snapshot()?
+            .unwrap()
+            .as_bytes()
+            .iter()
+            .all(|&byte| byte == 0)
+    );
+    assert_eq!(
+        reader
+            .variable_headers_snapshot()?
+            .unwrap()
+            .as_slice()
+            .as_bytes(),
+        changed_headers
+    );
+    assert_eq!(
+        reader.session_info_buffer().unwrap().as_bytes(),
+        session.as_bytes()
+    );
+    assert_ne!(headers.as_slice().as_bytes(), changed_headers);
+    assert_eq!(reader.schema().variable_count(), headers.len());
+    assert_eq!(reader.current_frame(), 0);
+    assert!(reader.read_next_frame()?.is_some());
+
+    file.set_len(u64::try_from(variable_region.offset())?)?;
+    assert!(reader.variable_headers_snapshot().is_err());
+    assert!(reader.frame(0).is_err());
+    assert_eq!(reader.current_frame(), 1);
+    Ok(())
+}
+
 fn representative_ibt_paths() -> Result<Vec<PathBuf>> {
     let test_data = crate::test_utils::get_test_data_dir()
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;

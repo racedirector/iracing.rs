@@ -143,6 +143,11 @@ impl MetadataRegions {
         self.session_info.as_ref()
     }
 
+    /// Returns the first byte offset after the fixed IBT preamble.
+    pub fn start(&self) -> usize {
+        IBT_PREAMBLE_SIZE
+    }
+
     /// Returns the first byte offset after all metadata and the fixed preamble.
     pub fn end(&self) -> usize {
         self.end

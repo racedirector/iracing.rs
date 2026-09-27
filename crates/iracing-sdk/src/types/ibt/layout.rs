@@ -88,7 +88,7 @@ impl IbtLayout {
 
     /// Returns the source-relative byte offset at which telemetry frames begin.
     pub fn frame_data_start(&self) -> usize {
-        self.frames.as_region().offset()
+        self.frames.start()
     }
 }
 

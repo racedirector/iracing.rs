@@ -15,10 +15,13 @@ decoded `Header` and the complete source length. Its private `ParsedIbtHeader`
 validates signed fields before geometry is constructed. `MetadataRegions` lives
 alongside the other region value objects in `types/regions`; frame counts derive
 from physical bytes, not the disk sub-header record count. The layout performs
-no I/O, schema decoding, or playback management. `IbtReader` does not consume it
-yet; only metadata bounds validation is shared through `parse_utils`, preserving
-the reader's existing checks and diagnostics. Validation uses ordinary functions
-rather than a macro family.
+no I/O, schema decoding, or playback management. `IbtReader` uses it as the sole
+authority for source geometry. The reader temporarily retains its legacy schema
+and session caches until provider cutover (#140). Fresh snapshot methods read
+the advertised regions on each call without refreshing those caches. Absent
+variable headers produce an empty legacy schema; absent session information
+produces no cached session. Both fresh snapshot APIs return `None` for absent
+regions. Shared validation lives in `parse_utils` and uses ordinary functions.
 
 Disk variable headers are parsed from `.ibt` files. Live variable headers are
 discovered from Windows shared memory. Both become `VariableSchema` containing

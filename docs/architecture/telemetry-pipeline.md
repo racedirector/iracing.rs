@@ -26,10 +26,20 @@ same.
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
 private seekable file plus owned schema/session metadata and reads one owned
 frame on demand; `from_bytes` uses the same parser over an owned in-memory
-cursor. Source offsets are `u64`, while validated frame/allocation sizes use
-`usize`. Metadata access never moves the telemetry cursor. Live
-`WindowsConnection` interprets the related shared-memory header and rotating
-buffers.
+cursor. `IbtLayout` owns metadata bounds, frame start/size/count, and indexed
+frame geometry. Source I/O uses checked conversions between `u64` seek offsets
+and `usize` layout coordinates. Unlike the earlier `u64` file navigation, this
+rejects sources larger than `usize::MAX` bytes: files of 4 GiB or more cannot be
+opened on 32-bit targets. Supporting those files would require a separately
+scoped wider layout API.
+
+`frame(index)`, `session_info_snapshot()`, and `variable_headers_snapshot()` read
+owned data from the source on each call. They may move its physical cursor but
+never change `current_frame()`. Every legacy sequential read reseeks to that
+logical frame, including after a failed read. Legacy schema/session access
+continues to use construction-time caches until provider cutover (#140); the
+reader no longer retains or exposes its file path. Live `WindowsConnection`
+interprets the related shared-memory header and rotating buffers.
 
 `VariableSchema` maps names to `VariableInfo` and records the frame size. A
 `VariableInfo` carries type, byte offset, element count, time-count marker,

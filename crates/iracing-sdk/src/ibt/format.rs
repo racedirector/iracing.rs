@@ -43,10 +43,12 @@ pub(super) fn extract_variable_schema<R: Read + Seek>(
         region.count()
     );
 
-    let offset = region.as_region().offset();
+    let offset = u64::try_from(region.as_region().offset()).map_err(|_| {
+        IRacingSDKError::parse_error("Variable headers seek", "Region offset exceeds u64")
+    })?;
 
     // Seek to the variable headers section and parse all variables
-    reader.seek(SeekFrom::Start(offset as u64)).map_err(|e| {
+    reader.seek(SeekFrom::Start(offset)).map_err(|e| {
         IRacingSDKError::parse_error(
             "Variable headers seek".to_string(),
             format!(
