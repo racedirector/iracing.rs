@@ -1,7 +1,7 @@
 use iracing_irsdk::{Header, VariableHeader};
 
 use super::ByteRegion;
-use crate::{IRacingSDKError, Result};
+use crate::{IRacingSDKError, Result, types::layout::ParsedIbtHeader};
 
 /// Location and size of the variable-header region advertised by a [`Header`].
 ///
@@ -19,6 +19,24 @@ pub struct VariableHeadersRegion {
 }
 
 impl VariableHeadersRegion {
+    /// Derives the variable-header region from a parsed IBT header.
+    ///
+    /// Returns `Ok(None)` when the parsed header advertises zero variable
+    /// headers. Source bounds are not checked; callers that have a complete
+    /// source should compare [`Self::end`] with its length before slicing.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the region-size calculation overflows.
+    pub(crate) fn try_from_parsed_header(header: &ParsedIbtHeader) -> Result<Option<Self>> {
+        let region = Self::from_parts(header.variable_header_offset(), header.variable_count())?;
+        if region.count == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(region))
+    }
+
     /// Derives the variable-header region advertised by an SDK header.
     ///
     /// Returns `Ok(None)` when the header advertises zero variable headers.
@@ -47,6 +65,15 @@ impl VariableHeadersRegion {
             )
         })?;
 
+        let region = Self::from_parts(offset, count)?;
+        if region.count == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(region))
+    }
+
+    fn from_parts(offset: usize, count: usize) -> Result<Self> {
         let length = count
             .checked_mul(size_of::<VariableHeader>())
             .ok_or_else(|| {
@@ -56,14 +83,10 @@ impl VariableHeadersRegion {
                 )
             })?;
 
-        if count == 0 {
-            return Ok(None);
-        }
-
-        Ok(Some(Self {
+        Ok(Self {
             region: ByteRegion::new(offset, length)?,
             count,
-        }))
+        })
     }
 
     /// Returns the byte region containing the variable-header records.
@@ -131,19 +154,7 @@ impl TryFrom<&Header> for VariableHeadersRegion {
             )
         })?;
 
-        let length = count
-            .checked_mul(size_of::<VariableHeader>())
-            .ok_or_else(|| {
-                IRacingSDKError::parse_error(
-                    "VariableHeadersRegion::try_from",
-                    "Variable headers size calculation overflowed".to_string(),
-                )
-            })?;
-
-        Ok(Self {
-            region: ByteRegion::new(offset, length)?,
-            count,
-        })
+        Self::from_parts(offset, count)
     }
 }
 

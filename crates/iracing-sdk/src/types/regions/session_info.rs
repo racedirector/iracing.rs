@@ -1,5 +1,5 @@
 use super::ByteRegion;
-use crate::{IRacingSDKError, Result, irsdk::Header};
+use crate::{IRacingSDKError, Result, irsdk::Header, types::layout::ParsedIbtHeader};
 
 /// Location and size of the session-information bytes advertised by an SDK header.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -8,6 +8,20 @@ pub struct SessionInfoRegion {
 }
 
 impl SessionInfoRegion {
+    /// Derives the session-information region from a parsed IBT header.
+    ///
+    /// Returns `Ok(None)` when the parsed header advertises a zero-length
+    /// region. Source bounds are not checked; callers that have a complete
+    /// source should compare [`Self::end`] with its length before slicing.
+    ///
+    /// # Errors
+    ///
+    /// Returns a parse error if the advertised offset plus length overflows
+    /// `usize`.
+    pub(crate) fn try_from_parsed_header(header: &ParsedIbtHeader) -> Result<Option<Self>> {
+        Self::from_parts(header.session_info_offset(), header.session_info_length())
+    }
+
     /// Derives the session-information region advertised by an SDK header.
     ///
     /// Returns `Ok(None)` when the header advertises a zero-length region.
@@ -33,6 +47,10 @@ impl SessionInfoRegion {
             )
         })?;
 
+        Self::from_parts(offset, length)
+    }
+
+    fn from_parts(offset: usize, length: usize) -> Result<Option<Self>> {
         if length == 0 {
             return Ok(None);
         }

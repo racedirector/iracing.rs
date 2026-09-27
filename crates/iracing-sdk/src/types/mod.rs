@@ -48,6 +48,7 @@
 mod dynamic_frame;
 mod frame;
 mod iracing_session_string;
+mod layout;
 mod regions;
 mod schema;
 mod session_info_buffer;
@@ -61,6 +62,7 @@ pub use dynamic_frame::DynamicFrame;
 pub use frame::FramePacket;
 pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
+pub use layout::{IbtLayout, MetadataRegions};
 pub use regions::*;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
