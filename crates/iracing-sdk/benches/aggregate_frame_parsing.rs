@@ -62,7 +62,7 @@
 //! Run this target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench aggregate_frame_parsing
+//! cargo bench -p iracing-sdk --features benchmark --bench aggregate-frame-parsing
 //! ```
 
 mod support;

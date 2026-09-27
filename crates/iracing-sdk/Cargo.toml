@@ -10,6 +10,7 @@ license.workspace = true
 build = "build.rs"
 autobins = false
 autoexamples = false
+autobenches = false
 
 [package.metadata.docs.rs]
 all-features = true
@@ -102,52 +103,50 @@ derive = ["dep:iracing-sdk-derive"]
 schema-discovery = []
 
 [[bench]]
-name = "adapter_performance"
+name = "adapter-performance"
+path = "benches/adapter_performance.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "aggregate_frame_parsing"
+name = "aggregate-frame-parsing"
+path = "benches/aggregate_frame_parsing.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "telemetry_delivery_e2e"
+name = "telemetry-delivery"
+path = "benches/telemetry_delivery_e2e.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "telemetry_delivery_allocations"
+name = "telemetry-diagnostics"
+path = "benches/telemetry_delivery_allocations.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "subscriber_fanout"
+name = "live-telemetry-diagnostic"
+path = "benches/live_frame_latency.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "frame_construction"
+name = "ibt-reader-performance"
+path = "benches/ibt_reader_performance.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "live_frame_latency"
+name = "ibt-reader-memory"
+path = "benches/ibt_reader_measurement.rs"
 harness = false
 required-features = ["benchmark"]
 
 [[bench]]
-name = "ibt_reader_performance"
-harness = false
-required-features = ["benchmark"]
-
-[[bench]]
-name = "ibt_reader_measurement"
-harness = false
-required-features = ["benchmark"]
-
-[[bench]]
-name = "var_data_extraction"
+name = "var-data-extraction"
+path = "benches/var_data_extraction.rs"
 harness = false
 required-features = ["benchmark"]
 
