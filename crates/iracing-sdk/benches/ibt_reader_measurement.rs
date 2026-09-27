@@ -3,7 +3,7 @@
 //! Run with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_measurement
+//! cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-memory
 //! ```
 //!
 //! The `file` mode uses [`IbtReader::open`]. The `memory_baseline` mode models

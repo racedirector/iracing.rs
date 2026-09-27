@@ -7,7 +7,7 @@
 //! Run only this focused target with:
 //!
 //! ```text
-//! cargo bench -p iracing-sdk --features benchmark --bench ibt_reader_performance
+//! cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-performance
 //! ```
 //!
 //! # Timed boundaries

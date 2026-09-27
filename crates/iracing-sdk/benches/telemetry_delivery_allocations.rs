@@ -1,4 +1,13 @@
-//! Allocation diagnostics for deterministic end-to-end telemetry delivery.
+//! Deterministic telemetry delivery diagnostics.
+//!
+//! This executable reports allocation counts, provider-to-consumer latency
+//! percentiles, and latest-value replacement behavior. It deliberately does
+//! not publish Criterion timing estimates because allocator instrumentation and
+//! timestamp sampling perturb the measured path.
+//!
+//! ```text
+//! cargo bench -p iracing-sdk --features benchmark --bench telemetry-diagnostics
+//! ```
 
 mod support;
 
@@ -12,11 +21,14 @@ use std::{
 };
 
 use support::{
-    telemetry_pipeline::{LatestCase, OnDemandCase},
+    telemetry_pipeline::{LatestCase, OnDemandCase, percentile},
     workloads::TimedConsumerFrame47,
 };
 
 const FRAMES: usize = 1_024;
+const LATENCY_FRAMES: usize = 2_048;
+const BURSTS: usize = 64;
+const BURST_SIZE: usize = 8;
 const SUBSCRIBERS: [usize; 3] = [1, 4, 16];
 
 struct CountingAllocator;
@@ -74,35 +86,24 @@ fn end_counting() -> (u64, u64) {
     )
 }
 
-fn report(policy: &str, subscribers: usize, allocations: u64, bytes: u64) {
-    let deliveries = (FRAMES * subscribers) as f64;
-    println!(
-        "telemetry_e2e allocations policy={policy} subscribers={subscribers} frames={FRAMES} allocations={allocations} bytes={bytes} allocations_per_frame={:.3} allocations_per_delivery={:.3} bytes_per_frame={:.1}",
-        allocations as f64 / FRAMES as f64,
-        allocations as f64 / deliveries,
-        bytes as f64 / FRAMES as f64,
-    );
-}
-
 fn runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .expect("allocation diagnostic runtime should build")
+        .expect("telemetry diagnostic runtime should build")
 }
 
-fn main() {
-    let fixture = support::full_frame_fixture();
-    let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
-    let runtime = runtime();
-
+fn allocation_diagnostics(
+    runtime: &tokio::runtime::Runtime,
+    data: &Arc<Vec<u8>>,
+    schema: &Arc<iracing_sdk::VariableSchema>,
+) {
     for subscribers in SUBSCRIBERS {
         let mut latest = {
-            let _runtime_guard = runtime.enter();
+            let _guard = runtime.enter();
             LatestCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
+                Arc::clone(data),
+                Arc::clone(schema),
                 subscribers,
                 None,
             )
@@ -112,14 +113,20 @@ fn main() {
             black_box(frame);
         }));
         let (allocations, bytes) = end_counting();
-        report("latest_paced", subscribers, allocations, bytes);
+        let deliveries = (FRAMES * subscribers) as f64;
+        println!(
+            "telemetry allocations policy=latest-paced subscribers={subscribers} frames={FRAMES} allocations={allocations} bytes={bytes} allocations_per_frame={:.3} allocations_per_delivery={:.3} bytes_per_frame={:.1}",
+            allocations as f64 / FRAMES as f64,
+            allocations as f64 / deliveries,
+            bytes as f64 / FRAMES as f64,
+        );
         runtime.block_on(latest.shutdown());
 
         let mut replay = {
-            let _runtime_guard = runtime.enter();
+            let _guard = runtime.enter();
             OnDemandCase::<TimedConsumerFrame47>::new(
-                Arc::clone(&data),
-                Arc::clone(&schema),
+                Arc::clone(data),
+                Arc::clone(schema),
                 subscribers,
                 None,
             )
@@ -129,7 +136,122 @@ fn main() {
             black_box(frame);
         }));
         let (allocations, bytes) = end_counting();
-        report("ondemand_acknowledged", subscribers, allocations, bytes);
+        println!(
+            "telemetry allocations policy=ondemand-acknowledged subscribers={subscribers} frames={FRAMES} allocations={allocations} bytes={bytes} allocations_per_frame={:.3} allocations_per_delivery={:.3} bytes_per_frame={:.1}",
+            allocations as f64 / FRAMES as f64,
+            allocations as f64 / deliveries,
+            bytes as f64 / FRAMES as f64,
+        );
         runtime.block_on(replay.shutdown());
     }
+}
+
+fn print_latency(policy: &str, subscribers: usize, samples: &mut [u64]) {
+    let p50 = percentile(samples, 0.50);
+    let p95 = percentile(samples, 0.95);
+    let p99 = percentile(samples, 0.99);
+    println!(
+        "telemetry latency policy={policy} subscribers={subscribers} samples={} p50_ns={p50} p95_ns={p95} p99_ns={p99}",
+        samples.len()
+    );
+}
+
+fn latency_diagnostics(
+    runtime: &tokio::runtime::Runtime,
+    data: &Arc<Vec<u8>>,
+    schema: &Arc<iracing_sdk::VariableSchema>,
+) {
+    for subscribers in SUBSCRIBERS {
+        let mut latest = {
+            let _guard = runtime.enter();
+            LatestCase::<TimedConsumerFrame47>::new(
+                Arc::clone(data),
+                Arc::clone(schema),
+                subscribers,
+                Some(LATENCY_FRAMES),
+            )
+        };
+        let times = Arc::clone(latest.times.as_ref().expect("latest timestamps"));
+        let mut samples = Vec::with_capacity(LATENCY_FRAMES * subscribers);
+        runtime.block_on(latest.consume_paced(LATENCY_FRAMES, |frame| {
+            black_box(&frame.frame_marker());
+            samples.push(times.elapsed_nanos(frame.tick));
+        }));
+        print_latency("latest-paced", subscribers, &mut samples);
+        runtime.block_on(latest.shutdown());
+
+        let mut replay = {
+            let _guard = runtime.enter();
+            OnDemandCase::<TimedConsumerFrame47>::new(
+                Arc::clone(data),
+                Arc::clone(schema),
+                subscribers,
+                Some(LATENCY_FRAMES),
+            )
+        };
+        let times = Arc::clone(replay.times.as_ref().expect("replay timestamps"));
+        let mut samples = Vec::with_capacity(LATENCY_FRAMES * subscribers);
+        runtime.block_on(replay.consume_acknowledged(LATENCY_FRAMES, |frame| {
+            black_box(&frame.frame_marker());
+            samples.push(times.elapsed_nanos(frame.tick));
+        }));
+        print_latency("ondemand-acknowledged", subscribers, &mut samples);
+        runtime.block_on(replay.shutdown());
+    }
+}
+
+fn delivery_diagnostics(
+    runtime: &tokio::runtime::Runtime,
+    data: &Arc<Vec<u8>>,
+    schema: &Arc<iracing_sdk::VariableSchema>,
+) {
+    for subscribers in SUBSCRIBERS {
+        let mut latest = {
+            let _guard = runtime.enter();
+            LatestCase::<TimedConsumerFrame47>::new(
+                Arc::clone(data),
+                Arc::clone(schema),
+                subscribers,
+                None,
+            )
+        };
+        let mut delivered = 0usize;
+        runtime.block_on(latest.consume_bursts(BURSTS, BURST_SIZE, |_| delivered += 1));
+        let produced = latest.source.reads.load(Ordering::Relaxed);
+        println!(
+            "telemetry delivery policy=latest-burst-8 subscribers={subscribers} produced={produced} delivered={delivered} replaced={}",
+            produced * subscribers - delivered
+        );
+        runtime.block_on(latest.shutdown());
+
+        let mut replay = {
+            let _guard = runtime.enter();
+            OnDemandCase::<TimedConsumerFrame47>::new(
+                Arc::clone(data),
+                Arc::clone(schema),
+                subscribers,
+                None,
+            )
+        };
+        let frames = BURSTS * BURST_SIZE;
+        let mut delivered = 0usize;
+        runtime.block_on(replay.consume_acknowledged(frames, |_| delivered += 1));
+        let produced = replay.source.reads.load(Ordering::Relaxed);
+        println!(
+            "telemetry delivery policy=ondemand-acknowledged subscribers={subscribers} produced={produced} delivered={delivered} blocked_ack_barriers={}",
+            frames.saturating_sub(1)
+        );
+        runtime.block_on(replay.shutdown());
+    }
+}
+
+fn main() {
+    let fixture = support::full_frame_fixture();
+    let data = Arc::new(fixture.data);
+    let schema = fixture.schema;
+    let runtime = runtime();
+
+    allocation_diagnostics(&runtime, &data, &schema);
+    latency_diagnostics(&runtime, &data, &schema);
+    delivery_diagnostics(&runtime, &data, &schema);
 }
