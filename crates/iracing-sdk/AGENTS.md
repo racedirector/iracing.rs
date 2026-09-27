@@ -9,6 +9,7 @@
 
 ## Key APIs & Layout
 
+- Mapped IBT recordings must remain unchanged until the reader/provider/connection is dropped. Never mutate or truncate a live mapped test fixture; inject short reads through owned test sources instead.
 - `ibt/`: `IbtReader` provides indexed raw frame reads and fresh metadata snapshots. `IbtProvider` owns schema validation and sequential replay starting at frame zero; rely on `VariableSchema` and `VariableInfo` instead of re-parsing frame bytes.
 - `types/ibt/`: `IbtLayout` validates physical byte geometry from `Header` and source length without I/O. `MetadataRegions` lives in `types/regions/`; `IbtReader` delegates all geometry to the layout. The reader has no schema, session cache, or logical replay cursor. Provider construction rejects frames without variable headers but accepts empty recordings without metadata. Source lengths must fit `usize` (4 GiB files are rejected on 32-bit targets).
 - `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.

@@ -24,14 +24,17 @@ same.
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
-private seekable file plus decoded headers and layout, and reads one owned
+private read-only memory map plus decoded headers and layout, and reads one owned
 frame on demand; `from_bytes` uses the same parser over an owned in-memory
 cursor. `IbtLayout` owns metadata bounds, frame start/size/count, and indexed
 frame geometry. Source I/O uses checked conversions between `u64` seek offsets
 and `usize` layout coordinates. Unlike the earlier `u64` file navigation, this
 rejects sources larger than `usize::MAX` bytes: files of 4 GiB or more cannot be
 opened on 32-bit targets. Supporting those files would require a separately
-scoped wider layout API.
+scoped wider layout API. File-backed readers require completed, immutable
+recordings: no process may modify or truncate the file until the reader (or
+owning provider/connection) is dropped. Use `from_bytes` with an owned copy when
+that lifetime requirement cannot be met.
 
 `frame(index)`, `session_info_snapshot()`, and `variable_headers_snapshot()` read
 owned data from the source on each call. They may move its physical cursor;

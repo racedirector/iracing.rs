@@ -135,7 +135,7 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
 }
 
 #[test]
-fn fresh_snapshots_reread_source_but_previous_snapshots_remain_owned() -> Result<()> {
+fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     use std::io::{Seek, SeekFrom, Write};
     use zerocopy::IntoBytes;
 
@@ -157,6 +157,7 @@ fn fresh_snapshots_reread_source_but_previous_snapshots_remain_owned() -> Result
         .variable_headers()
         .unwrap()
         .as_region();
+    drop(reader);
     let mut file = fs::OpenOptions::new().write(true).open(&path)?;
     file.seek(SeekFrom::Start(u64::try_from(session_region.offset())?))?;
     file.write_all(&vec![0; session_region.len()])?;
@@ -167,6 +168,8 @@ fn fresh_snapshots_reread_source_but_previous_snapshots_remain_owned() -> Result
     file.seek(SeekFrom::Start(u64::try_from(variable_region.offset())?))?;
     file.write_all(&changed_headers)?;
     file.flush()?;
+    drop(file);
+    let mut reader = IbtReader::open(&path)?;
 
     assert!(
         reader
@@ -188,9 +191,12 @@ fn fresh_snapshots_reread_source_but_previous_snapshots_remain_owned() -> Result
     assert_ne!(headers.as_slice().as_bytes(), changed_headers);
     assert!(!reader.frame(0)?.is_empty());
 
-    file.set_len(u64::try_from(variable_region.offset())?)?;
-    assert!(reader.variable_headers_snapshot().is_err());
-    assert!(reader.frame(0).is_err());
+    drop(reader);
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&path)?
+        .set_len(u64::try_from(variable_region.offset())?)?;
+    assert!(IbtReader::open(&path).is_err());
     Ok(())
 }
 

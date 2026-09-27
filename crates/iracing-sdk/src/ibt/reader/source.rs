@@ -1,13 +1,11 @@
 use crate::{ByteRegion, IRacingSDKError, Result};
 
-use std::{
-    fs::File,
-    io::{Cursor, Read, Seek, SeekFrom},
-};
+use memmap2::Mmap;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 pub(crate) enum IbtSource {
-    File(File),
-    Memory(Cursor<Vec<u8>>),
+    Mapped(Cursor<Mmap>),
+    Owned(Cursor<Vec<u8>>),
 }
 
 // Keep the conversion separate so the address-space boundary can be tested
@@ -27,13 +25,10 @@ pub(super) fn layout_source_len(source_len: u64) -> Result<usize> {
 impl IbtSource {
     pub(super) fn len(&self) -> Result<u64> {
         match self {
-            Self::File(file) => file
-                .metadata()
-                .map(|metadata| metadata.len())
-                .map_err(|error| {
-                    IRacingSDKError::parse_error("IBT source length", error.to_string())
-                }),
-            Self::Memory(cursor) => u64::try_from(cursor.get_ref().len()).map_err(|_| {
+            Self::Mapped(cursor) => u64::try_from(cursor.get_ref().len()).map_err(|_| {
+                IRacingSDKError::parse_error("IBT source length", "Mapping length exceeds u64")
+            }),
+            Self::Owned(cursor) => u64::try_from(cursor.get_ref().len()).map_err(|_| {
                 IRacingSDKError::parse_error("IBT source length", "Memory length exceeds u64")
             }),
         }
@@ -87,8 +82,8 @@ impl IbtSource {
 impl Read for IbtSource {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
         match self {
-            Self::File(source) => source.read(buffer),
-            Self::Memory(source) => source.read(buffer),
+            Self::Mapped(source) => source.read(buffer),
+            Self::Owned(source) => source.read(buffer),
         }
     }
 }
@@ -96,8 +91,8 @@ impl Read for IbtSource {
 impl Seek for IbtSource {
     fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
         match self {
-            Self::File(source) => source.seek(position),
-            Self::Memory(source) => source.seek(position),
+            Self::Mapped(source) => source.seek(position),
+            Self::Owned(source) => source.seek(position),
         }
     }
 }

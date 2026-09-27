@@ -34,6 +34,7 @@ use crate::{
     IRacingSDKError, IbtLayout, Result, SessionInfoBuffer, VariableHeadersBuffer,
     irsdk::{DiskSubHeader, Header},
 };
+use memmap2::Mmap;
 use source::IbtSource;
 use std::{
     fs::File,
@@ -56,7 +57,11 @@ pub struct IbtReader {
 }
 
 impl IbtReader {
-    /// Open and parse an `.ibt` file.
+    /// Open and parse an immutable `.ibt` recording using a read-only memory map.
+    ///
+    /// The file must not be modified or truncated by any process while this reader
+    /// is alive. Only open completed recordings whose storage you control. Use
+    /// [`Self::from_bytes`] with an owned copy if this cannot be guaranteed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = File::open(&path).map_err(|source| IRacingSDKError::File {
@@ -64,12 +69,28 @@ impl IbtReader {
             source,
         })?;
 
-        Self::from_source(IbtSource::File(file))
+        // SAFETY: This maps a completed recording read-only. The documented
+        // open contract requires the backing file to remain unchanged for the
+        // reader's lifetime. Mmap owns the mapping independently of `file` and
+        // unmaps it on drop; no mapped references escape this reader.
+        let mapped = unsafe { Mmap::map(&file) }.map_err(|error| IRacingSDKError::File {
+            path,
+            source: std::io::Error::new(error.kind(), format!("Failed to map IBT source: {error}")),
+        })?;
+        Self::from_source(IbtSource::Mapped(Cursor::new(mapped)))
     }
 
     /// Parse owned in-memory `.ibt` data.
     pub fn from_bytes<B: Into<Vec<u8>>>(data: B) -> Result<Self> {
-        Self::from_source(IbtSource::Memory(Cursor::new(data.into())))
+        Self::from_source(IbtSource::Owned(Cursor::new(data.into())))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn owned_bytes_mut(&mut self) -> &mut Vec<u8> {
+        match &mut self.source {
+            IbtSource::Owned(cursor) => cursor.get_mut(),
+            IbtSource::Mapped(_) => panic!("fault injection requires an owned source"),
+        }
     }
 
     fn from_source(mut source: IbtSource) -> Result<Self> {
@@ -175,7 +196,7 @@ mod tests {
     use anyhow::{Context, Result};
 
     use std::fs::OpenOptions;
-    use std::io::{Seek, SeekFrom, Write};
+    use std::io::Seek;
     use std::path::PathBuf;
 
     fn fixture_path() -> Result<PathBuf> {
@@ -188,6 +209,77 @@ mod tests {
 
     fn write_i32(bytes: &mut [u8], offset: usize, value: i32) {
         bytes[offset..offset + std::mem::size_of::<i32>()].copy_from_slice(&value.to_le_bytes());
+    }
+
+    #[test]
+    fn file_and_owned_headers_and_layout_match() -> Result<()> {
+        use zerocopy::IntoBytes;
+
+        let path = fixture_path()?;
+        let file = IbtReader::open(&path)?;
+        let owned = IbtReader::from_bytes(std::fs::read(path)?)?;
+        assert_eq!(file.header().as_bytes(), owned.header().as_bytes());
+        assert_eq!(
+            file.disk_header().as_bytes(),
+            owned.disk_header().as_bytes()
+        );
+        assert_eq!(
+            file.layout().metadata().session_info(),
+            owned.layout().metadata().session_info()
+        );
+        assert_eq!(
+            file.layout().metadata().variable_headers(),
+            owned.layout().metadata().variable_headers()
+        );
+        assert_eq!(file.layout().frames(), owned.layout().frames());
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_file_and_owned_sources_fail_equivalently() -> Result<()> {
+        let original = fixture_bytes()?;
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("malformed.ibt");
+        let preamble_size = size_of::<Header>() + size_of::<DiskSubHeader>();
+        let mut cases = vec![
+            original[..1].to_vec(),
+            original[..size_of::<Header>() - 1].to_vec(),
+            original[..preamble_size - 1].to_vec(),
+            original[..original.len() - 1].to_vec(),
+        ];
+        for (offset, value) in [(28, i32::MAX), (20, i32::MAX), (36, 0)] {
+            let mut bytes = original.clone();
+            write_i32(&mut bytes, offset, value);
+            cases.push(bytes);
+        }
+        for bytes in cases {
+            std::fs::write(&path, &bytes)?;
+            let file_error = IbtReader::open(&path).err().context("file must fail")?;
+            let owned_error = IbtReader::from_bytes(bytes)
+                .err()
+                .context("owned source must fail")?;
+            assert_eq!(file_error.to_string(), owned_error.to_string());
+        }
+        // Empty files may fail at mapping rather than parsing on some platforms.
+        std::fs::write(&path, [])?;
+        assert!(IbtReader::open(&path).is_err());
+        assert!(IbtReader::from_bytes(Vec::new()).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn dropping_reader_releases_file_resources() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("drop.ibt");
+        std::fs::copy(fixture_path()?, &path)?;
+        let mut reader = IbtReader::open(&path)?;
+        let frame = reader.frame(0)?;
+        drop(reader);
+        // Windows disallows truncating a file with a live file mapping.
+        OpenOptions::new().write(true).open(&path)?.set_len(0)?;
+        std::fs::remove_file(&path)?;
+        assert!(!frame.is_empty());
+        Ok(())
     }
 
     #[test]
@@ -287,56 +379,22 @@ mod tests {
     }
 
     #[test]
-    fn truncation_after_construction_is_a_read_error() -> Result<()> {
-        let temporary_directory = tempfile::tempdir()?;
-        let temporary_file = temporary_directory.path().join("truncated-after-open.ibt");
-        std::fs::copy(fixture_path()?, &temporary_file)?;
-        let mut reader = IbtReader::open(&temporary_file)?;
-        let truncated_len = u64::try_from(reader.layout.frame_data_start())?
-            .checked_add(u64::try_from(reader.layout.frame_size())? - 1)
-            .context("truncated fixture length should fit")?;
-        OpenOptions::new()
-            .write(true)
-            .open(&temporary_file)?
-            .set_len(truncated_len)?;
-
-        assert!(reader.frame(0).is_err());
-        assert_eq!(
-            reader.source.stream_position()?,
-            u64::try_from(reader.layout.frame_data_start())?
-        );
-        Ok(())
-    }
-
-    #[test]
     fn from_bytes_builds_an_owned_memory_reader() -> Result<()> {
         let test_file = fixture_path()?;
         let data = std::fs::read(test_file)?;
 
         let mut reader = IbtReader::from_bytes(data)?;
 
+        assert!(matches!(reader.source, IbtSource::Owned(_)));
         assert!(reader.layout().frame_count() > 0);
         assert!(!reader.variable_headers_snapshot()?.unwrap().is_empty());
         Ok(())
     }
 
     #[test]
-    fn open_keeps_frames_file_backed() -> Result<()> {
-        let temporary_directory = tempfile::tempdir()?;
-        let temporary_file = temporary_directory.path().join("file-backed.ibt");
-        std::fs::copy(fixture_path()?, &temporary_file)?;
-        let mut reader = IbtReader::open(&temporary_file)?;
-
-        let replacement = 0xA5;
-        let mut file = OpenOptions::new().write(true).open(&temporary_file)?;
-        file.seek(SeekFrom::Start(u64::try_from(
-            reader.layout.frame_data_start(),
-        )?))?;
-        file.write_all(&[replacement])?;
-        file.flush()?;
-
-        let frame = reader.frame(0)?;
-        assert_eq!(frame[0], replacement);
+    fn open_keeps_frames_mapped() -> Result<()> {
+        let reader = IbtReader::open(fixture_path()?)?;
+        assert!(matches!(reader.source, IbtSource::Mapped(_)));
         Ok(())
     }
 }

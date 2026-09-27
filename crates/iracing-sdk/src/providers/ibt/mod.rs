@@ -20,6 +20,9 @@ pub struct IbtProvider {
 
 impl IbtProvider {
     /// Open an `.ibt` file and validate its replay schema.
+    ///
+    /// The recording must remain unchanged while the provider is alive, as
+    /// required by [`IbtReader::open`].
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         Self::from_reader(IbtReader::open(path)?)
     }
@@ -160,20 +163,15 @@ mod tests {
     #[test]
     fn failed_read_does_not_advance_replay() -> anyhow::Result<()> {
         let bytes = fs::read(require_smallest_ibt_fixture()?)?;
-        let directory = tempfile::tempdir()?;
-        let path = directory.path().join("retry.ibt");
-        fs::write(&path, &bytes)?;
-        let mut reader = IbtReader::open(&path)?;
+        let mut reader = IbtReader::from_bytes(bytes.clone())?;
         let expected = reader.frame(0)?;
         let start = reader.layout().frame_data_start();
         let mut provider = IbtProvider::from_reader(reader)?;
-        fs::OpenOptions::new()
-            .write(true)
-            .open(&path)?
-            .set_len(start as u64)?;
+        // Inject a short read without mutating a live mapped file.
+        provider.reader.owned_bytes_mut().truncate(start);
         assert!(block_on(provider.next_frame()).is_err());
         assert_eq!(provider.current_frame, 0);
-        fs::write(&path, &bytes)?;
+        *provider.reader.owned_bytes_mut() = bytes;
         let frame = block_on(provider.next_frame())?.unwrap();
         assert_eq!(frame.tick, 0);
         assert_eq!(frame.data.as_ref(), expected);
