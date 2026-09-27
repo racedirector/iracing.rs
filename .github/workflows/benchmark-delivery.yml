@@ -1,0 +1,34 @@
+name: Telemetry delivery comparison
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/benchmark-delivery.yml"
+      - ".github/workflows/criterion-compare.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/iracing-sdk/Cargo.toml"
+      - "crates/iracing-sdk/src/adapters/**"
+      - "crates/iracing-sdk/src/benchmarking.rs"
+      - "crates/iracing-sdk/src/provider.rs"
+      - "crates/iracing-sdk/src/stream/**"
+      - "crates/iracing-sdk/src/telemetry/**"
+      - "crates/iracing-sdk/src/types/**"
+      - "crates/iracing-sdk/benches/telemetry_delivery_e2e.rs"
+      - "crates/iracing-sdk/benches/support/mod.rs"
+      - "crates/iracing-sdk/benches/support/telemetry_pipeline.rs"
+      - "crates/iracing-sdk/benches/support/workloads.rs"
+      - "docs/reference/live-variable-schema.yml"
+
+jobs:
+  compare:
+    uses: ./.github/workflows/criterion-compare.yml
+    with:
+      benchmark: telemetry-delivery
+      artifact-name: criterion-telemetry-delivery
+      experiment-paths: |
+        crates/iracing-sdk/benches/telemetry_delivery_e2e.rs
+        crates/iracing-sdk/benches/support/mod.rs
+        crates/iracing-sdk/benches/support/telemetry_pipeline.rs
+        crates/iracing-sdk/benches/support/workloads.rs
+        docs/reference/live-variable-schema.yml
