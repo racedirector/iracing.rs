@@ -1,4 +1,4 @@
-//! # disk-position
+//! # ibt-read-frame
 //!
 //! Extracts positional telemetry from an iRacing `.ibt` file and writes it to CSV.
 //!
@@ -27,7 +27,7 @@
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example disk-position -- \
+//! cargo run --example ibt-read-frame -- \
 //!   --ibt-path ./session.ibt \
 //!   --output-path ./positions.csv
 //! ```
@@ -37,7 +37,7 @@
 //! Logging is controlled via `RUST_LOG`. Example:
 //!
 //! ```bash
-//! RUST_LOG=disk-position=info cargo run --example disk-position -- ...
+//! RUST_LOG=ibt-read-frame=info cargo run --example ibt-read-frame -- ...
 //! ```
 
 use anyhow::Result;
@@ -49,7 +49,7 @@ use iracing_sdk::{SchemaProvider, providers::ibt::IbtProvider, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
-/// CLI arguments for the `disk-position` extractor.
+/// CLI arguments for the `ibt-read-frame` extractor.
 ///
 /// Uses `clap` derive API for parsing.
 #[derive(Parser, Debug)]

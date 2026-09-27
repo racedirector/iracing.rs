@@ -66,10 +66,10 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(not(windows))]
     {
         tracing::warn!(
-            "live-position example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
+            "live-subscribe example is only supported on Windows because it depends on iRacing's Windows shared memory APIs."
         );
         Err(anyhow::anyhow!(
-            "live-position example is only supported on Windows"
+            "live-subscribe example is only supported on Windows"
         ))
     }
 

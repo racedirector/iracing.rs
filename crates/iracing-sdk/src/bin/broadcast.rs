@@ -234,11 +234,9 @@ fn main() -> Result<()> {
     {
         let _ = cli;
         tracing::warn!(
-            "broadcast-cli is only supported on Windows because iRacing broadcast messaging uses Win32 APIs."
+            "broadcast is only supported on Windows because iRacing broadcast messaging uses Win32 APIs."
         );
-        Err(anyhow::anyhow!(
-            "broadcast-cli is only supported on Windows"
-        ))
+        Err(anyhow::anyhow!("broadcast is only supported on Windows"))
     }
 }
 
@@ -474,7 +472,7 @@ mod tests {
 
     #[test]
     fn parses_chat_macro() {
-        let cli = Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "15"]).unwrap();
+        let cli = Cli::try_parse_from(["broadcast", "send", "chat", "macro", "15"]).unwrap();
         assert_eq!(
             cli.command,
             Command::Send {
@@ -487,8 +485,7 @@ mod tests {
 
     #[test]
     fn rejects_out_of_range_macro() {
-        let err =
-            Cli::try_parse_from(["broadcast-cli", "send", "chat", "macro", "16"]).unwrap_err();
+        let err = Cli::try_parse_from(["broadcast", "send", "chat", "macro", "16"]).unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("1..=15"));
     }

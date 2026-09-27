@@ -162,25 +162,31 @@ impl FrameAdapter for Row {
 | `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
 | `session schema live` and `session snapshot live` | No | Yes |
 | Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-position` example / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
+| `live-subscribe` and `session-updates` examples / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
 
 ## Examples and Binaries
 
 ### Examples
 
-- `disk-position`:
-  - `cargo run -p iracing-sdk --example disk-position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `live-position` (Windows only):
-  - `cargo run -p iracing-sdk --example live-position -- --csv-output-path .\\positions.csv`
-- `adapter_disk_position`:
-  - `cargo run -p iracing-sdk --example adapter_disk_position -- --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `adapter_live_position` (Windows only):
-  - `cargo run -p iracing-sdk --example adapter_live_position -- --csv-output-path .\\positions.csv`
-- `adapter_enum_bitfields_live` (Windows only):
-  - `cargo run -p iracing-sdk --example adapter_enum_bitfields_live -- --max-frames 120`
+- `ibt-read-frame` reads and decodes recorded frames directly:
+  - `cargo ibt-read-frame --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `manual-frame-adapter` demonstrates a handwritten frame adapter:
+  - `cargo manual-frame-adapter --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `ibt-subscribe` subscribes to typed recorded frames (requires `derive`):
+  - `cargo ibt-subscribe --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `live-subscribe` subscribes to typed live frames (Windows only; requires `derive`):
+  - `cargo live-subscribe --csv-output-path .\\positions.csv`
+- `enum-bitfields-ibt` decodes enum and bitfield values from a recording:
+  - `cargo enum-bitfields-ibt --ibt-path ./session.ibt`
+- `session-updates` observes session YAML revisions (Windows only):
+  - `cargo session-updates --output-dir .\\sessions`
+  - `cargo session-updates --car-setup-only --output-dir .\\setups`
+  - Omit `--output-dir` to print the selected YAML payload to stdout.
 
 ### Binaries
 
+- `broadcast` sends iRacing broadcast commands (Windows only):
+  - `cargo broadcast --help`
 - `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
   - Type schema: `cargo session schema type`
   - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`

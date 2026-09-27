@@ -8,6 +8,8 @@ homepage.workspace = true
 edition.workspace = true
 license.workspace = true
 build = "build.rs"
+autobins = false
+autoexamples = false
 
 [package.metadata.docs.rs]
 all-features = true
@@ -18,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [package.metadata.dist]
 dist = true
 
-[package.metadata.dist.bin.broadcast-cli]
+[package.metadata.dist.bin.broadcast]
 targets = ["x86_64-pc-windows-msvc"]
 
 [package.metadata.dist.bin.live_to_csv]
@@ -150,46 +152,34 @@ harness = false
 required-features = ["benchmark"]
 
 [[example]]
-name = "car-setup-observer"
-path = "examples/car_setup_observer.rs"
-
-[[example]]
-name = "disk-position"
+name = "ibt-read-frame"
 path = "examples/disk_position.rs"
 
 [[example]]
-name = "disk-position-derive"
-path = "examples/disk_position_derive.rs"
-required-features = ["derive"]
-
-[[example]]
-name = "live-position"
-path = "examples/live_position.rs"
-
-[[example]]
-name = "live-position-derive"
-path = "examples/live_position_derive.rs"
-required-features = ["derive"]
-
-[[example]]
-name = "adapter-disk-position"
+name = "manual-frame-adapter"
 path = "examples/adapter_disk_position.rs"
 
 [[example]]
-name = "adapter-live-position"
-path = "examples/adapter_live_position.rs"
+name = "ibt-subscribe"
+path = "examples/disk_position_derive_connection.rs"
+required-features = ["derive"]
 
 [[example]]
-name = "adapter-enum-bitfields-live"
-path = "examples/adapter_enum_bitfields_live.rs"
+name = "live-subscribe"
+path = "examples/live_position_derive_connection.rs"
+required-features = ["derive"]
 
 [[example]]
-name = "session-update-observer"
+name = "enum-bitfields-ibt"
+path = "examples/enum_bitfields_disk.rs"
+
+[[example]]
+name = "session-updates"
 path = "examples/session_update_observer.rs"
 
 [[bin]]
-name = "broadcast-cli"
-path = "src/bin/broadcast_cli.rs"
+name = "broadcast"
+path = "src/bin/broadcast.rs"
 
 [[bin]]
 name = "car-setup-schema"
