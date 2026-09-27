@@ -121,7 +121,13 @@ impl VariableSchema {
                 .and_then(|size| var_info.offset.checked_add(size))
                 .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
             if end_offset > frame_size {
-                return Err(IRacingSDKError::memory_access_error(var_info.offset));
+                return Err(IRacingSDKError::parse_error(
+                    "VariableSchema::validate",
+                    format!(
+                        "Variable '{name}' ends at byte {end_offset}, beyond frame size {}",
+                        frame_size
+                    ),
+                ));
             }
         }
 

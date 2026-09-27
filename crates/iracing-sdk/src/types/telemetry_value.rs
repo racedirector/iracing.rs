@@ -61,14 +61,24 @@ impl TelemetryValue {
         element_info.count = 1;
 
         for index in 0..info.count {
-            let offset_delta = index
-                .checked_mul(element_size)
-                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
+            let offset_delta = index.checked_mul(element_size).ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "TelemetryValue::decode_array",
+                    format!(
+                        "Array element {index} offset calculation overflows usize for element size {element_size}"
+                    ),
+                )
+            })?;
 
-            element_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or_else(|| IRacingSDKError::memory_access_error(info.offset))?;
+            element_info.offset = info.offset.checked_add(offset_delta).ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "TelemetryValue::decode_array",
+                    format!(
+                        "Variable offset {} + element offset {offset_delta} overflows usize",
+                        info.offset
+                    ),
+                )
+            })?;
 
             values.push(Self::decode_scalar(data, &element_info)?);
         }
