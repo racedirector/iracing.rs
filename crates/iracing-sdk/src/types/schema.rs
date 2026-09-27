@@ -138,7 +138,12 @@ impl VariableSchema {
     }
 
     /// Constructs a schema from an exact snapshot of SDK variable headers.
-    pub fn from_headers(headers: &VariableHeadersBuffer, frame_size: usize) -> crate::Result<Self> {
+    pub fn from_snapshot(snapshot: VariableHeadersBuffer, frame_size: usize) -> Result<Self> {
+        Self::from_headers(snapshot.as_slice(), frame_size)
+    }
+
+    /// Constructs and validates a schema from decoded SDK variable headers.
+    pub fn from_headers(headers: &[VariableHeader], frame_size: usize) -> Result<Self> {
         let mut variables = HashMap::with_capacity(headers.len());
 
         for header in headers.iter() {
@@ -324,7 +329,7 @@ mod tests {
         let bytes = header.as_bytes();
         let headers = VariableHeadersBuffer::try_from_region_bytes(bytes, 1).unwrap();
 
-        let schema = VariableSchema::from_headers(&headers, 8).unwrap();
+        let schema = VariableSchema::from_snapshot(headers, 8).unwrap();
 
         let speed = schema.get_variable("Speed").unwrap();
         assert_eq!(speed.offset, 4);

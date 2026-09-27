@@ -1,8 +1,8 @@
 //! Performance baseline for the public [`IbtReader`] storage API.
 //!
-//! This target is intentionally compatible with both the complete-file reader
-//! and the file-backed reader. Keep its case names and timed boundaries stable
-//! so Criterion can compare results across the storage refactor.
+//! Case names are retained across the reader/provider API migration. The random
+//! seek case now reads indexed frames because the reader no longer exposes a
+//! cursor-only seek operation; its timings are not comparable to that old case.
 //!
 //! Run only this focused target with:
 //!
@@ -15,15 +15,14 @@
 //! - `ibt_reader_open` includes opening the path, reading whatever the reader
 //!   implementation requires, parsing metadata, and dropping the reader.
 //! - `ibt_reader_sequential_replay` constructs the reader outside the timed
-//!   routine, then reads every owned frame through `read_next_frame()`.
+//!   routine, then reads every owned frame through `frame(index)`.
 //! - `ibt_provider_sequential_replay` constructs the replay provider outside
 //!   the timed routine, then requests frames through `Provider::next_frame()`.
 //! - `ibt_connection_sequential_replay` constructs the public disk connection
 //!   and one dynamic-frame subscription outside the timed routine, then starts
 //!   and drains the coordinated replay stream.
 //! - `ibt_reader_random_seek` constructs the reader outside the timed routine,
-//!   then performs 1,024 deterministic `seek_to_frame()` calls. It does not
-//!   read frames after seeking.
+//!   then performs 1,024 deterministic `frame(index)` calls, including frame I/O.
 //!
 //! Results include normal operating-system filesystem behavior and may be
 //! affected by a warm page cache. Compare revisions on the same machine with
@@ -57,7 +56,7 @@ impl Recording {
             .len();
         let reader = IbtReader::open(&path)
             .unwrap_or_else(|error| panic!("could not open {}: {error}", path.display()));
-        let frame_count = reader.total_frames();
+        let frame_count = reader.layout().frame_count();
         let frame_size = u64::try_from(reader.header().buffer_length)
             .expect("validated IBT frame size should fit u64");
         let replay_bytes = frame_size
@@ -122,10 +121,8 @@ fn bench_sequential_replay(c: &mut Criterion) {
                 b.iter_batched(
                     || IbtReader::open(path).expect("fixture should open"),
                     |mut reader| {
-                        while let Some(frame) =
-                            reader.read_next_frame().expect("fixture frame should read")
-                        {
-                            black_box(frame);
+                        for index in 0..reader.layout().frame_count() {
+                            black_box(reader.frame(index).expect("fixture frame should read"));
                         }
                     },
                     BatchSize::LargeInput,
@@ -246,11 +243,12 @@ fn bench_random_seek(c: &mut Criterion) {
                     || IbtReader::open(path).expect("fixture should open"),
                     |mut reader| {
                         for &position in positions {
-                            reader
-                                .seek_to_frame(black_box(position))
-                                .expect("fixture seek should succeed");
+                            black_box(
+                                reader
+                                    .frame(black_box(position))
+                                    .expect("fixture frame should read"),
+                            );
                         }
-                        black_box(reader.current_frame())
                     },
                     BatchSize::LargeInput,
                 );

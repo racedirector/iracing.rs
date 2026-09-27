@@ -8,7 +8,7 @@ namespace.
 
 This crate provides:
 
-- Cross-platform `.ibt` telemetry replay via `IbtReader`
+- Cross-platform `.ibt` indexed reads via `IbtReader` and replay via `IbtProvider`
 - Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
 - Session YAML parsing via `SessionInfo::parse`; telemetry session policies handle source-specific updates
 - Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
@@ -16,7 +16,7 @@ This crate provides:
 
 ## Start Here
 
-1. Use `IbtReader` for offline replay from `.ibt` files (all platforms).
+1. Use `IbtProvider` for sequential replay, or `IbtReader` for indexed frames and metadata snapshots (all platforms).
 2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
 3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
 4. Parse decoded session YAML with `SessionInfo::parse`; use telemetry session policies for live updates or IBT replay.
@@ -50,11 +50,11 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader}
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+use iracing_sdk::{SchemaProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
 
-fn main() -> iracing_sdk::Result<()> {
-    let mut reader = IbtReader::open("telemetry.ibt")?;
-    let speed_info = reader
+async fn replay() -> iracing_sdk::Result<()> {
+    let mut provider = IbtProvider::open("telemetry.ibt")?;
+    let speed_info = provider
         .schema()
         .get_variable("Speed")
         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
@@ -63,8 +63,8 @@ fn main() -> iracing_sdk::Result<()> {
         })?
         .clone();
 
-    while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
-        let speed_mps = f32::from_bytes(&frame, &speed_info)?;
+    while let Some(packet) = provider.next_frame().await? {
+        let speed_mps = f32::from_bytes(&packet.data, &speed_info)?;
         let _speed_kph = speed_mps * 3.6;
     }
 
@@ -78,9 +78,9 @@ fn main() -> iracing_sdk::Result<()> {
 use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
 fn main() -> iracing_sdk::Result<()> {
-    let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(yaml) = reader.session_yaml() {
-        let session = SessionInfo::parse(&yaml)?;
+    let mut reader = IbtReader::open("telemetry.ibt")?;
+    if let Some(snapshot) = reader.session_info_snapshot()? {
+        let session = SessionInfo::try_from(snapshot)?;
         println!("Track: {}", session.weekend_info.track_display_name);
     }
     Ok(())
@@ -157,7 +157,7 @@ impl FrameAdapter for Row {
 
 | Capability | Linux/macOS | Windows |
 |---|---|---|
-| `.ibt` replay (`IbtReader`) | Yes | Yes |
+| `.ibt` replay (`IbtProvider`) | Yes | Yes |
 | Session parsing (`SessionInfo::parse`) | Yes | Yes |
 | `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
 | `session schema live` and `session snapshot live` | No | Yes |

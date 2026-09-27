@@ -21,7 +21,8 @@ The unpublished `test-fixtures` crate defines profiles and writes both `.ibt`
 and session YAML files. It constructs the 112-byte SDK header, 32-byte disk
 sub-header, and 144-byte variable headers through `iracing-irsdk` wire types.
 Its verifier checks manifest invariants, hashes, headers, frame geometry,
-variables, companion YAML, and complete parsing through `IbtReader`.
+variables, companion YAML, indexed source parsing through `IbtReader`, and
+complete replay through `IbtProvider`.
 
 `cargo test-fixtures` is the normal entry point. It:
 

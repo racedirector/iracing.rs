@@ -16,12 +16,13 @@ validates signed fields before geometry is constructed. `MetadataRegions` lives
 alongside the other region value objects in `types/regions`; frame counts derive
 from physical bytes, not the disk sub-header record count. The layout performs
 no I/O, schema decoding, or playback management. `IbtReader` uses it as the sole
-authority for source geometry. The reader temporarily retains its legacy schema
-and session caches until provider cutover (#140). Fresh snapshot methods read
-the advertised regions on each call without refreshing those caches. Absent
-variable headers produce an empty legacy schema; absent session information
-produces no cached session. Both fresh snapshot APIs return `None` for absent
-regions. Shared validation lives in `parse_utils` and uses ordinary functions.
+authority for source geometry. Fresh snapshot methods read the advertised regions
+on each call and return `None` for absent regions. The reader retains no schema
+or session cache. `IbtProvider` builds its schema once with
+`VariableSchema::from_snapshot(snapshot, frame_size)`; decoded header slices can
+also be validated with `VariableSchema::from_headers`. Missing variable metadata
+is accepted only when there are no telemetry frames. Shared validation lives in
+`parse_utils` and uses ordinary functions.
 
 Disk variable headers are parsed from `.ibt` files. Live variable headers are
 discovered from Windows shared memory. Both become `VariableSchema` containing
@@ -62,7 +63,7 @@ encoding is cached; control-character cleanup and parsing remain subsequent oper
 iRacing session data can contain control characters and non-UTF-8 bytes.
 `SessionInfoBuffer` bounds and decodes the captured bytes; the internal
 `IRacingSessionString` removes invalid control characters and rejects empty
-text. `IbtReader::session_yaml` and live acquisition supply this sanitized
+text. `IbtProvider::session_yaml` and live acquisition supply this sanitized
 text. `SessionInfo::parse` then deserializes it into the typed session model.
 Keep decoding and sanitization in the source path.
 

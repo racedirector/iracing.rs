@@ -111,10 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ibt_provider = IbtProvider::open(&ibt_path).expect("Failed to initialize IBT provider");
     let schema = ibt_provider.schema();
 
-    tracing::info!(
-        total_frames = ibt_provider.total_frames(),
-        "Parsing frames from IBT provider"
-    );
+    tracing::info!("Parsing frames from IBT provider");
 
     let shared_validation = DriverInput::validate_schema(schema)?;
     while let Some(packet) = ibt_provider.next_frame().await? {

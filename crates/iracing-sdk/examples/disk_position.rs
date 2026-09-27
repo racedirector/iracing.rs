@@ -43,7 +43,9 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{SchemaProvider, ibt::IbtReader, types::VarData};
+use futures::executor::block_on;
+use iracing_sdk::provider::Provider;
+use iracing_sdk::{SchemaProvider, providers::ibt::IbtProvider, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -120,7 +122,7 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
+    let mut reader = IbtProvider::open(&ibt_path).expect("Failed to open IBT file");
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
     tracing::info!("Resolving telemetry schema");
@@ -159,14 +161,15 @@ fn main() -> Result<()> {
     // Frame iteration
     // ------------------------------------------------------------
     //
-    // `read_next_frame()` returns:
-    //   Result<Option<(data, tick, session_version)>>
+    // `next_frame()` returns:
+    //   Result<Option<FramePacket>>
     //
     // - Err(_)       => read failure
     // - Ok(None)     => end-of-stream
     // - Ok(Some(...))=> next frame
     //
-    while let Some((data, _tick, _session_version)) = reader.read_next_frame()? {
+    while let Some(packet) = block_on(reader.next_frame())? {
+        let data = packet.data;
         // Extract strongly-typed values from raw frame bytes.
         let lap_distance_meters = f32::from_bytes(&data, lap_distance_meters_info).unwrap();
 

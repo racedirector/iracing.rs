@@ -24,7 +24,7 @@ same.
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
-private seekable file plus owned schema/session metadata and reads one owned
+private seekable file plus decoded headers and layout, and reads one owned
 frame on demand; `from_bytes` uses the same parser over an owned in-memory
 cursor. `IbtLayout` owns metadata bounds, frame start/size/count, and indexed
 frame geometry. Source I/O uses checked conversions between `u64` seek offsets
@@ -34,12 +34,10 @@ opened on 32-bit targets. Supporting those files would require a separately
 scoped wider layout API.
 
 `frame(index)`, `session_info_snapshot()`, and `variable_headers_snapshot()` read
-owned data from the source on each call. They may move its physical cursor but
-never change `current_frame()`. Every legacy sequential read reseeks to that
-logical frame, including after a failed read. Legacy schema/session access
-continues to use construction-time caches until provider cutover (#140); the
-reader no longer retains or exposes its file path. Live `WindowsConnection`
-interprets the related shared-memory header and rotating buffers.
+owned data from the source on each call. They may move its physical cursor;
+there is no reader-owned logical cursor, schema, or session cache. Every indexed
+read seeks to its validated region. Live `WindowsConnection` interprets the
+related shared-memory header and rotating buffers.
 
 `VariableSchema` maps names to `VariableInfo` and records the frame size. A
 `VariableInfo` carries type, byte offset, element count, time-count marker,
@@ -71,8 +69,17 @@ bytes and schema for exploratory name-based lookup. Hot paths should implement
 - return session YAML when available;
 - report the source tick rate.
 
-`IbtProvider` wraps `IbtReader`, preserves its cursor, and exposes seek/time
-metadata. Its reads complete as fast as the file can be decoded.
+`IbtProvider::from_reader` validates the exact variable-header snapshot against
+the layout's frame size and owns the resulting shared schema. Construction
+starts its sequential cursor at frame zero, even after indexed reader operations.
+Frames without variable metadata are rejected; zero-frame recordings may have
+an empty schema. Successful reads advance one index, failed reads retain the
+index for retry, and the layout's frame count determines permanent EOF. Packets
+use the zero-based index cast to `u32` as their synthetic tick and retain the
+header's session update counter. Tick rate comes from the header with a 60 Hz
+fallback for nonpositive values. Session YAML is read from a fresh snapshot,
+decoded and sanitized by the provider. Reads complete as fast as the file can be
+decoded; the provider has no seek/time helper API.
 
 `LiveProvider` is Windows-only. It builds a schema from shared-memory metadata,
 waits cooperatively for updates, returns the newest owned frame snapshot, and

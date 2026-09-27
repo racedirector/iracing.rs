@@ -1,12 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
+use futures::executor::block_on;
+use iracing_sdk::provider::Provider;
 use iracing_sdk::{
     BitField, SchemaProvider, VarData,
-    ibt::IbtReader,
     irsdk::{
         CarLeftRight, EngineWarnings, PaceMode, PitServiceFlags, SessionFlags, SessionState,
         TrackLocation, TrackSurface, TrackWetness,
     },
+    providers::ibt::IbtProvider,
 };
 use std::path::PathBuf;
 
@@ -31,7 +33,7 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let mut reader = IbtReader::open(&args.ibt_path)?;
+    let mut reader = IbtProvider::open(&args.ibt_path)?;
     let schema = reader.schema().clone();
 
     let session_state = schema.get_variable("SessionState").cloned();
@@ -44,7 +46,9 @@ fn main() -> Result<()> {
     let pace_mode = schema.get_variable("PaceMode").cloned();
     let pit_sv_flags = schema.get_variable("PitSvFlags").cloned();
 
-    while let Some((frame, tick, _session_version)) = reader.read_next_frame()? {
+    while let Some(packet) = block_on(reader.next_frame())? {
+        let frame = packet.data;
+        let tick = packet.tick;
         let session_state_value = session_state
             .as_ref()
             .and_then(|info| i32::from_bytes(&frame, info).ok())

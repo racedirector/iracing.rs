@@ -2,14 +2,17 @@
 //!
 //! Verification is deliberately layered. It checks manifest geometry and hashes,
 //! decodes foundational wire structures, compares the embedded and companion
-//! YAML bytes, then consumes the same data through [`IbtReader`]. This reduces
+//! YAML bytes, then consumes the same data through [`IbtReader`] and [`IbtProvider`]. This reduces
 //! the chance that matching generator and verifier mistakes accept invalid data.
 
 use std::{fs, io::Cursor, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
+use futures::executor::block_on;
 use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType};
-use iracing_sdk::{SchemaProvider, ibt::IbtReader};
+use iracing_sdk::{
+    SchemaProvider, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
+};
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 
@@ -23,7 +26,7 @@ use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 ///
 /// Returns an error when required files cannot be read, manifest paths escape
 /// `repo_root`, layout/hash/header/YAML invariants disagree, SDK validation
-/// fails, or `IbtReader` cannot expose the declared schema and frame count.
+/// fails, or `IbtProvider` cannot expose the declared schema and frame count.
 pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
     let manifest_path = repo_root.join("test-data/ibt/manifest.json");
     let manifest_bytes = fs::read(&manifest_path)
@@ -207,28 +210,31 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             yaml_path.display()
         );
 
-        let mut reader = IbtReader::from_bytes(data)
+        let reader = IbtReader::from_bytes(data)
             .with_context(|| format!("opening {} through IbtReader", path.display()))?;
         ensure!(
-            reader.total_frames() == fixture.num_frames,
+            reader.layout().frame_count() == fixture.num_frames,
             "{} reader frame count mismatch",
             path.display()
         );
+        let mut provider = IbtProvider::from_reader(reader)
+            .with_context(|| format!("validating {} through IbtProvider", path.display()))?;
+        let schema = provider.schema();
         ensure!(
-            reader.schema().variable_count() == fixture.num_vars as usize,
-            "{} reader variable count mismatch",
+            schema.variable_count() == fixture.num_vars as usize,
+            "{} provider variable count mismatch",
             path.display()
         );
         for expected in &fixture.required_variables {
             ensure!(
-                reader.schema().get_variable(&expected.name).is_some(),
-                "{} reader schema is missing {}",
+                schema.get_variable(&expected.name).is_some(),
+                "{} provider schema is missing {}",
                 path.display(),
                 expected.name
             );
         }
         let mut read_frames = 0usize;
-        while reader.read_next_frame()?.is_some() {
+        while block_on(provider.next_frame())?.is_some() {
             read_frames += 1;
         }
         ensure!(

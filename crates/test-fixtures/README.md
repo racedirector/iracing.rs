@@ -95,7 +95,7 @@ views:
 - SHA-256 and exact file length;
 - typed SDK header and variable-header decoding;
 - companion YAML equality;
-- schema and complete frame iteration through `IbtReader`.
+- schema and complete frame iteration through `IbtProvider`, constructed from `IbtReader`.
 
 Manifest paths must be repository-relative and cannot contain parent-directory
 components. This prevents a malformed manifest from escaping the supplied
@@ -139,5 +139,5 @@ fixture change is present but not yet committed.
 - `src/main.rs` — Cargo-facing CLI.
 - `src/model.rs` — fixture profiles and manifest schema.
 - `src/generate.rs` — YAML, headers, frames, hashes, and artifact writes.
-- `src/verify.rs` — structural, manifest, YAML, and `IbtReader` validation.
+- `src/verify.rs` — structural, manifest, YAML, and `IbtReader`/`IbtProvider` validation.
 - `tests/cli.rs` — end-to-end command coverage against an isolated root.

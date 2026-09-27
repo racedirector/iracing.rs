@@ -87,10 +87,7 @@ async fn main() -> Result<()> {
     let schema = provider.schema();
     let mut writer = Writer::from_path(&csv_output_path)?;
 
-    tracing::info!(
-        total_frames = provider.total_frames(),
-        "Parsing frames from IBT provider"
-    );
+    tracing::info!("Parsing frames from IBT provider");
 
     let shared_validation = Row::validate_schema(schema)?;
     while let Some(packet) = provider.next_frame().await? {

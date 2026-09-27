@@ -44,10 +44,10 @@ struct Args {
 fn parse_disk_session(ibt_path: PathBuf) -> Result<SessionInfo> {
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
-    let reader = IbtReader::open(&ibt_path)?;
+    let mut reader = IbtReader::open(&ibt_path)?;
 
     let session_yaml = reader
-        .session_info_buffer()
+        .session_info_snapshot()?
         .ok_or_else(|| anyhow!("No session YAML found in IBT file"))?;
 
     Ok(SessionInfo::try_from(session_yaml)?)

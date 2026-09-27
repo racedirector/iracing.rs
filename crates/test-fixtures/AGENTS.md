@@ -12,7 +12,7 @@ or commands.
   gate.
 - `RUSTDOCFLAGS="-D warnings" cargo doc -p test-fixtures --no-deps` validates
   maintenance documentation.
-- `cargo test -p iracing-sdk --lib ibt::format::tests` checks the generated data
+- `cargo test -p iracing-sdk --lib ibt::tests` checks the generated data
   through SDK fixture tests.
 - `cargo test-fixtures verify` is read-only; use it when existing artifacts must
   not be rewritten.
@@ -42,7 +42,7 @@ shared-memory fixtures.
   SDK structs.
 - This crate owns profiles, deterministic values, session YAML, IBT assembly,
   manifest serialization, hashing, verification orchestration, and drift checks.
-- Use `IbtReader` in verification so generated data is exercised as downstream
+- Use `IbtReader` and sequential `IbtProvider` replay in verification so generated data is exercised as downstream
   consumers read it. Do not replace it with only a second hand-written parser.
 - Live telemetry, shared memory, real capture rewriting, and schema discovery
   are out of scope.
@@ -90,7 +90,7 @@ shared-memory fixtures.
 2. `cargo test -p test-fixtures --all-targets`
 3. `cargo clippy -p test-fixtures --all-targets -- -D warnings`
 4. `RUSTDOCFLAGS="-D warnings" cargo doc -p test-fixtures --no-deps`
-5. `cargo test -p iracing-sdk --lib ibt::format::tests`
+5. `cargo test -p iracing-sdk --lib ibt::tests`
 6. `cargo test-fixtures verify`
 
 For intentional generated-byte changes, also run

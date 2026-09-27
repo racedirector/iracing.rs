@@ -188,10 +188,7 @@ async fn main() -> Result<()> {
 
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    tracing::info!(
-        total_frames = ibt_provider.total_frames(),
-        "Parsing frames from IBT provider"
-    );
+    tracing::info!("Parsing frames from IBT provider");
 
     let schema = ibt_provider.schema();
     let shared_validation = Row::validate_schema(schema)?;

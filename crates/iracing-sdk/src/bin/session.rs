@@ -236,10 +236,10 @@ fn handle_schema_command(command: SchemaOutputCommands) -> Result<()> {
 }
 
 fn capture_disk_session_info<P: AsRef<Path>>(ibt_path: &P) -> Result<SessionInfo> {
-    let reader = IbtReader::open(ibt_path)?;
+    let mut reader = IbtReader::open(ibt_path)?;
 
     let buffer = reader
-        .session_info_buffer()
+        .session_info_snapshot()?
         .ok_or_else(|| anyhow::anyhow!("IBT contains no session information"))?;
 
     Ok(SessionInfo::try_from(buffer)?)

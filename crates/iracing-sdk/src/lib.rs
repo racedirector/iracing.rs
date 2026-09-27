@@ -26,11 +26,11 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{SchemaProvider, VarData, ibt::IbtReader};
+//! use iracing_sdk::{SchemaProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
 //!
-//! fn main() -> iracing_sdk::Result<()> {
-//!     let mut reader = IbtReader::open("telemetry.ibt")?;
-//!     let speed_info = reader
+//! async fn replay() -> iracing_sdk::Result<()> {
+//!     let mut provider = IbtProvider::open("telemetry.ibt")?;
+//!     let speed_info = provider
 //!         .schema()
 //!         .get_variable("Speed")
 //!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
@@ -39,8 +39,8 @@
 //!         })?
 //!         .clone();
 //!
-//!     while let Some((frame, _tick, _session_version)) = reader.read_next_frame()? {
-//!         let speed_mps = f32::from_bytes(&frame, &speed_info)?;
+//!     while let Some(packet) = provider.next_frame().await? {
+//!         let speed_mps = f32::from_bytes(&packet.data, &speed_info)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
 //!

@@ -14,11 +14,11 @@ mod json_telemetry_writer;
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use iracing_sdk::{
-    DynamicFrame, FrameAdapter, SchemaProvider, VariableInfo, provider::Provider,
+    DynamicFrame, FrameAdapter, FramePacket, SchemaProvider, VariableInfo, ibt::IbtReader,
     providers::ibt::IbtProvider,
 };
 use json_telemetry_writer::{DynamicFrameSnapshot, JsonTelemetryWriter};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
@@ -37,8 +37,7 @@ struct Args {
     frame_number: Option<usize>,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
@@ -50,8 +49,11 @@ async fn main() -> Result<()> {
     let frame_number = frame_number.unwrap_or(0);
 
     tracing::info!(path = %ibt_path.display(), frame_number, "Opening IBT frame");
-    let mut provider = IbtProvider::open(&ibt_path).context("Failed to open IBT telemetry file")?;
-    seek_to_frame(&mut provider, frame_number)?;
+    let mut reader = IbtReader::open(&ibt_path).context("Failed to open IBT telemetry file")?;
+    validate_frame_number(reader.layout().frame_count(), frame_number)?;
+    let data = reader.frame(frame_number)?;
+    let session_version = reader.header().session_info_update as u32;
+    let provider = IbtProvider::from_reader(reader)?;
 
     let mut variables: Vec<VariableInfo> = provider.variables();
     variables.sort_unstable_by(|left, right| {
@@ -61,10 +63,12 @@ async fn main() -> Result<()> {
     });
 
     let validation = DynamicFrame::validate_schema(provider.schema())?;
-    let packet = provider
-        .next_frame()
-        .await?
-        .ok_or_else(|| anyhow!("IBT frame {frame_number} could not be read"))?;
+    let packet = FramePacket::new(
+        data,
+        frame_number as u32,
+        session_version,
+        Arc::new(provider.schema().clone()),
+    );
     let frame = DynamicFrame::adapt(&packet, &validation);
     let snapshot = DynamicFrameSnapshot::from_frame(&frame, &variables)?;
 
@@ -80,15 +84,6 @@ async fn main() -> Result<()> {
         "Wrote IBT telemetry JSON snapshot"
     );
     Ok(())
-}
-
-fn seek_to_frame(provider: &mut IbtProvider, frame_number: usize) -> Result<()> {
-    let total_frames = provider.total_frames();
-    validate_frame_number(total_frames, frame_number)?;
-
-    provider
-        .seek_to_frame(frame_number)
-        .with_context(|| format!("Failed to seek to IBT frame {frame_number}"))
 }
 
 fn validate_frame_number(total_frames: usize, frame_number: usize) -> Result<()> {

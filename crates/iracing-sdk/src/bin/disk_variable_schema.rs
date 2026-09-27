@@ -4,7 +4,7 @@
 //! (serialized as YAML) based on the embedded variable headers.
 //!
 //! # Behavior
-//! - Opens `--ibt-path` via `iracing_sdk::ibt::IbtReader`
+//! - Opens `--ibt-path` via `iracing_sdk::providers::ibt::IbtProvider`
 //! - Reads the telemetry variable schema from the file
 //! - Converts it to JSON Schema and writes YAML to `--output-path`
 //!
@@ -16,7 +16,7 @@
 use anyhow::Result;
 use clap::Parser;
 use iracing_sdk::SchemaProvider;
-use iracing_sdk::ibt::IbtReader;
+use iracing_sdk::providers::ibt::IbtProvider;
 use std::{fs::File, io::BufWriter, path::PathBuf};
 
 /// CLI arguments for the disk telemetry schema generator.
@@ -56,9 +56,9 @@ pub fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader
     // ------------------------------------------------------------
-    let reader = IbtReader::open(&ibt_path).expect("Failed to open IBT file");
+    let provider = IbtProvider::open(&ibt_path)?;
 
-    let variable_schema = reader.schema().clone();
+    let variable_schema = provider.schema();
     let schema = schemars::schema_for_value!(variable_schema);
 
     let output_file = File::create(&output_path)?;

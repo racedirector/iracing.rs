@@ -1,9 +1,8 @@
 //! IBT file reading and parsing support (cross-platform)
 //!
 //! This module provides support for reading iRacing's IBT (telemetry) files
-//! and implementing the FrameProvider interface for unified telemetry streaming.
+//! through indexed frame reads and owned metadata snapshots.
 
-pub mod format;
 pub mod reader;
 
 pub use reader::IbtReader;
