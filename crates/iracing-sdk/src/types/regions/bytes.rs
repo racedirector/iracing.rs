@@ -170,4 +170,26 @@ mod tests {
         let adjacent = ByteRegion::new(4, 1).unwrap();
         assert!(!region.overlaps(adjacent));
     }
+
+    #[test]
+    fn empty_region_never_overlaps_even_inside_another_region() {
+        let occupied = ByteRegion::new(2, 5).unwrap();
+        for offset in [2, 4, 7] {
+            let empty = ByteRegion::new(offset, 0).unwrap();
+            assert!(!empty.overlaps(occupied));
+            assert!(!occupied.overlaps(empty));
+        }
+    }
+
+    #[test]
+    fn valid_regions_can_end_at_usize_max() {
+        for region in [
+            ByteRegion::new(usize::MAX, 0).unwrap(),
+            ByteRegion::new(usize::MAX - 1, 1).unwrap(),
+        ] {
+            assert_eq!(region.end(), usize::MAX);
+            assert_eq!(region.as_range().end, usize::MAX);
+        }
+        assert!(ByteRegion::new(usize::MAX, 1).is_err());
+    }
 }
