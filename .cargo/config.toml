@@ -1,6 +1,8 @@
 [alias]
 test-fixtures = ["run", "-p", "test-fixtures", "--"]
 
+iracing-sdk = ["run", "-p", "iracing-sdk-cli", "--bin", "iracing-sdk", "--"]
+
 broadcast = ["run", "-p", "iracing-sdk-cli", "--bin", "broadcast", "--"]
 
 ibt-read-frame = [
@@ -12,10 +14,31 @@ ibt-read-frame = [
   "--",
 ]
 
-manual-frame-adapter = ["run", "-p", "iracing-sdk", "--example", "manual-frame-adapter", "--"]
+manual-frame-adapter = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--example",
+  "manual-frame-adapter",
+  "--",
+]
 ibt-subscribe = ["run", "-p", "iracing-sdk", "--example", "ibt-subscribe", "--"]
-live-subscribe = ["run", "-p", "iracing-sdk", "--example", "live-subscribe", "--"]
-enum-bitfields-ibt = ["run", "-p", "iracing-sdk", "--example", "enum-bitfields-ibt", "--"]
+live-subscribe = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--example",
+  "live-subscribe",
+  "--",
+]
+enum-bitfields-ibt = [
+  "run",
+  "-p",
+  "iracing-sdk",
+  "--example",
+  "enum-bitfields-ibt",
+  "--",
+]
 
 car-setup-schema = [
   "run",

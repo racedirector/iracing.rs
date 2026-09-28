@@ -9,6 +9,8 @@ edition.workspace = true
 license.workspace = true
 build = "build.rs"
 autobins = false
+default-run = "iracing-sdk"
+
 
 [package.metadata.dist]
 dist = true
@@ -38,7 +40,7 @@ clap = { workspace = true }
 csv = { workspace = true }
 futures = { workspace = true }
 iracing-sdk = { workspace = true }
-schemars = { workspace = true, optional = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml_ng = { workspace = true }
@@ -49,12 +51,12 @@ type-layout = { workspace = true }
 
 [features]
 default = []
-codegen = ["dep:schemars", "iracing-sdk/codegen"]
+codegen = ["iracing-sdk/codegen"]
 schema-discovery = ["iracing-sdk/schema-discovery"]
 
 [[bin]]
-name = "broadcast"
-path = "src/bin/broadcast.rs"
+name = "iracing-sdk"
+path = "src/main.rs"
 
 [[bin]]
 name = "car-setup-schema"
