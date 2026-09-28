@@ -107,6 +107,10 @@ macro_rules! sdk_bitmask {
             Hash,
             serde::Serialize,
             serde::Deserialize,
+            zerocopy::FromBytes,
+            zerocopy::IntoBytes,
+            zerocopy::KnownLayout,
+            zerocopy::Immutable,
         )]
         $vis struct $name(u32);
 
@@ -346,6 +350,19 @@ mod tests {
         assert!(!TestBitmask::FIRST.has_all(both));
         assert!(TestBitmask::FIRST.has_any(both));
         assert!(both.has_all(both));
+    }
+
+    #[test]
+    fn bitmask_constructors_zerocopy() {
+        use zerocopy::{FromBytes, IntoBytes};
+
+        let flags = TestBitmask::FIRST | TestBitmask::SECOND;
+
+        let bytes = flags.as_bytes();
+
+        let decoded = TestBitmask::read_from_bytes(bytes).unwrap();
+
+        assert_eq!(decoded, flags);
     }
 
     #[test]
