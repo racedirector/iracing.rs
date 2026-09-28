@@ -63,6 +63,20 @@ impl IbtProvider {
     pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
         Arc::clone(&self.schema)
     }
+
+    /// Returns the total number of telemetry frames in the recording.
+    pub fn total_frames(&self) -> usize {
+        self.reader.layout().frame_count()
+    }
+
+    fn tick_for_frame(index: usize) -> Result<u32> {
+        u32::try_from(index).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "IbtProvider::next_frame",
+                format!("Frame index {index} exceeds the u32 tick range"),
+            )
+        })
+    }
 }
 
 impl SchemaProvider for IbtProvider {
@@ -75,17 +89,18 @@ impl SchemaProvider for IbtProvider {
 impl Provider for IbtProvider {
     /// Emits each frame once in index order, then returns permanent EOF.
     ///
-    /// The synthetic tick is the zero-based frame index (cast to `u32`), and
+    /// The synthetic tick is the zero-based frame index (checked against `u32`), and
     /// the session version is the recording header's update counter. Failed
     /// reads leave the replay cursor unchanged so the same frame can be retried.
     async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
-        if self.current_frame >= self.reader.layout().frame_count() {
+        if self.current_frame >= self.total_frames() {
             return Ok(None);
         }
+        let tick = Self::tick_for_frame(self.current_frame)?;
         let frame_data = self.reader.frame(self.current_frame)?;
         let packet = FramePacket::new(
             frame_data,
-            self.current_frame as u32,
+            tick,
             self.reader.header().session_info_update as u32,
             self.shared_schema(),
         );
@@ -94,11 +109,11 @@ impl Provider for IbtProvider {
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        Ok(self
-            .reader
-            .session_info_snapshot()?
-            .and_then(|snapshot| IRacingSessionString::try_from(snapshot).ok())
-            .map(Into::into))
+        let Some(snapshot) = self.reader.session_info_snapshot()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(IRacingSessionString::try_from(snapshot)?.into()))
     }
 
     fn tick_rate(&self) -> f64 {
@@ -128,6 +143,7 @@ mod tests {
                 IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?,
                 IbtProvider::from_reader(moved)?,
             ] {
+                assert_eq!(provider.total_frames(), fixture.num_frames);
                 assert_eq!(provider.schema().frame_size, fixture.frame_size);
                 assert_eq!(
                     provider.schema().variable_count(),
@@ -197,6 +213,40 @@ mod tests {
         let reader = IbtReader::from_bytes(bytes)?;
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
         assert!(error.contains("beyond frame size"), "{error}");
+        Ok(())
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn frame_index_beyond_tick_range_is_rejected() {
+        assert_eq!(
+            IbtProvider::tick_for_frame(u32::MAX as usize).unwrap(),
+            u32::MAX
+        );
+        let error = IbtProvider::tick_for_frame(u32::MAX as usize + 1)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("exceeds the u32 tick range"), "{error}");
+    }
+
+    #[test]
+    fn invalid_session_snapshot_returns_an_error() -> anyhow::Result<()> {
+        let bytes = fs::read(require_smallest_ibt_fixture()?)?;
+        let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
+        let offset = provider
+            .reader
+            .layout()
+            .metadata()
+            .session_info()
+            .expect("fixture has session information")
+            .offset();
+        provider.reader.owned_bytes_mut()[offset] = 0;
+
+        let error = block_on(provider.session_yaml(0)).unwrap_err().to_string();
+        assert!(
+            error.contains("YAML is empty after preprocessing"),
+            "{error}"
+        );
         Ok(())
     }
 }
