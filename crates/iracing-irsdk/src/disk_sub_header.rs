@@ -62,7 +62,7 @@ impl DiskSubHeader {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if `reader` cannot supply a complete header.
+    /// Returns [`crate::Error::Io`] if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
         read_wire_bytes_from_io(reader)
     }
@@ -111,6 +111,17 @@ mod tests {
                 expected: 32,
                 actual: 31,
             })
+        ));
+    }
+
+    #[test]
+    fn disk_sub_header_reader_reports_truncated_input_as_io_error() {
+        let mut reader = std::io::Cursor::new([0_u8; 10]);
+
+        assert!(matches!(
+            DiskSubHeader::try_from_reader(&mut reader),
+            Err(crate::Error::Io(error))
+                if error.kind() == std::io::ErrorKind::UnexpectedEof
         ));
     }
 }

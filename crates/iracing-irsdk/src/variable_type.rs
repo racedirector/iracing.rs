@@ -2,11 +2,6 @@
 
 use std::fmt;
 
-#[cfg(feature = "codegen")]
-use schemars::{JsonSchema, Schema, json_schema};
-use serde::{Deserialize, Serialize};
-use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
-
 /// Variable kinds advertised by an iRacing SDK variable header.
 #[repr(i32)]
 #[derive(
@@ -16,14 +11,14 @@ use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
     PartialEq,
     Eq,
     Hash,
-    Serialize,
-    Deserialize,
-    Immutable,
-    KnownLayout,
-    TryFromBytes,
-    IntoBytes,
+    serde::Serialize,
+    serde::Deserialize,
+    zerocopy::Immutable,
+    zerocopy::KnownLayout,
+    zerocopy::TryFromBytes,
+    zerocopy::IntoBytes,
 )]
-#[cfg_attr(feature = "codegen", derive(JsonSchema))]
+#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 pub enum VariableType {
     /// `irsdk_char`.
     #[serde(alias = "Char")]
@@ -51,9 +46,6 @@ impl fmt::Display for VariableType {
 }
 
 impl VariableType {
-    /// Exact contents of `irsdk_VarTypeBytes`.
-    pub const BYTE_SIZES: [usize; 6usize] = [1, 1, 4, 4, 4, 8];
-
     /// Returns the SDK byte width for this variable type.
     pub const fn byte_size(self) -> usize {
         match self {
@@ -87,7 +79,7 @@ impl From<VariableType> for i32 {
 }
 
 #[cfg(feature = "codegen")]
-impl From<VariableType> for Schema {
+impl From<VariableType> for schemars::Schema {
     fn from(value: VariableType) -> Self {
         let type_value = match value {
             VariableType::Character => "string",
@@ -96,7 +88,7 @@ impl From<VariableType> for Schema {
             VariableType::Float | VariableType::Double => "number",
         };
 
-        json_schema!({
+        schemars::json_schema!({
             "type": type_value
         })
     }
@@ -130,7 +122,6 @@ mod tests {
     #[test]
     fn values_and_sizes_match_the_sdk() {
         assert_eq!(i32::from(VariableType::Character), 0);
-        assert_eq!(VariableType::BYTE_SIZES, [1, 1, 4, 4, 4, 8]);
         assert_eq!(VariableType::Double.byte_size(), 8);
     }
 

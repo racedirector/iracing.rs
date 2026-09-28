@@ -22,6 +22,10 @@ thiserror = { workspace = true }
 type-layout = { workspace = true }
 zerocopy = { workspace = true }
 
+[dependencies.bitflags]
+version = "2.13.2"
+features = ["serde"]
+
 [dev-dependencies]
 serde_json = { workspace = true }
 serde_yaml_ng = { workspace = true }

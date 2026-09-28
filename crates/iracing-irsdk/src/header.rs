@@ -3,7 +3,10 @@ use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{StatusField, VariableBuffer, constants::IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS};
-use crate::{Result, parse_utils::read_wire_bytes};
+use crate::{
+    Result,
+    parse_utils::{read_wire_bytes, read_wire_bytes_from_io},
+};
 
 /// An iRacing SDK header.
 #[repr(C)]
@@ -60,14 +63,9 @@ impl Header {
     ///
     /// # Errors
     ///
-    /// Returns a parse error if `reader` cannot supply a complete header.
+    /// Returns [`crate::Error::Io`] if `reader` cannot supply a complete header.
     pub fn try_from_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::read_from_io(reader).map_err(|error| {
-            crate::Error::parse(
-                "Header::try_from_reader",
-                format!("Failed to read disk header: {error}"),
-            )
-        })
+        read_wire_bytes_from_io(reader)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -204,15 +202,14 @@ mod tests {
     }
 
     #[test]
-    fn header_reader_rejects_truncated_input() {
+    fn header_reader_reports_truncated_input_as_io_error() {
         let truncated_data = vec![0u8; 10];
         let mut cursor = std::io::Cursor::new(truncated_data);
         let result = Header::try_from_reader(&mut cursor);
 
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Parse { .. } => {}
-            other => panic!("Expected Parse error, got {:?}", other),
-        }
+        assert!(matches!(
+            result,
+            Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof
+        ));
     }
 }

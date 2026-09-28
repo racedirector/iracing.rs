@@ -52,7 +52,10 @@ impl FlagObserver {
         &mut self,
         flags: SessionFlags,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        println!("{:?}", flags.names());
+        println!(
+            "{:?}",
+            flags.iter_names().map(|(name, _)| name).collect::<Vec<_>>()
+        );
 
         self.writer.serialize(flags)?;
 

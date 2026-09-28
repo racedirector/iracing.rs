@@ -30,7 +30,8 @@ source or runtime:
 
 - fixed-layout `Header`, `DiskSubHeader`, `VariableBuffer`, and
   `VariableHeader` structures;
-- intrinsic fixed-size wire decoding through `WireType`;
+- intrinsic fixed-size wire decoding through the wire types' `try_from_bytes`
+  methods;
 - `VariableType`, constants, enum discriminants, flags, packed fields, and
   broadcast command values;
 - optional schema metadata for those primitive definitions.

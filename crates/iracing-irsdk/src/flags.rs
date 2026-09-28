@@ -2,15 +2,143 @@
 //!
 //! Composite-mask predicates use `has_any_*` when one matching bit is
 //! sufficient. Predicates without `any` require the complete state described
-//! by their name. At the structural level, [`EngineWarnings::has_any`] and the
-//! corresponding methods on each bitmask test for any matching bit, while
-//! `has_all` tests for every bit in a mask.
+//! by their name. Use `intersects` for any matching bit and `contains` for
+//! every bit in a mask.
 
-use super::macros::sdk_bitmask;
+use bitflags::bitflags;
+
 use crate::{Result, parse_utils::read_wire_bytes};
-use type_layout::TypeLayout;
 
 /// `irsdk_StatusField`, stored in `irsdk_header::status` as an `int`.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    serde::Deserialize,
+    serde::Serialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
+#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
+pub struct StatusField(i32);
+
+impl type_layout::TypeLayout for StatusField {
+    fn type_layout() -> type_layout::TypeLayoutInfo {
+        type_layout::TypeLayoutInfo {
+            name: "StatusField".into(),
+            size: std::mem::size_of::<Self>(),
+            alignment: std::mem::align_of::<Self>(),
+            fields: vec![type_layout::Field::Field {
+                name: "bits".into(),
+                ty: "i32".into(),
+                size: std::mem::size_of::<i32>(),
+            }],
+        }
+    }
+}
+
+bitflags! {
+    impl StatusField: i32 {
+        /// `irsdk_stConnected`.
+        const CONNECTED = 1;
+        // The source may set any bits.
+        const _ = !0;
+    }
+}
+
+impl StatusField {
+    /// Decodes one SDK status field from its exact wire representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::WireSize`] if `bytes` has the wrong length.
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
+        read_wire_bytes(bytes)
+    }
+
+    /// Helper indicating if the status field indicates "connected"
+    pub fn is_connected(self) -> bool {
+        self.contains(Self::CONNECTED)
+    }
+}
+
+/// `irsdk_EngineWarnings`.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Deserialize,
+    serde::Serialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
+pub struct EngineWarnings(u32);
+
+bitflags! {
+    impl EngineWarnings: u32 {
+        /// Water temperature warning
+        const WATER_TEMP_WARNING = 0x0001;
+        /// Fuel pressure warning
+        const FUEL_PRESSURE_WARNING = 0x0002;
+        /// Oil pressure warning
+        const OIL_PRESSURE_WARNING = 0x0004;
+
+        /// Engine stalled
+        const ENGINE_STALLED = 0x0008;
+
+        /// Pit speed limiter engaged
+        const PIT_SPEED_LIMITER = 0x0010;
+
+        /// Rev limiter engaged
+        const REV_LIMITER_ACTIVE = 0x0020;
+
+        /// Oil temperature warning
+        const OIL_TEMP_WARNING = 0x0040;
+
+        /// Engine has mandatory repairs
+        const MANDATORY_REPAIR_NEEDED = 0x0080;
+        /// Engine has optional repairs
+        const OPTIONAL_REPAIR_NEEDED = 0x0100;
+
+        const _ = !0;
+
+    }
+}
+
+impl EngineWarnings {
+    /// Either repair warning.
+    pub const REPAIR_WARNINGS: Self =
+        Self::MANDATORY_REPAIR_NEEDED.union(Self::OPTIONAL_REPAIR_NEEDED);
+    /// Returns whether either repair warning is set.
+    pub const fn has_any_repair_warning(self) -> bool {
+        self.intersects(Self::REPAIR_WARNINGS)
+    }
+
+    /// Returns whether the mandatory-repair warning is set.
+    pub const fn has_mandatory_repair_warning(self) -> bool {
+        self.contains(Self::MANDATORY_REPAIR_NEEDED)
+    }
+
+    /// Returns whether the optional-repair warning is set.
+    pub const fn has_optional_repair_warning(self) -> bool {
+        self.contains(Self::OPTIONAL_REPAIR_NEEDED)
+    }
+}
+
+/// `irsdk_Flags`.
 #[repr(transparent)]
 #[derive(
     Debug,
@@ -20,7 +148,6 @@ use type_layout::TypeLayout;
     PartialEq,
     Eq,
     Hash,
-    TypeLayout,
     serde::Serialize,
     serde::Deserialize,
     zerocopy::FromBytes,
@@ -28,118 +155,64 @@ use type_layout::TypeLayout;
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
-#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
-pub struct StatusField {
-    bits: i32,
-}
+pub struct SessionFlags(u32);
 
-impl StatusField {
-    /// `irsdk_stConnected`.
-    pub const CONNECTED: Self = Self { bits: 1 };
-
-    /// Decodes one SDK status field from its exact wire representation.
-    ///
-    /// Unknown status bits are preserved.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::WireSize`] when `bytes` is not exactly the size
-    /// of a status field.
-    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
-        read_wire_bytes(bytes)
-    }
-
-    /// Represents the disconnected/empty state.
-    pub const fn empty() -> Self {
-        Self::from_bits(0)
-    }
-
-    /// Constructs the status field without discarding unknown bits.
-    pub const fn from_bits(bits: i32) -> Self {
-        Self { bits }
-    }
-
-    /// Returns the complete underlying SDK bit pattern.
-    pub const fn bits(self) -> i32 {
-        self.bits
-    }
-
-    /// Returns whether all bits in `other` are set.
-    pub const fn contains(self, other: Self) -> bool {
-        self.bits & other.bits == other.bits
-    }
-
-    /// Returns whether the SDK's connected status bit is set.
-    pub fn is_connected(self) -> bool {
-        self.contains(Self::CONNECTED)
-    }
-}
-
-sdk_bitmask! {
-    /// `irsdk_EngineWarnings`.
-    pub struct EngineWarnings {
-        WATER_TEMP_WARNING = 0x0001,
-        FUEL_PRESSURE_WARNING = 0x0002,
-        OIL_PRESSURE_WARNING = 0x0004,
-        ENGINE_STALLED = 0x0008,
-        PIT_SPEED_LIMITER = 0x0010,
-        REV_LIMITER_ACTIVE = 0x0020,
-        OIL_TEMP_WARNING = 0x0040,
-        MANDATORY_REPAIR_NEEDED = 0x0080,
-        OPTIONAL_REPAIR_NEEDED = 0x0100,
-    }
-}
-
-impl EngineWarnings {
-    /// Repair warnings from the engine bitfield.
-    pub const REPAIR_WARNINGS: Self =
-        Self::MANDATORY_REPAIR_NEEDED.union(Self::OPTIONAL_REPAIR_NEEDED);
-
-    /// Returns whether either repair warning is set.
-    pub const fn has_any_repair_warning(self) -> bool {
-        self.has_any(Self::REPAIR_WARNINGS)
-    }
-
-    /// Returns whether the mandatory-repair warning is set.
-    pub const fn has_mandatory_repair_warning(self) -> bool {
-        self.has_all(Self::MANDATORY_REPAIR_NEEDED)
-    }
-
-    /// Returns whether the optional-repair warning is set.
-    pub const fn has_optional_repair_warning(self) -> bool {
-        self.has_all(Self::OPTIONAL_REPAIR_NEEDED)
-    }
-}
-
-sdk_bitmask! {
-    /// `irsdk_Flags`.
-    pub struct SessionFlags {
-        CHECKERED = 0x0000_0001,
-        WHITE = 0x0000_0002,
-        GREEN = 0x0000_0004,
-        YELLOW = 0x0000_0008,
-        RED = 0x0000_0010,
-        BLUE = 0x0000_0020,
-        DEBRIS = 0x0000_0040,
-        CROSSED = 0x0000_0080,
-        YELLOW_WAVING = 0x0000_0100,
-        ONE_LAP_TO_GREEN = 0x0000_0200,
-        GREEN_HELD = 0x0000_0400,
-        TEN_TO_GO = 0x0000_0800,
-        FIVE_TO_GO = 0x0000_1000,
-        RANDOM_WAVING = 0x0000_2000,
-        CAUTION = 0x0000_4000,
-        CAUTION_WAVING = 0x0000_8000,
-        BLACK = 0x0001_0000,
-        DISQUALIFY = 0x0002_0000,
-        SERVICE_ALLOWED = 0x0004_0000,
-        FURLED = 0x0008_0000,
-        REPAIR = 0x0010_0000,
-        DISQUALIFICATION_SCORING_INVALID = 0x0020_0000,
-        START_HIDDEN = 0x1000_0000,
-        START_READY = 0x2000_0000,
-        START_SET = 0x4000_0000,
-        START_GO = 0x8000_0000,
+bitflags! {
+    impl SessionFlags: u32 {
+        /// SDK mask `CHECKERED`.
+        const CHECKERED = 0x0000_0001;
+        /// SDK mask `WHITE`.
+        const WHITE = 0x0000_0002;
+        /// SDK mask `GREEN`.
+        const GREEN = 0x0000_0004;
+        /// SDK mask `YELLOW`.
+        const YELLOW = 0x0000_0008;
+        /// SDK mask `RED`.
+        const RED = 0x0000_0010;
+        /// SDK mask `BLUE`.
+        const BLUE = 0x0000_0020;
+        /// SDK mask `DEBRIS`.
+        const DEBRIS = 0x0000_0040;
+        /// SDK mask `CROSSED`.
+        const CROSSED = 0x0000_0080;
+        /// SDK mask `YELLOW_WAVING`.
+        const YELLOW_WAVING = 0x0000_0100;
+        /// SDK mask `ONE_LAP_TO_GREEN`.
+        const ONE_LAP_TO_GREEN = 0x0000_0200;
+        /// SDK mask `GREEN_HELD`.
+        const GREEN_HELD = 0x0000_0400;
+        /// SDK mask `TEN_TO_GO`.
+        const TEN_TO_GO = 0x0000_0800;
+        /// SDK mask `FIVE_TO_GO`.
+        const FIVE_TO_GO = 0x0000_1000;
+        /// SDK mask `RANDOM_WAVING`.
+        const RANDOM_WAVING = 0x0000_2000;
+        /// SDK mask `CAUTION`.
+        const CAUTION = 0x0000_4000;
+        /// SDK mask `CAUTION_WAVING`.
+        const CAUTION_WAVING = 0x0000_8000;
+        /// SDK mask `BLACK`.
+        const BLACK = 0x0001_0000;
+        /// SDK mask `DISQUALIFY`.
+        const DISQUALIFY = 0x0002_0000;
+        /// SDK mask `SERVICE_ALLOWED`.
+        const SERVICE_ALLOWED = 0x0004_0000;
+        /// SDK mask `FURLED`.
+        const FURLED = 0x0008_0000;
+        /// SDK mask `REPAIR`.
+        const REPAIR = 0x0010_0000;
+        /// SDK mask `DISQUALIFICATION_SCORING_INVALID`.
+        const DISQUALIFICATION_SCORING_INVALID = 0x0020_0000;
+        /// SDK mask `START_HIDDEN`.
+        const START_HIDDEN = 0x1000_0000;
+        /// SDK mask `START_READY`.
+        const START_READY = 0x2000_0000;
+        /// SDK mask `START_SET`.
+        const START_SET = 0x4000_0000;
+        /// SDK mask `START_GO`.
+        const START_GO = 0x8000_0000;
+        // Keep future SDK bits when decoding recorded or live values.
+        const _ = !0;
     }
 }
 
@@ -195,55 +268,109 @@ impl SessionFlags {
 
     /// Returns whether any visible start-control flag is set.
     pub const fn has_any_start_control(self) -> bool {
-        self.has_any(Self::START_CONTROL_FLAGS)
+        self.intersects(Self::START_CONTROL_FLAGS)
     }
 
     /// Returns whether either caution flag is set.
     pub const fn has_any_caution(self) -> bool {
-        self.has_any(Self::CAUTION_FLAGS)
+        self.intersects(Self::CAUTION_FLAGS)
     }
 
     /// Returns whether either yellow flag is set.
     pub const fn has_any_yellow(self) -> bool {
-        self.has_any(Self::YELLOW_FLAGS)
+        self.intersects(Self::YELLOW_FLAGS)
     }
 
     /// Returns whether any penalty flag is set.
     pub const fn has_any_penalty(self) -> bool {
-        self.has_any(Self::PENALTY_FLAGS)
+        self.intersects(Self::PENALTY_FLAGS)
     }
 
     /// Returns whether disqualification has invalidated scoring.
     pub const fn has_disqualification_scoring_invalid(self) -> bool {
-        self.has_all(Self::DISQUALIFICATION_SCORING_INVALID)
+        self.contains(Self::DISQUALIFICATION_SCORING_INVALID)
     }
 }
 
-sdk_bitmask! {
-    /// `irsdk_CameraState`.
-    pub struct CameraState {
-        IS_SESSION_SCREEN = 0x0001,
-        IS_SCENIC_ACTIVE = 0x0002,
-        CAMERA_TOOL_ACTIVE = 0x0004,
-        USER_INTERFACE_HIDDEN = 0x0008,
-        USE_AUTO_SHOT_SELECTION = 0x0010,
-        USE_TEMPORARY_EDITS = 0x0020,
-        USE_KEY_ACCELERATION = 0x0040,
-        USE_KEY_TEN_TIMES_ACCELERATION = 0x0080,
-        USE_MOUSE_AIM_MODE = 0x0100,
+/// `irsdk_CameraState`.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
+pub struct CameraState(u32);
+
+bitflags! {
+    impl CameraState: u32 {
+        /// SDK mask `IS_SESSION_SCREEN`.
+        const IS_SESSION_SCREEN = 0x0001;
+        /// SDK mask `IS_SCENIC_ACTIVE`.
+        const IS_SCENIC_ACTIVE = 0x0002;
+        /// SDK mask `CAMERA_TOOL_ACTIVE`.
+        const CAMERA_TOOL_ACTIVE = 0x0004;
+        /// SDK mask `USER_INTERFACE_HIDDEN`.
+        const USER_INTERFACE_HIDDEN = 0x0008;
+        /// SDK mask `USE_AUTO_SHOT_SELECTION`.
+        const USE_AUTO_SHOT_SELECTION = 0x0010;
+        /// SDK mask `USE_TEMPORARY_EDITS`.
+        const USE_TEMPORARY_EDITS = 0x0020;
+        /// SDK mask `USE_KEY_ACCELERATION`.
+        const USE_KEY_ACCELERATION = 0x0040;
+        /// SDK mask `USE_KEY_TEN_TIMES_ACCELERATION`.
+        const USE_KEY_TEN_TIMES_ACCELERATION = 0x0080;
+        /// SDK mask `USE_MOUSE_AIM_MODE`.
+        const USE_MOUSE_AIM_MODE = 0x0100;
+        const _ = !0;
     }
 }
 
-sdk_bitmask! {
-    /// `irsdk_PitSvFlags`.
-    pub struct PitServiceFlags {
-        LEFT_FRONT_TIRE_CHANGE = 0x0001,
-        RIGHT_FRONT_TIRE_CHANGE = 0x0002,
-        LEFT_REAR_TIRE_CHANGE = 0x0004,
-        RIGHT_REAR_TIRE_CHANGE = 0x0008,
-        FUEL_FILL = 0x0010,
-        WINDSHIELD_TEAROFF = 0x0020,
-        FAST_REPAIR = 0x0040,
+/// `irsdk_PitSvFlags`.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
+pub struct PitServiceFlags(u32);
+
+bitflags! {
+    impl PitServiceFlags: u32 {
+        /// SDK mask `LEFT_FRONT_TIRE_CHANGE`.
+        const LEFT_FRONT_TIRE_CHANGE = 0x0001;
+        /// SDK mask `RIGHT_FRONT_TIRE_CHANGE`.
+        const RIGHT_FRONT_TIRE_CHANGE = 0x0002;
+        /// SDK mask `LEFT_REAR_TIRE_CHANGE`.
+        const LEFT_REAR_TIRE_CHANGE = 0x0004;
+        /// SDK mask `RIGHT_REAR_TIRE_CHANGE`.
+        const RIGHT_REAR_TIRE_CHANGE = 0x0008;
+        /// SDK mask `FUEL_FILL`.
+        const FUEL_FILL = 0x0010;
+        /// SDK mask `WINDSHIELD_TEAROFF`.
+        const WINDSHIELD_TEAROFF = 0x0020;
+        /// SDK mask `FAST_REPAIR`.
+        const FAST_REPAIR = 0x0040;
+        const _ = !0;
     }
 }
 
@@ -277,53 +404,160 @@ impl PitServiceFlags {
 
     /// Returns whether any tire-change service is requested.
     pub const fn has_any_tire_service(self) -> bool {
-        self.has_any(Self::TIRE_SERVICE_FLAGS)
+        self.intersects(Self::TIRE_SERVICE_FLAGS)
     }
 
     /// Returns whether either front tire change is requested.
     pub const fn has_any_front_tire_service(self) -> bool {
-        self.has_any(Self::FRONT_TIRE_SERVICE_FLAGS)
+        self.intersects(Self::FRONT_TIRE_SERVICE_FLAGS)
     }
 
     /// Returns whether either rear tire change is requested.
     pub const fn has_any_rear_tire_service(self) -> bool {
-        self.has_any(Self::REAR_TIRE_SERVICE_FLAGS)
+        self.intersects(Self::REAR_TIRE_SERVICE_FLAGS)
     }
 
     /// Returns whether either left-side tire change is requested.
     pub const fn has_any_left_side_tire_service(self) -> bool {
-        self.has_any(Self::LEFT_SIDE_TIRE_SERVICE_FLAGS)
+        self.intersects(Self::LEFT_SIDE_TIRE_SERVICE_FLAGS)
     }
 
     /// Returns whether either right-side tire change is requested.
     pub const fn has_any_right_side_tire_service(self) -> bool {
-        self.has_any(Self::RIGHT_SIDE_TIRE_SERVICE_FLAGS)
+        self.intersects(Self::RIGHT_SIDE_TIRE_SERVICE_FLAGS)
     }
 
     /// Returns whether all four tires, fuel, and a tearoff are requested.
     pub const fn has_full_service(self) -> bool {
-        self.has_all(Self::FULL_SERVICE_FLAGS)
+        self.contains(Self::FULL_SERVICE_FLAGS)
     }
 
     /// Returns whether any tire, fuel, or windshield-tearoff service is requested.
     pub const fn has_any_service(self) -> bool {
-        self.has_any(Self::FULL_SERVICE_FLAGS)
+        self.intersects(Self::FULL_SERVICE_FLAGS)
     }
 }
 
-sdk_bitmask! {
-    /// `irsdk_PaceFlags`.
-    pub struct PaceFlags {
-        END_OF_LINE = 0x0001,
-        FREE_PASS = 0x0002,
-        WAVED_AROUND = 0x0004,
+/// `irsdk_PaceFlags`.
+#[repr(transparent)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
+)]
+pub struct PaceFlags(u32);
+
+bitflags! {
+    impl PaceFlags: u32 {
+        /// SDK mask `END_OF_LINE`.
+        const END_OF_LINE = 0x0001;
+        /// SDK mask `FREE_PASS`.
+        const FREE_PASS = 0x0002;
+        /// SDK mask `WAVED_AROUND`.
+        const WAVED_AROUND = 0x0004;
+        const _ = !0;
     }
 }
+
+// Numeric SDK fields and the generic telemetry BitField retain all source bits.
+macro_rules! impl_flag_interop {
+    ($($name:ident),+ $(,)?) => {
+        $(
+            impl From<u32> for $name {
+                fn from(bits: u32) -> Self {
+                    Self::from_bits_retain(bits)
+                }
+            }
+
+            impl From<$name> for u32 {
+                fn from(flags: $name) -> Self {
+                    flags.bits()
+                }
+            }
+
+            impl From<crate::BitField> for $name {
+                fn from(field: crate::BitField) -> Self {
+                    Self::from_bits_retain(field.value())
+                }
+            }
+
+            impl From<$name> for crate::BitField {
+                fn from(flags: $name) -> Self {
+                    Self::new(flags.bits())
+                }
+            }
+
+            #[cfg(feature = "codegen")]
+            impl schemars::JsonSchema for $name {
+                fn schema_name() -> std::borrow::Cow<'static, str> {
+                    stringify!($name).into()
+                }
+
+                fn schema_id() -> std::borrow::Cow<'static, str> {
+                    concat!(module_path!(), "::", stringify!($name)).into()
+                }
+
+                fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                    #[allow(dead_code)]
+                    #[derive(schemars::JsonSchema)]
+                    struct SchemaRepresentation(u32);
+
+                    let mut schema = <SchemaRepresentation as schemars::JsonSchema>::json_schema(generator);
+                    let schema_object = schema.ensure_object();
+                    let named_flags = <$name as bitflags::Flags>::FLAGS
+                        .iter()
+                        .filter(|flag| flag.is_named());
+                    let values: Vec<_> = named_flags
+                        .map(|flag| (flag.name(), i64::from(flag.value().bits())))
+                        .collect();
+                    let known_mask = values.iter().fold(0u32, |mask, (_, bits)| mask | *bits as u32);
+                    schema_object.insert("x-irsdk-kind".into(), "bitflags".into());
+                    schema_object.insert(
+                        "x-irsdk-values".into(),
+                        crate::codegen::named_schema_values(&values),
+                    );
+                    schema_object.insert("x-irsdk-known-mask".into(), (known_mask as u64).into());
+                    schema
+                }
+            }
+        )+
+    };
+}
+
+impl_flag_interop!(
+    EngineWarnings,
+    SessionFlags,
+    CameraState,
+    PitServiceFlags,
+    PaceFlags
+);
 
 /// `irsdk_IncidentFlags` is two packed fields, not a set of independent flags.
 #[repr(transparent)]
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    zerocopy::FromBytes,
+    zerocopy::IntoBytes,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 pub struct IncidentFlags(u32);
 
@@ -576,11 +810,27 @@ impl schemars::JsonSchema for IncidentFlags {
 mod tests {
     use super::*;
     use crate::BitField;
-    use zerocopy::IntoBytes;
+    use zerocopy::{FromBytes, Immutable, IntoBytes};
+
+    #[test]
+    fn u32_flags_round_trip_unknown_bits() {
+        fn round_trip<T: FromBytes + IntoBytes + Immutable + PartialEq + std::fmt::Debug>(
+            value: T,
+        ) {
+            assert_eq!(T::read_from_bytes(value.as_bytes()).unwrap(), value);
+        }
+
+        const RAW: u32 = 0x8000_0408;
+        round_trip(SessionFlags::from_bits_retain(RAW));
+        round_trip(CameraState::from_bits_retain(RAW));
+        round_trip(PitServiceFlags::from_bits_retain(RAW));
+        round_trip(PaceFlags::from_bits_retain(RAW));
+        round_trip(IncidentFlags::from_bits_retain(RAW));
+    }
 
     #[test]
     fn status_field_decodes_exact_wire_bytes() {
-        let status = StatusField::from_bits(StatusField::CONNECTED.bits() | 0x4000_0000);
+        let status = StatusField::from_bits(StatusField::CONNECTED.bits() | 0x4000_0000).unwrap();
         let decoded = StatusField::try_from_bytes(status.as_bytes()).unwrap();
 
         assert_eq!(decoded, status);
@@ -594,7 +844,32 @@ mod tests {
     }
 
     #[test]
-    fn bitmask_macro_provides_the_existing_structural_api() {
+    fn status_field_handles_unknown_wire_bytes() {
+        let status = StatusField::from_bits_retain(0x4000_0002);
+        assert_eq!(
+            StatusField::try_from_bytes(status.as_bytes()).unwrap(),
+            status
+        );
+        assert_eq!(status.bits(), 0x4000_0002);
+    }
+
+    #[test]
+    fn status_field_is_connected_helper() {
+        let connected = StatusField::CONNECTED;
+        assert!(connected.is_connected());
+
+        let not_connected = StatusField::from_bits_retain(2);
+        assert!(!not_connected.is_connected());
+
+        let empty = StatusField::empty();
+        assert!(!empty.is_connected());
+
+        let connected_with_unknown_bits = StatusField::from_bits_retain(3);
+        assert!(connected_with_unknown_bits.is_connected());
+    }
+
+    #[test]
+    fn bitflags_preserve_bits_and_iterate_names() {
         let flags = SessionFlags::empty()
             .union(SessionFlags::GREEN)
             .union(SessionFlags::YELLOW);
@@ -607,12 +882,14 @@ mod tests {
             SessionFlags::from_bits_retain(flags.bits() | 0x0800_0000).bits(),
             flags.bits() | 0x0800_0000
         );
-        assert_eq!(flags.names(), vec!["GREEN", "YELLOW"]);
-        assert!(SessionFlags::DEFINITIONS.contains(&(SessionFlags::GREEN, "GREEN")));
+        assert_eq!(
+            flags.iter_names().map(|(name, _)| name).collect::<Vec<_>>(),
+            vec!["GREEN", "YELLOW"]
+        );
     }
 
     #[test]
-    fn bitmask_macro_provides_numeric_conversions() {
+    fn bitflags_provide_numeric_conversions() {
         let flags = SessionFlags::from(SessionFlags::GREEN.bits());
         let bitfield = BitField::from(flags);
         assert_eq!(bitfield.value(), SessionFlags::GREEN.bits());
@@ -622,20 +899,37 @@ mod tests {
 
     #[cfg(feature = "codegen")]
     #[test]
-    fn bitmask_macro_provides_schema_metadata() {
-        assert!(SessionFlags::SCHEMA_VALUES.contains(&("GREEN", 0x0000_0004)));
-        assert_eq!(
-            SessionFlags::SCHEMA_KNOWN_MASK & SessionFlags::GREEN.bits(),
-            SessionFlags::GREEN.bits()
+    fn bitflags_provide_schema_metadata() {
+        let schema = schemars::schema_for!(SessionFlags);
+        let object = schema.as_value().as_object().unwrap();
+        assert_eq!(object["x-irsdk-kind"], "bitflags");
+        assert!(
+            object["x-irsdk-values"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|flag| flag["name"] == "GREEN" && flag["value"] == 4)
         );
-        let _ = schemars::schema_for!(SessionFlags);
+        assert_eq!(
+            object["x-irsdk-known-mask"].as_u64().unwrap() & u64::from(SessionFlags::GREEN.bits()),
+            u64::from(SessionFlags::GREEN.bits())
+        );
     }
 
     #[test]
     fn masks_preserve_unknown_bits() {
-        let flags = SessionFlags::from_bits(SessionFlags::GREEN.bits() | 0x0800_0000);
+        let raw = SessionFlags::GREEN.bits() | 0x0800_0000;
+        let flags = SessionFlags::from_bits(raw).unwrap();
         assert!(flags.contains(SessionFlags::GREEN));
-        assert_eq!(flags.bits(), 0x0800_0004);
+        assert_eq!(flags.bits(), raw);
+        assert_eq!(serde_json::to_string(&flags).unwrap(), raw.to_string());
+        assert_eq!(
+            serde_json::from_str::<SessionFlags>(&raw.to_string()).unwrap(),
+            flags
+        );
+
+        let warnings = EngineWarnings::from_bits(0x8000_0000).unwrap();
+        assert_eq!(warnings.bits(), 0x8000_0000);
     }
 
     #[test]

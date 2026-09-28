@@ -153,7 +153,6 @@ impl From<iracing_irsdk::Error> for IRacingSDKError {
                 Self::WireSize { expected, actual }
             }
             iracing_irsdk::Error::InvalidWireValue { target } => Self::InvalidWireValue { target },
-            iracing_irsdk::Error::Version { expected, found } => Self::Version { expected, found },
             iracing_irsdk::Error::Parse { context, details } => Self::Parse { context, details },
             iracing_irsdk::Error::InvalidConfiguration { field, reason } => {
                 Self::InvalidConfiguration { field, reason }
