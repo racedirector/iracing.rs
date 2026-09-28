@@ -12,6 +12,7 @@ autobins = false
 
 [package.metadata.dist]
 dist = true
+features = ["codegen", "schema-discovery"]
 
 [package.metadata.dist.bin.broadcast]
 targets = ["x86_64-pc-windows-msvc"]
