@@ -197,15 +197,15 @@ impl FrameAdapter for Row {
   - Live snapshot (Windows only): `cargo session snapshot live --output ./live-session.yaml`
   - All subcommands default to YAML on stdout. Use `--output -` for explicit stdout, `--output <file>` for a file, or `--encoding json` / `--encoding json-pretty` for JSON. Diagnostics go to stderr.
 - `ibt-json-snapshot`:
-  - `cargo run -p iracing-sdk --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
+  - `cargo run -p iracing-sdk-cli --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
 - `ibt-to-json`:
-  - `cargo run -p iracing-sdk --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
+  - `cargo run -p iracing-sdk-cli --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
 - `live-to-csv` (Windows only):
-  - `cargo run -p iracing-sdk --bin live-to-csv -- --output-path .\\live.csv`
+  - `cargo run -p iracing-sdk-cli --bin live-to-csv -- --output-path .\\live.csv`
 - `live-json-snapshot` (Windows only):
-  - `cargo run -p iracing-sdk --bin live-json-snapshot -- --output-path .\\live-snapshot.jsonl`
+  - `cargo run -p iracing-sdk-cli --bin live-json-snapshot -- --output-path .\\live-snapshot.jsonl`
 - `live-to-jsonl` (Windows only):
-  - `cargo run -p iracing-sdk --bin live-to-jsonl -- --output-path .\\live.jsonl`
+  - `cargo run -p iracing-sdk-cli --bin live-to-jsonl -- --output-path .\\live.jsonl`
 
 ## Troubleshooting
 

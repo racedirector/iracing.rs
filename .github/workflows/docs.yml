@@ -31,6 +31,7 @@ jobs:
             iracing_sdk:
               - 'crates/iracing-irsdk/**'
               - 'crates/iracing-sdk/**'
+              - 'crates/iracing-sdk-cli/**'
               - 'crates/iracing-sdk-derive/**'
               - '.github/workflows/docs.yml'
 
@@ -110,8 +111,11 @@ jobs:
           path: target/doc
           if-no-files-found: error
 
-      - name: Check examples and binaries
-        run: cargo check -p iracing-sdk --examples --bins
+      - name: Check SDK examples
+        run: cargo check -p iracing-sdk --examples
+
+      - name: Check CLI binaries
+        run: cargo check -p iracing-sdk-cli --bins --all-features
 
   iracing-sdk-derive-docs:
     name: iracing-sdk-derive docs (${{ matrix.os }})

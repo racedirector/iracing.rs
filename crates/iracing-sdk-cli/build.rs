@@ -13,6 +13,6 @@ fn main() {
         .to_str()
         .expect("manifest path must be valid UTF-8 for linker args");
 
-    println!("cargo:rustc-link-arg-examples=/MANIFEST:EMBED");
-    println!("cargo:rustc-link-arg-examples=/MANIFESTINPUT:{manifest}");
+    println!("cargo:rustc-link-arg-bins=/MANIFEST:EMBED");
+    println!("cargo:rustc-link-arg-bins=/MANIFESTINPUT:{manifest}");
 }

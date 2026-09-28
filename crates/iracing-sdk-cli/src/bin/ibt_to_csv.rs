@@ -27,7 +27,7 @@
 //! Parse an `.ibt` file and write CSV:
 //!
 //! ```bash
-//! cargo run -p iracing-sdk --bin ibt_to_csv -- \
+//! cargo run -p iracing-sdk-cli --bin ibt-to-csv -- \
 //!   --ibt-path "C:\path\to\telemetry.ibt" \
 //!   --output-path "C:\path\to\telemetry.csv"
 //! ```
@@ -35,7 +35,7 @@
 //! Reduce log noise:
 //!
 //! ```bash
-//! RUST_LOG=info cargo run -p iracing-sdk --bin ibt_to_csv -- \
+//! RUST_LOG=info cargo run -p iracing-sdk-cli --bin ibt-to-csv -- \
 //!   -i "./telemetry.ibt" \
 //!   -o "./telemetry.csv"
 //! ```

@@ -1101,6 +1101,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "iracing-sdk-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "csv",
+ "futures",
+ "iracing-sdk",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "type-layout",
+]
+
+[[package]]
 name = "iracing-sdk-derive"
 version = "0.1.0"
 dependencies = [

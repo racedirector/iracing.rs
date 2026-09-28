@@ -1,7 +1,7 @@
 [alias]
 test-fixtures = ["run", "-p", "test-fixtures", "--"]
 
-broadcast = ["run", "-p", "iracing-sdk", "--bin", "broadcast", "--"]
+broadcast = ["run", "-p", "iracing-sdk-cli", "--bin", "broadcast", "--"]
 
 ibt-read-frame = [
   "run",
@@ -20,7 +20,7 @@ enum-bitfields-ibt = ["run", "-p", "iracing-sdk", "--example", "enum-bitfields-i
 car-setup-schema = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",
@@ -31,7 +31,7 @@ car-setup-schema = [
 disk-variable-schema = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",
@@ -39,25 +39,25 @@ disk-variable-schema = [
   "--",
 ]
 
-headers = ["run", "-p", "iracing-sdk", "--bin", "headers", "--"]
+headers = ["run", "-p", "iracing-sdk-cli", "--bin", "headers", "--"]
 
-ibt-to-csv = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-csv", "--"]
+ibt-to-csv = ["run", "-p", "iracing-sdk-cli", "--bin", "ibt-to-csv", "--"]
 
 ibt-json-snapshot = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--bin",
   "ibt-json-snapshot",
   "--",
 ]
 
-ibt-to-json = ["run", "-p", "iracing-sdk", "--bin", "ibt-to-json", "--"]
+ibt-to-json = ["run", "-p", "iracing-sdk-cli", "--bin", "ibt-to-json", "--"]
 
 primitives-schema = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",
@@ -65,23 +65,23 @@ primitives-schema = [
   "--",
 ]
 
-live-to-csv = ["run", "-p", "iracing-sdk", "--bin", "live-to-csv", "--"]
+live-to-csv = ["run", "-p", "iracing-sdk-cli", "--bin", "live-to-csv", "--"]
 
 live-json-snapshot = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--bin",
   "live-json-snapshot",
   "--",
 ]
 
-live-to-jsonl = ["run", "-p", "iracing-sdk", "--bin", "live-to-jsonl", "--"]
+live-to-jsonl = ["run", "-p", "iracing-sdk-cli", "--bin", "live-to-jsonl", "--"]
 
 live-variable-schema = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",
@@ -92,7 +92,7 @@ live-variable-schema = [
 session = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",
@@ -112,7 +112,7 @@ session-updates = [
 variable-schema = [
   "run",
   "-p",
-  "iracing-sdk",
+  "iracing-sdk-cli",
   "--features",
   "codegen,schema-discovery",
   "--bin",

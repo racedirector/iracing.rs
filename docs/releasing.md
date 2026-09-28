@@ -4,8 +4,7 @@ This repository uses standalone `dist` (not `cargo dist`) to publish binaries to
 
 ## What Gets Released
 
-- Package: `iracing-sdk`
-- Package: `iracing-sdk-codegen`
+- Package: `iracing-sdk-cli`
 - Targets:
   - `x86_64-unknown-linux-gnu`
   - `x86_64-pc-windows-msvc`
@@ -24,8 +23,7 @@ This repository uses standalone `dist` (not `cargo dist`) to publish binaries to
 Run from repository root:
 
 ```bash
-cargo check -p iracing-sdk --bins
-cargo check -p iracing-sdk-codegen --bins
+cargo check -p iracing-sdk-cli --bins
 ```
 
 Validate release planning (same targets/installers used by CI):
@@ -49,7 +47,7 @@ dist generate --mode ci --check --allow-dirty
 
 ### 1. Bump versions
 
-Keep `iracing-sdk` and `iracing-sdk-codegen` in lockstep.
+Keep `iracing-sdk` and `iracing-sdk-cli` in lockstep.
 
 ### 2. Prerelease (recommended first)
 

@@ -10,8 +10,8 @@ on commands, boundaries, and easy-to-miss constraints.
 - `cargo test --workspace --all-targets` hits every crate; scope with `cargo test -p <crate>` or `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` when debugging.
 - `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. For intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings` are the formatting/lint gates.
-- For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p <crate> --examples --bins`.
-- Codegen binaries require `cargo build -p iracing-sdk --features codegen,schema-discovery` when you need schema outputs.
+- For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p iracing-sdk --examples` and `cargo check -p iracing-sdk-cli --bins --all-features`.
+- Codegen binaries require `cargo build -p iracing-sdk-cli --features codegen,schema-discovery` when you need schema outputs.
 
 ## Quality Gates
 
@@ -30,6 +30,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - `crates/iracing-irsdk`: dependency-light native SDK wire contract: fixed-layout headers, intrinsic byte decoding, constants, enums, flags, packed fields, and portable broadcast command values. Do not add IBT navigation, shared-memory access, schemas, session parsing, or runtime orchestration here.
 - `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
+- `crates/iracing-sdk-cli`: binary-only CLI and schema generator tools; its features forward to `iracing-sdk`.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
 - `crates/test-fixtures`: unpublished Rust generator, verifier, and drift checker for deterministic `.ibt` fixtures.
