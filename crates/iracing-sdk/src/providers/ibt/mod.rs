@@ -109,9 +109,11 @@ impl Provider for IbtProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::irsdk::{DiskSubHeader, Header};
     use crate::test_utils::{load_fixture_manifest, require_smallest_ibt_fixture};
     use futures::executor::block_on;
     use std::fs;
+    use std::mem::{offset_of, size_of};
 
     #[test]
     fn constructors_replay_equivalent_frames_and_schema_from_zero() -> anyhow::Result<()> {
@@ -197,6 +199,40 @@ mod tests {
         let reader = IbtReader::from_bytes(bytes)?;
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
         assert!(error.contains("beyond frame size"), "{error}");
+        Ok(())
+    }
+
+    #[test]
+    fn zero_frame_recording_without_variable_headers_has_empty_schema() -> anyhow::Result<()> {
+        let mut bytes = fs::read(require_smallest_ibt_fixture()?)?;
+        let reader = IbtReader::from_bytes(bytes.clone())?;
+        let metadata_end = reader
+            .layout()
+            .metadata()
+            .session_info()
+            .expect("fixture has session information")
+            .end();
+        let frame_size = reader.layout().frame_size();
+
+        bytes[offset_of!(Header, variable_count)..offset_of!(Header, variable_count) + 4]
+            .copy_from_slice(&0_i32.to_le_bytes());
+        let record_count_offset = size_of::<Header>() + offset_of!(DiskSubHeader, record_count);
+        bytes[record_count_offset..record_count_offset + 4].copy_from_slice(&0_i32.to_le_bytes());
+        bytes.truncate(metadata_end);
+
+        let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
+        assert_eq!(provider.reader.layout().frame_count(), 0);
+        assert!(
+            provider
+                .reader
+                .layout()
+                .metadata()
+                .variable_headers()
+                .is_none()
+        );
+        assert_eq!(provider.schema().variable_count(), 0);
+        assert_eq!(provider.schema().frame_size, frame_size);
+        assert!(block_on(provider.next_frame())?.is_none());
         Ok(())
     }
 }
