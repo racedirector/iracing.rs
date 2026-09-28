@@ -23,7 +23,7 @@ This repository uses standalone `dist` (not `cargo dist`) to publish binaries to
 Run from repository root:
 
 ```bash
-cargo check -p iracing-sdk-cli --bins
+cargo check -p iracing-sdk-cli --bins --all-features
 ```
 
 Validate release planning (same targets/installers used by CI):
