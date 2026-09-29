@@ -1,3 +1,4 @@
+#[cfg(windows)]
 mod broadcast;
 mod headers;
 mod session;
@@ -8,6 +9,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
+#[cfg(windows)]
 use broadcast::{Command as BroadcastCommand, handle_command as handle_broadcast_command};
 use headers::{Command as HeadersCommand, handle_command as handle_headers_command};
 use session::{Command as SessionCommand, handle_command as handle_session_command};
@@ -40,7 +42,7 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_writer(std::io::stderr)

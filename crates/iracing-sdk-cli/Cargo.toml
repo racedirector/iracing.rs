@@ -16,9 +16,6 @@ default-run = "iracing-sdk"
 dist = true
 features = ["codegen", "schema-discovery"]
 
-[package.metadata.dist.bin.broadcast]
-targets = ["x86_64-pc-windows-msvc"]
-
 [package.metadata.dist.bin.live_to_csv]
 targets = ["x86_64-pc-windows-msvc"]
 
@@ -105,11 +102,6 @@ path = "src/bin/live_json_snapshot.rs"
 [[bin]]
 name = "live-to-jsonl"
 path = "src/bin/live_to_jsonl.rs"
-
-[[bin]]
-name = "session"
-path = "src/bin/session.rs"
-required-features = ["codegen", "schema-discovery"]
 
 [[bin]]
 name = "variable-schema"

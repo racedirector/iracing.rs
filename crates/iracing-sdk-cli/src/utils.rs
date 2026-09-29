@@ -9,7 +9,7 @@ use anyhow::Result;
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
 
-use crate::types::{OutputEncoding, OutputTarget};
+use crate::types::{DocumentFormat, OutputTarget};
 
 #[cfg(windows)]
 pub(crate) fn get_connection() -> Result<WindowsConnection> {
@@ -50,7 +50,7 @@ pub(crate) fn get_disk_session_info(reader: &mut IbtReader) -> Result<SessionInf
 pub(super) fn write_to_output<T>(
     value: &T,
     target: &OutputTarget,
-    encoding: OutputEncoding,
+    encoding: DocumentFormat,
 ) -> Result<()>
 where
     T: ?Sized + serde::Serialize,
@@ -67,15 +67,15 @@ where
     }
 }
 
-fn write_to_writer<T, W>(value: &T, mut writer: W, encoding: OutputEncoding) -> Result<()>
+fn write_to_writer<T, W>(value: &T, mut writer: W, encoding: DocumentFormat) -> Result<()>
 where
     T: ?Sized + serde::Serialize,
     W: Write,
 {
     match encoding {
-        OutputEncoding::Yaml => serde_yaml_ng::to_writer(&mut writer, value)?,
-        OutputEncoding::Json => serde_json::to_writer(&mut writer, value)?,
-        OutputEncoding::JsonPretty => serde_json::to_writer_pretty(&mut writer, value)?,
+        DocumentFormat::Yaml => serde_yaml_ng::to_writer(&mut writer, value)?,
+        DocumentFormat::Json => serde_json::to_writer(&mut writer, value)?,
+        DocumentFormat::JsonPretty => serde_json::to_writer_pretty(&mut writer, value)?,
     }
     writer.flush()?;
     Ok(())

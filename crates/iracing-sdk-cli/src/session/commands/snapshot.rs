@@ -1,5 +1,5 @@
 use crate::{
-    types::{OutputEncoding, OutputTarget},
+    types::{DocumentFormat, OutputTarget},
     utils::{get_disk_reader, get_disk_session_info, write_to_output},
 };
 use anyhow::Result;
@@ -17,7 +17,7 @@ pub(crate) enum Command {
 
         /// The encoding for the session string.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: OutputEncoding,
+        encoding: DocumentFormat,
     },
     /// Captures the session string from the IBT file and outputs it to the destination in the requested format.
     Ibt {
@@ -31,7 +31,7 @@ pub(crate) enum Command {
 
         /// The encoding for the session string.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: OutputEncoding,
+        encoding: DocumentFormat,
     },
 }
 
@@ -44,7 +44,7 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
         } => {
             let mut reader = get_disk_reader(&path)?;
             let session_info = get_disk_session_info(&mut reader)?;
-            // let session_info = capture_disk_session_info(&path)?;
+
             write_to_output(&session_info, &output, encoding)?;
 
             tracing::info!(ibt_path=%path.display(), output=%output, encoding=%encoding, "Wrote disk session snapshot.");

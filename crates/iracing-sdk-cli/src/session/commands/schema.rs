@@ -1,7 +1,10 @@
-use crate::types::{OutputEncoding, OutputTarget};
+use crate::{
+    types::{DocumentFormat, OutputTarget},
+    utils::{get_disk_reader, get_disk_session_info, write_to_output},
+};
 use anyhow::Result;
 use clap::Subcommand;
-// use schemars::{schema_for, schema_for_value};
+use schemars::{schema_for, schema_for_value};
 use std::path::PathBuf;
 
 #[derive(Subcommand, Debug)]
@@ -16,7 +19,7 @@ pub(crate) enum Commands {
 
         /// The encoding for the JSON schema.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: OutputEncoding,
+        encoding: DocumentFormat,
     },
     /// Captures the session string from the IBT file and outputs JSON schema to `output`
     /// in the requested format.
@@ -31,7 +34,7 @@ pub(crate) enum Commands {
 
         /// The encoding for the JSON schema.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: OutputEncoding,
+        encoding: DocumentFormat,
     },
     /// Outputs a JSON schema of the underlying library type to the output in the requested format.
     Type {
@@ -41,7 +44,7 @@ pub(crate) enum Commands {
 
         /// The encoding for the JSON schema.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: OutputEncoding,
+        encoding: DocumentFormat,
     },
 }
 
@@ -52,21 +55,26 @@ pub(crate) fn handle_command(command: Commands) -> Result<()> {
             output,
             encoding,
         } => {
-            // let session_info = capture_disk_session_info(&path)?;
-            // let schema = schema_for_value!(session_info);
-            // write_to_output(&schema, &output, encoding)?;
+            let mut reader = get_disk_reader(&path)?;
+            let session_info = get_disk_session_info(&mut reader)?;
+            let schema = schema_for_value!(session_info);
+            write_to_output(&schema, &output, encoding)?;
             tracing::info!(output=%output, encoding=%encoding, ibt_path=%path.display(),"Wrote IBT session schema");
         }
         #[cfg(windows)]
         Commands::Live { output, encoding } => {
-            // let session_info = capture_live_session_info()?;
-            // let schema = schema_for_value!(session_info);
-            // write_to_output(&schema, &output, encoding)?;
+            use crate::utils::{get_connection, get_live_session_info};
+
+            let connection = get_connection()?;
+            let session_info = get_live_session_info(&connection)?;
+
+            let schema = schema_for_value!(session_info);
+            write_to_output(&schema, &output, encoding)?;
             tracing::info!(output=%output,encoding=%encoding,"Wrote live session schema");
         }
         Commands::Type { output, encoding } => {
-            // let schema = schema_for!(iracing_sdk::schema::SessionInfo);
-            // write_to_output(&schema, &output, encoding)?;
+            let schema = schema_for!(iracing_sdk::schema::SessionInfo);
+            write_to_output(&schema, &output, encoding)?;
             tracing::info!(output=%output,encoding=%encoding,"Wrote static session schema");
         }
     }

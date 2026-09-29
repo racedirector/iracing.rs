@@ -2,14 +2,15 @@ use std::{convert::Infallible, fmt, path::PathBuf, str::FromStr};
 
 use clap::ValueEnum;
 
+/// Represents possible output encodings for non-sequential data
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum OutputEncoding {
+pub(super) enum DocumentFormat {
     Json,
     JsonPretty,
     Yaml,
 }
 
-impl fmt::Display for OutputEncoding {
+impl fmt::Display for DocumentFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Json => f.write_str("json"),
@@ -19,6 +20,22 @@ impl fmt::Display for OutputEncoding {
     }
 }
 
+#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RecordStreamFormat {
+    Jsonl,
+    Csv,
+}
+
+impl fmt::Display for RecordStreamFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Jsonl => f.write_str("json-lines"),
+            Self::Csv => f.write_str("csv"),
+        }
+    }
+}
+
+/// Output targets for singular and sequential data.
 #[derive(Debug, Clone)]
 pub(super) enum OutputTarget {
     Stdout,

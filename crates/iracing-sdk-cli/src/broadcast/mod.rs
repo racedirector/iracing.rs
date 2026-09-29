@@ -269,7 +269,7 @@ impl From<ReplayStateArg> for ReplayStateMode {
 }
 
 pub(crate) fn handle_command(command: Command) -> Result<()> {
-    let client = Broadcast::new().expect("Could not create iRacing broadcast client");
+    let client = Broadcast::new()?;
 
     let messages = command_to_messages(command)?;
     for message in messages {
