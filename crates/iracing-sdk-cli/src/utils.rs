@@ -67,7 +67,11 @@ where
     }
 }
 
-fn write_to_writer<T, W>(value: &T, mut writer: W, encoding: DocumentFormat) -> Result<()>
+pub(crate) fn write_to_writer<T, W>(
+    value: &T,
+    mut writer: W,
+    encoding: DocumentFormat,
+) -> Result<()>
 where
     T: ?Sized + serde::Serialize,
     W: Write,
@@ -76,6 +80,13 @@ where
         DocumentFormat::Yaml => serde_yaml_ng::to_writer(&mut writer, value)?,
         DocumentFormat::Json => serde_json::to_writer(&mut writer, value)?,
         DocumentFormat::JsonPretty => serde_json::to_writer_pretty(&mut writer, value)?,
+        DocumentFormat::None => match serde_json::to_value(value)? {
+            serde_json::Value::String(text) => writeln!(writer, "{text}")?,
+            value => writeln!(writer, "{value}")?,
+        },
+    }
+    if matches!(encoding, DocumentFormat::Json | DocumentFormat::JsonPretty) {
+        writer.write_all(b"\n")?;
     }
     writer.flush()?;
     Ok(())

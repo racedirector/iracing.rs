@@ -8,6 +8,7 @@ pub(super) enum DocumentFormat {
     Json,
     JsonPretty,
     Yaml,
+    None,
 }
 
 impl fmt::Display for DocumentFormat {
@@ -16,6 +17,7 @@ impl fmt::Display for DocumentFormat {
             Self::Json => f.write_str("json"),
             Self::JsonPretty => f.write_str("json-pretty"),
             Self::Yaml => f.write_str("yaml"),
+            Self::None => f.write_str("none"),
         }
     }
 }

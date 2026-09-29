@@ -24,7 +24,10 @@ pub(crate) enum Command {
     #[cfg(windows)]
     Record,
     /// Snapshots a telemetry source
-    Snapshot,
+    Snapshot {
+        #[command(subcommand)]
+        command: SnapshotCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -61,8 +64,17 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             path,
             output,
             format,
-        } => bail!("convert not implemented"),
+        } => bail!(format!(
+            "convert not implemented: path = {}, output = {}, format = {}",
+            path.display(),
+            output,
+            format
+        )),
         Command::Record => bail!("record not implemented"),
-        Command::Snapshot => bail!("snapshot not implemented"),
+        Command::Snapshot { command } => handle_snapshot_command(command),
     }
+}
+
+fn handle_snapshot_command(command: SnapshotCommand) -> Result<()> {
+    bail!(format!("snapshot not implemented: {:#?}", command))
 }
