@@ -2,7 +2,10 @@ use anyhow::{Result, bail};
 use clap::Subcommand;
 use std::path::PathBuf;
 
-use crate::types::{DocumentFormat, OutputTarget};
+use crate::{
+    types::{DocumentFormat, OutputTarget},
+    utils::{get_connection, get_disk_reader},
+};
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
@@ -33,6 +36,7 @@ pub(crate) enum Command {
 #[derive(Subcommand, Debug)]
 pub(crate) enum SnapshotCommand {
     /// Captures the next frame output from the live telemetry
+    #[cfg(windows)]
     Live {
         /// Output destination. Use `-` for stdout.
         #[arg(short, long, default_value = "-")]
@@ -76,5 +80,34 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
 }
 
 fn handle_snapshot_command(command: SnapshotCommand) -> Result<()> {
-    bail!(format!("snapshot not implemented: {:#?}", command))
+    match command {
+        SnapshotCommand::Live {
+            output: _,
+            format: _,
+        } => {
+            let connection = get_connection()?;
+
+            let Some(_) = connection.variable_headers_buffer() else {
+                bail!("Could not get variable headers buffer");
+            };
+
+            Ok(())
+        }
+        SnapshotCommand::Ibt {
+            path,
+            output: _,
+            format: _,
+        } => {
+            let mut reader = get_disk_reader(&path)?;
+
+            let Some(_) = reader.variable_headers_snapshot()? else {
+                bail!(format!(
+                    "Could not get variable headers from {}",
+                    path.display()
+                ));
+            };
+
+            Ok(())
+        }
+    }
 }
