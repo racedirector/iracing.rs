@@ -4,6 +4,7 @@ mod headers;
 mod session;
 mod types;
 pub(crate) mod utils;
+mod variables;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -13,6 +14,7 @@ use tracing_subscriber::EnvFilter;
 use broadcast::{Command as BroadcastCommand, handle_command as handle_broadcast_command};
 use headers::{Command as HeadersCommand, handle_command as handle_headers_command};
 use session::{Command as SessionCommand, handle_command as handle_session_command};
+use variables::{Command as VariablesCommand, handle_command as handle_variables_command};
 
 #[derive(Parser)]
 #[command(name = "iracing-sdk", version, about = "iRacing SDK tools", long_about = None, arg_required_else_help = true)]
@@ -32,6 +34,11 @@ enum Commands {
     Session {
         #[command(subcommand)]
         command: SessionCommand,
+    },
+    /// Tools for interacting with disk and live variables.
+    Variables {
+        #[command(subcommand)]
+        command: VariablesCommand,
     },
     /// Tools for sending broadcast commands to the simulator.
     #[cfg(windows)]
@@ -54,6 +61,7 @@ fn main() -> Result<()> {
         #[cfg(windows)]
         Commands::Broadcast { command } => handle_broadcast_command(command)?,
         Commands::Headers { command } => handle_headers_command(command)?,
+        Commands::Variables { command } => handle_variables_command(command)?,
     }
 
     Ok(())
