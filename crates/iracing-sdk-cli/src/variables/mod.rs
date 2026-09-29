@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Subcommand;
 use std::path::PathBuf;
 
@@ -21,11 +21,19 @@ pub(crate) enum Command {
 
         /// The encoding for the session string.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: DocumentFormat,
+        format: DocumentFormat,
     },
     /// Gets headers from a live iRacing connection.
     #[cfg(windows)]
-    Live,
+    Live {
+        /// Output destination. Use `-` for stdout.
+        #[arg(short, long, default_value = "-")]
+        output: OutputTarget,
+
+        /// The encoding for the session string.
+        #[arg(long, default_value = "yaml", value_enum)]
+        format: DocumentFormat,
+    },
 }
 
 pub(crate) fn handle_command(command: Command) -> Result<()> {
@@ -33,29 +41,39 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
         Command::Ibt {
             path,
             output,
-            encoding,
+            format,
         } => {
             let mut reader = get_disk_reader(&path)?;
 
             let Some(snapshot) = reader.variable_headers_snapshot()? else {
-                return anyhow::bail!(format!(
-                    "Could not retrieve variable headers from ibt: {}",
+                bail!(format!(
+                    "No variable headers found in IBT file: {}",
                     path.display()
-                ));
+                ))
             };
 
-            write_to_output(&snapshot, &output, encoding)?;
+            write_to_output(&snapshot, &output, format)?;
+            tracing::info!(ibt_path=%path.display(), output=%output, format=%format, "Wrote disk telemetry variables");
 
             Ok(())
         }
         #[cfg(windows)]
-        Command::Live => {
-            // use crate::utils::get_connection;
+        Command::Live { output, format } => {
+            use crate::utils::get_connection;
 
-            // let connection = get_connection()?;
+            let connection = get_connection()?;
 
-            anyhow::bail!("Not implemented")
-            // Ok(())
+            let Some(snapshot) = connection.variable_headers_buffer() else {
+                bail!(format!(
+                    "Could not retrieve variable headers from live connection"
+                ))
+            };
+
+            write_to_output(&snapshot, &output, format)?;
+
+            tracing::info!(output=%output, format=%format, "Wrote live telemetry variables");
+
+            Ok(())
         }
     }
 }

@@ -2,6 +2,7 @@
 mod broadcast;
 mod headers;
 mod session;
+mod telemetry;
 mod types;
 pub(crate) mod utils;
 mod variables;
@@ -14,6 +15,7 @@ use tracing_subscriber::EnvFilter;
 use broadcast::{Command as BroadcastCommand, handle_command as handle_broadcast_command};
 use headers::{Command as HeadersCommand, handle_command as handle_headers_command};
 use session::{Command as SessionCommand, handle_command as handle_session_command};
+use telemetry::{Command as TelemetryCommand, handle_command as handle_telemetry_command};
 use variables::{Command as VariablesCommand, handle_command as handle_variables_command};
 
 #[derive(Parser)]
@@ -40,6 +42,11 @@ enum Commands {
         #[command(subcommand)]
         command: VariablesCommand,
     },
+    /// Tools for capturing telemetry from a source.
+    Telemetry {
+        #[command(subcommand)]
+        command: TelemetryCommand,
+    },
     /// Tools for sending broadcast commands to the simulator.
     #[cfg(windows)]
     Broadcast {
@@ -62,6 +69,7 @@ fn main() -> Result<()> {
         Commands::Broadcast { command } => handle_broadcast_command(command)?,
         Commands::Headers { command } => handle_headers_command(command)?,
         Commands::Variables { command } => handle_variables_command(command)?,
+        Commands::Telemetry { command } => handle_telemetry_command(command)?,
     }
 
     Ok(())
