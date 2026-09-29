@@ -361,9 +361,9 @@ fn variable_type(expected: &str) -> VariableType {
 
 fn assert_required_variable(actual: &VariableInfo, expected: &IbtVariableManifest) {
     assert_eq!(actual.name, expected.name);
-    assert_eq!(actual.data_type, variable_type(&expected.data_type));
-    assert_eq!(actual.offset, expected.offset);
-    assert_eq!(actual.count, expected.count);
+    assert_eq!(actual.data_type(), variable_type(&expected.data_type));
+    assert_eq!(actual.offset(), expected.offset);
+    assert_eq!(actual.count(), expected.count);
     assert_eq!(actual.units, expected.units);
 }
 

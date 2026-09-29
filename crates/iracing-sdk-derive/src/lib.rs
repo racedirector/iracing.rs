@@ -1250,7 +1250,7 @@ fn generate_type_default_assignment(
                                     ::iracing_sdk::__private::tracing::warn!(
                                         field = #field_name_lit,
                                         expected_type = ::std::any::type_name::<#field_type>(),
-                                        actual_type = ?var_info.data_type,
+                                        actual_type = ?var_info.data_type(),
                                         error = ?_e,
                                         "Type mismatch: failed to convert field, using default value (warning shown once)"
                                     );
@@ -1329,7 +1329,7 @@ fn generate_with_default_assignment(
                                     ::iracing_sdk::__private::tracing::warn!(
                                         field = #field_name_lit,
                                         expected_type = ::std::any::type_name::<#field_type>(),
-                                        actual_type = ?var_info.data_type,
+                                        actual_type = ?var_info.data_type(),
                                         error = ?_e,
                                         "Type mismatch: failed to convert field, using default value (warning shown once)"
                                     );
@@ -1405,7 +1405,7 @@ fn generate_optional_assignment(
                                     ::iracing_sdk::__private::tracing::warn!(
                                         field = #field_name_lit,
                                         expected_type = ::std::any::type_name::<#inner_type>(),
-                                        actual_type = ?var_info.data_type,
+                                        actual_type = ?var_info.data_type(),
                                         error = ?_e,
                                         "Type mismatch: failed to convert optional field, using None (warning shown once)"
                                     );
@@ -1540,7 +1540,7 @@ fn generate_bitfield_has_assignment(
                                         ::iracing_sdk::__private::tracing::warn!(
                                             field = #field_name_lit,
                                             expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
+                                            actual_type = ?var_info.data_type(),
                                             error = ?_e,
                                             "Type mismatch: failed to convert bitfield, using None (warning shown once)"
                                         );
@@ -1579,7 +1579,7 @@ fn generate_bitfield_has_assignment(
                                         ::iracing_sdk::__private::tracing::warn!(
                                             field = #field_name_lit,
                                             expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
+                                            actual_type = ?var_info.data_type(),
                                             error = ?_e,
                                             "Type mismatch: failed to convert bitfield, using default value (warning shown once)"
                                         );
@@ -1647,7 +1647,7 @@ fn generate_bitfield_map_assignment(
                                         ::iracing_sdk::__private::tracing::warn!(
                                             field = #field_name_lit,
                                             expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
+                                            actual_type = ?var_info.data_type(),
                                             error = ?_e,
                                             "Type mismatch: failed to convert bitfield, using None (warning shown once)"
                                         );
@@ -1686,7 +1686,7 @@ fn generate_bitfield_map_assignment(
                                         ::iracing_sdk::__private::tracing::warn!(
                                             field = #field_name_lit,
                                             expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
+                                            actual_type = ?var_info.data_type(),
                                             error = ?_e,
                                             "Type mismatch: failed to convert bitfield, using default value (warning shown once)"
                                         );

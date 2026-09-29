@@ -2,14 +2,10 @@
 
 #[cfg(feature = "codegen")]
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    IRacingSDKError, Result,
-    irsdk::{VariableHeader, VariableType as IRSDKVariableType},
-    parse_utils,
-};
+use crate::{IRacingSDKError, Result, VariableInfo, irsdk::VariableHeader};
 
 use super::variable_headers_buffer::VariableHeadersBuffer;
 
@@ -17,73 +13,10 @@ fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
 }
 
-/// # Variable info
-/// Information about a specific telemetry variable.
-#[cfg_attr(feature = "codegen", derive(JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VariableInfo {
-    /// # Name
-    /// Variable name as defined by iRacing
-    pub name: String,
-    /// # Data type
-    /// Data type of the variable
-    #[cfg_attr(feature = "codegen", schemars(schema_with = "storage_type_schema"))]
-    pub data_type: IRSDKVariableType,
-    /// # Byte offset
-    /// Byte offset within the telemetry frame
-    pub offset: usize,
-    /// # Count
-    /// Number of elements (1 for scalar, >1 for arrays)
-    pub count: usize,
-    /// # Count as time
-    /// Whether the simulator treats the sample count as elapsed time
-    pub count_as_time: bool,
-    /// # Units
-    /// Units of measurement (e.g., "m/s", "C", "N*m")
-    pub units: String,
-    /// # Description
-    /// Human-readable description
-    pub description: String,
-}
-
-impl TryFrom<&VariableHeader> for VariableInfo {
-    type Error = IRacingSDKError;
-
-    fn try_from(value: &VariableHeader) -> Result<Self> {
-        Ok(VariableInfo {
-            name: parse_utils::c_string_to_string(&value.name),
-            description: parse_utils::c_string_to_string(&value.description),
-            units: parse_utils::c_string_to_string(&value.unit),
-            offset: usize::try_from(value.offset).map_err(|_| {
-                IRacingSDKError::parse_error(
-                    "VariableInfo::try_from",
-                    format!("Could not convert {} to usize", value.offset),
-                )
-            })?,
-            count: usize::try_from(value.count).map_err(|_| {
-                IRacingSDKError::parse_error(
-                    "VariableInfo::try_from",
-                    format!("Could not convert {} to usize", value.count,),
-                )
-            })?,
-            count_as_time: value.count_as_time != 0,
-            data_type: value.variable_type,
-        })
-    }
-}
-
-impl TryFrom<VariableHeader> for VariableInfo {
-    type Error = IRacingSDKError;
-
-    fn try_from(value: VariableHeader) -> Result<Self> {
-        Self::try_from(&value)
-    }
-}
-
 /// # Variable schema
 /// Schema describing the structure and metadata of telemetry variables.
 #[cfg_attr(feature = "codegen", derive(JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VariableSchema {
     /// # Variables map
     /// Map of variable names to their metadata (provides O(1) lookup)
@@ -95,42 +28,23 @@ pub struct VariableSchema {
 
 impl VariableSchema {
     /// Create a new VariableSchema with validation.
-    pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> crate::Result<Self> {
-        for (name, var_info) in &variables {
-            // Validate variable count
-            if var_info.count == 0 {
+    pub fn new(variables: HashMap<String, VariableInfo>, frame_size: usize) -> Result<Self> {
+        for (name, info) in &variables {
+            if name.is_empty() || info.name.is_empty() {
+                return Err(schema_validation_error("Variable name is empty"));
+            }
+            if *name != info.name {
                 return Err(schema_validation_error(format!(
-                    "Variable '{}' has count of 0",
-                    name
+                    "Variable map key '{name}' doesn't match info name '{}'",
+                    info.name
                 )));
             }
-
-            // Validate variable name matches info name
-            if var_info.name != *name {
+            if info.region().as_region().end() > frame_size {
                 return Err(schema_validation_error(format!(
-                    "Variable map key '{}' doesn't match info name '{}'",
-                    name, var_info.name
+                    "Variable '{name}' extends past frame size {frame_size}"
                 )));
-            }
-
-            // Validate that variable fits within frame
-            let end_offset = var_info
-                .data_type
-                .byte_size()
-                .checked_mul(var_info.count)
-                .and_then(|size| var_info.offset.checked_add(size))
-                .ok_or_else(|| schema_validation_error("Variable extent overflows usize"))?;
-            if end_offset > frame_size {
-                return Err(IRacingSDKError::parse_error(
-                    "VariableSchema::validate",
-                    format!(
-                        "Variable '{name}' ends at byte {end_offset}, beyond frame size {}",
-                        frame_size
-                    ),
-                ));
             }
         }
-
         Ok(Self {
             variables,
             frame_size,
@@ -147,7 +61,7 @@ impl VariableSchema {
         let mut variables = HashMap::with_capacity(headers.len());
 
         for header in headers.iter() {
-            let variable = VariableInfo::try_from(header)?;
+            let variable = VariableInfo::try_from_header(header, frame_size)?;
 
             if variable.name.is_empty() {
                 return Err(schema_validation_error("Variable header has empty name"));
@@ -192,6 +106,19 @@ impl VariableSchema {
     }
 }
 
+impl<'de> Deserialize<'de> for VariableSchema {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Fields {
+            variables: HashMap<String, VariableInfo>,
+            frame_size: usize,
+        }
+
+        let fields = Fields::deserialize(deserializer)?;
+        Self::new(fields.variables, fields.frame_size).map_err(serde::de::Error::custom)
+    }
+}
+
 /// Provider abstraction for schema discovery across telemetry sources.
 ///
 /// This trait enables consumers to work with any telemetry source (live iRacing,
@@ -226,14 +153,6 @@ pub trait SchemaProvider {
     }
 }
 
-#[cfg(feature = "codegen")]
-fn storage_type_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-    schemars::json_schema!({
-        "type": "string",
-        "enum": ["Character", "Boolean", "Integer", "BitField", "Float", "Double"]
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use zerocopy::IntoBytes;
@@ -249,29 +168,6 @@ mod tests {
         fn schema(&self) -> &VariableSchema {
             &self.schema
         }
-    }
-
-    #[test]
-    fn rejects_overflowing_metadata() {
-        let header = VariableHeader::new(
-            IRSDKVariableType::Float,
-            0,
-            1,
-            false,
-            "Speed",
-            "Vehicle speed",
-            "m/s",
-        )
-        .unwrap();
-        let mut info = VariableInfo::try_from(&header).unwrap();
-        info.count = usize::MAX;
-        assert!(
-            VariableSchema::new(HashMap::from([("Speed".into(), info.clone())]), usize::MAX)
-                .is_err()
-        );
-        info.count = 1;
-        info.offset = usize::MAX;
-        assert!(VariableSchema::new(HashMap::from([("Speed".into(), info)]), usize::MAX).is_err());
     }
 
     #[cfg(feature = "codegen")]
@@ -290,27 +186,9 @@ mod tests {
                 "Double"
             ])
         );
-    }
-
-    #[test]
-    fn schema_provider_basic_usage() {
-        let speed = VariableInfo {
-            name: "Speed".to_string(),
-            data_type: IRSDKVariableType::Float,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: "mph".to_string(),
-            description: "Car speed".to_string(),
-        };
-        let provider = TestProvider {
-            schema: VariableSchema::new(HashMap::from([("Speed".to_string(), speed)]), 4).unwrap(),
-        };
-
-        assert!(provider.has_variable("Speed"));
-        assert!(!provider.has_variable("InvalidField"));
-        assert!(provider.variable("Speed").is_some());
-        assert_eq!(provider.variable_names(), vec!["Speed".to_string()]);
+        assert!(value["properties"].get("offset").is_some());
+        assert!(value["properties"].get("count").is_some());
+        assert!(value["properties"].get("region").is_none());
     }
 
     #[test]
@@ -332,8 +210,50 @@ mod tests {
         let schema = VariableSchema::from_snapshot(headers, 8).unwrap();
 
         let speed = schema.get_variable("Speed").unwrap();
-        assert_eq!(speed.offset, 4);
-        assert_eq!(speed.count, 1);
+        assert_eq!(speed.offset(), 4);
+        assert_eq!(speed.count(), 1);
         assert_eq!(schema.frame_size, 8);
+    }
+
+    #[test]
+    fn schema_preserves_semantic_checks() {
+        let header =
+            VariableHeader::new(IRSDKVariableType::Float, 0, 1, false, "Speed", "", "").unwrap();
+        assert!(VariableSchema::from_headers(&[header, header], 4).is_err());
+        let empty = VariableHeader::new(IRSDKVariableType::Float, 0, 1, false, "", "", "").unwrap();
+        assert!(VariableSchema::from_headers(&[empty], 4).is_err());
+
+        let info = VariableInfo::try_from_header(&header, 4).unwrap();
+        assert!(VariableSchema::new(HashMap::from([("Other".into(), info.clone())]), 4).is_err());
+        assert!(VariableSchema::new(HashMap::from([("Speed".into(), info)]), 3).is_err());
+    }
+
+    #[test]
+    fn invalid_storage_type_is_rejected_at_wire_boundary() {
+        let header =
+            VariableHeader::new(IRSDKVariableType::Float, 0, 1, false, "Speed", "", "").unwrap();
+        let mut bytes = header.as_bytes().to_vec();
+        bytes[..4].copy_from_slice(&6_i32.to_le_bytes());
+        assert!(VariableHeadersBuffer::try_from_region_bytes(&bytes, 1).is_err());
+    }
+
+    #[test]
+    fn schema_deserialization_checks_frame_size() {
+        let header =
+            VariableHeader::new(IRSDKVariableType::Float, 4, 2, false, "Speed", "", "").unwrap();
+        let schema = VariableSchema::from_headers(&[header], 12).unwrap();
+        let value = serde_json::to_value(&schema).unwrap();
+        let decoded: VariableSchema = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            decoded.get_variable("Speed").unwrap().region().as_range(),
+            4..12
+        );
+
+        let mut invalid = value;
+        invalid["frame_size"] = serde_json::json!(11);
+        assert!(serde_json::from_value::<VariableSchema>(invalid).is_err());
+
+        let provider = TestProvider { schema };
+        assert!(provider.has_variable("Speed"));
     }
 }

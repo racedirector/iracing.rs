@@ -25,15 +25,10 @@
 //!
 //! // Create a schema for RPM data
 //! let mut variables = HashMap::new();
-//! variables.insert("RPM".to_string(), VariableInfo {
-//!     name: "RPM".to_string(),
-//!     data_type: VariableType::Float,
-//!     offset: 0,
-//!     count: 1,
-//!     count_as_time: false,
-//!     units: "rev/min".to_string(),
-//!     description: "Engine RPM".to_string(),
-//! });
+//! variables.insert("RPM".to_string(), VariableInfo::try_new(
+//!     "RPM".to_string(), VariableType::Float, 0, 1, 4, false,
+//!     "rev/min".to_string(), "Engine RPM".to_string(),
+//! )?);
 //!
 //! let schema = VariableSchema::new(variables, 4)?;
 //! let frame = vec![0x00, 0xA0, 0x8C, 0x45]; // 4500.0 as little-endian f32
@@ -56,6 +51,7 @@ mod telemetry_value;
 mod update_rate;
 mod var_data;
 mod variable_headers_buffer;
+mod variable_info;
 
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
@@ -64,12 +60,13 @@ pub use ibt::IbtLayout;
 pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::*;
-pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
+pub use schema::{SchemaProvider, VariableSchema};
 pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
 pub use variable_headers_buffer::VariableHeadersBuffer;
+pub use variable_info::VariableInfo;
 
 #[cfg(test)]
 mod tests {
@@ -91,16 +88,8 @@ mod tests {
             count in 1..10usize,
             units in "[a-zA-Z/^2]*",
             description in "[a-zA-Z ]*"
-        ) -> VariableInfo {
-            VariableInfo {
-                name,
-                data_type,
-                offset,
-                count,
-                count_as_time: false,
-                units,
-                description,
-            }
+        ) -> (String, VariableType, usize, usize, String, String) {
+            (name, data_type, offset, count, units, description)
         }
     }
 
@@ -123,18 +112,18 @@ mod tests {
             let mut adjusted_variables = HashMap::new();
 
             // Adjust variable offsets to ensure they fit within frame_size
-            for (name, mut var_info) in variables.into_iter() {
+            for (name, (info_name, data_type, offset, count, units, description)) in variables {
                 // Ensure offset is within reasonable bounds for the frame size
-                let max_size = var_info.data_type.byte_size() * var_info.count;
-                if max_size < frame_size {
-                    var_info.offset %= frame_size - max_size;
+                let max_size = data_type.byte_size() * count;
+                let (offset, count) = if max_size < frame_size {
+                    (offset % (frame_size - max_size + 1), count)
                 } else {
-                    var_info.offset = 0;
-                    var_info.count = 1;
-                }
+                    (0, 1)
+                };
 
                 // Ensure name consistency
-                var_info.name = name.clone();
+                let _ = info_name;
+                let var_info = VariableInfo::try_new(name.clone(), data_type, offset, count, frame_size, false, units, description).unwrap();
                 adjusted_variables.insert(name, var_info);
             }
 
@@ -149,9 +138,9 @@ mod tests {
 
             // All variable offsets should be reasonable
             for var_info in schema.variables.values() {
-                let end_offset = var_info.offset + (var_info.data_type.byte_size() * var_info.count);
+                let end_offset = var_info.region().as_region().end();
                 prop_assert!(end_offset <= schema.frame_size);
-                prop_assert!(var_info.count > 0);
+                prop_assert!(var_info.count() > 0);
             }
         }
 
@@ -189,15 +178,7 @@ mod tests {
             let bytes = value.to_le_bytes();
             data[offset..offset + 4].copy_from_slice(&bytes);
 
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::Float,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
+            let var_info = VariableInfo::try_new("test".to_string(), VariableType::Float, offset, 1, data.len(), false, "test".to_string(), "test".to_string()).unwrap();
 
             let result = f32::from_bytes(&data, &var_info);
             prop_assert!(result.is_ok());
@@ -221,15 +202,7 @@ mod tests {
             let bytes = value.to_le_bytes();
             data[offset..offset + 4].copy_from_slice(&bytes);
 
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::Integer,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
+            let var_info = VariableInfo::try_new("test".to_string(), VariableType::Integer, offset, 1, data.len(), false, "test".to_string(), "test".to_string()).unwrap();
 
             let result = i32::from_bytes(&data, &var_info);
             prop_assert!(result.is_ok());
@@ -246,15 +219,7 @@ mod tests {
             let bytes = value.to_le_bytes();
             data[offset..offset + 4].copy_from_slice(&bytes);
 
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::BitField,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
+            let var_info = VariableInfo::try_new("test".to_string(), VariableType::BitField, offset, 1, data.len(), false, "test".to_string(), "test".to_string()).unwrap();
 
             let result = BitField::from_bytes(&data, &var_info);
             prop_assert!(result.is_ok());

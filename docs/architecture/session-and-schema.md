@@ -28,6 +28,14 @@ Disk variable headers are parsed from `.ibt` files. Live variable headers are
 discovered from Windows shared memory. Both become `VariableSchema` containing
 named `VariableInfo` entries and a frame size.
 
+Header conversion constructs each `VariableInfo` with a validated `VariableRegion`
+using the frame size. The region is the sole stored offset, count, and extent;
+readers use `offset()`, `count()`, and `region()`. `VariableSchema::new` checks
+map names and that each region fits its frame without recomputing its extent.
+Serialized metadata retains top-level `offset` and `count` fields. Deserializing
+an individual variable checks positive count and overflow; deserializing a schema
+also checks each variable against the schema's frame size.
+
 Consumers should resolve fields through the schema and decode through `VarData`
 or `TelemetryValue`. This keeps type sizes, arrays, bitfields, bounds, and
 little-endian conversion centralized.
@@ -37,8 +45,8 @@ schema and frame types are platform-neutral.
 
 `VariableInfo::data_type` uses `irsdk::VariableType`, also re-exported at the
 crate root. Only the six SDK storage kinds are valid telemetry metadata;
-header conversion, schema validation, and runtime decoding reject the count
-sentinel. Array strides use SDK byte widths. `VarData` supports `u8` for
+wire decoding rejects the count sentinel before a `VariableInfo` exists.
+Array strides use SDK byte widths. `VarData` supports `u8` for
 characters, `bool`, `i32`, `BitField`, `f32`, `f64`, and their vectors.
 
 Metadata serialization emits `Character`, `Boolean`, `Integer`, `BitField`,

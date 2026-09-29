@@ -14,20 +14,22 @@ use iracing_sdk_derive::IRacingTelemetryFrame;
 /// ```
 /// let info = make_variable_info("Speed", VariableType::Float, 0);
 /// assert_eq!(info.name, "Speed");
-/// assert_eq!(info.data_type, VariableType::Float);
-/// assert_eq!(info.offset, 0);
-/// assert_eq!(info.count, 1);
+/// assert_eq!(info.data_type(), VariableType::Float);
+/// assert_eq!(info.offset(), 0);
+/// assert_eq!(info.count(), 1);
 /// ```
 fn make_variable_info(name: &str, data_type: VariableType, offset: usize) -> VariableInfo {
-    VariableInfo {
-        name: name.to_string(),
+    VariableInfo::try_new(
+        name.to_string(),
         data_type,
         offset,
-        count: 1,
-        count_as_time: false,
-        units: String::new(),
-        description: String::new(),
-    }
+        1,
+        offset + data_type.byte_size(),
+        false,
+        String::new(),
+        String::new(),
+    )
+    .unwrap()
 }
 
 /// Builds a VariableSchema from a list of `(name, VariableType, offset)` entries.

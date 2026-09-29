@@ -69,15 +69,10 @@ impl AdapterValidation {
     /// };
     /// use std::{collections::HashMap, sync::Arc};
     ///
-    /// let speed_info = VariableInfo {
-    ///     name: "Speed".to_string(),
-    ///     data_type: VariableType::Float,
-    ///     offset: 0,
-    ///     count: 1,
-    ///     count_as_time: false,
-    ///     units: "m/s".to_string(),
-    ///     description: "Car speed".to_string(),
-    /// };
+    /// let speed_info = VariableInfo::try_new(
+    ///     "Speed".into(), VariableType::Float, 0, 1, 4, false,
+    ///     "m/s".into(), "Car speed".into(),
+    /// )?;
     ///
     /// let validation = AdapterValidation::new(vec![FieldExtraction::Required {
     ///     name: "Speed".to_string(),
@@ -130,15 +125,10 @@ impl AdapterValidation {
 /// ```no_run
 /// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
 /// # use iracing_sdk::{VariableInfo, irsdk::VariableType};
-/// let var_info = VariableInfo {
-///     name: "Speed".to_string(),
-///     data_type: VariableType::Float,
-///     offset: 0,
-///     count: 1,
-///     count_as_time: false,
-///     units: "m/s".to_string(),
-///     description: "Car speed".to_string(),
-/// };
+/// let var_info = VariableInfo::try_new(
+///     "Speed".into(), VariableType::Float, 0, 1, 4, false,
+///     "m/s".into(), "Car speed".into(),
+/// ).unwrap();
 /// let _ = telemetry_type_mismatch_details::<f32>(&var_info);
 /// ```
 #[doc(hidden)]

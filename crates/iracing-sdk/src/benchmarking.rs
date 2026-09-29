@@ -261,8 +261,7 @@ mod tests {
     ) {
         let (credits, receiver) = mpsc::unbounded_channel();
         let reads = Arc::new(AtomicUsize::new(0));
-        let schema =
-            Arc::new(VariableSchema::new(HashMap::new(), 0).expect("empty schema should validate"));
+        let schema = Arc::new(VariableSchema::new(HashMap::new(), 0).unwrap());
         (
             ControlledProvider {
                 credits: receiver,

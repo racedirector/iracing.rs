@@ -80,7 +80,7 @@ fn decode_all(data: &[u8], variables: &[&VariableInfo]) -> Vec<TelemetryValue> {
             TelemetryValue::decode(data, info).unwrap_or_else(|error| {
                 panic!(
                     "aggregate decode failed for `{}` at offset {} with type {:?} and count {}: {error}",
-                    info.name, info.offset, info.data_type, info.count
+                    info.name, info.offset(), info.data_type(), info.count()
                 )
             })
         })
@@ -148,7 +148,7 @@ fn bench_telemetry_value_scalars(c: &mut Criterion) {
     support::verify_full_frame(&packet, &variables);
     let scalar_variables: Vec<_> = variables
         .into_iter()
-        .filter(|info| info.count == 1)
+        .filter(|info| info.count() == 1)
         .collect();
     assert!(!scalar_variables.is_empty());
 

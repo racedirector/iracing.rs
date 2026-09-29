@@ -282,7 +282,17 @@ impl Connection {
             _ => return Ok(Vec::new()),
         };
 
-        buffer.iter().map(VariableInfo::try_from).collect()
+        let frame_size = crate::parse_utils::parse_positive_usize(
+            "buffer_length",
+            self.header().buffer_length,
+            "Connection::get_variables",
+        )?
+        .get();
+
+        buffer
+            .iter()
+            .map(|header| VariableInfo::try_from_header(header, frame_size))
+            .collect()
     }
 
     /// Find the buffer with the highest tick count

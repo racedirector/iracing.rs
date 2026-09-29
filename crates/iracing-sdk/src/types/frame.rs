@@ -76,24 +76,22 @@ impl TelemetryValueProvider for FramePacket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::irsdk::VariableType;
-    use std::collections::HashMap;
+    use iracing_irsdk::{VariableHeader, VariableType};
 
     #[test]
     fn frame_packet_provides_schema_and_telemetry_values() {
-        let rpm_info = VariableInfo {
-            name: "RPM".into(),
-            data_type: VariableType::Integer,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: "rev/min".into(),
-            description: "Engine RPM".into(),
-        };
-        let schema = Arc::new(VariableSchema {
-            variables: HashMap::from([("RPM".to_string(), rpm_info)]),
-            frame_size: 4,
-        });
+        let header = VariableHeader::new(
+            VariableType::Integer,
+            0,
+            1,
+            false,
+            "RPM",
+            "Engine RPM",
+            "rev/min",
+        )
+        .unwrap();
+
+        let schema = Arc::new(VariableSchema::from_headers(&[header], 4).unwrap());
         let packet = FramePacket::new(1234i32.to_le_bytes().to_vec(), 10, 2, Arc::clone(&schema));
 
         assert!(std::ptr::eq(packet.schema(), schema.as_ref()));

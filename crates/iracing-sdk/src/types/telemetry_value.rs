@@ -28,23 +28,21 @@ pub enum TelemetryValue {
 impl TelemetryValue {
     /// Decodes the variable described by `info` from a complete telemetry frame.
     ///
-    /// `info.offset` is relative to the start of `data`; a zero element count
-    /// produces an empty [`Self::Array`].
+    /// `info.offset()` is relative to the start of `data`.
     ///
     /// # Errors
     ///
     /// Returns an error if the metadata does not describe an SDK storage type,
     /// its extent overflows, or the requested bytes are outside `data`.
     pub fn decode(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        match info.count {
-            0 => Ok(Self::Array(Vec::new())),
+        match info.count() {
             1 => Self::decode_scalar(data, info),
             _ => Self::decode_array(data, info),
         }
     }
 
     fn decode_scalar(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        match info.data_type {
+        match info.data_type() {
             VariableType::Character => u8::from_bytes(data, info).map(Self::Char),
             VariableType::BitField => BitField::from_bytes(data, info).map(Self::BitField),
             VariableType::Boolean => bool::from_bytes(data, info).map(Self::Bool),
@@ -55,12 +53,12 @@ impl TelemetryValue {
     }
 
     fn decode_array(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        let element_size = info.data_type.byte_size();
-        let mut values = Vec::with_capacity(info.count);
+        let element_size = info.data_type().byte_size();
+        let mut values = Vec::with_capacity(info.count());
         let mut element_info = info.clone();
-        element_info.count = 1;
+        let region_end = info.region().as_region().end();
 
-        for index in 0..info.count {
+        for index in 0..info.count() {
             let offset_delta = index.checked_mul(element_size).ok_or_else(|| {
                 IRacingSDKError::parse_error(
                     "TelemetryValue::decode_array",
@@ -70,11 +68,11 @@ impl TelemetryValue {
                 )
             })?;
 
-            element_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or_else(|| IRacingSDKError::memory_invalid_input(info.offset, offset_delta))?;
+            let offset = info.offset().checked_add(offset_delta).ok_or_else(|| {
+                IRacingSDKError::memory_invalid_input(info.offset(), offset_delta)
+            })?;
 
+            element_info.set_scalar_offset(offset, region_end)?;
             values.push(Self::decode_scalar(data, &element_info)?);
         }
 

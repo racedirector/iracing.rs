@@ -154,8 +154,8 @@ mod tests {
                 assert_eq!(provider.tick_rate(), f64::from(fixture.tick_rate));
                 for expected in &fixture.required_variables {
                     let actual = provider.schema().get_variable(&expected.name).unwrap();
-                    assert_eq!(actual.offset, expected.offset);
-                    assert_eq!(actual.count, expected.count);
+                    assert_eq!(actual.offset(), expected.offset);
+                    assert_eq!(actual.count(), expected.count);
                     assert_eq!(actual.units, expected.units);
                 }
                 for index in 0..reference.layout().frame_count() {
@@ -214,7 +214,7 @@ mod tests {
         // Byte geometry remains valid; the provider owns semantic validation.
         let reader = IbtReader::from_bytes(bytes)?;
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
-        assert!(error.contains("beyond frame size"), "{error}");
+        assert!(error.contains("past frame size"), "{error}");
         Ok(())
     }
 

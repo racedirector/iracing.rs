@@ -50,8 +50,8 @@ async fn main() -> Result<()> {
 
     let mut variables: Vec<VariableInfo> = connection.variables();
     variables.sort_unstable_by(|left, right| {
-        left.offset
-            .cmp(&right.offset)
+        left.offset()
+            .cmp(&right.offset())
             .then_with(|| left.name.cmp(&right.name))
     });
 

@@ -51,8 +51,8 @@ macro_rules! impl_bitmask_var_data {
     ($($type:ty),+ $(,)?) => {$ (
         impl VarData for $type {
             fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                if info.data_type != iracing_irsdk::VariableType::BitField {
-                    return Err(IRacingSDKError::type_conversion("BitField", info.data_type));
+                if info.data_type() != iracing_irsdk::VariableType::BitField {
+                    return Err(IRacingSDKError::type_conversion("BitField", info.data_type()));
                 }
 
                 <BitField as VarData>::from_bytes(data, info).map(Self::from)
@@ -71,7 +71,7 @@ impl_bitmask_var_data!(
 
 impl VarData for IncidentFlags {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        match info.data_type {
+        match info.data_type() {
             iracing_irsdk::VariableType::BitField => {
                 <BitField as VarData>::from_bytes(data, info).map(Self::from)
             }
@@ -92,15 +92,17 @@ mod tests {
     use iracing_irsdk::VariableType;
 
     fn variable_info(data_type: VariableType) -> VariableInfo {
-        VariableInfo {
-            name: "test".to_owned(),
+        VariableInfo::try_new(
+            "test".to_owned(),
             data_type,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
+            0,
+            1,
+            data_type.byte_size(),
+            false,
+            String::new(),
+            String::new(),
+        )
+        .unwrap()
     }
 
     #[test]

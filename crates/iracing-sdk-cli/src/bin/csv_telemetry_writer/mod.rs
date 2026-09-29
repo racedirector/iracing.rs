@@ -92,15 +92,19 @@ impl CsvTelemetryWriterBuilder {
             .variables
             .ok_or_else(|| anyhow!("Telemetry variables are required"))?;
 
-        let mut headers =
-            Vec::with_capacity(variables.iter().map(|variable| variable.count.max(1)).sum());
+        let mut headers = Vec::with_capacity(
+            variables
+                .iter()
+                .map(|variable| variable.count().max(1))
+                .sum(),
+        );
         for variable in &variables {
-            if variable.count <= 1 {
+            if variable.count() <= 1 {
                 headers.push(variable.name.clone());
                 continue;
             }
 
-            for index in 0..variable.count {
+            for index in 0..variable.count() {
                 headers.push(format!("{}[{}]", variable.name, index));
             }
         }
@@ -138,15 +142,17 @@ mod tests {
     }
 
     fn variable(name: &str, data_type: VariableType, offset: usize, count: usize) -> VariableInfo {
-        VariableInfo {
-            name: name.to_string(),
+        VariableInfo::try_new(
+            name.to_string(),
             data_type,
             offset,
             count,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
+            usize::MAX,
+            false,
+            String::new(),
+            String::new(),
+        )
+        .unwrap()
     }
 
     #[test]

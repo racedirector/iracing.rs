@@ -55,20 +55,12 @@ impl VarData for f64 {
 // Array support for VarData
 impl<T: VarData> VarData for Vec<T> {
     fn from_bytes(data: &[u8], info: &VariableInfo) -> Result<Self> {
-        let element_size = info.data_type.byte_size();
+        let element_size = info.data_type().byte_size();
+        let mut result = Vec::with_capacity(info.count());
+        let mut scalar_info = info.clone();
+        let region_end = info.region().as_region().end();
 
-        if info.count == 0 {
-            return Ok(Vec::new());
-        }
-
-        let mut result = Vec::with_capacity(info.count);
-
-        // Clone the variable info and set the count to 1.
-        let mut var_info = info.clone();
-        // Set the count to 1 to represent a single item within the array.
-        var_info.count = 1;
-
-        for i in 0..info.count {
+        for i in 0..info.count() {
             // Check the offset of the item
             let offset_delta = i
                 .checked_mul(element_size)
@@ -82,13 +74,13 @@ impl<T: VarData> VarData for Vec<T> {
                 })?;
 
             // Set the offset
-            var_info.offset = info
-                .offset
-                .checked_add(offset_delta)
-                .ok_or_else(|| IRacingSDKError::memory_invalid_input(info.offset, offset_delta))?;
+            let offset = info.offset().checked_add(offset_delta).ok_or_else(|| {
+                IRacingSDKError::memory_invalid_input(info.offset(), offset_delta)
+            })?;
 
             // Parse the variable and store it in the result.
-            result.push(T::from_bytes(data, &var_info)?);
+            scalar_info.set_scalar_offset(offset, region_end)?;
+            result.push(T::from_bytes(data, &scalar_info)?);
         }
 
         Ok(result)
@@ -102,15 +94,26 @@ mod tests {
     use std::fmt::Debug;
 
     fn variable_info(data_type: VariableType, offset: usize) -> VariableInfo {
-        VariableInfo {
-            name: "test".to_string(),
+        variable_info_with_count(data_type, offset, 1)
+    }
+
+    fn variable_info_with_count(
+        data_type: VariableType,
+        offset: usize,
+        count: usize,
+    ) -> VariableInfo {
+        let frame_size = offset + data_type.byte_size() * count;
+        VariableInfo::try_new(
+            "test".to_string(),
             data_type,
             offset,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
+            count,
+            frame_size,
+            false,
+            String::new(),
+            String::new(),
+        )
+        .unwrap()
     }
 
     fn assert_type_conversion<T: VarData>(data_type: VariableType) {
@@ -137,8 +140,7 @@ mod tests {
         data.extend_from_slice(first);
         data.extend_from_slice(second);
 
-        let mut info = variable_info(data_type, 1);
-        info.count = 2;
+        let info = variable_info_with_count(data_type, 1, 2);
         assert_eq!(Vec::<T>::from_bytes(&data, &info).unwrap(), expected);
     }
 
@@ -244,20 +246,19 @@ mod tests {
 
     #[test]
     fn arrays_report_type_mismatch_and_later_element_bounds_errors() {
-        let mut info = variable_info(VariableType::Integer, 1);
-        info.count = 2;
+        let info = variable_info_with_count(VariableType::Integer, 1, 2);
         assert!(matches!(
             Vec::<u8>::from_bytes(&[], &info),
             Err(IRacingSDKError::TypeConversion { .. })
         ));
 
-        info.data_type = VariableType::Character;
+        let info = variable_info_with_count(VariableType::Character, 1, 2);
         assert!(matches!(
             Vec::<u8>::from_bytes(&[0xAA, 42], &info),
             Err(IRacingSDKError::Memory { offset: 2, .. })
         ));
 
-        info.data_type = VariableType::Float;
+        let info = variable_info_with_count(VariableType::Float, 1, 2);
         let mut truncated = vec![0xAA];
         truncated.extend_from_slice(&1.5_f32.to_le_bytes());
         truncated.extend_from_slice(&[0, 0]);
@@ -268,9 +269,19 @@ mod tests {
     }
 
     #[test]
-    fn zero_count_array_is_empty() {
-        let mut info = variable_info(VariableType::Character, usize::MAX);
-        info.count = 0;
-        assert!(Vec::<u8>::from_bytes(&[], &info).unwrap().is_empty());
+    fn zero_count_metadata_is_rejected() {
+        assert!(
+            VariableInfo::try_new(
+                "test".into(),
+                VariableType::Character,
+                0,
+                0,
+                0,
+                false,
+                String::new(),
+                String::new(),
+            )
+            .is_err()
+        );
     }
 }

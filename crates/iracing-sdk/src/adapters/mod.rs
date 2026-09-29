@@ -77,15 +77,17 @@ mod tests {
     fn adapter_validation_creation() {
         let extraction_plan = vec![FieldExtraction::Required {
             name: "Speed".to_string(),
-            var_info: VariableInfo {
-                name: "Speed".to_string(),
-                data_type: VariableType::Float,
-                offset: 0,
-                count: 1,
-                count_as_time: false,
-                units: "mph".to_string(),
-                description: "Car speed".to_string(),
-            },
+            var_info: VariableInfo::try_new(
+                "Speed".into(),
+                VariableType::Float,
+                0,
+                1,
+                4,
+                false,
+                "mph".into(),
+                "Car speed".into(),
+            )
+            .unwrap(),
         }];
 
         let validation = AdapterValidation::new(extraction_plan);
@@ -99,15 +101,17 @@ mod tests {
     fn field_extraction_properties() {
         let required_field = FieldExtraction::Required {
             name: "Speed".to_string(),
-            var_info: VariableInfo {
-                name: "Speed".to_string(),
-                data_type: VariableType::Float,
-                offset: 0,
-                count: 1,
-                count_as_time: false,
-                units: "mph".to_string(),
-                description: "Car speed".to_string(),
-            },
+            var_info: VariableInfo::try_new(
+                "Speed".into(),
+                VariableType::Float,
+                0,
+                1,
+                4,
+                false,
+                "mph".into(),
+                "Car speed".into(),
+            )
+            .unwrap(),
         };
 
         assert_eq!(required_field.field_name(), Some("Speed"));

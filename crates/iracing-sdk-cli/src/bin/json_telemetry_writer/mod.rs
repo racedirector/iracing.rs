@@ -183,15 +183,17 @@ mod tests {
     }
 
     fn variable(name: &str) -> VariableInfo {
-        VariableInfo {
-            name: name.to_string(),
-            data_type: VariableType::Integer,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
+        VariableInfo::try_new(
+            name.to_string(),
+            VariableType::Integer,
+            0,
+            1,
+            4,
+            false,
+            String::new(),
+            String::new(),
+        )
+        .unwrap()
     }
 
     #[test]
