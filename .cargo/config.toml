@@ -3,8 +3,6 @@ test-fixtures = ["run", "-p", "test-fixtures", "--"]
 
 iracing-sdk = ["run", "-p", "iracing-sdk-cli", "--bin", "iracing-sdk", "--"]
 
-broadcast = ["run", "-p", "iracing-sdk-cli", "--bin", "broadcast", "--"]
-
 ibt-read-frame = [
   "run",
   "-p",
@@ -22,7 +20,9 @@ manual-frame-adapter = [
   "manual-frame-adapter",
   "--",
 ]
+
 ibt-subscribe = ["run", "-p", "iracing-sdk", "--example", "ibt-subscribe", "--"]
+
 live-subscribe = [
   "run",
   "-p",
@@ -31,6 +31,7 @@ live-subscribe = [
   "live-subscribe",
   "--",
 ]
+
 enum-bitfields-ibt = [
   "run",
   "-p",
@@ -61,8 +62,6 @@ disk-variable-schema = [
   "disk-variable-schema",
   "--",
 ]
-
-headers = ["run", "-p", "iracing-sdk-cli", "--bin", "headers", "--"]
 
 ibt-to-csv = ["run", "-p", "iracing-sdk-cli", "--bin", "ibt-to-csv", "--"]
 
@@ -109,17 +108,6 @@ live-variable-schema = [
   "codegen,schema-discovery",
   "--bin",
   "live-variable-schema",
-  "--",
-]
-
-session = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "session",
   "--",
 ]
 

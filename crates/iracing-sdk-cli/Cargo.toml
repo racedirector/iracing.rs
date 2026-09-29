@@ -14,7 +14,6 @@ default-run = "iracing-sdk"
 
 [package.metadata.dist]
 dist = true
-features = ["codegen", "schema-discovery"]
 
 [package.metadata.dist.bin.live_to_csv]
 targets = ["x86_64-pc-windows-msvc"]
@@ -36,7 +35,7 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }
 futures = { workspace = true }
-iracing-sdk = { workspace = true }
+iracing-sdk = { workspace = true, features = ["schema-discovery", "codegen"] }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -45,11 +44,6 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 type-layout = { workspace = true }
-
-[features]
-default = []
-codegen = ["iracing-sdk/codegen"]
-schema-discovery = ["iracing-sdk/schema-discovery"]
 
 [[bin]]
 name = "iracing-sdk"
@@ -64,10 +58,6 @@ required-features = ["codegen"]
 name = "disk-variable-schema"
 path = "src/bin/disk_variable_schema.rs"
 required-features = ["codegen"]
-
-[[bin]]
-name = "headers"
-path = "src/bin/headers.rs"
 
 [[bin]]
 name = "live-variable-schema"

@@ -14,17 +14,7 @@ pub(crate) enum Command {
     },
     /// Gets headers from a live iRacing connection.
     #[cfg(windows)]
-    Live {
-        /// Whether to wait for the connection
-        #[arg(short, long)]
-        wait: bool,
-        /// How long to wait before timeout. No value wait indefinitely.
-        #[arg(short, long)]
-        timeout_ms: Option<u64>,
-        /// How often to poll for a connection. Default is 1 second.
-        #[arg(short, long, default_value_t = 1, value_parser = clap::value_parser!(u64).range(1..))]
-        poll_s: u64,
-    },
+    Live,
     /// Prints the type information for the header data structures.
     Type,
 }
@@ -48,12 +38,14 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             Ok(())
         }
         #[cfg(windows)]
-        Command::Live {
-            wait,
-            timeout_ms,
-            poll_s,
-        } => {
-            tracing::debug!("Live not yet implemented");
+        Command::Live => {
+            use crate::utils::get_connection;
+
+            let connection = get_connection()?;
+            let header = connection.header();
+
+            tracing::info!("Parsed live header:\n{:#?}", header,);
+
             Ok(())
         }
         Command::Type => {
