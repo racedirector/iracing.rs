@@ -26,7 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      CARGO_TARGET_DIR: ${{ github.workspace }}/comparison-target
+      BASE_TARGET_DIR: ${{ github.workspace }}/comparison-target-base
+      HEAD_TARGET_DIR: ${{ github.workspace }}/comparison-target-head
     steps:
       - name: Checkout PR base
         uses: actions/checkout@v7
@@ -80,20 +81,27 @@ jobs:
           done
       - name: Clear prior Criterion data
         shell: bash
-        run: rm -rf "$CARGO_TARGET_DIR/criterion"
+        run: rm -rf "$BASE_TARGET_DIR/criterion" "$HEAD_TARGET_DIR/criterion"
       - name: Measure PR base
         working-directory: pr-base
         shell: bash
         env:
+          CARGO_TARGET_DIR: ${{ env.BASE_TARGET_DIR }}
           BENCHMARK: ${{ inputs.benchmark }}
         run: |
           set -o pipefail
           cargo bench --locked --quiet -p iracing-sdk --features benchmark --bench "$BENCHMARK" -- --save-baseline pr-base --color never 2>&1 | tee "$RUNNER_TEMP/base.log"
+      - name: Transfer Criterion baseline
+        shell: bash
+        run: |
+          mkdir -p "$HEAD_TARGET_DIR"
+          cp -a "$BASE_TARGET_DIR/criterion" "$HEAD_TARGET_DIR/criterion"
       - name: Compare PR head with base
         id: compare
         working-directory: pr-head
         shell: bash
         env:
+          CARGO_TARGET_DIR: ${{ env.HEAD_TARGET_DIR }}
           BENCHMARK: ${{ inputs.benchmark }}
         run: |
           set -o pipefail
@@ -137,6 +145,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.artifact-name }}
-          path: ${{ env.CARGO_TARGET_DIR }}/criterion
+          path: ${{ env.HEAD_TARGET_DIR }}/criterion
           if-no-files-found: ignore
           retention-days: 14
