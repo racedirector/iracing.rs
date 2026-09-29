@@ -116,14 +116,22 @@ impl Header {
     }
 
     /// Returns the range of the session info buffer, relative to file start.
-    pub fn session_info_range(&self) -> Range<i32> {
-        self.session_info_offset..self.session_info_offset + self.session_info_length
+    /// Returns `None` if the range endpoint overflows.
+    pub fn session_info_range(&self) -> Option<Range<i32>> {
+        let end = self
+            .session_info_offset
+            .checked_add(self.session_info_length)?;
+        Some(self.session_info_offset..end)
     }
 
     /// Returns the range of the variable header array, relative to file start.
-    pub fn variable_headers_range(&self) -> Range<i32> {
-        self.variable_header_offset
-            ..self.variable_header_offset + self.variable_count * size_of::<VariableHeader>() as i32
+    /// Returns `None` if the range endpoint overflows.
+    pub fn variable_headers_range(&self) -> Option<Range<i32>> {
+        let length = self
+            .variable_count
+            .checked_mul(size_of::<VariableHeader>() as i32)?;
+        let end = self.variable_header_offset.checked_add(length)?;
+        Some(self.variable_header_offset..end)
     }
 
     /// Returns the advertised buffer descriptor at `index`.
@@ -216,6 +224,23 @@ mod tests {
             decoded.buffers[1].buffer_offset,
             header.buffers[1].buffer_offset
         );
+    }
+
+    #[test]
+    fn ranges_return_none_when_length_or_endpoint_overflows() {
+        let mut header = valid_live_header();
+        assert_eq!(header.session_info_range(), Some(112..1_112));
+        assert_eq!(header.variable_headers_range(), Some(1_112..15_512));
+
+        header.session_info_offset = i32::MAX;
+        assert_eq!(header.session_info_range(), None);
+
+        header.variable_count = i32::MAX;
+        assert_eq!(header.variable_headers_range(), None);
+
+        header.variable_count = 1;
+        header.variable_header_offset = i32::MAX;
+        assert_eq!(header.variable_headers_range(), None);
     }
 
     #[test]

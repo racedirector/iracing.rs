@@ -54,8 +54,13 @@ impl Serialize for VariableHeader {
 
 impl VariableHeader {
     /// Returns the byte range occupied by this variable, relative to the telemetry buffer start.
-    pub fn range(&self) -> Range<i32> {
-        self.offset..self.offset + self.count * self.variable_type.byte_size() as i32
+    /// Returns `None` if the range endpoint overflows.
+    pub fn range(&self) -> Option<Range<i32>> {
+        let length = self
+            .count
+            .checked_mul(self.variable_type.byte_size() as i32)?;
+        let end = self.offset.checked_add(length)?;
+        Some(self.offset..end)
     }
 
     /// Returns the NUL-terminated variable name, replacing invalid UTF-8.
@@ -200,6 +205,20 @@ mod tests {
         assert_eq!(&bytes[13..16], &[0; 3]);
         assert_eq!(&bytes[16..22], b"Speed\0");
         assert_eq!(VariableHeader::try_from_bytes(bytes).unwrap().offset, 8);
+    }
+
+    #[test]
+    fn range_returns_none_when_length_or_endpoint_overflows() {
+        let mut header =
+            VariableHeader::new(VariableType::Float, 8, 2, false, "Speed", "", "").unwrap();
+        assert_eq!(header.range(), Some(8..16));
+
+        header.count = i32::MAX;
+        assert_eq!(header.range(), None);
+
+        header.count = 2;
+        header.offset = i32::MAX;
+        assert_eq!(header.range(), None);
     }
 
     #[test]
