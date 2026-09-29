@@ -24,10 +24,6 @@ pub(crate) fn nul_terminated_bytes(bytes: &[u8]) -> &[u8] {
     &bytes[..end]
 }
 
-pub(crate) fn c_string_to_string(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(nul_terminated_bytes(bytes)).to_string()
-}
-
 pub(crate) fn parse_nonnegative_usize(
     field_name: &'static str,
     value: i32,
