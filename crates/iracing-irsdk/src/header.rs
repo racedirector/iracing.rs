@@ -258,6 +258,35 @@ mod tests {
     }
 
     #[test]
+    fn buffer_accessors_respect_advertised_count() {
+        let mut header = valid_live_header();
+        header.buffer_count = 2;
+        header.current_buffer = 1;
+
+        assert_eq!(header.buffer(0).map(|buffer| buffer.tick_count), Some(10));
+        assert_eq!(header.buffer(1).map(|buffer| buffer.tick_count), Some(9));
+        assert!(header.buffer(2).is_none());
+        assert_eq!(
+            header.current_buffer().map(|buffer| buffer.tick_count),
+            Some(9)
+        );
+
+        header.current_buffer = 2;
+        assert!(header.current_buffer().is_none());
+    }
+
+    #[test]
+    fn buffer_accessors_reject_invalid_advertised_counts() {
+        let mut header = valid_live_header();
+
+        for count in [-1, 0, Header::MAX_BUFFERS as i32 + 1] {
+            header.buffer_count = count;
+            assert!(header.buffer(0).is_none());
+            assert!(header.current_buffer().is_none());
+        }
+    }
+
+    #[test]
     fn header_reader_reports_truncated_input_as_io_error() {
         let truncated_data = vec![0u8; 10];
         let mut cursor = std::io::Cursor::new(truncated_data);
