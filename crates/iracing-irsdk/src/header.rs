@@ -118,10 +118,7 @@ impl Header {
     /// Returns the range of the session info buffer, relative to file start.
     /// Returns `None` if the range endpoint overflows.
     pub fn session_info_range(&self) -> Option<Range<i32>> {
-        let end = self
-            .session_info_offset
-            .checked_add(self.session_info_length)?;
-        Some(self.session_info_offset..end)
+        i32_checked_range(self.session_info_offset, self.session_info_length)
     }
 
     /// Returns the range of the variable header array, relative to file start.
@@ -130,15 +127,15 @@ impl Header {
         let length = self
             .variable_count
             .checked_mul(size_of::<VariableHeader>() as i32)?;
-        let end = self.variable_header_offset.checked_add(length)?;
-        Some(self.variable_header_offset..end)
+
+        i32_checked_range(self.variable_header_offset, length)
     }
 
     /// Returns the advertised buffer descriptor at `index`.
     ///
     /// Returns `None` if the advertised buffer count is invalid or `index` is
     /// outside that count. This does not validate or copy the buffer's frame data.
-    pub fn buffer(&self, index: usize) -> Option<&VariableBuffer> {
+    pub fn variable_buffer(&self, index: usize) -> Option<&VariableBuffer> {
         let count = usize::try_from(self.buffer_count).ok()?;
         if count == 0 || count > Self::MAX_BUFFERS || index >= count {
             return None;
@@ -152,9 +149,27 @@ impl Header {
     /// Returns `None` if the advertised buffer count or current index is
     /// invalid. A live writer may reuse this buffer after it is selected, so
     /// callers must check for a torn read when copying its frame data.
-    pub fn current_buffer(&self) -> Option<&VariableBuffer> {
-        self.buffer(usize::from(self.current_buffer))
+    pub fn current_variable_buffer(&self) -> Option<&VariableBuffer> {
+        self.variable_buffer(usize::from(self.current_buffer))
     }
+
+    /// Returns the range of the buffer at `index`.
+    pub fn variable_buffer_range(&self, index: usize) -> Option<Range<i32>> {
+        let buffer = self.variable_buffer(index)?;
+        i32_checked_range(buffer.buffer_offset, self.buffer_length)
+    }
+
+    /// Returns the range of the most recently published buffer.
+    pub fn current_variable_buffer_range(&self) -> Option<Range<i32>> {
+        let buffer = self.current_variable_buffer()?;
+        i32_checked_range(buffer.buffer_offset, self.buffer_length)
+    }
+}
+
+/// ???: Consider implementing a macro to generate the helpers...
+fn i32_checked_range(offset: i32, length: i32) -> Option<Range<i32>> {
+    let end = offset.checked_add(length)?;
+    Some(offset..end)
 }
 
 #[cfg(test)]
