@@ -30,6 +30,7 @@ pub use disk_sub_header::DiskSubHeader;
 pub use error::{Error, Result};
 pub use flags::*;
 pub use header::Header;
+pub use parse_utils::{decode, encode};
 pub use telemetry::*;
 pub use variable_buffer::VariableBuffer;
 pub use variable_header::VariableHeader;

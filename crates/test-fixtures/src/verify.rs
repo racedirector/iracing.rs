@@ -9,7 +9,7 @@ use std::{fs, io::Cursor, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
 use futures::executor::block_on;
-use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType};
+use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, decode};
 use iracing_sdk::{
     SchemaProvider, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
 };
@@ -148,7 +148,7 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
                 })?;
 
             ensure!(
-                c_string(&variable.name) == expected.name,
+                decode::fixed_string(variable.name_bytes()) == expected.name,
                 "{} variable {index} name mismatch",
                 path.display()
             );
@@ -184,7 +184,7 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
                 expected.name
             );
             ensure!(
-                c_string(&variable.unit) == expected.units,
+                decode::fixed_string(variable.unit_bytes()) == expected.units,
                 "{} variable {} units mismatch",
                 path.display(),
                 expected.name
@@ -327,15 +327,6 @@ fn checked_join(root: &Path, relative: &str) -> Result<std::path::PathBuf> {
         bail!("manifest path must remain relative to the repository: {relative}");
     }
     Ok(root.join(path))
-}
-
-/// Decodes bytes through the first NUL using replacement characters for invalid UTF-8.
-fn c_string(bytes: &[u8]) -> String {
-    let end = bytes
-        .iter()
-        .position(|byte| *byte == 0)
-        .unwrap_or(bytes.len());
-    String::from_utf8_lossy(&bytes[..end]).into_owned()
 }
 
 #[cfg(test)]

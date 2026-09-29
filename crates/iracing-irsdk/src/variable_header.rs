@@ -1,13 +1,19 @@
+use std::{borrow::Cow, ops::Range};
+
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use type_layout::TypeLayout;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
-use crate::parse_utils::try_from_wire_bytes;
+use crate::parse_utils::{decode, encode, try_from_wire_bytes};
 use crate::{Error, Result};
 
 use super::VariableType;
 use super::constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING};
 
-/// iRacing variable header structure matching the C SDK layout
+/// iRacing variable header structure matching the C SDK layout.
+///
+/// Serialization exposes the metadata as named fields, decodes the fixed-width
+/// text fields, and omits ABI padding.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, TypeLayout, TryFromBytes, IntoBytes, KnownLayout, Immutable)]
 pub struct VariableHeader {
@@ -22,14 +28,66 @@ pub struct VariableHeader {
     /// Padding for alignment (matches 3-byte C padding)
     _pad: [u8; 3],
     /// Variable name (32 bytes, null-terminated)
-    pub name: [u8; IRSDK_MAX_STRING],
+    name: [u8; IRSDK_MAX_STRING],
     /// Variable description (64 bytes, null-terminated)
-    pub description: [u8; IRSDK_MAX_DESC],
+    description: [u8; IRSDK_MAX_DESC],
     /// Variable units (32 bytes, null-terminated)
-    pub unit: [u8; IRSDK_MAX_STRING],
+    unit: [u8; IRSDK_MAX_STRING],
+}
+
+impl Serialize for VariableHeader {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut header = serializer.serialize_struct("VariableHeader", 7)?;
+        header.serialize_field("variable_type", &self.variable_type)?;
+        header.serialize_field("offset", &self.offset)?;
+        header.serialize_field("count", &self.count)?;
+        header.serialize_field("count_as_time", &(self.count_as_time != 0))?;
+        header.serialize_field("name", &self.name())?;
+        header.serialize_field("description", &self.description())?;
+        header.serialize_field("unit", &self.unit())?;
+        header.end()
+    }
 }
 
 impl VariableHeader {
+    /// Returns the byte range occupied by this variable, relative to the telemetry buffer start.
+    pub fn range(&self) -> Range<i32> {
+        self.offset..self.offset + self.count * self.variable_type.byte_size() as i32
+    }
+
+    /// Returns the NUL-terminated variable name, replacing invalid UTF-8.
+    pub fn name(&self) -> Cow<'_, str> {
+        decode::fixed_string(self.name_bytes())
+    }
+
+    /// Returns the complete fixed-width variable name bytes, including its NUL and padding.
+    pub fn name_bytes(&self) -> &[u8] {
+        &self.name
+    }
+
+    /// Returns the NUL-terminated variable description, replacing invalid UTF-8.
+    pub fn description(&self) -> Cow<'_, str> {
+        decode::fixed_string(self.description_bytes())
+    }
+
+    /// Returns the complete fixed-width description bytes, including its NUL and padding.
+    pub fn description_bytes(&self) -> &[u8] {
+        &self.description
+    }
+
+    /// Returns the NUL-terminated variable unit, replacing invalid UTF-8.
+    pub fn unit(&self) -> Cow<'_, str> {
+        decode::fixed_string(self.unit_bytes())
+    }
+
+    /// Returns the complete fixed-width unit bytes, including its NUL and padding.
+    pub fn unit_bytes(&self) -> &[u8] {
+        &self.unit
+    }
+
     /// Decodes one variable header from its exact wire representation.
     ///
     /// This validates that every field has a representable value, including
@@ -81,36 +139,11 @@ impl VariableHeader {
             count,
             count_as_time: u8::from(count_as_time),
             _pad: [0; 3],
-            name: fixed_ascii("name", name)?,
-            description: fixed_ascii("description", description)?,
-            unit: fixed_ascii("unit", unit)?,
+            name: encode::fixed_string("name", name)?,
+            description: encode::fixed_string("description", description)?,
+            unit: encode::fixed_string("unit", unit)?,
         })
     }
-}
-
-fn fixed_ascii<const N: usize>(field: &'static str, value: &str) -> Result<[u8; N]> {
-    if !value.is_ascii() {
-        return Err(Error::invalid_configuration(
-            field,
-            "must contain ASCII only",
-        ));
-    }
-    if value.as_bytes().contains(&0) {
-        return Err(Error::invalid_configuration(
-            field,
-            "must not contain an interior NUL byte",
-        ));
-    }
-    if value.len() >= N {
-        return Err(Error::invalid_configuration(
-            field,
-            format!("must be shorter than {N} bytes to remain NUL-terminated"),
-        ));
-    }
-
-    let mut bytes = [0; N];
-    bytes[..value.len()].copy_from_slice(value.as_bytes());
-    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -170,6 +203,55 @@ mod tests {
     }
 
     #[test]
+    fn serializes_header_metadata_without_wire_padding() {
+        let header = VariableHeader::new(
+            VariableType::Float,
+            8,
+            1,
+            true,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(header).unwrap(),
+            serde_json::json!({
+                "variable_type": "Float",
+                "offset": 8,
+                "count": 1,
+                "count_as_time": true,
+                "name": "Speed",
+                "description": "Vehicle speed",
+                "unit": "m/s",
+            })
+        );
+    }
+
+    #[test]
+    fn accessors_decode_fixed_width_text() {
+        let header = VariableHeader::try_from_bytes(&variable_header_bytes(4)).unwrap();
+
+        assert_eq!(header.name(), "Speed");
+        assert_eq!(header.description(), "Vehicle speed");
+        assert_eq!(header.unit(), "m/s");
+        assert!(matches!(header.name(), Cow::Borrowed(_)));
+        assert_eq!(header.name_bytes().len(), IRSDK_MAX_STRING);
+        assert_eq!(header.description_bytes().len(), IRSDK_MAX_DESC);
+        assert_eq!(header.unit_bytes().len(), IRSDK_MAX_STRING);
+        assert_eq!(&header.name_bytes()[..6], b"Speed\0");
+        assert_eq!(&header.description_bytes()[..14], b"Vehicle speed\0");
+        assert_eq!(&header.unit_bytes()[..4], b"m/s\0");
+
+        let mut bytes = variable_header_bytes(4);
+        bytes[16] = 0xFF;
+        let header = VariableHeader::try_from_bytes(&bytes).unwrap();
+        assert_eq!(header.name(), "�peed");
+        assert_eq!(header.name_bytes()[0], 0xFF);
+    }
+
+    #[test]
     fn variable_header_from_bytes_parses_the_complete_wire_representation() {
         let bytes = variable_header_bytes(i32::from(VariableType::Float));
 
@@ -179,12 +261,16 @@ mod tests {
         assert_eq!(header.offset, 0x1020_3040);
         assert_eq!(header.count, 3);
         assert_eq!(header.count_as_time, 1);
-        assert_eq!(&header.name[..6], b"Speed\0");
-        assert!(header.name[6..].iter().all(|byte| *byte == 0));
-        assert_eq!(&header.description[..14], b"Vehicle speed\0");
-        assert!(header.description[14..].iter().all(|byte| *byte == 0));
-        assert_eq!(&header.unit[..4], b"m/s\0");
-        assert!(header.unit[4..].iter().all(|byte| *byte == 0));
+        assert_eq!(&header.name_bytes()[..6], b"Speed\0");
+        assert!(header.name_bytes()[6..].iter().all(|byte| *byte == 0));
+        assert_eq!(&header.description_bytes()[..14], b"Vehicle speed\0");
+        assert!(
+            header.description_bytes()[14..]
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        assert_eq!(&header.unit_bytes()[..4], b"m/s\0");
+        assert!(header.unit_bytes()[4..].iter().all(|byte| *byte == 0));
         assert_eq!(&header.as_bytes()[13..16], &[0xAA, 0xBB, 0xCC]);
     }
 

@@ -1,10 +1,10 @@
-use std::io::Read;
+use std::{io::Read, ops::Range};
 use type_layout::TypeLayout;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use super::{StatusField, VariableBuffer, constants::IRSDK_MAX_BUFS as IRSDK_MAX_BUFFERS};
 use crate::{
-    Result,
+    Result, VariableHeader,
     parse_utils::{read_wire_bytes, read_wire_bytes_from_io},
 };
 
@@ -104,9 +104,7 @@ impl Header {
             buffers,
         }
     }
-}
 
-impl Header {
     /// Indicates whether the header is connected.
     pub fn is_connected(&self) -> bool {
         self.status.contains(StatusField::CONNECTED)
@@ -115,6 +113,17 @@ impl Header {
     /// Indicates whether the session info has changed compared to `last_update`.
     pub fn session_info_changed(&self, last_update: i32) -> bool {
         self.session_info_update != last_update
+    }
+
+    /// Returns the range of the session info buffer, relative to file start.
+    pub fn session_info_range(&self) -> Range<i32> {
+        self.session_info_offset..self.session_info_offset + self.session_info_length
+    }
+
+    /// Returns the range of the variable header array, relative to file start.
+    pub fn variable_headers_range(&self) -> Range<i32> {
+        self.variable_header_offset
+            ..self.variable_header_offset + self.variable_count * size_of::<VariableHeader>() as i32
     }
 }
 

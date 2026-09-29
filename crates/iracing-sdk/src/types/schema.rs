@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use crate::{
     IRacingSDKError, Result,
     irsdk::{VariableHeader, VariableType as IRSDKVariableType},
-    parse_utils,
 };
 
 use super::variable_headers_buffer::VariableHeadersBuffer;
@@ -51,9 +50,9 @@ impl TryFrom<&VariableHeader> for VariableInfo {
 
     fn try_from(value: &VariableHeader) -> Result<Self> {
         Ok(VariableInfo {
-            name: parse_utils::c_string_to_string(&value.name),
-            description: parse_utils::c_string_to_string(&value.description),
-            units: parse_utils::c_string_to_string(&value.unit),
+            name: value.name().into_owned(),
+            description: value.description().into_owned(),
+            units: value.unit().into_owned(),
             offset: usize::try_from(value.offset).map_err(|_| {
                 IRacingSDKError::parse_error(
                     "VariableInfo::try_from",

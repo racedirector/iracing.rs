@@ -67,7 +67,7 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
     for keep_variables in [false, true] {
         for keep_session in [false, true] {
             for keep_frames in [false, true] {
-                let mut header = Header::try_from_reader(&mut std::io::Cursor::new(&bytes))?;
+                let mut header = Header::try_from_bytes(&bytes[..size_of::<Header>()])?;
                 let mut data = bytes[..preamble].to_vec();
                 header.variable_header_offset = 0;
                 header.variable_count = 0;
@@ -161,12 +161,20 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     let mut file = fs::OpenOptions::new().write(true).open(&path)?;
     file.seek(SeekFrom::Start(u64::try_from(session_region.offset())?))?;
     file.write_all(&vec![0; session_region.len()])?;
-    let mut changed_headers = headers.as_slice().as_bytes().to_vec();
-    // Change a description byte, preserving all wire and schema geometry.
-    let description = std::mem::offset_of!(VariableHeader, description);
-    changed_headers[description] = b'!';
+    let first = &headers.as_slice()[0];
+    let original_description = first.description().into_owned();
+    let changed_description = "Changed by snapshot test";
+    let changed_header = VariableHeader::new(
+        first.variable_type,
+        first.offset,
+        first.count,
+        first.count_as_time != 0,
+        &first.name(),
+        changed_description,
+        &first.unit(),
+    )?;
     file.seek(SeekFrom::Start(u64::try_from(variable_region.offset())?))?;
-    file.write_all(&changed_headers)?;
+    file.write_all(changed_header.as_bytes())?;
     file.flush()?;
     drop(file);
     let mut reader = IbtReader::open(&path)?;
@@ -180,15 +188,12 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
             .all(|&byte| byte == 0)
     );
     assert_eq!(
-        reader
-            .variable_headers_snapshot()?
-            .unwrap()
-            .as_slice()
-            .as_bytes(),
-        changed_headers
+        reader.variable_headers_snapshot()?.unwrap().as_slice()[0].description(),
+        changed_description
     );
     assert!(session.as_bytes().iter().any(|&byte| byte != 0));
-    assert_ne!(headers.as_slice().as_bytes(), changed_headers);
+    assert_eq!(headers.as_slice()[0].description(), original_description);
+    assert_ne!(headers.as_slice()[0].description(), changed_description);
     assert!(!reader.frame(0)?.is_empty());
 
     drop(reader);
@@ -292,7 +297,10 @@ fn test_generated_fixture_headers_match_manifest() -> Result<()> {
         assert_eq!(header.tick_rate, fixture.tick_rate);
         assert_eq!(header.variable_count, fixture.num_vars);
         assert_eq!(header.variable_header_offset, fixture.var_header_offset);
-        assert_eq!(header.variable_header_offset, 144);
+        assert_eq!(
+            usize::try_from(header.variable_header_offset)?,
+            size_of::<Header>() + size_of::<DiskSubHeader>()
+        );
         assert_eq!(header.buffer_length, fixture.frame_size as i32);
         assert_eq!(header.buffer_count, fixture.num_buf);
         assert_eq!(header.session_info_length, fixture.session_info_len);
