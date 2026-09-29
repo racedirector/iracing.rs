@@ -125,6 +125,28 @@ impl Header {
         self.variable_header_offset
             ..self.variable_header_offset + self.variable_count * size_of::<VariableHeader>() as i32
     }
+
+    /// Returns the advertised buffer descriptor at `index`.
+    ///
+    /// Returns `None` if the advertised buffer count is invalid or `index` is
+    /// outside that count. This does not validate or copy the buffer's frame data.
+    pub fn buffer(&self, index: usize) -> Option<&VariableBuffer> {
+        let count = usize::try_from(self.buffer_count).ok()?;
+        if count == 0 || count > Self::MAX_BUFFERS || index >= count {
+            return None;
+        }
+
+        self.buffers.get(index)
+    }
+
+    /// Returns the most recently published buffer descriptor.
+    ///
+    /// Returns `None` if the advertised buffer count or current index is
+    /// invalid. A live writer may reuse this buffer after it is selected, so
+    /// callers must check for a torn read when copying its frame data.
+    pub fn current_buffer(&self) -> Option<&VariableBuffer> {
+        self.buffer(usize::from(self.current_buffer))
+    }
 }
 
 #[cfg(test)]
