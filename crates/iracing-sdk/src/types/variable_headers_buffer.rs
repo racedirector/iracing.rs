@@ -1,4 +1,5 @@
 use crate::{IRacingSDKError, Result, irsdk::VariableHeader};
+use serde::{Serialize, Serializer};
 use zerocopy::TryFromBytes;
 
 /// Exact, owned snapshot of decoded SDK variable-header records.
@@ -6,9 +7,19 @@ use zerocopy::TryFromBytes;
 /// Construction validates that the source contains exactly the advertised
 /// number of complete records. Semantic validation of individual headers
 /// remains the responsibility of later wire-to-domain conversion.
+/// Serializes as an array of variable headers in their source order.
 #[derive(Debug, Clone)]
 pub struct VariableHeadersBuffer {
     headers: Vec<VariableHeader>,
+}
+
+impl Serialize for VariableHeadersBuffer {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.headers.serialize(serializer)
+    }
 }
 
 impl VariableHeadersBuffer {
@@ -73,6 +84,10 @@ mod tests {
 
         assert!(snapshot.is_empty());
         assert_eq!(snapshot.iter().len(), 0);
+        assert_eq!(
+            serde_json::to_value(&snapshot).unwrap(),
+            serde_json::json!([])
+        );
     }
 
     #[test]
@@ -90,6 +105,18 @@ mod tests {
         let snapshot = VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 2).unwrap();
 
         assert_eq!(snapshot.len(), 2);
+    }
+
+    #[test]
+    fn serializes_headers_as_an_array() {
+        let headers = [header("Speed", 4), header("RPM", 8)];
+        let snapshot = VariableHeadersBuffer::try_from_region_bytes(headers.as_bytes(), 2).unwrap();
+
+        let value = serde_json::to_value(&snapshot).unwrap();
+        let entries = value.as_array().unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0]["name"], "Speed");
+        assert_eq!(entries[1]["name"], "RPM");
     }
 
     #[test]
