@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// BitField type for handling iRacing bitfield variables.
+#[deprecated]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BitField(pub u32);
 
