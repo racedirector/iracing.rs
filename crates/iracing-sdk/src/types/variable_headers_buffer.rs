@@ -14,6 +14,12 @@ pub struct VariableHeadersBuffer {
 impl VariableHeadersBuffer {
     /// Decodes exactly `expected_count` headers from a complete region snapshot.
     pub(crate) fn try_from_region_bytes(bytes: &[u8], expected_count: usize) -> Result<Self> {
+        if bytes.is_empty() && expected_count == 0 {
+            return Ok(Self {
+                headers: Vec::new(),
+            });
+        }
+
         let headers = <[VariableHeader]>::try_ref_from_bytes_with_elems(bytes, expected_count)
             .map_err(IRacingSDKError::from)?
             .to_vec();
