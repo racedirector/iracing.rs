@@ -1,4 +1,5 @@
 use crate::{IRacingSDKError, Result, irsdk::VariableHeader};
+use zerocopy::TryFromBytes;
 
 /// Exact, owned snapshot of decoded SDK variable-header records.
 ///
@@ -13,31 +14,9 @@ pub struct VariableHeadersBuffer {
 impl VariableHeadersBuffer {
     /// Decodes exactly `expected_count` headers from a complete region snapshot.
     pub(crate) fn try_from_region_bytes(bytes: &[u8], expected_count: usize) -> Result<Self> {
-        let (chunks, []) = bytes.as_chunks::<{ size_of::<VariableHeader>() }>() else {
-            return Err(IRacingSDKError::parse_error(
-                "VariableHeadersBuffer",
-                format!(
-                    "variable-header region length {} is not divisible by record size {}",
-                    bytes.len(),
-                    size_of::<VariableHeader>(),
-                ),
-            ));
-        };
-
-        if chunks.len() != expected_count {
-            return Err(IRacingSDKError::parse_error(
-                "VariableHeadersBuffer",
-                format!(
-                    "expected {expected_count} variable headers, but decoded {}",
-                    chunks.len(),
-                ),
-            ));
-        }
-
-        let headers = chunks
-            .iter()
-            .map(|bytes| VariableHeader::try_from_bytes(bytes).map_err(IRacingSDKError::from))
-            .collect::<Result<Vec<_>>>()?;
+        let headers = <[VariableHeader]>::try_ref_from_bytes_with_elems(bytes, expected_count)
+            .map_err(IRacingSDKError::from)?
+            .to_vec();
 
         Ok(Self { headers })
     }

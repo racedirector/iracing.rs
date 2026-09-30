@@ -165,6 +165,19 @@ impl From<iracing_irsdk::Error> for IRacingSDKError {
     }
 }
 
+impl<T: zerocopy::TryFromBytes + zerocopy::KnownLayout + ?Sized>
+    From<zerocopy::error::TryCastError<&[u8], T>> for IRacingSDKError
+{
+    fn from(error: zerocopy::error::TryCastError<&[u8], T>) -> Self {
+        match error {
+            zerocopy::error::TryCastError::Validity(_) => Self::InvalidWireValue {
+                target: std::any::type_name::<T>(),
+            },
+            error => Self::parse_error(std::any::type_name::<T>(), error.to_string()),
+        }
+    }
+}
+
 impl IRacingSDKError {
     /// Returns whether this error is potentially recoverable through retry.
     pub fn is_retryable(&self) -> bool {
