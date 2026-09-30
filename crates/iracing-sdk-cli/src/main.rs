@@ -3,9 +3,9 @@ mod broadcast;
 mod headers;
 mod session;
 mod telemetry;
-mod types;
 pub(crate) mod utils;
 mod variables;
+mod writer;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -55,7 +55,8 @@ enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
         Commands::Broadcast { command } => handle_broadcast_command(command)?,
         Commands::Headers { command } => handle_headers_command(command)?,
         Commands::Variables { command } => handle_variables_command(command)?,
-        Commands::Telemetry { command } => handle_telemetry_command(command)?,
+        Commands::Telemetry { command } => handle_telemetry_command(command).await?,
     }
 
     Ok(())

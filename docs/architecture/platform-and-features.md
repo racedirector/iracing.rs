@@ -39,6 +39,7 @@ builds all targets, and distributable binaries must be listed under matching
 | Feature | Role |
 | --- | --- |
 | `derive` (default) | Re-export `iracing-sdk-derive` macros. |
+| `test-utils` | Expose fixture helpers for downstream tests without enabling benchmark targets. |
 | `codegen` | Add `schemars` derives/helpers and enable schema-generation binaries. |
 | `schema-discovery` | Preserve and inspect unknown session YAML fields. |
 | `benchmark` | Enable Criterion benchmark targets. |

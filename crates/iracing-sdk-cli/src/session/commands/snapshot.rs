@@ -1,6 +1,6 @@
 use crate::{
-    types::{DocumentFormat, OutputTarget},
-    utils::{get_disk_reader, get_disk_session_info, write_to_output},
+    utils::{get_disk_reader, get_disk_session_info},
+    writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 use anyhow::Result;
 use clap::Subcommand;
@@ -15,9 +15,9 @@ pub(crate) enum Command {
         #[arg(short, long, default_value = "-")]
         output: OutputTarget,
 
-        /// The encoding for the session string.
+        /// The format for the output.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: DocumentFormat,
+        format: DocumentFormat,
     },
     /// Captures the session string from the IBT file and outputs it to the destination in the requested format.
     Ibt {
@@ -29,9 +29,9 @@ pub(crate) enum Command {
         #[arg(short, long, default_value = "-")]
         output: OutputTarget,
 
-        /// The encoding for the session string.
+        /// The format for the output.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: DocumentFormat,
+        format: DocumentFormat,
     },
 }
 
@@ -40,26 +40,27 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
         Command::Ibt {
             path,
             output,
-            encoding,
+            format,
         } => {
             let mut reader = get_disk_reader(&path)?;
             let session_info = get_disk_session_info(&mut reader)?;
 
-            write_to_output(&session_info, &output, encoding)?;
-
-            tracing::info!(ibt_path=%path.display(), output=%output, encoding=%encoding, "Wrote disk session snapshot.");
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&session_info)?;
+            tracing::info!(ibt_path=%path.display(), output=%output, encoding=%format, "Wrote disk session snapshot.");
+            writer.finalize()
         }
         #[cfg(windows)]
-        Command::Live { output, encoding } => {
+        Command::Live { output, format } => {
             use crate::utils::{get_connection, get_live_session_info};
 
             let connection = get_connection()?;
             let session_info = get_live_session_info(&connection)?;
-            write_to_output(&session_info, &output, encoding)?;
 
-            tracing::info!(output=%output, encoding=%encoding, "Wrote live session snapshot.");
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&session_info)?;
+            tracing::info!(output=%output, encoding=%format, "Wrote live session snapshot.");
+            writer.finalize()
         }
     }
-
-    Ok(())
 }

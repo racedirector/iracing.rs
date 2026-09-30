@@ -1,4 +1,4 @@
-#![cfg(any(test, feature = "benchmark"))]
+#![cfg(any(test, feature = "benchmark", feature = "test-utils"))]
 #![allow(missing_docs)]
 
 //! Test utilities for consistent path resolution and test data access

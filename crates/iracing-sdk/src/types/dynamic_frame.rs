@@ -6,7 +6,8 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo, VariableSchema,
+    BitField, FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo,
+    VariableSchema,
     adapters::{AdapterValidation, FrameAdapter},
     types::telemetry_value::TelemetryValueProvider,
 };
@@ -39,7 +40,7 @@ impl DynamicFrame {
     }
 
     /// Look up an SDK bitfield, or `None` if missing or the wrong type.
-    pub fn bitfield(&self, name: &str) -> Option<crate::BitField> {
+    pub fn bitfield(&self, name: &str) -> Option<BitField> {
         self.get(name)
     }
 
@@ -59,7 +60,7 @@ impl DynamicFrame {
     }
 
     /// Retrieves the variable from the frame by name.
-    pub fn value(&self, name: &str) -> crate::Result<Option<TelemetryValue>> {
+    pub fn value(&self, name: &str) -> Result<Option<TelemetryValue>> {
         let Some(info) = self.variable(name) else {
             return Ok(None);
         };
@@ -75,7 +76,7 @@ impl SchemaProvider for DynamicFrame {
 }
 
 impl TelemetryValueProvider for DynamicFrame {
-    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
+    fn telemetry_value(&self, info: &VariableInfo) -> Result<TelemetryValue> {
         TelemetryValue::decode(self.data.as_ref(), info)
     }
 }

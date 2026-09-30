@@ -89,8 +89,8 @@ helpers that collect their paths, inferred types, and examples. This supports
 evolving the typed model without silently losing evidence of new simulator
 fields.
 
-`cargo session schema ibt --path <file.ibt>` and, on Windows,
-`cargo session schema live` generate a schema from a captured typed value.
+`cargo iracing-sdk session schema ibt --path <file.ibt>` and, on Windows,
+`cargo iracing-sdk session schema live` generate a schema from a captured typed value.
 Discovery maps serialize their keys inline in the appropriate domain, so
 unknown keys appear in the inferred schema and its example, not under an
 `unknown_fields` property. Both commands also include
@@ -110,10 +110,7 @@ selection, domain model updates, and verification.
 - disk-derived variable schema;
 - live-derived variable and session schemas.
 
-These files are generated artifacts. Change the Rust model or generator first,
-then regenerate via the Cargo aliases in `.cargo/config.toml`. Most schema
-binaries require `codegen,schema-discovery`; live discovery also requires
-Windows and an appropriate simulator state.
+These files are generated artifacts. Session schemas can be regenerated with `cargo iracing-sdk session schema`. Variable, primitive, and car-setup schema generators are deferred after removal of the standalone binaries; retain their existing reference artifacts. Live discovery requires Windows and an appropriate simulator state.
 
 `docs/reference/README.md` is the usage index for those artifacts.
 

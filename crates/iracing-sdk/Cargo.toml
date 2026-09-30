@@ -63,6 +63,8 @@ tracing-subscriber = { workspace = true }
 [features]
 default = ["derive"]
 benchmark = []
+# Fixture helpers for downstream tests without enabling benchmark targets.
+test-utils = []
 codegen = ["dep:schemars", "iracing-irsdk/codegen"]
 derive = ["dep:iracing-sdk-derive"]
 schema-discovery = []

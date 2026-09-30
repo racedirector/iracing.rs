@@ -1,15 +1,9 @@
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::Result;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
-
-use crate::types::{DocumentFormat, OutputTarget};
 
 #[cfg(windows)]
 pub(crate) fn get_connection() -> Result<WindowsConnection> {
@@ -45,49 +39,4 @@ pub(crate) fn get_disk_session_info(reader: &mut IbtReader) -> Result<SessionInf
         .ok_or_else(|| anyhow::anyhow!("IBT contains no session information"))?;
 
     Ok(SessionInfo::try_from(buffer)?)
-}
-
-pub(super) fn write_to_output<T>(
-    value: &T,
-    target: &OutputTarget,
-    encoding: DocumentFormat,
-) -> Result<()>
-where
-    T: ?Sized + serde::Serialize,
-{
-    match target {
-        OutputTarget::Stdout => {
-            let stdout = std::io::stdout();
-            write_to_writer(value, stdout.lock(), encoding)
-        }
-        OutputTarget::File(path) => {
-            let writer = BufWriter::new(File::create(path)?);
-            write_to_writer(value, writer, encoding)
-        }
-    }
-}
-
-pub(crate) fn write_to_writer<T, W>(
-    value: &T,
-    mut writer: W,
-    encoding: DocumentFormat,
-) -> Result<()>
-where
-    T: ?Sized + serde::Serialize,
-    W: Write,
-{
-    match encoding {
-        DocumentFormat::Yaml => serde_yaml_ng::to_writer(&mut writer, value)?,
-        DocumentFormat::Json => serde_json::to_writer(&mut writer, value)?,
-        DocumentFormat::JsonPretty => serde_json::to_writer_pretty(&mut writer, value)?,
-        DocumentFormat::None => match serde_json::to_value(value)? {
-            serde_json::Value::String(text) => writeln!(writer, "{text}")?,
-            value => writeln!(writer, "{value}")?,
-        },
-    }
-    if matches!(encoding, DocumentFormat::Json | DocumentFormat::JsonPretty) {
-        writer.write_all(b"\n")?;
-    }
-    writer.flush()?;
-    Ok(())
 }

@@ -3,8 +3,8 @@ use clap::Subcommand;
 use std::path::PathBuf;
 
 use crate::{
-    types::{DocumentFormat, OutputTarget},
-    utils::{get_disk_reader, write_to_output},
+    utils::get_disk_reader,
+    writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
 #[derive(Subcommand, Debug)]
@@ -52,10 +52,9 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
                 ))
             };
 
-            write_to_output(&snapshot, &output, format)?;
-            tracing::info!(ibt_path=%path.display(), output=%output, format=%format, "Wrote disk telemetry variables");
-
-            Ok(())
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&snapshot)?;
+            writer.finalize()
         }
         #[cfg(windows)]
         Command::Live { output, format } => {
@@ -69,11 +68,9 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
                 ))
             };
 
-            write_to_output(&snapshot, &output, format)?;
-
-            tracing::info!(output=%output, format=%format, "Wrote live telemetry variables");
-
-            Ok(())
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&snapshot)?;
+            writer.finalize()
         }
     }
 }

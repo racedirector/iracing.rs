@@ -11,7 +11,7 @@ on commands, boundaries, and easy-to-miss constraints.
 - `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. For intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings` are the formatting/lint gates.
 - For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p iracing-sdk --examples` and `cargo check -p iracing-sdk-cli --bins --all-features`.
-- Codegen binaries require `cargo build -p iracing-sdk-cli --features codegen,schema-discovery` when you need schema outputs.
+- Build the consolidated CLI with `cargo build -p iracing-sdk-cli`; use `cargo iracing-sdk session schema --help` for supported schema outputs. Variable, primitive, and car-setup schema generators are deferred.
 
 ## Quality Gates
 

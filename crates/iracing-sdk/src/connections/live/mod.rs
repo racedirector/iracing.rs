@@ -51,7 +51,8 @@ impl LiveConnection {
         LiveConnectionBuilder::default()
     }
 
-    fn from_provider(provider: LiveProvider) -> Self {
+    /// Creates a new connection from a given provider
+    pub fn from_provider(provider: LiveProvider) -> Self {
         // Extract metadata
         let schema = provider.shared_schema();
         let source_hz = provider.tick_rate();

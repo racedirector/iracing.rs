@@ -41,92 +41,11 @@ enum-bitfields-ibt = [
   "--",
 ]
 
-car-setup-schema = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "car-setup-schema",
-  "--",
-]
-
-disk-variable-schema = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "disk-variable-schema",
-  "--",
-]
-
-ibt-to-csv = ["run", "-p", "iracing-sdk-cli", "--bin", "ibt-to-csv", "--"]
-
-ibt-json-snapshot = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--bin",
-  "ibt-json-snapshot",
-  "--",
-]
-
-ibt-to-json = ["run", "-p", "iracing-sdk-cli", "--bin", "ibt-to-json", "--"]
-
-primitives-schema = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "primitives-schema",
-  "--",
-]
-
-live-to-csv = ["run", "-p", "iracing-sdk-cli", "--bin", "live-to-csv", "--"]
-
-live-json-snapshot = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--bin",
-  "live-json-snapshot",
-  "--",
-]
-
-live-to-jsonl = ["run", "-p", "iracing-sdk-cli", "--bin", "live-to-jsonl", "--"]
-
-live-variable-schema = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "live-variable-schema",
-  "--",
-]
-
 session-updates = [
   "run",
   "-p",
   "iracing-sdk",
   "--example",
   "session-updates",
-  "--",
-]
-
-variable-schema = [
-  "run",
-  "-p",
-  "iracing-sdk-cli",
-  "--features",
-  "codegen,schema-discovery",
-  "--bin",
-  "variable-schema",
   "--",
 ]

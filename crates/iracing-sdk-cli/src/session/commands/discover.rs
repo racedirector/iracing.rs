@@ -3,8 +3,8 @@ use clap::Subcommand;
 use std::path::PathBuf;
 
 use crate::{
-    types::{DocumentFormat, OutputTarget},
-    utils::{get_disk_reader, get_disk_session_info, write_to_output},
+    utils::{get_disk_reader, get_disk_session_info},
+    writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
 #[derive(Subcommand, Debug)]
@@ -15,9 +15,9 @@ pub(crate) enum Command {
         #[arg(short, long, default_value = "-")]
         output: OutputTarget,
 
-        /// The encoding for the session string.
+        /// The format for the output.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: DocumentFormat,
+        format: DocumentFormat,
     },
     Ibt {
         /// Path to the input `.ibt` telemetry file.
@@ -28,36 +28,40 @@ pub(crate) enum Command {
         #[arg(short, long, default_value = "-")]
         output: OutputTarget,
 
-        /// The encoding for the session string.
+        /// The format for the output.
         #[arg(long, default_value = "yaml", value_enum)]
-        encoding: DocumentFormat,
+        format: DocumentFormat,
     },
 }
 
 pub(crate) fn handle_command(command: Command) -> Result<()> {
     match command {
         #[cfg(windows)]
-        Command::Live { output, encoding } => {
+        Command::Live { output, format } => {
             use crate::utils::{get_connection, get_live_session_info};
 
             let connection = get_connection()?;
             let session_info = get_live_session_info(&connection)?;
             let unknown_fields = session_info.collect_unknown_fields();
-            write_to_output(&unknown_fields, &output, encoding)?;
-            tracing::info!(output=%output, encoding=%encoding, "Wrote live session unknown fields snapshot.");
+
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&unknown_fields)?;
+            tracing::info!(output=%output, format=%format, "Wrote live session unknown fields snapshot.");
+            writer.finalize()
         }
         Command::Ibt {
             path,
             output,
-            encoding,
+            format,
         } => {
             let mut reader = get_disk_reader(&path)?;
             let session_info = get_disk_session_info(&mut reader)?;
             let unknown_fields = session_info.collect_unknown_fields();
-            write_to_output(&unknown_fields, &output, encoding)?;
-            tracing::info!(ibt_path=%path.display(), output=%output, encoding=%encoding, "Wrote disk session unknown fields snapshot.");
+
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&unknown_fields)?;
+            tracing::info!(ibt_path=%path.display(), output=%output, format=%format, "Wrote disk session unknown fields snapshot.");
+            writer.finalize()
         }
     }
-
-    Ok(())
 }

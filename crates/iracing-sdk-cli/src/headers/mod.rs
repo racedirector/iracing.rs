@@ -4,10 +4,7 @@ use iracing_sdk::irsdk::{DiskSubHeader, Header, VariableBuffer, VariableHeader};
 use std::{fs::File, io::Read, path::PathBuf};
 use type_layout::TypeLayout;
 
-use crate::{
-    types::{DocumentFormat, OutputTarget},
-    utils::{write_to_output, write_to_writer},
-};
+use crate::writer::{DocumentFormat, DocumentWriter, OutputTarget};
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
@@ -54,10 +51,10 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             let header = Header::try_from_reader(&mut handle)?;
             let sub_header = DiskSubHeader::try_from_reader(&mut handle)?;
 
-            write_to_output(&header, &output, format)?;
-            write_to_output(&sub_header, &output, format)?;
-
-            Ok(())
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&header)?;
+            writer.write(&sub_header)?;
+            writer.finalize()
         }
         #[cfg(windows)]
         Command::Live { output, format } => {
@@ -66,38 +63,24 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             let connection = get_connection()?;
             let header = connection.header();
 
-            write_to_output(&header, &output, format)?;
-
-            Ok(())
+            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+            writer.write(&header)?;
+            writer.finalize()
         }
         Command::Type => {
-            let stdout = std::io::stdout();
+            let mut writer =
+                DocumentWriter::from_parts(OutputTarget::Stdout, DocumentFormat::None)?;
 
-            write_to_writer(
-                &format!("{}", VariableBuffer::type_layout()).to_string(),
-                stdout.lock(),
-                DocumentFormat::None,
-            )?;
+            for layout in [
+                VariableBuffer::type_layout(),
+                Header::type_layout(),
+                DiskSubHeader::type_layout(),
+                VariableHeader::type_layout(),
+            ] {
+                writer.write(&layout.to_string())?;
+            }
 
-            write_to_writer(
-                &format!("{}", Header::type_layout()).to_string(),
-                stdout.lock(),
-                DocumentFormat::None,
-            )?;
-
-            write_to_writer(
-                &format!("{}", DiskSubHeader::type_layout()).to_string(),
-                stdout.lock(),
-                DocumentFormat::None,
-            )?;
-
-            write_to_writer(
-                &format!("{}", VariableHeader::type_layout()).to_string(),
-                stdout.lock(),
-                DocumentFormat::None,
-            )?;
-
-            Ok(())
+            writer.finalize()
         }
     }
 }
