@@ -63,9 +63,7 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             let connection = get_connection()?;
 
             let Some(snapshot) = connection.variable_headers_buffer() else {
-                bail!(format!(
-                    "Could not retrieve variable headers from live connection"
-                ))
+                bail!("Could not retrieve variable headers from live connection")
             };
 
             let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
