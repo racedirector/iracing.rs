@@ -384,7 +384,7 @@ mod tests {
     #[ignore = "iracing_required"]
     fn connects_to_live_iracing() {
         let connection = Connection::try_connect().expect("Failed to connect to iRacing");
-        let header = connection.header();
+        let header = connection.header_snapshot().unwrap();
 
         // Validate header structure sizes match expected C SDK layout
         assert_eq!(

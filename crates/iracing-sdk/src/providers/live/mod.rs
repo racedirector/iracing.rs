@@ -58,7 +58,7 @@ impl LiveProvider {
         poll_interval: Duration,
         max_no_connection_attempts: Option<u32>,
     ) -> Result<Self> {
-        let header = connection.header();
+        let header = connection.header_snapshot()?;
         let variables = connection.get_variables()?;
         let mut variable_map = std::collections::HashMap::new();
 
