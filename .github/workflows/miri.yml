@@ -1,0 +1,27 @@
+name: Modeled Rust memory verification
+on:
+  pull_request:
+    paths: ['crates/iracing-irsdk/**', 'crates/iracing-sdk/**', 'Cargo.toml', 'Cargo.lock', '.github/workflows/miri.yml']
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pure-rust:
+    name: Miri wire, range, owned source and physical layout (no Win32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        with:
+          toolchain: nightly-2026-10-01
+          components: miri,rust-src
+      - run: "cargo +nightly-2026-10-01 miri setup"
+      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-irsdk --lib --all-features"
+      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib types::regions::"
+      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib types::ibt::layout::"
+      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib ibt::reader::source::tests::"

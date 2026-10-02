@@ -184,6 +184,20 @@ impl VariableHeader {
     }
 }
 
+// Native SDK ABI invariants must hold even when tests are not built.
+const _: () = {
+    assert!(std::mem::size_of::<VariableHeader>() == 144);
+    assert!(std::mem::align_of::<VariableHeader>() == 4);
+    assert!(std::mem::offset_of!(VariableHeader, variable_type) == 0);
+    assert!(std::mem::offset_of!(VariableHeader, offset) == 4);
+    assert!(std::mem::offset_of!(VariableHeader, count) == 8);
+    assert!(std::mem::offset_of!(VariableHeader, count_as_time) == 12);
+    assert!(std::mem::offset_of!(VariableHeader, _pad) == 13);
+    assert!(std::mem::offset_of!(VariableHeader, name) == 16);
+    assert!(std::mem::offset_of!(VariableHeader, description) == 48);
+    assert!(std::mem::offset_of!(VariableHeader, unit) == 112);
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -102,6 +102,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn owned_reads_check_destination_and_available_bytes() {
+        let mut source = IbtSource::Owned(Cursor::new(vec![1, 2, 3, 4]));
+        let region = ByteRegion::new(1, 2).unwrap();
+        let mut destination = [0; 2];
+        source.read_region_into(region, &mut destination).unwrap();
+        assert_eq!(destination, [2, 3]);
+        assert!(source.read_region_into(region, &mut [0; 1]).is_err());
+        assert!(source.read_region(ByteRegion::new(3, 2).unwrap()).is_err());
+        assert_eq!(source.read_region(region).unwrap(), [2, 3]);
+    }
+
+    #[test]
     fn source_length_representability_boundary() {
         let maximum = u64::try_from(usize::MAX).unwrap();
         assert_eq!(layout_source_len(maximum).unwrap(), usize::MAX);
