@@ -243,7 +243,7 @@ impl Connection {
 
         let bytes = self.copy_region(region.as_region())?;
 
-        Some(SessionInfoBuffer::from_owned_checked_region(bytes))
+        Some(SessionInfoBuffer::from_checked_region(&bytes))
     }
 
     /// Copies the variable-header region advertised by the live header.
