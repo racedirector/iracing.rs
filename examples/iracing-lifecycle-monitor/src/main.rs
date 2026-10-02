@@ -146,6 +146,8 @@ fn monitor_connected_session(
     poll_interval: Duration,
     telemetry_wait: Duration,
 ) {
+    use iracing_sdk::windows::WaitResult;
+
     tracing::info!("Monitoring live telemetry session");
 
     loop {
@@ -177,10 +179,10 @@ fn monitor_connected_session(
 
         // Wait for an update
         match connection.wait_for_update(telemetry_wait) {
-            Ok(iracing_sdk::WaitResult::Signaled) => {
+            Ok(WaitResult::Signaled) => {
                 tracing::debug!("Telemetry update signaled");
             }
-            Ok(iracing_sdk::WaitResult::Timeout) => {
+            Ok(WaitResult::Timeout) => {
                 tracing::debug!("Telemetry wait timed out");
             }
             Err(err) => {

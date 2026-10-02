@@ -3,165 +3,139 @@
 //! This module provides direct memory mapping to iRacing's shared memory
 //! following the same patterns as the official C++ SDK implementation.
 
-use crate::{
-    ByteParser, ByteRegion, IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer,
-    SessionInfoRegion, VariableHeadersBuffer, VariableHeadersRegion, VariableInfo,
-    irsdk::{
-        Header,
-        constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME},
-    },
-    windows::wide_string,
-};
-use std::ptr::NonNull;
-use std::time::Duration;
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
-use windows::Win32::System::Memory::{
-    FILE_MAP_READ, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile, OpenFileMappingW, UnmapViewOfFile,
-};
-use windows::Win32::System::Threading::{
-    OpenEventW, SYNCHRONIZATION_ACCESS_RIGHTS, WaitForSingleObject,
-};
-use windows::core::PCWSTR;
+use iracing_irsdk::{StatusField, VariableBuffer};
 
-/// Result of waiting for data updates
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WaitResult {
-    /// Wait resolved with data.
-    Signaled,
-    /// Wait time elapsed.
-    Timeout,
-}
+use super::source::WaitResult;
+use crate::ByteRegion;
+use crate::{
+    IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
+    VariableHeadersBuffer, VariableHeadersRegion, VariableInfo, irsdk::Header,
+    windows::source::LiveSource,
+};
+use std::mem::offset_of;
+use std::time::Duration;
 
 /// Direct connection to iRacing shared memory
 #[derive(Debug)]
 pub struct Connection {
-    mapping: HANDLE,
-    base: NonNull<u8>,
-    event: HANDLE,
+    source: LiveSource,
+
+    frame_data: Vec<u8>,
     last_tick_count: i32,
 }
 
 impl Connection {
-    fn wait_for_event(event: HANDLE, timeout_ms: u32) -> Result<WaitResult> {
-        tracing::trace!(timeout_ms = timeout_ms, "Waiting for telemetry update");
-
-        let result = unsafe { WaitForSingleObject(event, timeout_ms) };
-
-        match result {
-            WAIT_OBJECT_0 => {
-                tracing::trace!("Telemetry update signaled");
-                Ok(WaitResult::Signaled)
-            }
-            WAIT_TIMEOUT => {
-                tracing::trace!("Wait timed out");
-                Ok(WaitResult::Timeout)
-            }
-            _ => {
-                let win_err = windows::core::Error::from_thread();
-                Err(IRacingSDKError::windows_api_error(
-                    "WaitForSingleObject",
-                    win_err,
-                ))
-            }
-        }
-    }
-
     /// Attempt to connect to iRacing shared memory
     pub fn try_connect() -> Result<Self> {
         tracing::trace!("Attempting to connect to iRacing shared memory");
 
-        // Open the memory mapping
-        let mapping = unsafe {
-            let wide_name = wide_string(IRSDK_MEMMAPFILENAME);
-            OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR::from_raw(wide_name.as_ptr()))
-                .map_err(|e| IRacingSDKError::windows_api_error("OpenFileMappingW", e))?
-        };
-
-        // Map the view
-        let base = unsafe {
-            let ptr = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
-            NonNull::new(ptr.Value as *mut u8).ok_or_else(|| {
-                let win_err = windows::core::Error::from_thread();
-                IRacingSDKError::windows_api_error("MapViewOfFile", win_err)
-            })?
-        };
-
-        // Open the data valid event
-        let event = unsafe {
-            let wide_name = wide_string(IRSDK_DATAVALIDEVENTNAME);
-            OpenEventW(
-                SYNCHRONIZATION_ACCESS_RIGHTS(0x0010_0000),
-                false,
-                PCWSTR::from_raw(wide_name.as_ptr()),
-            ) // SYNCHRONIZE
-            .map_err(|e| IRacingSDKError::windows_api_error("OpenEventW", e))?
-        };
-
         // Initialize with i32::MAX to match C++ SDK's INT_MAX
-        // This ensures the first frame is always accepted as "new"
+        // The first observed tick establishes the baseline without a frame.
         let connection = Self {
-            mapping,
-            base,
-            event,
+            source: LiveSource::try_connect()?,
+
+            frame_data: Vec::new(),
             last_tick_count: i32::MAX,
         };
 
-        tracing::debug!("Initialized last_tick_count to i32::MAX for first frame acceptance");
-        tracing::debug!("Successfully connected to iRacing shared memory");
+        tracing::trace!("Successfully connected to iRacing shared memory");
 
         Ok(connection)
     }
 
-    /// Get direct access to the header
+    /// Borrows the legacy header directly from the shared-memory mapping.
+    ///
+    /// The header contents are volatile: iRacing can change them independently
+    /// of this connection. This compatibility accessor does not perform volatile
+    /// loads or provide a coherent snapshot. Ordinary Rust references require
+    /// the referent to remain unchanged, which the live simulator does not
+    /// guarantee; retaining this API does not resolve that legacy limitation.
+    /// New code should use [`Self::header_snapshot`] or scalar accessors.
+    #[deprecated(
+        note = "use header_snapshot() or scalar accessors; mapped header contents can change"
+    )]
     pub fn header(&self) -> &Header {
-        unsafe { &*(self.base.as_ptr() as *const Header) }
+        assert!(
+            self.source.len() >= size_of::<Header>(),
+            "mapped header is truncated"
+        );
+        // Legacy compatibility only: bounds and page alignment are established,
+        // but concurrent simulator mutation remains the documented limitation.
+        unsafe { &*self.source.legacy_header_ptr().cast::<Header>() }
+    }
+
+    /// Copies the live header into an owned value.
+    ///
+    /// The result remains stable after the copy, but fields may reflect different
+    /// publication instants if the simulator updates them during the copy.
+    /// Frame acquisition still requires separate synchronization-word checks.
+    ///
+    /// # Errors
+    /// Returns an error if the mapping is too short or the source copy fails.
+    pub fn header_snapshot(&self) -> Result<Header> {
+        if self.source.len() < size_of::<Header>() {
+            return Err(IRacingSDKError::parse_error(
+                "Header",
+                "Mapped header is truncated",
+            ));
+        }
+        // SAFETY: The full header fits in the retained mapping. Header implements
+        // FromBytes, and the source copies into disjoint, owned storage.
+        unsafe { self.source.copy_value_unchecked::<Header>(0) }
+    }
+
+    /// The connection status advertised from the header
+    pub fn status(&self) -> StatusField {
+        let raw = self
+            .source
+            .read_i32(offset_of!(Header, status))
+            .unwrap_or_default();
+
+        StatusField::from_bits_retain(raw)
     }
 
     /// Check if iRacing is connected
     pub fn is_connected(&self) -> bool {
-        self.header().status.is_connected()
+        self.status().is_connected()
+    }
+
+    /// Get session info update counter
+    pub fn session_info_update(&self) -> i32 {
+        // SAFETY: Activation validated the fixed header. This aligned word
+        // remains within our retained mapping for the reader's lifetime.
+        unsafe {
+            self.source
+                .read_i32_unchecked(offset_of!(Header, session_info_update))
+                .unwrap_or(-1)
+        }
+    }
+
+    /// The tick rate advertised by the header
+    pub fn tick_rate(&self) -> i32 {
+        // SAFETY: Activation validated the fixed header. This aligned word
+        // remains within our retained mapping for the reader's lifetime.
+        unsafe {
+            self.source
+                .read_i32_unchecked(offset_of!(Header, tick_rate))
+                .unwrap_or(-1)
+        }
     }
 
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
-        let ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-        Self::wait_for_event(self.event, ms)
+        self.source.wait_for_update(timeout)
     }
 
     /// Wait for new telemetry data (async - cooperative, non-blocking)
-    ///
-    /// This method uses `spawn_blocking` to isolate the synchronous Windows event wait
-    /// on a dedicated blocking thread pool, preventing starvation of other async tasks.
-    /// The async worker thread yields cooperatively via `.await` while the blocking
-    /// thread waits for the Windows event signal.
-    ///
-    /// At 60Hz (16.67ms frames), the hot path (data already available) never reaches
-    /// this method, so spawn_blocking overhead is only paid during startup, pauses,
-    /// or frame drops - exactly when we want cooperative yielding anyway.
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
-        // Convert HANDLE to raw pointer value (usize) to make it Send
-        // SAFETY: Windows event handles are thread-safe kernel objects
-        let event_raw = self.event.0 as usize;
-        let timeout_ms = timeout.as_millis().min(u32::MAX as u128) as u32;
-
-        tokio::task::spawn_blocking(move || {
-            tracing::trace!(timeout_ms, "Async waiting for Windows event");
-
-            // Reconstruct HANDLE from raw pointer value
-            // SAFETY: event_raw came from a valid HANDLE, kernel object is still alive
-            let event = HANDLE(event_raw as *mut std::ffi::c_void);
-            Self::wait_for_event(event, timeout_ms)
-        })
-        .await
-        .map_err(|e| {
-            IRacingSDKError::buffer_operation_error(
-                format!("Event wait task panicked: {}", e),
-                None,
-            )
-        })?
+        self.source.wait_for_update_async(timeout).await
     }
 
-    /// Get latest telemetry data if available
+    /// Copies the published current telemetry buffer into connection-owned storage.
+    ///
+    /// Returns a slice only after the completed tick read before the copy matches
+    /// the begin tick read afterward, retrying acquisition at most twice. Equal
+    /// ticks return no data; older ticks establish a new baseline without a frame.
     pub fn get_new_data(&mut self) -> Option<&[u8]> {
         if !self.is_connected() {
             tracing::debug!("Not connected to iRacing");
@@ -169,58 +143,72 @@ impl Connection {
             return None;
         }
 
-        let header = self.header();
+        let header = self.header_snapshot().ok()?;
+        // Use the published current buffer, with the native fallback to zero.
+        // The backing array also bounds malformed advertised buffer counts.
+        let current_buffer = self.source.read_u8(offset_of!(Header, current_buffer))?;
+        let latest_buf_idx = Self::current_buffer_index(current_buffer, header.buffer_count);
+        let descriptor_offset =
+            offset_of!(Header, buffers) + latest_buf_idx * size_of::<VariableBuffer>();
+        let tick_offset = descriptor_offset + offset_of!(VariableBuffer, tick_count);
+        let begin_offset = descriptor_offset + offset_of!(VariableBuffer, tick_count_begin);
 
-        // Find the buffer with the highest tick count (most recent)
-        let latest_buf_idx = self.find_latest_buffer(header);
-        let latest_buf = &header.buffers[latest_buf_idx];
+        let latest_tick = self.source.read_i32(tick_offset)?;
 
-        tracing::trace!(
-            "Checking for new data: last_tick={}, latest_tick={}, buffer_idx={}",
-            self.last_tick_count,
-            latest_buf.tick_count,
-            latest_buf_idx
-        );
-
-        // Check if we have new data
-        if self.last_tick_count == latest_buf.tick_count {
-            tracing::trace!("No new data (same tick count)");
+        if self.last_tick_count == latest_tick {
             return None;
         }
 
-        // Handle potential tick count reset or wraparound
-        if self.last_tick_count > latest_buf.tick_count && self.last_tick_count != i32::MAX {
+        // Match the native SDK, including its initial INT_MAX sentinel:
+        // record an older tick, but do not return that frame.
+        if self.last_tick_count > latest_tick {
             tracing::trace!(
                 "Tick count reset detected: {} -> {}",
                 self.last_tick_count,
-                latest_buf.tick_count
+                latest_tick
             );
+            self.last_tick_count = latest_tick;
+            return None;
         }
 
-        // Double-read pattern to ensure data consistency
-        for attempt in 0..2 {
-            let tick_before = latest_buf.tick_count;
-            let data_ptr = unsafe { self.base.as_ptr().add(latest_buf.buffer_offset as usize) };
-            let data_slice =
-                unsafe { std::slice::from_raw_parts(data_ptr, header.buffer_length as usize) };
-            let tick_after = latest_buf.tick_count;
+        let frame_offset = usize::try_from(header.buffers[latest_buf_idx].buffer_offset).ok()?;
+        let frame_len = usize::try_from(header.buffer_length).ok()?;
 
-            if tick_before == tick_after {
-                self.last_tick_count = tick_before;
-                tracing::trace!(
-                    "Returning new data: tick={}, size={} bytes",
-                    tick_before,
-                    data_slice.len()
-                );
-                return Some(data_slice);
-            } else {
-                tracing::trace!(
-                    "Data consistency check failed on attempt {}: before={}, after={}",
-                    attempt + 1,
-                    tick_before,
-                    tick_after
-                );
+        if frame_offset.checked_add(frame_len)? > self.source.len() {
+            return None;
+        }
+
+        self.frame_data.resize(frame_len, 0);
+
+        // Keep the selected descriptor fixed across both attempts,
+        // as the native SDK does.
+        for attempt in 0..2 {
+            let tick_count = self.source.read_i32(tick_offset)?;
+
+            // SAFETY: The source range was checked above. frame_data is
+            // initialized Rust-owned storage, disjoint from the mapping.
+            // Geometry is assumed stable during this acquisition, as in
+            // the native SDK.
+            unsafe {
+                self.source
+                    .copy_unchecked(frame_offset, &mut self.frame_data)
+                    .ok()?;
             }
+
+            let tick_count_begin = self.source.read_i32(begin_offset)?;
+
+            if tick_count == tick_count_begin {
+                self.last_tick_count = tick_count;
+                return Some(self.frame_data.as_slice());
+            }
+
+            tracing::trace!(
+                "Data consistency check failed on attempt {}: \
+             tick_count={}, tick_count_begin={}",
+                attempt + 1,
+                tick_count,
+                tick_count_begin
+            );
         }
 
         tracing::warn!("Failed consistency checks, no data returned");
@@ -231,13 +219,13 @@ impl Connection {
     ///
     /// Returns `None` when the header advertises no usable region.
     pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
-        let header = self.header();
+        let header = self.header_snapshot().ok()?;
 
-        let region = SessionInfoRegion::try_from(header).ok()?;
+        let region = SessionInfoRegion::try_from_header(&header).ok()??;
 
-        let session_info_bytes = self.bytes_at_region(region.as_region());
+        let bytes = self.copy_region(region.as_region())?;
 
-        Some(SessionInfoBuffer::from_checked_region(session_info_bytes))
+        Some(SessionInfoBuffer::from_owned_checked_region(bytes))
     }
 
     /// Returns decoded live session-information text with invalid control characters removed.
@@ -251,22 +239,16 @@ impl Connection {
         Some(session_info.into())
     }
 
-    /// Get session info update counter
-    pub fn session_info_update(&self) -> i32 {
-        self.header().session_info_update
-    }
-
     /// Copies the variable-header region advertised by the live header.
     ///
     /// Returns `None` when the header advertises no usable region.
     pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
-        let header = self.header();
+        let header = self.header_snapshot().ok()?;
+        let region = VariableHeadersRegion::try_from_header(&header).ok()??;
 
-        let region = VariableHeadersRegion::try_from_header(header).ok()??;
+        let variable_header_bytes = self.copy_region(region.as_region())?;
 
-        let variable_header_bytes = self.bytes_at_region(region.as_region());
-
-        VariableHeadersBuffer::try_from_region_bytes(variable_header_bytes, region.count()).ok()
+        VariableHeadersBuffer::try_from_region_bytes(&variable_header_bytes, region.count()).ok()
     }
 
     /// Decodes all variable definitions from a copied variable-header region.
@@ -285,7 +267,40 @@ impl Connection {
         buffer.iter().map(VariableInfo::try_from).collect()
     }
 
-    /// Find the buffer with the highest tick count
+    fn copy_region(&self, region: ByteRegion) -> Option<Vec<u8>> {
+        if region.end() > self.source.len() {
+            return None;
+        }
+
+        let mut bytes = vec![0; region.len()];
+
+        // SAFETY: ByteRegion guarantees non-overflowing geometry; the
+        // bounds check establishes the source extent. bytes is initialized,
+        // writable storage disjoint from the retained mapping.
+        unsafe {
+            self.source
+                .copy_unchecked(region.offset(), &mut bytes)
+                .ok()?;
+        }
+
+        Some(bytes)
+    }
+
+    fn current_buffer_index(current_buffer: u8, buffer_count: i32) -> usize {
+        let index = usize::from(current_buffer);
+        if i32::from(current_buffer) < buffer_count && index < Header::MAX_BUFFERS {
+            index
+        } else {
+            0
+        }
+    }
+
+    /// Find the buffer with the highest tick count.
+    ///
+    /// This legacy selection differs from the native SDK's current-buffer index.
+    #[deprecated(
+        note = "use the published current_buffer; get_new_data() now follows native selection"
+    )]
     pub fn find_latest_buffer(&self, header: &Header) -> usize {
         let mut latest = 0;
         let num_buf = header.buffer_count.clamp(0, 4) as usize;
@@ -298,28 +313,6 @@ impl Connection {
     }
 }
 
-impl ByteParser for Connection {
-    fn bytes_at_region(&self, region: ByteRegion) -> &[u8] {
-        unsafe {
-            let bytes_ptr = self.base.as_ptr().add(region.offset());
-            std::slice::from_raw_parts(bytes_ptr, region.len())
-        }
-    }
-}
-
-impl Drop for Connection {
-    fn drop(&mut self) {
-        unsafe {
-            let addr = MEMORY_MAPPED_VIEW_ADDRESS {
-                Value: self.base.as_ptr() as *mut _,
-            };
-            let _ = UnmapViewOfFile(addr);
-            let _ = CloseHandle(self.mapping);
-            let _ = CloseHandle(self.event);
-        }
-    }
-}
-
 // SAFETY: The Connection struct only holds Windows handles and a memory pointer
 // that are safe to send between threads for our read-only use case
 unsafe impl Send for Connection {}
@@ -329,16 +322,6 @@ unsafe impl Sync for Connection {}
 mod tests {
     use super::*;
     use crate::irsdk::{StatusField, VariableBuffer, constants::IRSDK_VER};
-    use std::mem::ManuallyDrop;
-
-    fn test_connection() -> ManuallyDrop<Connection> {
-        ManuallyDrop::new(Connection {
-            mapping: HANDLE::default(),
-            base: NonNull::dangling(),
-            event: HANDLE::default(),
-            last_tick_count: i32::MAX,
-        })
-    }
 
     fn test_header(num_buf: i32) -> Header {
         Header::new(
@@ -364,22 +347,19 @@ mod tests {
     }
 
     #[test]
-    fn find_latest_buffer_caps_count_at_backing_array_length() {
-        let connection = test_connection();
-        let header = test_header(5);
-
-        assert_eq!(connection.find_latest_buffer(&header), 1);
+    fn current_buffer_selection_uses_published_index_instead_of_highest_tick() {
+        let header = test_header(4);
+        assert_eq!(
+            Connection::current_buffer_index(header.current_buffer, header.buffer_count),
+            2
+        );
     }
 
     #[test]
-    #[ignore = "known bug: a negative num_buf is cast to usize after applying only an upper bound"]
-    fn find_latest_buffer_does_not_panic_for_negative_count() {
-        let connection = test_connection();
-        let header = test_header(-1);
-
-        let result = std::panic::catch_unwind(|| connection.find_latest_buffer(&header));
-
-        assert!(result.is_ok(), "negative num_buf must not cause a panic");
+    fn current_buffer_selection_falls_back_to_zero_for_invalid_indices() {
+        for (index, count) in [(4, 4), (255, 4), (2, 2), (2, 0), (2, -1), (4, 5)] {
+            assert_eq!(Connection::current_buffer_index(index, count), 0);
+        }
     }
 
     #[test]

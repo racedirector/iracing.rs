@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::{
-    FramePacket, Result, SchemaProvider, VariableSchema, WaitResult, WindowsConnection,
-    provider::Provider,
+    FramePacket, Result, SchemaProvider, VariableSchema, WindowsConnection, provider::Provider,
+    windows::WaitResult,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -129,9 +129,12 @@ impl LiveProvider {
             // This catches frames that arrived since our last check
             if let Some(data) = self.connection.get_new_data() {
                 let frame_data = data.to_vec();
-                let header = self.connection.header();
-                let latest_buf_idx = self.connection.find_latest_buffer(header);
-                let tick = header.buffers[latest_buf_idx].tick_count as u32;
+                let header = self.connection.header_snapshot()?;
+                let Some(buffer) = header.current_variable_buffer() else {
+                    unreachable!("Buffers should exist")
+                };
+
+                let tick = buffer.tick_count as u32;
                 let session_version = header.session_info_update as u32;
 
                 tracing::trace!(
@@ -245,7 +248,7 @@ impl Provider for LiveProvider {
     }
 
     fn tick_rate(&self) -> f64 {
-        self.connection.header().tick_rate as f64
+        self.connection.tick_rate() as f64
     }
 }
 

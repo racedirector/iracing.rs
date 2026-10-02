@@ -38,8 +38,10 @@
 
 mod broadcast;
 mod connection;
+mod source;
 mod utils;
 
 pub use broadcast::{Broadcast, BroadcastCommand};
-pub use connection::{Connection, WaitResult};
+pub use connection::Connection;
+pub use source::WaitResult;
 pub use utils::wide_string;

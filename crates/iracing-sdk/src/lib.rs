@@ -103,7 +103,7 @@ pub mod windows;
 // Windows memory exports
 #[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(windows)))]
-pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection, WaitResult};
+pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection};
 
 // Main API exports
 pub use connections::ibt::IbtConnection;
