@@ -1,3 +1,4 @@
+mod generated;
 mod support;
 mod workflows;
 
@@ -17,6 +18,10 @@ struct Args {
 enum Task {
     /// Check repository configuration for drift.
     CheckRepo,
+    /// Check deterministic generated references without writing them.
+    CheckGenerated,
+    /// Regenerate deterministic reference artifacts.
+    GenerateReference,
     /// Run the shared sequential local quality gate.
     PrePush,
 }
@@ -40,6 +45,7 @@ fn cargo(args: &[&str]) -> Result<()> {
 fn check_repo() -> Result<()> {
     workflows::check(root())?;
     support::check(root())?;
+    generated::check(root())?;
     println!("Repository consistency checks passed");
     Ok(())
 }
@@ -47,6 +53,8 @@ fn check_repo() -> Result<()> {
 fn main() -> Result<()> {
     match Args::parse().command {
         Task::CheckRepo => check_repo(),
+        Task::CheckGenerated => generated::check(root()),
+        Task::GenerateReference => generated::generate(root()),
         Task::PrePush => {
             check_repo()?;
             for args in [

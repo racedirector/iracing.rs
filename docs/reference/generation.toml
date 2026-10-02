@@ -1,0 +1,41 @@
+[[artifact]]
+file = "session-schema.yml"
+kind = "generated"
+source = "Current workspace Rust types and locked schemars"
+command = "cargo xtask generate-reference"
+context = "Deterministic YAML from sorted serde_json values; no simulator input"
+
+[[artifact]]
+file = "variable-schema.yml"
+kind = "generated"
+source = "Current workspace Rust types and locked schemars"
+command = "cargo xtask generate-reference"
+context = "Deterministic YAML from sorted serde_json values; no simulator input"
+
+[[artifact]]
+file = "primitives-schema.yml"
+kind = "generated"
+source = "Current workspace Rust types and locked schemars"
+command = "cargo xtask generate-reference"
+context = "Deterministic YAML from sorted serde_json values; no simulator input"
+
+[[artifact]]
+file = "disk-variable-schema.yml"
+kind = "captured"
+source = "fordmustanggt4_interlagos gp 2026-08-01 11-24-51.ibt (not committed)"
+command = "Historical variable generator, currently deferred"
+context = "Capture context 2026-08-01 from filename; generator revision/build unknown; cannot reproduce without original input; representative, not normative or exhaustive"
+
+[[artifact]]
+file = "live-variable-schema.yml"
+kind = "captured"
+source = "External live simulator; raw capture not committed"
+command = "Historical live variable generator, currently deferred"
+context = "Capture date, simulator build and generator revision unknown; representative, not normative or exhaustive"
+
+[[artifact]]
+file = "live-session-schema.yml"
+kind = "captured"
+source = "External live simulator; raw capture not committed"
+command = "cargo iracing-sdk session schema live --output docs/reference/live-session-schema.yml"
+context = "Capture date, simulator build and generator revision unknown; representative, not normative or exhaustive"

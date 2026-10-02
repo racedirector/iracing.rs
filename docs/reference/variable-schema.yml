@@ -1,22 +1,18 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-title: Variable info
 description: Information about a specific telemetry variable.
-type: object
 properties:
   count:
-    title: Count
     description: Number of elements (1 for scalar, >1 for arrays)
-    type: integer
     format: uint
     minimum: 0
+    title: Count
+    type: integer
   count_as_time:
-    title: Count as time
     description: Whether the simulator treats the sample count as elapsed time
+    title: Count as time
     type: boolean
   data_type:
-    title: Data type
     description: Data type of the variable
-    type: string
     enum:
     - Character
     - Boolean
@@ -24,23 +20,25 @@ properties:
     - BitField
     - Float
     - Double
+    title: Data type
+    type: string
   description:
-    title: Description
     description: Human-readable description
+    title: Description
     type: string
   name:
-    title: Name
     description: Variable name as defined by iRacing
+    title: Name
     type: string
   offset:
-    title: Byte offset
     description: Byte offset within the telemetry frame
-    type: integer
     format: uint
     minimum: 0
+    title: Byte offset
+    type: integer
   units:
-    title: Units
     description: Units of measurement (e.g., "m/s", "C", "N*m")
+    title: Units
     type: string
 required:
 - name
@@ -50,3 +48,5 @@ required:
 - count_as_time
 - units
 - description
+title: Variable info
+type: object

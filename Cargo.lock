@@ -3292,8 +3292,13 @@ dependencies = [
  "anyhow",
  "clap",
  "globset",
+ "iracing-irsdk",
+ "iracing-sdk",
+ "schemars",
  "serde",
+ "serde_json",
  "serde_yaml_ng",
+ "tempfile",
  "toml",
 ]
 

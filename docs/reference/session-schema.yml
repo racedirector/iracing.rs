@@ -1,218 +1,169 @@
-$schema: https://json-schema.org/draft/2020-12/schema
-title: SessionInfo
-description: |-
-  Session information extracted and parsed from iRacing's YAML session data
-  This matches the actual structure that iRacing outputs
-type: object
-properties:
-  CameraInfo:
-    description: Camera information
-    anyOf:
-    - $ref: '#/$defs/CameraInfo'
-    - type: 'null'
-    default: null
-  CarSetup:
-    description: Car setup information
-    default: null
-  DriverInfo:
-    description: Driver information (single object with current driver + drivers list)
-    anyOf:
-    - $ref: '#/$defs/DriverInfoData'
-    - type: 'null'
-    default: null
-  QualifyResultsInfo:
-    description: Qualifying results information
-    anyOf:
-    - $ref: '#/$defs/QualifyResultsInfo'
-    - type: 'null'
-    default: null
-  RadioInfo:
-    description: Radio information
-    anyOf:
-    - $ref: '#/$defs/RadioInfo'
-    - type: 'null'
-    default: null
-  SessionInfo:
-    description: Session information and session list
-    $ref: '#/$defs/SessionInfoData'
-  SplitTimeInfo:
-    description: Split timing information
-    anyOf:
-    - $ref: '#/$defs/SplitTimeInfo'
-    - type: 'null'
-    default: null
-  WeekendInfo:
-    description: Weekend and track information
-    $ref: '#/$defs/WeekendInfo'
-additionalProperties: true
-required:
-- WeekendInfo
-- SessionInfo
 $defs:
   Camera:
+    additionalProperties: true
     description: Individual camera information
-    type: object
     properties:
       CameraName:
+        default: null
         description: Camera name
         type:
         - string
         - 'null'
-        default: null
       CameraNum:
+        default: null
         description: Camera number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  CameraGroup:
-    description: Camera group information
     type: object
+  CameraGroup:
+    additionalProperties: true
+    description: Camera group information
     properties:
       Cameras:
+        default: null
         description: List of cameras in this group
+        items:
+          $ref: '#/$defs/Camera'
         type:
         - array
         - 'null'
-        default: null
-        items:
-          $ref: '#/$defs/Camera'
       GroupName:
+        default: null
         description: Group name
         type:
         - string
         - 'null'
-        default: null
       GroupNum:
+        default: null
         description: Group number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       IsScenic:
+        default: null
         description: Whether this is a scenic camera group
         type:
         - boolean
         - 'null'
-        default: null
-    additionalProperties: true
-  CameraInfo:
-    description: Camera information
     type: object
+  CameraInfo:
+    additionalProperties: true
+    description: Camera information
     properties:
       Groups:
+        default: null
         description: Camera groups
+        items:
+          $ref: '#/$defs/CameraGroup'
         type:
         - array
         - 'null'
-        default: null
-        items:
-          $ref: '#/$defs/CameraGroup'
-    additionalProperties: true
-  Driver:
-    description: Individual driver data (from Drivers list)
     type: object
+  Driver:
+    additionalProperties: true
+    description: Individual driver data (from Drivers list)
     properties:
       AbbrevName:
+        default: null
         description: Driver abbreviation
         type:
         - string
         - 'null'
-        default: null
       BodyType:
+        default: null
         description: Body type (avatar)
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarCfg:
+        default: null
         description: Car configuration ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarCfgCustomPaintExt:
+        default: null
         description: Car custom paint extension
         type:
         - string
         - 'null'
-        default: null
       CarCfgName:
+        default: null
         description: Car configuration name
         type:
         - string
         - 'null'
-        default: null
       CarClassColor:
+        default: null
         description: Car class color (hex)
         type:
         - string
         - 'null'
-        default: null
       CarClassDryTireSetLimit:
+        default: null
         description: Car class dry tire set limit
         type:
         - string
         - 'null'
-        default: null
       CarClassEstLapTime:
+        default: null
         description: Car class estimated lap time
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       CarClassID:
+        default: null
         description: Car class ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarClassLicenseLevel:
+        default: null
         description: Car class license level requirement
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarClassMaxFuelPct:
+        default: null
         description: Car class maximum fuel percentage
         type:
         - string
         - 'null'
-        default: null
       CarClassPowerAdjust:
+        default: null
         description: Car class power adjustment (BOP)
         type:
         - string
         - 'null'
-        default: null
       CarClassRelSpeed:
+        default: null
         description: Car class relative speed
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarClassShortName:
+        default: null
         description: Car class short name
         type:
         - string
         - 'null'
-        default: null
       CarClassWeightPenalty:
+        default: null
         description: Car class weight penalty
         type:
         - string
         - 'null'
-        default: null
       CarDesignStr:
+        default: null
         description: |-
           Car design string (livery colors)
 
@@ -221,47 +172,47 @@ $defs:
         type:
         - string
         - 'null'
-        default: null
       CarID:
+        default: null
         description: Car ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarIdx:
-        description: Car index number
-        type: integer
-        format: int32
         default: 0
+        description: Car index number
+        format: int32
+        type: integer
       CarIsAI:
+        default: null
         description: Whether this is AI
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarIsElectric:
+        default: null
         description: Whether this is an electric car
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarIsPaceCar:
+        default: null
         description: Whether this is a pace car
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarNumber:
+        default: null
         description: Car number (display)
         type:
         - string
         - 'null'
-        default: null
       CarNumberDesignStr:
+        default: null
         description: |-
           Car number design string
 
@@ -270,100 +221,100 @@ $defs:
         type:
         - string
         - 'null'
-        default: null
       CarNumberRaw:
+        default: null
         description: Car number raw (numeric with class prefix)
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarPath:
+        default: null
         description: Car path (directory name)
         type:
         - string
         - 'null'
-        default: null
       CarScreenName:
+        default: null
         description: Car screen name
         type:
         - string
         - 'null'
-        default: null
       CarScreenNameShort:
+        default: null
         description: Car screen name short
         type:
         - string
         - 'null'
-        default: null
       CarSponsor_1:
+        default: null
         description: Car sponsor 1
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarSponsor_2:
+        default: null
         description: Car sponsor 2
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ClubID:
+        default: null
         description: Club ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ClubName:
+        default: null
         description: Club name
         type:
         - string
         - 'null'
-        default: null
       CurDriverIncidentCount:
+        default: null
         description: Current driver incident count
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DivisionID:
+        default: null
         description: Division ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DivisionName:
+        default: null
         description: Division name
         type:
         - string
         - 'null'
-        default: null
       FaceType:
+        default: null
         description: Face type (avatar)
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FlairID:
+        default: null
         description: Flair ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FlairName:
+        default: null
         description: Flair name
         type:
         - string
         - 'null'
-        default: null
       HelmetDesignStr:
+        default: null
         description: |-
           Helmet design string
 
@@ -372,61 +323,61 @@ $defs:
         type:
         - string
         - 'null'
-        default: null
       HelmetType:
+        default: null
         description: Helmet type
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       IRating:
+        default: null
         description: iRating
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       Initials:
+        default: null
         description: Driver initials
         type:
         - string
         - 'null'
-        default: null
       IsSpectator:
+        default: null
         description: Whether this is a spectator
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       LicColor:
+        default: null
         description: License color (hex)
         type:
         - string
         - 'null'
-        default: null
       LicLevel:
+        default: null
         description: License level
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       LicString:
+        default: null
         description: License string (display)
         type:
         - string
         - 'null'
-        default: null
       LicSubLevel:
+        default: null
         description: License sub-level
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SuitDesignStr:
+        default: null
         description: |-
           Suit design string
 
@@ -435,1258 +386,1321 @@ $defs:
         type:
         - string
         - 'null'
-        default: null
       TeamID:
+        default: null
         description: Team ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TeamIncidentCount:
+        default: null
         description: Team incident count
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TeamName:
+        default: null
         description: Team name
         type:
         - string
         - 'null'
-        default: null
       UserID:
+        default: null
         description: User ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       UserName:
+        default: ''
         description: Driver name
         type: string
-        default: ''
-    additionalProperties: true
-  DriverInfoData:
-    description: Driver information data containing current driver info + drivers list
     type: object
+  DriverInfoData:
+    additionalProperties: true
+    description: Driver information data containing current driver info + drivers list
     properties:
       DriverBrakeCurvingFactor:
+        default: null
         description: Driver brake curving factor
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarEngCylinderCount:
+        default: null
         description: Driver car engine cylinder count
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarEstLapTime:
+        default: null
         description: Driver car estimated lap time
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarFuelKgPerLtr:
+        default: null
         description: Driver car fuel density (kg per liter)
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarFuelMaxLtr:
+        default: null
         description: Driver car fuel tank capacity (liters)
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarGearNeutral:
+        default: null
         description: Driver car neutral gear present
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarGearNumForward:
+        default: null
         description: Driver car number of forward gears
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarGearReverse:
+        default: null
         description: Driver car reverse gear present
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarIdleRPM:
+        default: null
         description: Driver car idle RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarIdx:
+        default: null
         description: Current driver car index
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarIsElectric:
+        default: null
         description: Whether driver car is electric
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverCarMaxFuelPct:
+        default: null
         description: Driver car maximum fuel percentage
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarRedLine:
+        default: null
         description: Driver car redline RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarSLBlinkRPM:
+        default: null
         description: Driver car shift light blink RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarSLFirstRPM:
+        default: null
         description: Driver car shift light first RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarSLLastRPM:
+        default: null
         description: Driver car shift light last RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarSLShiftRPM:
+        default: null
         description: Driver car shift light shift RPM
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverCarShiftAid:
+        default: null
         description: Driver car shift aid
         type:
         - string
         - 'null'
-        default: null
       DriverCarVersion:
+        default: null
         description: Driver car version
         type:
         - string
         - 'null'
-        default: null
       DriverGearboxControlType:
+        default: null
         description: Driver gearbox control type
         type:
         - string
         - 'null'
-        default: null
       DriverGearboxType:
+        default: null
         description: Driver gearbox type
         type:
         - string
         - 'null'
-        default: null
       DriverHeadPosX:
+        default: null
         description: Driver head position X
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverHeadPosY:
+        default: null
         description: Driver head position Y
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverHeadPosZ:
+        default: null
         description: Driver head position Z
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverIncidentCount:
+        default: null
         description: Driver incident count
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverIsAdmin:
+        default: null
         description: Whether driver is admin
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverPitTrkPct:
+        default: null
         description: Driver pit entrance track percentage
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       DriverSetupIsModified:
+        default: null
         description: Driver setup modified flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverSetupLoadTypeName:
+        default: null
         description: Driver setup load type name
         type:
         - string
         - 'null'
-        default: null
       DriverSetupName:
+        default: null
         description: Driver setup name
         type:
         - string
         - 'null'
-        default: null
       DriverSetupPassedTech:
+        default: null
         description: Driver setup passed tech inspection
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       DriverTires:
-        description: Available tire compounds
-        type:
-        - array
-        - 'null'
         default: null
+        description: Available tire compounds
         items:
           $ref: '#/$defs/DriverTire'
-      DriverUserID:
-        description: Current driver user ID
-        type:
-        - integer
-        - 'null'
-        format: int32
-        default: null
-      Drivers:
-        description: List of all drivers in session
         type:
         - array
         - 'null'
+      DriverUserID:
         default: null
-        items:
-          $ref: '#/$defs/Driver'
-      PaceCarIdx:
-        description: Pace car index
+        description: Current driver user ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
+      Drivers:
         default: null
-    additionalProperties: true
-  DriverTire:
-    description: Driver tire compound information
+        description: List of all drivers in session
+        items:
+          $ref: '#/$defs/Driver'
+        type:
+        - array
+        - 'null'
+      PaceCarIdx:
+        default: null
+        description: Pace car index
+        format: int32
+        type:
+        - integer
+        - 'null'
     type: object
+  DriverTire:
+    additionalProperties: true
+    description: Driver tire compound information
     properties:
       TireCompoundType:
+        default: null
         description: Tire compound type
         type:
         - string
         - 'null'
-        default: null
       TireIndex:
+        default: null
         description: Tire index
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  Frequency:
-    description: Radio frequency configuration
     type: object
+  Frequency:
+    additionalProperties: true
+    description: Radio frequency configuration
     properties:
       CanScan:
+        default: null
         description: Can scan flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CanSquawk:
+        default: null
         description: Can squawk flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       CarIdx:
+        default: null
         description: Car index (-1 for broadcast channels)
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ClubID:
+        default: null
         description: Club ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       EntryIdx:
+        default: null
         description: Entry index
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FrequencyName:
+        default: null
         description: Frequency name
         type:
         - string
         - 'null'
-        default: null
       FrequencyNum:
+        default: null
         description: Frequency number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       IsDeletable:
+        default: null
         description: Is deletable flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       IsMutable:
+        default: null
         description: Is mutable flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       Muted:
+        default: null
         description: Muted flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       Priority:
+        default: null
         description: Priority level
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  QualifyResult:
-    description: Individual qualifying result
     type: object
+  QualifyResult:
+    additionalProperties: true
+    description: Individual qualifying result
     properties:
       CarIdx:
+        default: null
         description: Car index
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ClassPosition:
+        default: null
         description: Class position
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FastestLap:
+        default: null
         description: Fastest lap number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FastestTime:
+        default: null
         description: Fastest lap time
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       Position:
+        default: null
         description: Overall position
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  QualifyResultsInfo:
-    description: Qualifying results information
     type: object
+  QualifyResultsInfo:
+    additionalProperties: true
+    description: Qualifying results information
     properties:
       Results:
-        description: List of qualifying results
-        type:
-        - array
-        - 'null'
         default: null
+        description: List of qualifying results
         items:
           $ref: '#/$defs/QualifyResult'
-    additionalProperties: true
-  Radio:
-    description: Individual radio configuration
+        type:
+        - array
+        - 'null'
     type: object
+  Radio:
+    additionalProperties: true
+    description: Individual radio configuration
     properties:
       Frequencies:
-        description: List of frequencies
-        type:
-        - array
-        - 'null'
         default: null
+        description: List of frequencies
         items:
           $ref: '#/$defs/Frequency'
+        type:
+        - array
+        - 'null'
       HopCount:
+        default: null
         description: Hop count
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       NumFrequencies:
+        default: null
         description: Number of frequencies
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       RadioNum:
+        default: null
         description: Radio number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ScanningIsOn:
+        default: null
         description: Scanning enabled flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TunedToFrequencyNum:
+        default: null
         description: Currently tuned frequency number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  RadioInfo:
-    description: Radio information
     type: object
+  RadioInfo:
+    additionalProperties: true
+    description: Radio information
     properties:
       Radios:
-        description: List of radios
-        type:
-        - array
-        - 'null'
         default: null
+        description: List of radios
         items:
           $ref: '#/$defs/Radio'
+        type:
+        - array
+        - 'null'
       SelectedRadioNum:
+        default: null
         description: Currently selected radio number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
-    additionalProperties: true
-  Sector:
-    description: Individual sector timing information
     type: object
+  Sector:
+    additionalProperties: true
+    description: Individual sector timing information
     properties:
       SectorNum:
+        default: null
         description: Sector number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SectorStartPct:
+        default: null
         description: Sector start percentage along track
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
-    additionalProperties: true
-  Session:
-    description: Individual session data
     type: object
+  Session:
+    additionalProperties: true
+    description: Individual session data
     properties:
+      QualifyPositions:
+        default: null
+        description: Results qualifying
+        items:
+          $ref: '#/$defs/QualifyResult'
+        type:
+        - array
+        - 'null'
       ResultsAverageLapTime:
+        default: null
         description: Results average lap time
+        format: double
         type:
         - number
         - 'null'
-        format: double
-        default: null
       ResultsFastestLap:
+        default: null
         description: Results fastest lap data
+        items: true
         type:
         - array
         - 'null'
-        default: null
-        items: true
       ResultsLapsComplete:
+        default: null
         description: Laps complete
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ResultsNumCautionFlags:
+        default: null
         description: Number of caution flags
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ResultsNumCautionLaps:
+        default: null
         description: Number of caution laps
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ResultsNumLeadChanges:
+        default: null
         description: Number of lead changes
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ResultsOfficial:
+        default: null
         description: Whether results are official
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       ResultsPositions:
+        default: null
         description: Results positions
+        items: true
         type:
         - array
         - 'null'
-        default: null
-        items: true
       SessionEnforceTireCompoundChange:
+        default: null
         description: Whether tire compound change is enforced
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SessionLaps:
+        default: ''
         description: Session laps ("unlimited" or number)
         type: string
-        default: ''
       SessionName:
+        default: null
         description: Session name
         type:
         - string
         - 'null'
-        default: null
       SessionNum:
-        description: Session number
-        type: integer
-        format: int32
         default: 0
+        description: Session number
+        format: int32
+        type: integer
       SessionNumLapsToAvg:
+        default: null
         description: Number of laps to average for qualifying
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SessionRunGroupsUsed:
+        default: null
         description: Whether run groups were used
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SessionSkipped:
+        default: null
         description: Whether session was skipped
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SessionSubType:
+        default: null
         description: Session sub type
         type:
         - string
         - 'null'
-        default: null
       SessionTime:
+        default: ''
         description: Session time ("unlimited" or time)
         type: string
-        default: ''
       SessionTrackRubberState:
+        default: null
         description: Session track rubber state
         type:
         - string
         - 'null'
-        default: null
       SessionType:
+        default: ''
         description: Session type
         type: string
-        default: ''
-    additionalProperties: true
-  SessionInfoData:
-    description: Session information data from iRacing
     type: object
+  SessionInfoData:
+    additionalProperties: true
+    description: Session information data from iRacing
     properties:
       CurrentSessionNum:
-        description: Current session number
-        type: integer
-        format: int32
         default: 0
+        description: Current session number
+        format: int32
+        type: integer
       Sessions:
-        description: List of sessions
-        type: array
         default: []
+        description: List of sessions
         items:
           $ref: '#/$defs/Session'
-    additionalProperties: true
-  SplitTimeInfo:
-    description: Split timing information
+        type: array
     type: object
+  SplitTimeInfo:
+    additionalProperties: true
+    description: Split timing information
     properties:
       Sectors:
+        default: null
         description: Sector information
+        items:
+          $ref: '#/$defs/Sector'
         type:
         - array
         - 'null'
-        default: null
-        items:
-          $ref: '#/$defs/Sector'
-    additionalProperties: true
-  TelemetryOptions:
-    description: Telemetry recording options
     type: object
+  TelemetryOptions:
+    additionalProperties: true
+    description: Telemetry recording options
     properties:
       TelemetryDiskFile:
+        default: null
         description: Telemetry disk file path
         type:
         - string
         - 'null'
-        default: null
-    additionalProperties: true
-  WeekendInfo:
-    description: Weekend and track information from iRacing
     type: object
+  WeekendInfo:
+    additionalProperties: true
+    description: Weekend and track information from iRacing
     properties:
+      AltAssetTag:
+        default: null
+        description: AltAssetTag (observed null; type unconfirmed).
+        type:
+        - string
+        - 'null'
       BuildTarget:
+        default: null
         description: Build target (Members, AI, etc.)
         type:
         - string
         - 'null'
-        default: null
       BuildType:
+        default: null
         description: Build type (Release, Beta, etc.)
         type:
         - string
         - 'null'
-        default: null
       BuildVersion:
+        default: null
         description: Build version
         type:
         - string
         - 'null'
-        default: null
       Category:
+        default: null
         description: Category (Road, Oval, etc.)
         type:
         - string
         - 'null'
-        default: null
       DCRuleSet:
+        default: null
         description: Drive through/stop-go rule set
         type:
         - string
         - 'null'
-        default: null
       Encoding:
+        default: null
         description: Encoding used for the raw session string (for example, `UTF8` or `ISO_8859_1`)
         type:
         - string
         - 'null'
-        default: null
       EventType:
+        default: null
         description: Event type
         type:
         - string
         - 'null'
-        default: null
       HeatRacing:
+        default: null
         description: Heat racing enabled
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       LeagueID:
+        default: null
         description: League ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       MaxDrivers:
+        default: null
         description: Maximum number of drivers
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       MinDrivers:
+        default: null
         description: Minimum number of drivers
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       NumCarClasses:
+        default: null
         description: Number of car classes
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       NumCarTypes:
+        default: null
         description: Number of car types
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       Official:
+        default: null
         description: Official session flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       QualifierMustStartRace:
+        default: null
         description: Qualifier must start race flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       RaceFarm:
+        default: null
         description: Race farm identifier
         type:
         - string
         - 'null'
-        default: null
       RaceWeek:
+        default: null
         description: Race week number
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SeasonID:
+        default: null
         description: Season ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SeriesID:
+        default: null
         description: Series ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SessionID:
+        default: null
         description: Session ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       SimMode:
+        default: null
         description: Simulation mode (full, fixed, open)
         type:
         - string
         - 'null'
-        default: null
       SubSessionID:
+        default: null
         description: Sub-session ID (for splits)
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TeamRacing:
+        default: null
         description: Team racing enabled
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TelemetryOptions:
-        description: Telemetry options
         anyOf:
         - $ref: '#/$defs/TelemetryOptions'
         - type: 'null'
         default: null
+        description: Telemetry options
       TrackAirDensity:
+        default: null
         description: Track air density
         type:
         - string
         - 'null'
-        default: null
       TrackAirPressure:
+        default: null
         description: Track air pressure
         type:
         - string
         - 'null'
-        default: null
       TrackAirTemp:
+        default: null
         description: Track air temperature
         type:
         - string
         - 'null'
-        default: null
       TrackAltitude:
+        default: null
         description: Track altitude
         type:
         - string
         - 'null'
-        default: null
       TrackCity:
+        default: null
         description: Track city
         type:
         - string
         - 'null'
-        default: null
       TrackCleanup:
+        default: null
         description: Track cleanup level
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TrackConfigName:
+        default: null
         description: Track configuration name
         type:
         - string
         - 'null'
-        default: null
       TrackCountry:
+        default: null
         description: Track country
         type:
         - string
         - 'null'
-        default: null
       TrackDirection:
+        default: null
         description: Track direction (neutral, clockwise, counter-clockwise)
         type:
         - string
         - 'null'
-        default: null
       TrackDisplayName:
+        default: ''
         description: Track display name
         type: string
-        default: ''
       TrackDisplayShortName:
+        default: null
         description: Track short name
         type:
         - string
         - 'null'
-        default: null
       TrackDynamicTrack:
+        default: null
         description: Track dynamic track enabled
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TrackFogLevel:
+        default: null
         description: Track fog level percentage
         type:
         - string
         - 'null'
-        default: null
       TrackID:
+        default: null
         description: Track ID
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TrackLatitude:
+        default: null
         description: Track latitude in meters
         type:
         - string
         - 'null'
-        default: null
       TrackLength:
+        default: ''
         description: Track length
         type: string
-        default: ''
       TrackLengthOfficial:
+        default: null
         description: Official track length
         type:
         - string
         - 'null'
-        default: null
       TrackLongitude:
+        default: null
         description: Track longitude in meters
         type:
         - string
         - 'null'
-        default: null
       TrackName:
+        default: ''
         description: Track name
         type: string
-        default: ''
       TrackNorthOffset:
+        default: null
         description: Track north offset in radians
         type:
         - string
         - 'null'
-        default: null
       TrackNumPitStalls:
+        default: null
         description: Track number of pit stalls
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TrackNumTurns:
+        default: null
         description: Track number of turns
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       TrackPaceSpeed:
+        default: null
         description: Track pace speed
         type:
         - string
         - 'null'
-        default: null
       TrackPitSpeedLimit:
+        default: null
         description: Track pit speed limit
         type:
         - string
         - 'null'
-        default: null
       TrackPrecipitation:
+        default: null
         description: Track precipitation percentage
         type:
         - string
         - 'null'
-        default: null
       TrackRelativeHumidity:
+        default: null
         description: Track relative humidity
         type:
         - string
         - 'null'
-        default: null
       TrackSkies:
+        default: null
         description: Track skies condition
         type:
         - string
         - 'null'
-        default: null
       TrackState:
+        default: null
         description: Track state/province
         type:
         - string
         - 'null'
-        default: null
       TrackSurfaceTemp:
+        default: null
         description: Track surface temperature
         type:
         - string
         - 'null'
-        default: null
       TrackSurfaceTempCrew:
+        default: null
         description: Track surface temperature (crew-facing)
         type:
         - string
         - 'null'
-        default: null
       TrackType:
+        default: null
         description: Track type (road course, oval, etc.)
         type:
         - string
         - 'null'
-        default: null
       TrackVersion:
+        default: null
         description: Track version
         type:
         - string
         - 'null'
-        default: null
       TrackWeatherType:
+        default: null
         description: Track weather type (Static, Dynamic)
         type:
         - string
         - 'null'
-        default: null
       TrackWindDir:
+        default: null
         description: Track wind direction
         type:
         - string
         - 'null'
-        default: null
       TrackWindVel:
+        default: null
         description: Track wind velocity
         type:
         - string
         - 'null'
-        default: null
       WeekendOptions:
-        description: Weekend options
         anyOf:
         - $ref: '#/$defs/WeekendOptions'
         - type: 'null'
         default: null
-    additionalProperties: true
-  WeekendOptions:
-    description: Weekend session options and configuration
+        description: Weekend options
     type: object
+  WeekendOptions:
+    additionalProperties: true
+    description: Weekend session options and configuration
     properties:
       CommercialMode:
+        default: null
         description: Commercial mode
         type:
         - string
         - 'null'
-        default: null
       CourseCautions:
+        default: null
         description: Course cautions setting
         type:
         - string
         - 'null'
-        default: null
       Date:
+        default: null
         description: Session date
         type:
         - string
         - 'null'
-        default: null
       EarthRotationSpeedupFactor:
+        default: null
         description: Earth rotation speedup factor
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       FastRepairsLimit:
+        default: null
         description: Fast repairs limit
         type:
         - string
         - 'null'
-        default: null
       FogLevel:
+        default: null
         description: Fog level
         type:
         - string
         - 'null'
-        default: null
       GreenWhiteCheckeredLimit:
+        default: null
         description: Green-white-checkered limit
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       HardcoreLevel:
+        default: null
         description: Hardcore level
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       HasOpenRegistration:
+        default: null
         description: Open registration flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       IncidentLimit:
+        default: null
         description: Incident limit
         type:
         - string
         - 'null'
-        default: null
       IncidentWarningInitialLimit:
+        default: null
         description: Incident count at which the first warning is shown
         type:
         - string
         - 'null'
-        default: null
       IncidentWarningSubsequentLimit:
+        default: null
         description: Incident interval at which subsequent warnings are shown
         type:
         - string
         - 'null'
-        default: null
       IsFixedSetup:
+        default: null
         description: Fixed setup required
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       NightMode:
+        default: null
         description: Night mode setting
         type:
         - string
         - 'null'
-        default: null
       NumJokerLaps:
+        default: null
         description: Number of joker laps
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       NumStarters:
+        default: null
         description: Number of starters
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       QualifyScoring:
+        default: null
         description: Qualifying scoring method
         type:
         - string
         - 'null'
-        default: null
       RelativeHumidity:
+        default: null
         description: Relative humidity
         type:
         - string
         - 'null'
-        default: null
       Restarts:
+        default: null
         description: Restart format
         type:
         - string
         - 'null'
-        default: null
       ShortParadeLap:
+        default: null
         description: Short parade lap enabled
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       Skies:
+        default: null
         description: Sky condition
         type:
         - string
         - 'null'
-        default: null
       StandingStart:
+        default: null
         description: Standing start enabled
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       StartingGrid:
+        default: null
         description: Starting grid format
         type:
         - string
         - 'null'
-        default: null
       StrictLapsChecking:
+        default: null
         description: Strict laps checking
         type:
         - string
         - 'null'
-        default: null
       TimeOfDay:
+        default: null
         description: Time of day
         type:
         - string
         - 'null'
-        default: null
       Unofficial:
+        default: null
         description: Unofficial session flag
+        format: int32
         type:
         - integer
         - 'null'
-        format: int32
-        default: null
       WeatherTemp:
+        default: null
         description: Weather temperature
         type:
         - string
         - 'null'
-        default: null
       WeatherType:
+        default: null
         description: Weather type
         type:
         - string
         - 'null'
-        default: null
       WindDirection:
+        default: null
         description: Wind direction
         type:
         - string
         - 'null'
-        default: null
       WindSpeed:
+        default: null
         description: Wind speed
         type:
         - string
         - 'null'
-        default: null
-    additionalProperties: true
+    type: object
+$schema: https://json-schema.org/draft/2020-12/schema
+additionalProperties: true
+description: |-
+  Session information extracted and parsed from iRacing's YAML session data
+  This matches the actual structure that iRacing outputs
+properties:
+  CameraInfo:
+    anyOf:
+    - $ref: '#/$defs/CameraInfo'
+    - type: 'null'
+    default: null
+    description: Camera information
+  CarSetup:
+    default: null
+    description: Car setup information
+  DriverInfo:
+    anyOf:
+    - $ref: '#/$defs/DriverInfoData'
+    - type: 'null'
+    default: null
+    description: Driver information (single object with current driver + drivers list)
+  QualifyResultsInfo:
+    anyOf:
+    - $ref: '#/$defs/QualifyResultsInfo'
+    - type: 'null'
+    default: null
+    description: Qualifying results information
+  RadioInfo:
+    anyOf:
+    - $ref: '#/$defs/RadioInfo'
+    - type: 'null'
+    default: null
+    description: Radio information
+  SessionInfo:
+    $ref: '#/$defs/SessionInfoData'
+    description: Session information and session list
+  SplitTimeInfo:
+    anyOf:
+    - $ref: '#/$defs/SplitTimeInfo'
+    - type: 'null'
+    default: null
+    description: Split timing information
+  WeekendInfo:
+    $ref: '#/$defs/WeekendInfo'
+    description: Weekend and track information
+required:
+- WeekendInfo
+- SessionInfo
+title: SessionInfo
+type: object
