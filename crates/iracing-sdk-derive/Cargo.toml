@@ -26,3 +26,4 @@ syn = { version = "3.0.4", features = ["full", "fold"] }
 
 [dev-dependencies]
 iracing-sdk = { workspace = true }
+trybuild = "1.0"

@@ -32,6 +32,14 @@ mod tests {
     use super::IbtSource;
 
     #[test]
+    fn owned_reads_check_destination_and_available_bytes() {
+        let source = IbtSource::Owned(vec![1, 2, 3, 4]);
+        assert_eq!(source.get(1..3), Some([2, 3].as_slice()));
+        assert_eq!(source.get(3..5), None);
+        assert_eq!(source.get(1..3), Some([2, 3].as_slice()));
+    }
+
+    #[test]
     fn checked_ranges_enforce_source_bounds() {
         let bytes = vec![10, 20, 30, 40];
         let mut mapping = memmap2::MmapMut::map_anon(bytes.len()).unwrap();

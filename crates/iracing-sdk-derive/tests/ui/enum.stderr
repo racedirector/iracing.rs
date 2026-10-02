@@ -1,0 +1,5 @@
+error: Only structs are supported
+ --> tests/ui/enum.rs:2:1
+  |
+2 | enum Frame { A }
+  | ^^^^^^^^^^^^^^^^

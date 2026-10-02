@@ -48,6 +48,16 @@ impl VariableBuffer {
     }
 }
 
+// Native SDK ABI invariants must hold even when tests are not built.
+const _: () = {
+    assert!(std::mem::size_of::<VariableBuffer>() == 16);
+    assert!(std::mem::align_of::<VariableBuffer>() == 4);
+    assert!(std::mem::offset_of!(VariableBuffer, tick_count) == 0);
+    assert!(std::mem::offset_of!(VariableBuffer, buffer_offset) == 4);
+    assert!(std::mem::offset_of!(VariableBuffer, tick_count_begin) == 8);
+    assert!(std::mem::offset_of!(VariableBuffer, _pad) == 12);
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,5 @@
+error: Only named fields are supported
+ --> tests/ui/tuple.rs:2:1
+  |
+2 | struct Frame(f32);
+  | ^^^^^^^^^^^^^^^^^^

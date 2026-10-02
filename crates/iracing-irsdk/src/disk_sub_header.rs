@@ -77,6 +77,17 @@ impl DiskSubHeader {
     }
 }
 
+// Native SDK ABI invariants must hold even when tests are not built.
+const _: () = {
+    assert!(std::mem::size_of::<DiskSubHeader>() == 32);
+    assert!(std::mem::align_of::<DiskSubHeader>() == 8);
+    assert!(std::mem::offset_of!(DiskSubHeader, start_date) == 0);
+    assert!(std::mem::offset_of!(DiskSubHeader, start_time) == 8);
+    assert!(std::mem::offset_of!(DiskSubHeader, end_time) == 16);
+    assert!(std::mem::offset_of!(DiskSubHeader, lap_count) == 24);
+    assert!(std::mem::offset_of!(DiskSubHeader, record_count) == 28);
+};
+
 #[cfg(test)]
 mod tests {
     use zerocopy::IntoBytes;

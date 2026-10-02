@@ -1,0 +1,5 @@
+error: #[fail_if_missing] cannot be used on Option<T> fields
+ --> tests/ui/critical_option.rs:2:66
+  |
+2 | struct Frame { #[field_name = "Speed"] #[fail_if_missing] speed: Option<f32> }
+  |                                                                  ^^^^^^^^^^^

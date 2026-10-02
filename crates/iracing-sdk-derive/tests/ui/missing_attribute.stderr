@@ -1,0 +1,5 @@
+error: Missing #[field_name = "..."] attribute. Use #[skip] for non-telemetry fields.
+ --> tests/ui/missing_attribute.rs:2:16
+  |
+2 | struct Frame { speed: f32 }
+  |                ^^^^^^^^^^
