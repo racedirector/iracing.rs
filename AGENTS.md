@@ -6,6 +6,8 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## Critical Commands
 
+- `cargo xtask check-repo` checks repository configuration; `cargo xtask pre-push` runs the shared sequential broad gate. See `docs/development.md`.
+
 - `cargo build --workspace` for workspace sanity; release builds defer to cargo-dist.
 - `cargo test --workspace --all-targets` hits every crate; scope with `cargo test -p <crate>` or `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` when debugging.
 - `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. For intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.

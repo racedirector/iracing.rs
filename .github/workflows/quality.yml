@@ -35,6 +35,9 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Check repository consistency
+        run: cargo xtask check-repo
+
       - name: Verify generated fixtures
         run: cargo test-fixtures
 

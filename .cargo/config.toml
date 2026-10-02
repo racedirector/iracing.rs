@@ -1,4 +1,5 @@
 [alias]
+xtask = ["run", "-p", "xtask", "--"]
 test-fixtures = ["run", "-p", "test-fixtures", "--"]
 
 iracing-sdk = ["run", "-p", "iracing-sdk-cli", "--bin", "iracing-sdk", "--"]
