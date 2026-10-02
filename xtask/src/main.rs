@@ -1,3 +1,4 @@
+mod support;
 mod workflows;
 
 use anyhow::{Context, Result, bail};
@@ -38,6 +39,7 @@ fn cargo(args: &[&str]) -> Result<()> {
 
 fn check_repo() -> Result<()> {
     workflows::check(root())?;
+    support::check(root())?;
     println!("Repository consistency checks passed");
     Ok(())
 }

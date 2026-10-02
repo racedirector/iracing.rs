@@ -20,6 +20,7 @@ repository = "https://github.com/racedirector/iracing.rs"
 homepage = "https://github.com/racedirector/iracing.rs"
 license = "MIT"
 edition = "2024"
+rust-version = "1.88"
 
 [workspace.dependencies]
 anyhow = "1.0.102"

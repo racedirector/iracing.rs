@@ -64,3 +64,31 @@ When adding a public API:
 3. add or preserve a clear unsupported-platform behavior;
 4. check examples/binaries on both cfg paths;
 5. update dist target metadata for shipped binaries;
+
+## Compiler and release support contract
+
+The workspace MSRV is Rust **1.88.0**, inherited by publishable crates. Edition
+2024/resolver 3 require 1.85; CLI integer `is_multiple_of` and current globset
+require 1.87 and 1.88 respectively. The locked all-feature workspace was checked
+on 1.88.0. CI verifies that exact compiler on Linux and Windows. Dependency
+updates must preserve this floor or deliberately raise/document it with CI.
+
+Supported SDK configurations are default (`derive`), no defaults, all features,
+and no defaults plus `codegen,schema-discovery`. Stable CI tests the SDK library
+in each on Linux and Windows; the wire crate is also tested with codegen enabled.
+These are deliberate public contracts, not a feature powerset. Workspace examples
+exercise downstream feature unification separately in quality CI. CLI forwards
+schema features; benchmark/test-utils are tooling capabilities.
+
+Release targets are x86_64 Linux GNU and Windows MSVC (native quality tests plus
+explicit target compilation), and aarch64 macOS (workspace/all-feature compile
+check on a macOS runner). macOS compilation does not imply live simulator support.
+Other architectures are not release-supported; portable models/range logic keep
+checked pointer-width behavior. `cargo xtask check-repo` compares dist targets to
+actual support workflow cells and checks the declared MSRV compiler/inheritance.
+
+Locally: `cargo +1.88.0 check --locked --workspace --all-features`; run the four
+`cargo test -p iracing-sdk --lib` flag variants above. Target checks use
+`cargo check --locked --workspace --all-features --target <target>` after installing
+that target and its platform prerequisites. Native Windows integration remains
+necessary for actual Win32/external-memory behavior.
