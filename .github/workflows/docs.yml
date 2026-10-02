@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Detect docs changes
@@ -17,11 +20,13 @@ jobs:
       iracing_simulation: ${{ steps.filter.outputs.iracing_simulation }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Detect changed crates
         id: filter
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
           filters: |
             iracing_irsdk:
@@ -59,11 +64,12 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       - name: Run doctests
         run: cargo test -p iracing-irsdk --doc
 
@@ -73,7 +79,7 @@ jobs:
         run: cargo doc -p iracing-irsdk --all-features --no-deps
 
       - name: Upload generated docs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: iracing-irsdk-docs-${{ matrix.os }}
           path: target/doc
@@ -92,11 +98,12 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       - name: Run doctests
         run: cargo test -p iracing-sdk --doc
 
@@ -105,7 +112,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: iracing-sdk-docs-${{ matrix.os }}
           path: target/doc
@@ -130,11 +137,12 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       - name: Run doctests
         run: cargo test -p iracing-sdk-derive --doc
 
@@ -143,7 +151,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-sdk-derive --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: iracing-sdk-derive-docs-${{ matrix.os }}
           path: target/doc
@@ -165,11 +173,12 @@ jobs:
           - windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       - name: Run doctests
         run: cargo test -p iracing-simulation --doc
 
@@ -178,7 +187,7 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc -p iracing-simulation --no-deps
       - name: Upload generated docs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: iracing-simulation-docs-${{ matrix.os }}
           path: target/doc

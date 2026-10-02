@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   plan:
@@ -25,7 +24,9 @@ jobs:
       val: ${{ steps.plan.outputs.val }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install dist
         shell: bash
@@ -33,6 +34,8 @@ jobs:
 
       - name: Compute release plan
         id: plan
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -40,7 +43,7 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${{ github.event.inputs.tag }}"
+            TAG="${INPUT_TAG}"
           fi
 
           if [[ -z "${TAG}" ]]; then
@@ -60,7 +63,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload dist manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist-manifest
           path: dist-manifest.json
@@ -76,7 +79,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install dist (bash)
         if: ${{ matrix.install_dist.shell == 'bash' }}
@@ -89,7 +94,7 @@ jobs:
         run: ${{ matrix.install_dist.run }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
           targets: ${{ join(matrix.targets, ',') }}
 
@@ -104,7 +109,7 @@ jobs:
         run: dist build --allow-dirty ${{ matrix.dist_args }} --tag "${{ needs.plan.outputs.tag }}"
 
       - name: Upload local artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: artifacts-${{ matrix.host }}
           path: target/distrib/*
@@ -117,21 +122,22 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install dist
         shell: bash
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.4/cargo-dist-installer.sh | sh
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       - name: Build global artifacts
         shell: bash
         run: dist build --allow-dirty --artifacts=global --tag "${{ needs.plan.outputs.tag }}"
 
       - name: Upload global artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: artifacts-global
           path: target/distrib/*
@@ -151,14 +157,16 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install dist
         shell: bash
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.4/cargo-dist-installer.sh | sh
 
       - name: Download built artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: artifacts-*
           path: target/distrib/

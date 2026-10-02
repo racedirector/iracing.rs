@@ -20,6 +20,9 @@ on:
       - "crates/iracing-sdk/benches/support/workloads.rs"
       - "docs/reference/live-variable-schema.yml"
 
+permissions:
+  contents: read
+
 jobs:
   compare:
     uses: ./.github/workflows/criterion-compare.yml

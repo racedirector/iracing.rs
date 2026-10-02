@@ -15,6 +15,9 @@ on:
       - "test-data/fordmustanggt4_donington national 2026-04-09 21-57-46.ibt"
       - "test-data/ibt/b_mustang_bristol_race.ibt"
 
+permissions:
+  contents: read
+
 jobs:
   compare:
     uses: ./.github/workflows/criterion-compare.yml
