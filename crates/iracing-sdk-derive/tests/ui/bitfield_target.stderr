@@ -1,0 +1,5 @@
+error: #[bitfield(..., has = ...)] requires field type bool or Option<bool>
+ --> tests/ui/bitfield_target.rs:2:69
+  |
+2 | struct Frame { #[bitfield(name = "SessionFlags", has = "1")] flags: f32 }
+  |                                                                     ^^^

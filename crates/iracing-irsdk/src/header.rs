@@ -185,6 +185,26 @@ fn i32_checked_range(offset: i32, length: i32) -> Option<Range<i32>> {
     Some(offset..end)
 }
 
+// Native SDK ABI invariants must hold even when tests are not built.
+const _: () = {
+    assert!(std::mem::size_of::<Header>() == 112);
+    assert!(std::mem::align_of::<Header>() == 4);
+    assert!(std::mem::offset_of!(Header, version) == 0);
+    assert!(std::mem::offset_of!(Header, status) == 4);
+    assert!(std::mem::offset_of!(Header, tick_rate) == 8);
+    assert!(std::mem::offset_of!(Header, session_info_update) == 12);
+    assert!(std::mem::offset_of!(Header, session_info_length) == 16);
+    assert!(std::mem::offset_of!(Header, session_info_offset) == 20);
+    assert!(std::mem::offset_of!(Header, variable_count) == 24);
+    assert!(std::mem::offset_of!(Header, variable_header_offset) == 28);
+    assert!(std::mem::offset_of!(Header, buffer_count) == 32);
+    assert!(std::mem::offset_of!(Header, buffer_length) == 36);
+    assert!(std::mem::offset_of!(Header, current_buffer_tick_count) == 40);
+    assert!(std::mem::offset_of!(Header, current_buffer) == 44);
+    assert!(std::mem::offset_of!(Header, _pad) == 45);
+    assert!(std::mem::offset_of!(Header, buffers) == 48);
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
