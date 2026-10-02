@@ -48,7 +48,7 @@ windows = { workspace = true, features = [
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
 ] }
-windows-core = "0.62.0"
+windows-core = "0.100.0"
 
 [dev-dependencies]
 anyhow = { workspace = true }
