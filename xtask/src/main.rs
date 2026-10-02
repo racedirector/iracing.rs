@@ -1,7 +1,24 @@
 mod workflows;
 
 use anyhow::{Context, Result, bail};
+use clap::{Parser, Subcommand};
 use std::{path::Path, process::Command};
+
+/// Repository maintenance workflows.
+#[derive(Debug, Parser)]
+#[command(version, about, name = "cargo xtask")]
+struct Args {
+    #[command(subcommand)]
+    command: Task,
+}
+
+#[derive(Debug, Subcommand)]
+enum Task {
+    /// Check repository configuration for drift.
+    CheckRepo,
+    /// Run the shared sequential local quality gate.
+    PrePush,
+}
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
@@ -26,10 +43,9 @@ fn check_repo() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    match args.as_slice() {
-        [command] if command == "check-repo" => check_repo(),
-        [command] if command == "pre-push" => {
+    match Args::parse().command {
+        Task::CheckRepo => check_repo(),
+        Task::PrePush => {
             check_repo()?;
             for args in [
                 vec!["test-fixtures"],
@@ -58,6 +74,5 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        _ => bail!("usage: cargo xtask <check-repo|pre-push>"),
     }
 }
