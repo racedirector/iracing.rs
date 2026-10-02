@@ -14,10 +14,6 @@ Use this skill for raw pointers, `NonNull`, unsafe functions and traits, unions,
 
 Route ordinary ownership design to `rust-stable`, concurrent architecture to `rust-concurrency`, UniFFI-generated multi-language bindings to `rust-uniffi-building`, general build scripts to `rust-cargo-build`, and review reporting to `rust-code-review`.
 
-For proof-oriented audits of unsafe or invariant-bearing safe abstractions,
-compose `rust-soundness-review`; trace all producers/transitions to consumers.
-This skill remains focused on implementation details.
-
 ## Workflow
 
 ### 1. Justify and isolate unsafe operations
