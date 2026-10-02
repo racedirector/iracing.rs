@@ -61,7 +61,7 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             use crate::utils::get_connection;
 
             let connection = get_connection()?;
-            let header = connection.header();
+            let header = connection.header_snapshot()?;
 
             let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
             writer.write(&header)?;
