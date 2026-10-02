@@ -55,3 +55,10 @@ on commands, boundaries, and easy-to-miss constraints.
 - `benchmarks-codspeed.yml` runs CPU benchmarks on affected PRs and `main`. `benchmark-ibt.yml` and `benchmark-delivery.yml` call the shared same-runner Criterion comparison; `benchmarks.yml` runs diagnostics only.
 - `docs.yml` runs doctests, docs with warnings as errors, and `cargo check` for examples/bins for touched documentation crates; run those targets locally before opening PRs.
 - Releases are tag-driven (`v*`) via `cargo dist`; keep version bumps and dist metadata coordinated when preparing a release.
+
+## Soundness review routing
+
+For proof-oriented unsafe/invariant audits, compose `rust-soundness-review` and
+`rust-unsafe-ffi`. Read `docs/architecture/unsafe-boundaries.md` from the workspace
+root; trace current producers and consumers and keep unimplemented proposals
+separate from current-source conclusions.

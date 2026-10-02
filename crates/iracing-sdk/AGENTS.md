@@ -47,3 +47,10 @@
 - Benchmarks require `cargo bench -p iracing-sdk --features benchmark`.
 
 - Downstream fixture tests can enable the SDK's `test-utils` feature without enabling benchmark targets.
+
+## Soundness review routing
+
+For proof-oriented unsafe/invariant audits, compose `rust-soundness-review` and
+`rust-unsafe-ffi`. Read `docs/architecture/unsafe-boundaries.md` from the workspace
+root; trace current producers and consumers and keep unimplemented proposals
+separate from current-source conclusions.

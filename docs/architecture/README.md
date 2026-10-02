@@ -25,6 +25,8 @@ disagree, verify the implementation and update both in the same change.
 - [Testing and fixtures](testing-and-fixtures.md): deterministic data,
   test-helper contracts, and CI-aligned validation.
 
+- [Unsafe boundaries](unsafe-boundaries.md): current memory/wire obligations and verification limits.
+
 ## Reading paths
 
 For telemetry work, read this index, [workspace structure](workspace.md), and
