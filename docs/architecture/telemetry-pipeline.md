@@ -26,8 +26,14 @@ same.
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
 private read-only memory map plus decoded headers and layout, and reads one owned
 frame on demand; `from_bytes` uses the same parser over an owned in-memory
-cursor. `IbtLayout` owns metadata bounds, frame start/size/count, and indexed
-frame geometry. Source I/O uses checked conversions between `u64` seek offsets
+cursor. `IbtLayout` is the canonical physical source description, exposing total
+source length, main-header/disk-header/preamble regions, optional metadata bounds,
+frame start/size/count, and O(1) indexed frame geometry. `IbtReader::layout()`
+exposes the same validated description for inspection without additional reads
+or cursor changes. Fixed regions are derived from the wire types; source length
+comes from the EOF-delimited frame region. No duplicate coordinates are stored.
+The layout describes byte geometry, not telemetry fields, replay state, or CLI
+formatting. Source I/O uses checked conversions between `u64` seek offsets
 and `usize` layout coordinates. Unlike the earlier `u64` file navigation, this
 rejects sources larger than `usize::MAX` bytes: files of 4 GiB or more cannot be
 opened on 32-bit targets. Supporting those files would require a separately

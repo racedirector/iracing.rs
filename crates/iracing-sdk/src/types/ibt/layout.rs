@@ -1,13 +1,44 @@
-use iracing_irsdk::Header;
+use iracing_irsdk::{DiskSubHeader, Header};
 
 use super::{IBT_PREAMBLE_SIZE, ParsedIbtHeader};
 use crate::{ByteRegion, FrameRegion, FramesRegion, IRacingSDKError, MetadataRegions, Result};
 
-/// Validated locations of the metadata and telemetry frames in an IBT source.
+/// Canonical physical layout description of a validated IBT source.
 ///
 /// The layout is derived from an iRacing SDK [`Header`] and the total source
 /// length. It records byte locations only; it does not borrow or parse the
-/// bytes in those locations.
+/// bytes in those locations. Fixed header regions, optional metadata regions,
+/// and EOF-delimited frame geometry are available without re-reading the header.
+/// Both [`crate::ibt::IbtReader`] and inspection tools can use this description;
+/// it is independent of replay cursors, telemetry field layouts, and formatting.
+/// All byte coordinates are source-relative and fit within [`Self::source_len`].
+///
+/// Frame start is the greatest present metadata endpoint (or the preamble end
+/// when metadata is absent). Frame count comes from physical EOF and frame size,
+/// not the disk sub-header's advisory record count.
+///
+/// # Inspection
+///
+/// ```no_run
+/// use iracing_sdk::ibt::IbtReader;
+///
+/// # fn inspect() -> iracing_sdk::Result<()> {
+/// let reader = IbtReader::open("telemetry.ibt")?;
+/// let layout = reader.layout();
+/// println!("source: {} bytes", layout.source_len());
+/// println!("header: {:?}", layout.header_region().as_range());
+/// println!("disk sub-header: {:?}", layout.disk_header_region().as_range());
+/// if let Some(region) = layout.metadata().variable_headers() {
+///     println!("variable headers: {:?}", region.as_region().as_range());
+/// }
+/// if let Some(region) = layout.metadata().session_info() {
+///     println!("session info: {:?}", region.as_region().as_range());
+/// }
+/// println!("frames: {:?}", layout.frames().as_region().as_range());
+/// println!("{} frames of {} bytes", layout.frame_count(), layout.frame_size());
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone)]
 pub struct IbtLayout {
     metadata: MetadataRegions,
@@ -54,6 +85,28 @@ impl IbtLayout {
         )?;
 
         Ok(Self { metadata, frames })
+    }
+
+    /// Returns the total source length in bytes, including the preamble.
+    pub fn source_len(&self) -> usize {
+        // The validated frame region extends to physical EOF, even when empty.
+        self.frames.end()
+    }
+
+    /// Returns the fixed main-header region at the beginning of the source.
+    pub fn header_region(&self) -> ByteRegion {
+        ByteRegion::new(0, size_of::<Header>()).expect("fixed header region fits usize")
+    }
+
+    /// Returns the fixed disk sub-header region immediately after the main header.
+    pub fn disk_header_region(&self) -> ByteRegion {
+        ByteRegion::new(size_of::<Header>(), size_of::<DiskSubHeader>())
+            .expect("fixed IBT preamble fits usize")
+    }
+
+    /// Returns the complete fixed preamble containing both headers.
+    pub fn preamble_region(&self) -> ByteRegion {
+        ByteRegion::new(0, IBT_PREAMBLE_SIZE).expect("fixed IBT preamble fits usize")
     }
 
     /// Returns the validated variable-header and session-information regions.
@@ -106,6 +159,74 @@ mod tests {
         header.tick_rate = 60;
         header.buffer_length = 4;
         header
+    }
+
+    #[test]
+    fn fixed_regions_are_contiguous_and_source_bounded() {
+        // SDK wire sizes: the combined preamble must not be confused with Header.
+        for source_len in [144, 156] {
+            let layout = IbtLayout::try_from_headers(&valid_header(), source_len).unwrap();
+            assert_eq!(layout.source_len(), source_len);
+            assert_eq!(layout.header_region().as_range(), 0..112);
+            assert_eq!(layout.disk_header_region().as_range(), 112..144);
+            assert_eq!(layout.preamble_region().as_range(), 0..144);
+            assert_eq!(
+                layout.header_region().end(),
+                layout.disk_header_region().offset()
+            );
+            assert_eq!(
+                layout.disk_header_region().end(),
+                layout.preamble_region().end()
+            );
+            assert!(layout.preamble_region().end() <= layout.source_len());
+            assert_eq!(layout.frames().as_region().as_range(), 144..source_len);
+            assert_eq!(layout.frame_count(), (source_len - 144) / 4);
+        }
+    }
+
+    #[test]
+    fn inspection_preserves_gaps_and_single_metadata_regions() {
+        let variable_len = size_of::<VariableHeader>();
+        let variable_offset = IBT_PREAMBLE_SIZE + 11;
+        let session_offset = variable_offset + variable_len + 13;
+        for (has_variables, has_session) in [(true, false), (false, true), (true, true)] {
+            let mut header = valid_header();
+            if has_variables {
+                header.variable_header_offset = i32::try_from(variable_offset).unwrap();
+                header.variable_count = 1;
+            }
+            if has_session {
+                header.session_info_offset = i32::try_from(session_offset).unwrap();
+                header.session_info_length = 7;
+            }
+            let metadata_end = if has_session {
+                session_offset + 7
+            } else {
+                variable_offset + variable_len
+            };
+            let layout = IbtLayout::try_from_headers(&header, metadata_end + 8).unwrap();
+            assert_eq!(layout.source_len(), metadata_end + 8);
+            assert_eq!(
+                layout
+                    .metadata()
+                    .variable_headers()
+                    .map(|r| r.as_region().as_range()),
+                has_variables.then_some(variable_offset..variable_offset + variable_len)
+            );
+            assert_eq!(
+                layout
+                    .metadata()
+                    .session_info()
+                    .map(|r| r.as_region().as_range()),
+                has_session.then_some(session_offset..session_offset + 7)
+            );
+            assert_eq!(layout.frame_data_start(), metadata_end);
+            assert_eq!(
+                layout.frames().as_region().as_range(),
+                metadata_end..metadata_end + 8
+            );
+            assert_eq!(layout.frame(1).unwrap().end(), layout.source_len());
+        }
     }
 
     #[test]

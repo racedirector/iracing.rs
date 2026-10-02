@@ -129,7 +129,11 @@ impl IbtReader {
         })
     }
 
-    /// Returns the validated metadata and frame geometry.
+    /// Returns the canonical physical layout of this source.
+    ///
+    /// The layout is constructed once when the source is opened. It exposes the
+    /// fixed preamble, optional metadata, and indexed frame regions without
+    /// additional source reads or changes to the source cursor.
     pub fn layout(&self) -> &IbtLayout {
         &self.layout
     }
