@@ -1,0 +1,7 @@
+{
+  "id": "case-01",
+  "prompt": "Review the memory-access abstraction and its documented guarantees.",
+  "inputs": [
+    "source.rs"
+  ]
+}

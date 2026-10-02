@@ -1,0 +1,7 @@
+{
+  "id": "case-05",
+  "prompt": "Trace this real call path before evaluating its allocation behavior.",
+  "inputs": [
+    "source.rs"
+  ]
+}

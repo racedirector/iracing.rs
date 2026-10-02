@@ -1,0 +1,7 @@
+{
+  "id": "case-04",
+  "prompt": "Compare the storage assumptions of these entry points.",
+  "inputs": [
+    "source.rs"
+  ]
+}

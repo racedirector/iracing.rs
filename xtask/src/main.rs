@@ -1,3 +1,4 @@
+mod agent;
 mod generated;
 mod support;
 mod workflows;
@@ -24,6 +25,11 @@ enum Task {
     GenerateReference,
     /// Run the shared sequential local quality gate.
     PrePush,
+    /// Prepare and adjudicate the opt-in agent review corpus.
+    Agent {
+        #[command(subcommand)]
+        command: agent::AgentTask,
+    },
 }
 
 fn root() -> &'static Path {
@@ -52,6 +58,7 @@ fn check_repo() -> Result<()> {
 
 fn main() -> Result<()> {
     match Args::parse().command {
+        Task::Agent { command } => agent::run(command),
         Task::CheckRepo => check_repo(),
         Task::CheckGenerated => generated::check(root()),
         Task::GenerateReference => generated::generate(root()),

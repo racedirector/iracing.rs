@@ -1,0 +1,13 @@
+{
+  "id": "case-01",
+  "control": false,
+  "atoms": {
+    "a1": "Constructor lacks explicit lifetime/extent/alignment and external mutation contract; NonNull alone proves only non-nullness.",
+    "a2": "Volatile byte reads do not provide atomic synchronization or a coherent snapshot.",
+    "a3": "Thread traits require reviewing the complete external-writer and mapping lifetime protocol."
+  },
+  "hard_failures": {
+    "h1": "Claiming volatile creates atomic synchronization or snapshot coherence",
+    "h2": "Claiming modeled tests prove real Win32 behavior"
+  }
+}
