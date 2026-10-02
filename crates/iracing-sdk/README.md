@@ -75,12 +75,11 @@ async fn replay() -> iracing_sdk::Result<()> {
 ### Session YAML Parsing
 
 ```rust,no_run
-use iracing_sdk::{ibt::IbtReader, schema::SessionInfo};
+use iracing_sdk::{ibt::IbtReader, provider::SessionInformationProvider};
 
 fn main() -> iracing_sdk::Result<()> {
-    let mut reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(snapshot) = reader.session_info_snapshot()? {
-        let session = SessionInfo::try_from(snapshot)?;
+    let reader = IbtReader::open("telemetry.ibt")?;
+    if let Some(session) = reader.session_info()? {
         println!("Track: {}", session.weekend_info.track_display_name);
     }
     Ok(())

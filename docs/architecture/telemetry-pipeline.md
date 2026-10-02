@@ -42,7 +42,7 @@ recordings: no process may modify or truncate the file until the reader (or
 owning provider/connection) is dropped. Use `from_bytes` with an owned copy when
 that lifetime requirement cannot be met.
 
-`frame(index)`, `session_info_snapshot()`, and `variable_headers_snapshot()` read
+`frame(index)`, `session_info_snapshot()`, and `VariableHeadersProvider::variable_headers()` read
 owned data from the source on each call. They may move its physical cursor;
 there is no reader-owned logical cursor, schema, or session cache. Every indexed
 read seeks to its validated region. Live `WindowsConnection` interprets the
@@ -140,7 +140,7 @@ The current live read path is:
    `LiveSessionPolicy::observe` before publishing the frame.
 4. When the packet's session version differs from the last observed version,
    the policy immediately calls `Provider::session_yaml`. For `LiveProvider`,
-   this calls `WindowsConnection::session_info_buffer`, which reads the offset and
+   this calls `SessionInformationBytesProvider::session_info_snapshot`, which reads the offset and
    length from the current header and copies/extracts the one current YAML
    region into an owned `String`.
 5. `LiveProvider` performs iRacing YAML preprocessing on that owned string.
@@ -164,7 +164,7 @@ reasoning about session ordering:
   snapshot. Header snapshots themselves can span publication instants.
 - The `Provider::session_yaml` version argument is only a change trigger for
   `LiveProvider`; it is intentionally ignored rather than treated as a lookup
-  key. `WindowsConnection::session_info_buffer` copies whichever YAML occupies the
+  key. `SessionInformationBytesProvider::session_info_snapshot` copies whichever YAML occupies the
   single current session region at that moment. That copy does not compare
   `session_info_update` before and after reading the region.
 - The data-valid event can signal a session-only change, but

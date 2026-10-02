@@ -10,7 +10,7 @@ use crate::{
     irsdk::{VariableHeader, VariableType as IRSDKVariableType},
 };
 
-use super::variable_headers_buffer::VariableHeadersBuffer;
+use super::variable_headers::VariableHeaders;
 
 fn schema_validation_error(details: impl Into<String>) -> IRacingSDKError {
     IRacingSDKError::parse_error("Schema validation", details)
@@ -137,7 +137,7 @@ impl VariableSchema {
     }
 
     /// Constructs a schema from an exact snapshot of SDK variable headers.
-    pub fn from_snapshot(snapshot: VariableHeadersBuffer, frame_size: usize) -> Result<Self> {
+    pub fn from_snapshot(snapshot: VariableHeaders, frame_size: usize) -> Result<Self> {
         Self::from_headers(snapshot.as_slice(), frame_size)
     }
 
@@ -326,7 +326,7 @@ mod tests {
         .unwrap();
 
         let bytes = header.as_bytes();
-        let headers = VariableHeadersBuffer::try_from_region_bytes(bytes, 1).unwrap();
+        let headers = VariableHeaders::try_from_bytes(bytes, 1).unwrap();
 
         let schema = VariableSchema::from_snapshot(headers, 8).unwrap();
 

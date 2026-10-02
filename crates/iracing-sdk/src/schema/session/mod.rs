@@ -84,7 +84,7 @@ pub use session_data::{QualifyResult, QualifyResultsInfo, Session, SessionInfoDa
 pub use timing::{Sector, SplitTimeInfo};
 pub use weekend::{TelemetryOptions, WeekendInfo, WeekendOptions};
 
-use crate::{IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer};
+use crate::{IRacingSDKError, IRacingSessionString, Result, SessionInfoBytes};
 
 /// Session information extracted and parsed from iRacing's YAML session data
 /// This matches the actual structure that iRacing outputs
@@ -308,10 +308,10 @@ impl SessionInfo {
     }
 }
 
-impl TryFrom<SessionInfoBuffer> for SessionInfo {
+impl TryFrom<SessionInfoBytes> for SessionInfo {
     type Error = IRacingSDKError;
 
-    fn try_from(value: SessionInfoBuffer) -> Result<Self, Self::Error> {
+    fn try_from(value: SessionInfoBytes) -> Result<Self, Self::Error> {
         let session_info = IRacingSessionString::try_from(value)?;
         SessionInfo::try_from(session_info)
     }

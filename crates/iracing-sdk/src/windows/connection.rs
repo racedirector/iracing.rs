@@ -7,12 +7,15 @@ use iracing_irsdk::{StatusField, VariableBuffer};
 
 use super::source::WaitResult;
 use crate::ByteRegion;
+use crate::provider::{SessionInformationBytesProvider, VariableHeadersProvider};
 use crate::{
-    IRacingSDKError, Result, SessionInfoBuffer, SessionInfoRegion, VariableHeadersBuffer,
-    VariableHeadersRegion, irsdk::Header, windows::source::LiveSource,
+    IRacingSDKError, Result, SessionInfoBytes, SessionInfoRegion, VariableHeaders,
+    VariableHeadersRegion, windows::source::LiveSource,
 };
 use std::mem::offset_of;
 use std::time::Duration;
+
+use iracing_irsdk::Header;
 
 /// Direct connection to iRacing shared memory
 #[derive(Debug)]
@@ -233,29 +236,22 @@ impl Connection {
         None
     }
 
-    /// Copies the session-information region advertised by the live header.
-    ///
-    /// Returns `None` when the header advertises no usable region.
-    pub fn session_info_buffer(&self) -> Option<SessionInfoBuffer> {
-        let header = self.header_snapshot().ok()?;
-
-        let region = SessionInfoRegion::try_from_header(&header).ok()??;
-
-        let bytes = self.copy_region(region.as_region())?;
-
-        Some(SessionInfoBuffer::from_checked_region(&bytes))
+    /// Copies session bytes, returning None on absence or acquisition failure.
+    #[deprecated(
+        note = "use iracing_sdk::provider::SessionInformationBytesProvider::session_info_snapshot to preserve acquisition errors"
+    )]
+    pub fn session_info_buffer(&self) -> Option<SessionInfoBytes> {
+        self.session_info_snapshot().ok().flatten()
     }
 
-    /// Copies the variable-header region advertised by the live header.
-    ///
-    /// Returns `None` when the header advertises no usable region.
-    pub fn variable_headers_buffer(&self) -> Option<VariableHeadersBuffer> {
+    /// Copies headers, returning None on absence or acquisition failure.
+    #[deprecated(
+        note = "use iracing_sdk::provider::VariableHeadersProvider::variable_headers; absent metadata returns an empty snapshot and failures return errors"
+    )]
+    pub fn variable_headers_buffer(&self) -> Option<VariableHeaders> {
         let header = self.header_snapshot().ok()?;
-        let region = VariableHeadersRegion::try_from_header(&header).ok()??;
-
-        let variable_header_bytes = self.copy_region(region.as_region())?;
-
-        VariableHeadersBuffer::try_from_region_bytes(&variable_header_bytes, region.count()).ok()
+        VariableHeadersRegion::try_from_header(&header).ok()??;
+        self.variable_headers().ok()
     }
 
     fn copy_region(&self, region: ByteRegion) -> Option<Vec<u8>> {
@@ -301,6 +297,43 @@ impl Connection {
             }
         }
         latest
+    }
+}
+
+impl SessionInformationBytesProvider for Connection {
+    fn session_info_snapshot(&self) -> Result<Option<SessionInfoBytes>> {
+        let header = self.header_snapshot()?;
+
+        let Some(region) = SessionInfoRegion::try_from_header(&header)? else {
+            return Ok(None);
+        };
+
+        let Some(bytes) = self.copy_region(region.as_region()) else {
+            return Err(IRacingSDKError::parse_error(
+                "Connection::session_info_snapshot",
+                "Could not get session info bytes from source",
+            ));
+        };
+
+        Ok(Some(SessionInfoBytes::from_checked_region(&bytes)))
+    }
+}
+
+impl VariableHeadersProvider for Connection {
+    fn variable_headers(&self) -> Result<VariableHeaders> {
+        let header = self.header_snapshot()?;
+        let Some(region) = VariableHeadersRegion::try_from_header(&header)? else {
+            return Ok(VariableHeaders::default());
+        };
+
+        let Some(bytes) = self.copy_region(region.as_region()) else {
+            return Err(IRacingSDKError::parse_error(
+                "Connection::variable_headers",
+                "Could not get variable headers bytes from source",
+            ));
+        };
+
+        VariableHeaders::try_from_bytes(&bytes, region.count())
     }
 }
 
@@ -384,8 +417,8 @@ mod tests {
         header.session_info_length = 4;
         header.variable_header_offset = 270;
         let connection = connection_with_header(header, 272);
-        assert!(connection.session_info_buffer().is_none());
-        assert!(connection.variable_headers_buffer().is_none());
+        assert!(connection.session_info_snapshot().is_err());
+        assert!(connection.variable_headers().is_err());
     }
 
     #[test]

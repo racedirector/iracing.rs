@@ -1,5 +1,6 @@
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::Subcommand;
+use iracing_sdk::provider::VariableHeadersProvider;
 use std::path::PathBuf;
 
 use crate::{
@@ -43,18 +44,9 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             output,
             format,
         } => {
-            let mut reader = get_disk_reader(&path)?;
+            let reader = get_disk_reader(&path)?;
 
-            let Some(snapshot) = reader.variable_headers_snapshot()? else {
-                bail!(format!(
-                    "No variable headers found in IBT file: {}",
-                    path.display()
-                ))
-            };
-
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&snapshot)?;
-            writer.finalize()
+            write_headers(reader, output, format)
         }
         #[cfg(windows)]
         Command::Live { output, format } => {
@@ -62,13 +54,19 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
 
             let connection = get_connection()?;
 
-            let Some(snapshot) = connection.variable_headers_buffer() else {
-                bail!("Could not retrieve variable headers from live connection")
-            };
-
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&snapshot)?;
-            writer.finalize()
+            write_headers(connection, output, format)
         }
     }
+}
+
+fn write_headers(
+    provider: impl VariableHeadersProvider,
+    output: OutputTarget,
+    format: DocumentFormat,
+) -> Result<()> {
+    let headers = provider.variable_headers()?;
+
+    let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+    writer.write(&headers)?;
+    writer.finalize()
 }

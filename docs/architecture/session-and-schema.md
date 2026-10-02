@@ -51,7 +51,7 @@ replaces the former synthetic unsigned-integer shortcut.
 
 ## Session YAML path
 
-`SessionInfoBuffer` owns the complete captured region. Its `payload()` method
+`SessionInfoBytes` owns the complete captured region. Its `payload()` method
 borrows a `SessionInfoPayload` ending before the first NUL, preserving the original
 region without allocating. The payload detects `WeekendInfo.Encoding` and decodes
 the same bounded slice: declared UTF-8 uses replacement for malformed sequences,
@@ -61,7 +61,7 @@ buffer to `String` delegates to this payload decoder. Neither boundary nor
 encoding is cached; control-character cleanup and parsing remain subsequent operations.
 
 iRacing session data can contain control characters and non-UTF-8 bytes.
-`SessionInfoBuffer` bounds and decodes the captured bytes; the internal
+`SessionInfoBytes` bounds and decodes the captured bytes; the internal
 `IRacingSessionString` removes invalid control characters and rejects empty
 text. `IbtProvider::session_yaml` and live acquisition supply this sanitized
 text. `SessionInfo::parse` then deserializes it into the typed session model.
@@ -125,3 +125,13 @@ These files are generated artifacts. Session schemas can be regenerated with `ca
 - Bounds and encoding checks belong before deserialization.
 - Session version, retry, ordering, and EOF behavior belong in the telemetry
   session policies, not individual consumers.
+
+
+Metadata acquisition is shared through the traits in `provider`:
+`SessionInformationBytesProvider` returns owned bytes or `Ok(None)` when
+absent, and its blanket `SessionInformationProvider` implementation decodes,
+sanitizes, and parses those bytes. `VariableHeadersProvider` returns owned
+headers, using an empty snapshot for absent metadata. Acquisition and parsing
+failures remain errors. Legacy buffer names and inherent metadata accessors
+are deprecated compatibility entry points; live legacy accessors still collapse
+errors to `None`, and the IBT legacy header accessor preserves `None` on absence.

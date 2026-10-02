@@ -17,7 +17,7 @@
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
 //! - Session data path:
 //!   - [`schema::SessionInfo`] and [`schema::SessionInfo::parse`] for session YAML
-//!   - [`types::SessionInfoBuffer`] for decoding session data from the SDK
+//!   - [`types::SessionInfoBytes`] for decoding session data from the SDK
 //! - Live path (Windows only):
 //!   - `LiveProvider`, `WindowsConnection`, `WaitResult`
 //!   - `Broadcast`, `BroadcastCommand`

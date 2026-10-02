@@ -51,11 +51,11 @@ mod ibt;
 mod iracing_session_string;
 mod regions;
 mod schema;
-mod session_info_buffer;
+mod session_info_bytes;
 mod telemetry_value;
 mod update_rate;
 mod var_data;
-mod variable_headers_buffer;
+mod variable_headers;
 
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
@@ -65,11 +65,19 @@ pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::*;
 pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
-pub use session_info_buffer::{SessionInfoBuffer, SessionInfoEncoding, SessionInfoPayload};
+pub use session_info_bytes::{SessionInfoBytes, SessionInfoEncoding, SessionInfoPayload};
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
 pub use var_data::VarData;
-pub use variable_headers_buffer::VariableHeadersBuffer;
+pub use variable_headers::VariableHeaders;
+
+/// Deprecated name for owned session bytes.
+#[deprecated(note = "use SessionInfoBytes")]
+pub type SessionInfoBuffer = SessionInfoBytes;
+
+/// Deprecated name for owned variable headers.
+#[deprecated(note = "use VariableHeaders")]
+pub type VariableHeadersBuffer = VariableHeaders;
 
 #[cfg(test)]
 mod tests {

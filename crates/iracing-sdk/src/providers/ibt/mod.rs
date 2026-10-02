@@ -3,8 +3,10 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema, ibt::IbtReader,
-    provider::Provider, types::IRacingSessionString,
+    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    ibt::IbtReader,
+    provider::{Provider, VariableHeadersProvider},
+    types::IRacingSessionString,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
@@ -33,19 +35,18 @@ impl IbtProvider {
     /// Returns an error if variable headers cannot be read or validated against
     /// the layout's frame size, or if telemetry frames have no variable metadata.
     /// A zero-frame recording may have an empty schema.
-    pub fn from_reader(mut reader: IbtReader) -> Result<Self> {
+    pub fn from_reader(reader: IbtReader) -> Result<Self> {
         let frame_size = reader.frame_size();
-        let frame_count = reader.frame_count();
-        let schema = match reader.variable_headers_snapshot()? {
-            Some(snapshot) => VariableSchema::from_snapshot(snapshot, frame_size)?,
-            None if frame_count == 0 => VariableSchema::from_headers(&[], frame_size)?,
-            None => {
-                return Err(IRacingSDKError::parse_error(
-                    "IBT replay schema",
-                    "Telemetry frames require variable-header metadata",
-                ));
-            }
-        };
+
+        let headers = reader.variable_headers()?;
+        if headers.is_empty() && reader.frame_count() > 0 {
+            return Err(IRacingSDKError::parse_error(
+                "IBT replay schema",
+                "Telemetry frames require variable-header metadata",
+            ));
+        }
+        let schema = VariableSchema::from_headers(&headers, frame_size)?;
+
         let tick_rate = if reader.header().tick_rate > 0 {
             f64::from(reader.header().tick_rate)
         } else {
@@ -109,7 +110,9 @@ impl Provider for IbtProvider {
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        let Some(snapshot) = self.reader.session_info_snapshot()? else {
+        let Some(snapshot) =
+            crate::provider::SessionInformationBytesProvider::session_info_snapshot(&self.reader)?
+        else {
             return Ok(None);
         };
 
@@ -124,8 +127,10 @@ impl Provider for IbtProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::irsdk::{DiskSubHeader, Header};
-    use crate::test_utils::{load_fixture_manifest, require_smallest_ibt_fixture};
+    use crate::{
+        irsdk::{DiskSubHeader, Header},
+        test_utils::{load_fixture_manifest, require_smallest_ibt_fixture},
+    };
     use futures::executor::block_on;
     use std::fs;
     use std::mem::{offset_of, size_of};
@@ -138,8 +143,8 @@ mod tests {
             let mut reference = IbtReader::from_bytes(bytes.clone())?;
             let mut moved = IbtReader::open(&path)?;
             moved.frame(fixture.num_frames - 1)?;
-            moved.session_info_snapshot()?;
-            moved.variable_headers_snapshot()?;
+            crate::provider::SessionInformationBytesProvider::session_info_snapshot(&moved)?;
+            moved.variable_headers()?;
             for mut provider in [
                 IbtProvider::open(&path)?,
                 IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?,

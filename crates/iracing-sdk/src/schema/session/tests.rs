@@ -40,7 +40,7 @@ fn captured_buffers_deserialize_track_session_and_driver_fields() {
             "Synthetic ISO Driver 01",
         ),
     ] {
-        let session = SessionInfo::try_from(SessionInfoBuffer::from_checked_region(bytes))
+        let session = SessionInfo::try_from(SessionInfoBytes::from_checked_region(bytes))
             .expect("captured session should deserialize");
         assert_eq!(session.weekend_info.track_name, track);
         assert_eq!(session.weekend_info.track_display_name, display);
@@ -77,7 +77,7 @@ fn buffer_conversion_decodes_sanitizes_and_ignores_padding_before_parsing() {
     bytes.extend_from_slice(
         b"DriverInfo:\n  Drivers:\n    - CarIdx: 0\n      UserName: Jos\xe9\x01\n      CarNumber: '037'\n\0\xffinvalid: [",
     );
-    let session = SessionInfo::try_from(SessionInfoBuffer::from_checked_region(&bytes)).unwrap();
+    let session = SessionInfo::try_from(SessionInfoBytes::from_checked_region(&bytes)).unwrap();
     let drivers = session.driver_info.unwrap().drivers.unwrap();
     assert_eq!(drivers[0].user_name, "Jos\u{e9}");
     assert_eq!(drivers[0].car_number.as_deref(), Some("037"));
@@ -108,7 +108,7 @@ fn buffer_conversion_propagates_cleanup_and_deserialization_errors() {
         (b"WeekendInfo: [".as_slice(), "SessionInfo deserialization"),
     ] {
         let error =
-            SessionInfo::try_from(SessionInfoBuffer::from_checked_region(bytes)).unwrap_err();
+            SessionInfo::try_from(SessionInfoBytes::from_checked_region(bytes)).unwrap_err();
         assert!(matches!(error, IRacingSDKError::Parse { context, .. }
             if context == expected_context));
     }

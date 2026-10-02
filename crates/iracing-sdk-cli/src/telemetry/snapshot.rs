@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
+use iracing_sdk::provider::VariableHeadersProvider;
 
 use crate::{
     utils::get_disk_reader,
@@ -99,10 +100,12 @@ pub(super) async fn handle_command(command: Command) -> Result<()> {
             let data = reader
                 .frame(frame_index)
                 .with_context(|| format!("Could not read IBT frame {frame_index}"))?;
-            let headers = reader
-                .variable_headers_snapshot()?
-                .context("IBT contains no telemetry variable headers")?;
-            let schema = VariableSchema::from_snapshot(headers, reader.layout().frame_size())?;
+
+            let schema = VariableSchema::from_headers(
+                &reader.variable_headers()?,
+                reader.layout().frame_size(),
+            )?;
+
             let frame = FramePacket::new(
                 data,
                 u32::try_from(frame_index)

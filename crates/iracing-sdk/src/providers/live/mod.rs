@@ -11,7 +11,9 @@ use std::{
 
 use crate::{
     FramePacket, IRacingSDKError, IRacingSessionString, Result, SchemaProvider, VariableSchema,
-    WindowsConnection, provider::Provider, windows::WaitResult,
+    WindowsConnection,
+    provider::{Provider, SessionInformationBytesProvider, VariableHeadersProvider},
+    windows::WaitResult,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -67,10 +69,7 @@ impl LiveProvider {
             )
         })?;
 
-        let schema = match connection.variable_headers_buffer() {
-            Some(buffer) => VariableSchema::from_snapshot(buffer, frame_size),
-            None => VariableSchema::from_headers(&[], frame_size),
-        }?;
+        let schema = VariableSchema::from_headers(&connection.variable_headers()?, frame_size)?;
 
         Ok(Self {
             connection,
@@ -182,7 +181,7 @@ impl LiveProvider {
     async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        let Some(buffer) = self.connection.session_info_buffer() else {
+        let Some(buffer) = self.connection.session_info_snapshot()? else {
             return Ok(None);
         };
 

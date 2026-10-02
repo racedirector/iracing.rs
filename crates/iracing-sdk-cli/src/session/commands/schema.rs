@@ -1,9 +1,10 @@
 use crate::{
-    utils::{get_disk_reader, get_disk_session_info},
+    utils::get_disk_reader,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Subcommand;
+use iracing_sdk::provider::{SessionInformationBytesProvider, SessionInformationProvider};
 use schemars::{schema_for, schema_for_value};
 use std::path::PathBuf;
 
@@ -55,35 +56,46 @@ pub(crate) fn handle_command(command: Commands) -> Result<()> {
             output,
             format,
         } => {
-            let mut reader = get_disk_reader(&path)?;
-            let session_info = get_disk_session_info(&mut reader)?;
-            let schema = schema_for_value!(session_info);
+            let reader = get_disk_reader(&path)?;
+            write_session_info_schema(&reader, output.clone(), format)?;
 
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&schema)?;
             tracing::info!(output=%output, format=%format, ibt_path=%path.display(),"Wrote IBT session schema");
-            writer.finalize()
         }
         #[cfg(windows)]
         Commands::Live { output, format } => {
-            use crate::utils::{get_connection, get_live_session_info};
+            use crate::utils::get_connection;
 
             let connection = get_connection()?;
-            let session_info = get_live_session_info(&connection)?;
-            let schema = schema_for_value!(session_info);
+            write_session_info_schema(&connection, output.clone(), format)?;
 
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&schema)?;
             tracing::info!(output=%output,format=%format,"Wrote live session schema");
-            writer.finalize()
         }
         Commands::Type { output, format } => {
             let schema = schema_for!(iracing_sdk::schema::SessionInfo);
 
             let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
             writer.write(&schema)?;
+            writer.finalize()?;
+
             tracing::info!(output=%output,format=%format,"Wrote static session schema");
-            writer.finalize()
         }
     }
+
+    Ok(())
+}
+
+fn write_session_info_schema(
+    provider: &impl SessionInformationBytesProvider,
+    output: OutputTarget,
+    format: DocumentFormat,
+) -> Result<()> {
+    let Some(session_info) = provider.session_info()? else {
+        bail!("Could not retrieve session info")
+    };
+
+    let schema = schema_for_value!(session_info);
+
+    let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+    writer.write(&schema)?;
+    writer.finalize()
 }

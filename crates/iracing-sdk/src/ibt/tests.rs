@@ -1,6 +1,7 @@
 //! Cross-module compatibility checks against the generated IBT fixture manifest.
 
 use crate::SessionInfoRegion;
+use crate::provider::VariableHeadersProvider;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
     VariableHeadersRegion, VariableInfo,
@@ -41,10 +42,12 @@ fn indexed_and_snapshot_reads_match_source_bytes() -> Result<()> {
                 .session_info()
                 .unwrap()
                 .as_region();
-            let session = reader.session_info_snapshot()?.unwrap();
+            let session =
+                crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
+                    .unwrap();
             assert_eq!(session.as_bytes(), &bytes[session_region.as_range()]);
             let variable_region = *reader.layout().metadata().variable_headers().unwrap();
-            let headers = reader.variable_headers_snapshot()?.unwrap();
+            let headers = reader.variable_headers()?;
             assert_eq!(headers.len(), variable_region.count());
             assert_eq!(
                 headers.as_slice().as_bytes(),
@@ -91,13 +94,16 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
                     );
                 }
                 data[..size_of::<Header>()].copy_from_slice(header.as_bytes());
-                let mut reader = IbtReader::from_bytes(data)?;
-                assert_eq!(
-                    reader.variable_headers_snapshot()?.is_some(),
-                    keep_variables
-                );
+                let reader = IbtReader::from_bytes(data)?;
+                assert_eq!(!reader.variable_headers()?.is_empty(), keep_variables);
                 assert_eq!(reader.layout().frame_size(), original.layout().frame_size());
-                assert_eq!(reader.session_info_snapshot()?.is_some(), keep_session);
+                assert_eq!(
+                    crate::provider::SessionInformationBytesProvider::session_info_snapshot(
+                        &reader
+                    )?
+                    .is_some(),
+                    keep_session
+                );
                 let expected_frames = if keep_frames {
                     original.layout().frame_count()
                 } else {
@@ -142,9 +148,10 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("snapshots.ibt");
     fs::copy(crate::test_utils::require_smallest_ibt_fixture()?, &path)?;
-    let mut reader = IbtReader::open(&path)?;
-    let session = reader.session_info_snapshot()?.unwrap();
-    let headers = reader.variable_headers_snapshot()?.unwrap();
+    let reader = IbtReader::open(&path)?;
+    let session =
+        crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?.unwrap();
+    let headers = reader.variable_headers()?;
     let session_region = reader
         .layout()
         .metadata()
@@ -180,15 +187,14 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     let mut reader = IbtReader::open(&path)?;
 
     assert!(
-        reader
-            .session_info_snapshot()?
+        crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
             .unwrap()
             .as_bytes()
             .iter()
             .all(|&byte| byte == 0)
     );
     assert_eq!(
-        reader.variable_headers_snapshot()?.unwrap().as_slice()[0].description(),
+        reader.variable_headers()?.as_slice()[0].description(),
         changed_description
     );
     assert!(session.as_bytes().iter().any(|&byte| byte != 0));
@@ -381,10 +387,8 @@ fn test_generated_fixture_variables_match_manifest() -> Result<()> {
 
     for fixture in &manifest.fixtures {
         let path = fixture.fixture_path()?;
-        let mut reader = IbtReader::open(&path)?;
-        let snapshot = reader
-            .variable_headers_snapshot()?
-            .context("fixture variable headers")?;
+        let reader = IbtReader::open(&path)?;
+        let snapshot = reader.variable_headers()?;
         let schema = VariableSchema::from_snapshot(snapshot, reader.layout().frame_size())?;
 
         assert_eq!(schema.frame_size, fixture.frame_size);

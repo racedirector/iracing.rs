@@ -1,4 +1,4 @@
-use super::session_info_buffer::SessionInfoBuffer;
+use super::session_info_bytes::SessionInfoBytes;
 use crate::{IRacingSDKError, Result};
 use std::ops::Deref;
 
@@ -50,10 +50,10 @@ impl TryFrom<String> for IRacingSessionString {
     }
 }
 
-impl TryFrom<SessionInfoBuffer> for IRacingSessionString {
+impl TryFrom<SessionInfoBytes> for IRacingSessionString {
     type Error = IRacingSDKError;
 
-    fn try_from(value: SessionInfoBuffer) -> Result<Self> {
+    fn try_from(value: SessionInfoBytes) -> Result<Self> {
         let decoded: String = value.into();
         decoded.try_into()
     }
@@ -92,14 +92,14 @@ mod tests {
 
     #[test]
     fn buffer_conversion_decodes_then_sanitizes() {
-        let buffer = SessionInfoBuffer::from_checked_region(b"UserName: Jos\xe9\x01\n\0padding");
+        let buffer = SessionInfoBytes::from_checked_region(b"UserName: Jos\xe9\x01\n\0padding");
         let sanitized = IRacingSessionString::try_from(buffer).unwrap();
         assert_eq!(String::from(sanitized), "UserName: Jos\u{e9}\n");
     }
 
     #[test]
     fn buffer_conversion_rejects_empty_nul_terminated_text() {
-        let buffer = SessionInfoBuffer::from_checked_region(b"\0UserName: ignored");
+        let buffer = SessionInfoBytes::from_checked_region(b"\0UserName: ignored");
         assert!(IRacingSessionString::try_from(buffer).is_err());
     }
 

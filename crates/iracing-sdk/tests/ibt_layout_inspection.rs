@@ -1,5 +1,6 @@
 //! Downstream tooling can inspect complete geometry using only the public layout.
 
+use iracing_sdk::provider::VariableHeadersProvider;
 use iracing_sdk::{
     IbtLayout,
     ibt::IbtReader,
@@ -50,8 +51,11 @@ fn public_layout_describes_owned_and_mapped_recordings() -> anyhow::Result<()> {
         assert_eq!(layout.frames().end(), layout.source_len());
 
         // Metadata reads may move the source cursor; indexed frame reads still use the layout.
-        assert!(reader.session_info_snapshot()?.is_some());
-        assert!(reader.variable_headers_snapshot()?.is_some());
+        assert!(
+            iracing_sdk::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
+                .is_some()
+        );
+        assert!(!reader.variable_headers()?.is_empty());
         for index in [layout.frame_count() - 1, 0] {
             let region = layout.frame(index)?;
             assert_eq!(region.len(), layout.frame_size());

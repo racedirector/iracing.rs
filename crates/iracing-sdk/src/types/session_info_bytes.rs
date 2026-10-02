@@ -2,7 +2,7 @@ use crate::parse_utils::nul_terminated_bytes;
 
 /// Borrowed session bytes before the first NUL, without any UTF-8 or YAML validity guarantee.
 ///
-/// Obtain this view through [`SessionInfoBuffer::payload`].
+/// Obtain this view through [`SessionInfoBytes::payload`].
 #[derive(Debug, Clone, Copy)]
 pub struct SessionInfoPayload<'a> {
     bytes: &'a [u8],
@@ -72,12 +72,12 @@ impl SessionInfoPayload<'_> {
 /// that its contents are valid YAML or correspond atomically to another
 /// independently acquired snapshot.
 #[derive(Debug, Clone)]
-pub struct SessionInfoBuffer {
+pub struct SessionInfoBytes {
     /// Complete bytes copied from the advertised session-information region.
     bytes: Vec<u8>,
 }
 
-impl SessionInfoBuffer {
+impl SessionInfoBytes {
     pub(crate) fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -96,9 +96,9 @@ impl SessionInfoBuffer {
     }
 }
 
-impl From<SessionInfoBuffer> for String {
+impl From<SessionInfoBytes> for String {
     /// Decodes the NUL-bounded payload using [`SessionInfoPayload::decode`].
-    fn from(buffer: SessionInfoBuffer) -> Self {
+    fn from(buffer: SessionInfoBytes) -> Self {
         buffer.payload().decode()
     }
 }
@@ -111,7 +111,7 @@ mod tests {
     fn checked_region_snapshot_owns_all_bytes() {
         let original = b"WeekendInfo:\n Encoding: UTF8\n\0padding";
         let mut source = original.to_vec();
-        let buffer = SessionInfoBuffer::from_checked_region(&source);
+        let buffer = SessionInfoBytes::from_checked_region(&source);
         source.fill(0xff);
         drop(source);
         assert_eq!(buffer.as_bytes(), original);
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn payload_borrows_only_text_and_preserves_region() {
         let bytes = b"WeekendInfo:\n Encoding: UTF8\n\0padding";
-        let buffer = SessionInfoBuffer::from_checked_region(bytes);
+        let buffer = SessionInfoBytes::from_checked_region(bytes);
         let payload = buffer.payload();
         assert_eq!(payload.bytes, &bytes[..bytes.len() - 8]);
         assert_eq!(payload.bytes.as_ptr(), buffer.as_bytes().as_ptr());
@@ -131,11 +131,11 @@ mod tests {
 
     #[test]
     fn declared_encoding_controls_decoding() {
-        let utf8 = SessionInfoBuffer::from_checked_region(
+        let utf8 = SessionInfoBytes::from_checked_region(
             b"WeekendInfo:\n Encoding: UTF8\n Name: \xc3\xa9\xff",
         );
         assert!(utf8.payload().decode().ends_with("\u{e9}\u{fffd}"));
-        let latin1 = SessionInfoBuffer::from_checked_region(
+        let latin1 = SessionInfoBytes::from_checked_region(
             b"WeekendInfo:\n Encoding: ISO_8859_1\n Name: \xc3\xa9",
         );
         assert!(String::from(latin1).ends_with("\u{c3}\u{a9}"));
@@ -143,20 +143,20 @@ mod tests {
 
     #[test]
     fn decoding_stops_before_invalid_bytes_after_nul() {
-        let buffer = SessionInfoBuffer::from_checked_region(b"\xc3\xa9\0\xff");
+        let buffer = SessionInfoBytes::from_checked_region(b"\xc3\xa9\0\xff");
         assert_eq!(String::from(buffer), "\u{e9}");
     }
 
     #[test]
     fn iso_8859_1_fallback_preserves_single_byte_codepoints() {
-        let buffer = SessionInfoBuffer::from_checked_region(&[0x80, 0x93, 0x96, 0xe9]);
+        let buffer = SessionInfoBytes::from_checked_region(&[0x80, 0x93, 0x96, 0xe9]);
         assert_eq!(String::from(buffer), "\u{80}\u{93}\u{96}\u{e9}");
     }
 
     #[test]
     fn decoding_does_not_sanitize_or_reject_empty_text() {
         for bytes in [b"".as_slice(), b"\0padding", b"\x01 \n"] {
-            let buffer = SessionInfoBuffer::from_checked_region(bytes);
+            let buffer = SessionInfoBytes::from_checked_region(bytes);
             let expected = if bytes.starts_with(b"\0") {
                 ""
             } else {
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn test_session_info_buffer_with_null_terminator() {
         let bytes = b"SessionInfo:\n  TrackName: test\0padding".to_vec();
-        let buffer = SessionInfoBuffer::from_checked_region(&bytes);
+        let buffer = SessionInfoBytes::from_checked_region(&bytes);
 
         let result: String = buffer.into();
         assert_eq!(result, "SessionInfo:\n  TrackName: test");
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn test_session_info_buffer_without_null_terminator() {
         let bytes = b"SessionInfo:\n  TrackName: test".to_vec();
-        let buffer = SessionInfoBuffer::from_checked_region(&bytes);
+        let buffer = SessionInfoBytes::from_checked_region(&bytes);
 
         let result: String = buffer.into();
         assert_eq!(result, "SessionInfo:\n  TrackName: test");
@@ -188,7 +188,7 @@ mod tests {
     fn test_decode_yaml_from_utf8_with_special_characters() {
         let input = "DriverInfo:\n  UserName: \"José 🚗\"\n  CarScreenName: \"Mazda MX-5 – Cup\"";
         let bytes = input.as_bytes().to_vec();
-        let buffer = SessionInfoBuffer::from_checked_region(&bytes);
+        let buffer = SessionInfoBytes::from_checked_region(&bytes);
         let result: String = buffer.into();
 
         assert_eq!(result, input);
@@ -205,7 +205,7 @@ mod tests {
         ]
         .to_vec();
 
-        let buffer = SessionInfoBuffer::from_checked_region(&bytes);
+        let buffer = SessionInfoBytes::from_checked_region(&bytes);
         let result: String = buffer.into();
 
         assert_eq!(
@@ -217,7 +217,7 @@ mod tests {
 
 #[cfg(test)]
 mod encoding_tests {
-    use crate::{SessionInfoBuffer, SessionInfoEncoding};
+    use crate::{SessionInfoBytes, SessionInfoEncoding};
 
     #[test]
     fn detects_captured_headers() {
@@ -233,7 +233,7 @@ mod encoding_tests {
             ),
         ] {
             assert_eq!(
-                SessionInfoBuffer::from_checked_region(bytes)
+                SessionInfoBytes::from_checked_region(bytes)
                     .payload()
                     .encoding(),
                 expected
@@ -249,7 +249,7 @@ mod encoding_tests {
             b"---\nWeekendInfo:\n  TrackName: test\n\n# comment\n  Encoding:   UTF8\n",
         ] {
             assert_eq!(
-                SessionInfoBuffer::from_checked_region(bytes)
+                SessionInfoBytes::from_checked_region(bytes)
                     .payload()
                     .encoding(),
                 SessionInfoEncoding::Utf8
@@ -267,7 +267,7 @@ mod encoding_tests {
             b"WeekendInfo:\n\0 Encoding: UTF8\n",
         ] {
             assert_eq!(
-                SessionInfoBuffer::from_checked_region(bytes)
+                SessionInfoBytes::from_checked_region(bytes)
                     .payload()
                     .encoding(),
                 SessionInfoEncoding::Unknown

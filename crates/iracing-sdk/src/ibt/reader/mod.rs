@@ -31,12 +31,14 @@
 mod source;
 
 use crate::{
-    IRacingSDKError, IbtLayout, Result, SessionInfoBuffer, VariableHeadersBuffer,
-    irsdk::{DiskSubHeader, Header},
+    IRacingSDKError, IbtLayout, Result, SessionInfoBytes, VariableHeaders,
+    provider::{SessionInformationBytesProvider, VariableHeadersProvider},
 };
 use memmap2::Mmap;
 use source::IbtSource;
 use std::{fs::File, path::Path};
+
+use iracing_irsdk::{DiskSubHeader, Header};
 
 use zerocopy::FromBytes;
 
@@ -146,29 +148,12 @@ impl IbtReader {
         &self.layout
     }
 
-    /// Reads an owned snapshot of exactly the advertised session region on each call.
-    ///
-    /// Returns `None` if absent. Each snapshot owns its bytes independently of the source.
-    ///
-    /// # Errors
-    /// Returns an error if the source cannot supply the complete region.
-    pub fn session_info_snapshot(&mut self) -> Result<Option<SessionInfoBuffer>> {
-        let Some(region) = self.layout.metadata().session_info() else {
-            return Ok(None);
-        };
-
-        let range = region.as_region().as_range();
-
-        let Some(bytes) = self.source.get(range) else {
-            return Err(IRacingSDKError::parse_error(
-                "IbtReader::session_info_snapshot",
-                "Could not get session info bytes from source",
-            ));
-        };
-
-        let snapshot = SessionInfoBuffer::from_checked_region(bytes);
-
-        Ok(Some(snapshot))
+    /// Reads owned session bytes. Import the provider trait to migrate.
+    #[deprecated(
+        note = "use iracing_sdk::provider::SessionInformationBytesProvider::session_info_snapshot"
+    )]
+    pub fn session_info_snapshot(&mut self) -> Result<Option<SessionInfoBytes>> {
+        SessionInformationBytesProvider::session_info_snapshot(self)
     }
 
     /// Reads and decodes exactly the advertised variable-header records on each call.
@@ -177,23 +162,14 @@ impl IbtReader {
     ///
     /// # Errors
     /// Returns an error if reading or decoding the complete region fails.
-    pub fn variable_headers_snapshot(&mut self) -> Result<Option<VariableHeadersBuffer>> {
-        let Some(region) = self.layout.metadata().variable_headers() else {
+    #[deprecated(
+        note = "use iracing_sdk::provider::VariableHeadersProvider::variable_headers; absent metadata returns an empty snapshot"
+    )]
+    pub fn variable_headers_snapshot(&mut self) -> Result<Option<VariableHeaders>> {
+        if self.layout.metadata().variable_headers().is_none() {
             return Ok(None);
-        };
-
-        let range = region.as_region().as_range();
-
-        let Some(bytes) = self.source.get(range) else {
-            return Err(IRacingSDKError::parse_error(
-                "IbtReader::variable_headers_snapshot",
-                "Could not get variable headers bytes from source",
-            ));
-        };
-
-        let snapshot = VariableHeadersBuffer::try_from_region_bytes(bytes, region.count())?;
-
-        Ok(Some(snapshot))
+        }
+        self.variable_headers().map(Some)
     }
 
     /// Reads exactly one indexed frame, regardless of prior source reads.
@@ -235,6 +211,46 @@ impl IbtReader {
     }
 }
 
+impl SessionInformationBytesProvider for IbtReader {
+    fn session_info_snapshot(&self) -> Result<Option<SessionInfoBytes>> {
+        let Some(region) = self.layout.metadata().session_info() else {
+            return Ok(None);
+        };
+
+        let range = region.as_region().as_range();
+
+        let Some(bytes) = self.source.get(range) else {
+            return Err(IRacingSDKError::parse_error(
+                "IbtReader::session_info_snapshot",
+                "Could not get session info bytes from source",
+            ));
+        };
+
+        let snapshot = SessionInfoBytes::from_checked_region(bytes);
+
+        Ok(Some(snapshot))
+    }
+}
+
+impl VariableHeadersProvider for IbtReader {
+    fn variable_headers(&self) -> Result<VariableHeaders> {
+        let Some(region) = self.layout.metadata().variable_headers() else {
+            return Ok(VariableHeaders::default());
+        };
+
+        let range = region.as_region().as_range();
+
+        let Some(bytes) = self.source.get(range) else {
+            return Err(IRacingSDKError::parse_error(
+                "IbtReader::variable_headers_snapshot",
+                "Could not get variable headers bytes from source",
+            ));
+        };
+
+        VariableHeaders::try_from_bytes(bytes, region.count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,13 +278,27 @@ mod tests {
             let first = reader.frame(0)?;
             let last_index = reader.layout().frame_count() - 1;
             let last = reader.frame(last_index)?;
-            reader.session_info_snapshot()?;
-            reader.variable_headers_snapshot()?;
+            SessionInformationBytesProvider::session_info_snapshot(&reader)?;
+            reader.variable_headers()?;
             assert!(reader.frame(last_index + 1).is_err());
             assert!(reader.frame(usize::MAX).is_err());
             assert_eq!(reader.frame(0)?, first);
             assert_eq!(reader.frame(last_index)?, last);
         }
+        Ok(())
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_metadata_accessors_preserve_absence() -> Result<()> {
+        let mut bytes = fixture_bytes()?;
+        write_i32(&mut bytes, 16, 0);
+        write_i32(&mut bytes, 24, 0);
+        bytes.truncate(size_of::<Header>() + size_of::<DiskSubHeader>());
+        let mut reader = IbtReader::from_bytes(bytes)?;
+        assert!(reader.session_info_snapshot()?.is_none());
+        assert!(reader.variable_headers_snapshot()?.is_none());
+        assert!(reader.variable_headers()?.is_empty());
         Ok(())
     }
 
@@ -466,11 +496,11 @@ mod tests {
         let test_file = fixture_path()?;
         let data = std::fs::read(test_file)?;
 
-        let mut reader = IbtReader::from_bytes(data)?;
+        let reader = IbtReader::from_bytes(data)?;
 
         assert!(matches!(reader.source, IbtSource::Owned(_)));
         assert!(reader.layout().frame_count() > 0);
-        assert!(!reader.variable_headers_snapshot()?.unwrap().is_empty());
+        assert!(!reader.variable_headers()?.is_empty());
         Ok(())
     }
 

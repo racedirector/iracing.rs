@@ -1,9 +1,10 @@
 use crate::{
-    utils::{get_disk_reader, get_disk_session_info},
+    utils::get_disk_reader,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 use anyhow::Result;
 use clap::Subcommand;
+use iracing_sdk::provider::{SessionInformationBytesProvider, SessionInformationProvider};
 use std::path::PathBuf;
 
 #[derive(Subcommand, Debug)]
@@ -42,25 +43,29 @@ pub(crate) fn handle_command(command: Command) -> Result<()> {
             output,
             format,
         } => {
-            let mut reader = get_disk_reader(&path)?;
-            let session_info = get_disk_session_info(&mut reader)?;
-
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&session_info)?;
+            let reader = get_disk_reader(&path)?;
+            write_session_info(&reader, output.clone(), format)?;
             tracing::info!(ibt_path=%path.display(), output=%output, encoding=%format, "Wrote disk session snapshot.");
-            writer.finalize()
+            Ok(())
         }
         #[cfg(windows)]
         Command::Live { output, format } => {
-            use crate::utils::{get_connection, get_live_session_info};
+            use crate::utils::get_connection;
 
             let connection = get_connection()?;
-            let session_info = get_live_session_info(&connection)?;
-
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&session_info)?;
+            write_session_info(&connection, output.clone(), format)?;
             tracing::info!(output=%output, encoding=%format, "Wrote live session snapshot.");
-            writer.finalize()
+            Ok(())
         }
     }
+}
+
+fn write_session_info(
+    provider: &impl SessionInformationBytesProvider,
+    output: OutputTarget,
+    format: DocumentFormat,
+) -> Result<()> {
+    let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+    writer.write(&provider.session_info()?)?;
+    writer.finalize()
 }
