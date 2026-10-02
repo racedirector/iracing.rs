@@ -1,0 +1,7 @@
+{
+  "id": "case-03",
+  "prompt": "Review the decoding layers and their respective contracts.",
+  "inputs": [
+    "source.rs"
+  ]
+}
