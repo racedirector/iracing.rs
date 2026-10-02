@@ -25,14 +25,6 @@ impl IbtSource {
     pub fn get(&self, range: Range<usize>) -> Option<&[u8]> {
         self.as_bytes().get(range)
     }
-
-    /// # Safety
-    ///
-    /// The caller must guarantee that `range` is entirely
-    /// contained within the source.
-    pub unsafe fn get_unchecked(&self, range: Range<usize>) -> &[u8] {
-        unsafe { self.as_bytes().get_unchecked(range) }
-    }
 }
 
 #[cfg(test)]
@@ -57,8 +49,6 @@ mod tests {
             let start = 3;
             assert_eq!(source.get(start..2), None);
             assert_eq!(source.get(0..usize::MAX), None);
-            // SAFETY: 1..3 is within the four-byte source for both variants.
-            assert_eq!(unsafe { source.get_unchecked(1..3) }, &[20, 30]);
             assert_eq!(source.get(0..1), Some([10].as_slice()));
         }
     }

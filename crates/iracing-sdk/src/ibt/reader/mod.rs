@@ -85,9 +85,13 @@ impl IbtReader {
 
     fn from_source(source: IbtSource) -> Result<Self> {
         let source_len = source.len();
-        // Read the first 144 bytes to parse the header and sub-header
-        let bytes =
-            unsafe { source.get_unchecked(0..size_of::<Header>() + size_of::<DiskSubHeader>()) };
+        let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
+        let Some(bytes) = source.get(0..preamble_len) else {
+            return Err(IRacingSDKError::parse_error(
+                "IbtReader::from_source",
+                "Source is shorter than the IBT preamble",
+            ));
+        };
 
         // The first 132 bytes should be the header
         let (header, remainder) = Header::read_from_prefix(bytes).map_err(|_| {
@@ -356,6 +360,25 @@ mod tests {
         let bytes = fixture_bytes()?;
         assert!(IbtReader::from_bytes(bytes[..size_of::<Header>() - 1].to_vec()).is_err());
         Ok(())
+    }
+
+    #[test]
+    fn every_truncated_preamble_length_is_rejected() {
+        let preamble_size = size_of::<Header>() + size_of::<DiskSubHeader>();
+        for len in 0..preamble_size {
+            let error = IbtReader::from_bytes(vec![0; len])
+                .err()
+                .expect("truncated preamble must fail");
+            assert!(
+                matches!(error, IRacingSDKError::Parse { .. }),
+                "unexpected error for source length {len}: {error}"
+            );
+            assert!(
+                error
+                    .to_string()
+                    .contains("Source is shorter than the IBT preamble")
+            );
+        }
     }
 
     #[test]
