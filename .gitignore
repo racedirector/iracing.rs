@@ -54,6 +54,7 @@ no_llvm_build
 /unicode-downloads
 # Cargo build output, including package-local targets.
 target/
+/.live-benchmarks/
 /library/target
 /src/bootstrap/target
 /src/ci/citool/target
