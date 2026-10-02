@@ -62,6 +62,16 @@ class CorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'unadjudicated'):
                 runner.score(path)
 
+    def test_treatment_cannot_change_frozen_skills_after_preparation(self):
+        key = next((runner.HERE / 'frozen-skills').iterdir()).name
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'run'
+            runner.prepare(SimpleNamespace(run=path, condition=key, model='test-model', tools='test-tools'))
+            skill = next((path / 'skills').rglob('SKILL.md'))
+            skill.write_text(skill.read_text() + '\nChanged treatment')
+            with self.assertRaisesRegex(ValueError, 'modified'):
+                runner.score(path)
+
     def test_frozen_packages(self):
         for directory in (runner.HERE / 'frozen-skills').iterdir():
             runner.frozen(directory.name)

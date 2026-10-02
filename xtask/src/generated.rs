@@ -176,6 +176,46 @@ pub fn check(root: &Path) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn rejects_unregistered_and_malformed_reference_artifacts_without_rewriting() {
+        let temp = tempfile::tempdir().unwrap();
+        let destination = temp.path().join("docs/reference");
+        fs::create_dir_all(&destination).unwrap();
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("docs/reference");
+        for entry in fs::read_dir(source).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_file() {
+                fs::copy(&path, destination.join(path.file_name().unwrap())).unwrap();
+            }
+        }
+        check(temp.path()).unwrap();
+        let artifact = destination.join("session-schema.yml");
+        let original = fs::read_to_string(&artifact).unwrap();
+        let drift = format!("{original}\n");
+        fs::write(&artifact, &drift).unwrap();
+        assert!(
+            check(temp.path())
+                .unwrap_err()
+                .to_string()
+                .contains("reference drift")
+        );
+        assert_eq!(fs::read_to_string(&artifact).unwrap(), drift);
+        fs::write(&artifact, original).unwrap();
+        fs::write(destination.join("unregistered.yml"), "{}").unwrap();
+        assert!(check(temp.path()).is_err());
+        fs::remove_file(destination.join("unregistered.yml")).unwrap();
+        fs::write(destination.join("live-variable-schema.yml"), "[malformed").unwrap();
+        assert!(
+            check(temp.path())
+                .unwrap_err()
+                .to_string()
+                .contains("invalid reference")
+        );
+    }
+
+    #[test]
     fn deterministic_output_and_drift() {
         let first = outputs().unwrap();
         assert_eq!(first, outputs().unwrap());

@@ -28,3 +28,9 @@ verified full commit pins with version comments, maintained by Actions Dependabo
 Workflow defaults are read-only; CodSpeed retains its required OIDC write scope
 and release hosting alone retains contents write. Checkouts do not persist Git
 credentials; publishing uses the explicit job token rather than checkout state.
+
+Repository-check regressions include stale/missing benchmark coverage, release
+configuration/compiler drift, missing feature-fixture hydration, absent target
+compile commands, unregistered/malformed reference files, and read-only drift
+failure. Run `cargo test -p xtask`. Agent driver integrity/scoring tests remain
+opt-in: `python -m unittest discover -s evals/agent -p 'test_*.py'`.
