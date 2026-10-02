@@ -146,7 +146,10 @@ impl LiveProvider {
                 return Ok(Some(FramePacket::new(
                     frame_data,
                     u32::try_from(tick).map_err(|_| {
-                        IRacingSDKError::parse_error("LiveProvider::next_frame", "Negative tick count")
+                        IRacingSDKError::parse_error(
+                            "LiveProvider::next_frame",
+                            "Negative tick count",
+                        )
                     })?,
                     session_version,
                     self.shared_schema(),
