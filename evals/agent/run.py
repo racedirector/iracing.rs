@@ -60,13 +60,18 @@ def digest(files):
     return value.hexdigest()
 
 
-def frozen(condition):
-    path = HERE / "frozen-skills" / condition
+def verify_package(path, condition):
     metadata = read(path / "manifest.json")
     files = {str(p.relative_to(path)): p.read_bytes() for p in path.rglob("*") if p.is_file() and p.name != "manifest.json"}
     if digest(files) != condition or metadata["hash"] != condition:
         raise ValueError("frozen skill content was modified")
+    if metadata["files"] != sorted(files):
+        raise ValueError("frozen package inventory mismatch")
     return path
+
+
+def frozen(condition):
+    return verify_package(HERE / "frozen-skills" / condition, condition)
 
 
 def freeze():
@@ -120,6 +125,7 @@ def score(run):
         raise ValueError("incomplete run provenance")
     if metadata["condition"] != "baseline":
         frozen(metadata["condition"])
+        verify_package(run / "skills", metadata["condition"])
     judgments = read(run / "judgments.json")
     report = {}
     for case, oracle, _ in cases():
@@ -162,6 +168,8 @@ def main():
         print(json.dumps(score(args.run), indent=2))
     elif args.command == "compare":
         left, right = score(args.left), score(args.right)
+        if any(left["metadata"][key] != right["metadata"][key] for key in ("model", "tools")):
+            raise ValueError("comparison requires the same model/tool condition")
         print(json.dumps({"left": left["metadata"], "right": right["metadata"], "changes": {
             key: {"left": left["cases"][key], "right": right["cases"][key]}
             for key in left["cases"]}}, indent=2))

@@ -8,3 +8,9 @@ pub fn decode(bytes: [u8; 12]) -> Header {
 pub fn region(h: Header) -> std::ops::Range<usize> {
     (h.offset as usize)..((h.offset + h.length) as usize)
 }
+
+#[repr(i32)]
+pub enum VariableType { Float = 4, Double = 5 }
+pub fn variable_type(raw: i32) -> VariableType {
+    unsafe { std::mem::transmute(raw) }
+}

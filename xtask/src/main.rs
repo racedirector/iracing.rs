@@ -93,3 +93,58 @@ fn main() -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+    use clap::error::ErrorKind;
+
+    #[test]
+    fn clap_rejects_missing_or_unknown_commands_and_arguments() {
+        for args in [
+            vec!["xtask"],
+            vec!["xtask", "unknown"],
+            vec!["xtask", "check-repo", "extra"],
+            vec!["xtask", "agent"],
+            vec!["xtask", "agent", "prepare", "--run", "output"],
+            vec!["xtask", "agent", "score"],
+            vec!["xtask", "agent", "compare", "--left", "baseline"],
+        ] {
+            assert!(Args::try_parse_from(args).is_err());
+        }
+        assert_eq!(
+            Args::try_parse_from(["xtask", "agent", "--help"])
+                .unwrap_err()
+                .kind(),
+            ErrorKind::DisplayHelp
+        );
+    }
+
+    #[test]
+    fn clap_passes_agent_paths_and_values_as_structured_data() {
+        let args = Args::try_parse_from([
+            "xtask",
+            "agent",
+            "prepare",
+            "--run",
+            "runs/path with spaces",
+            "--model",
+            "model",
+            "--tools",
+            "tools; literal",
+            "--condition",
+            "baseline",
+        ])
+        .unwrap();
+        let Task::Agent { command } = args.command else {
+            panic!("expected agent task")
+        };
+        assert_eq!(
+            serde_json::to_value(command).unwrap(),
+            serde_json::json!({
+                "command": "prepare", "run": "runs/path with spaces", "model": "model",
+                "tools": "tools; literal", "condition": "baseline",
+            })
+        );
+    }
+}

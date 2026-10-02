@@ -86,6 +86,9 @@ pub fn check(root: &Path) -> Result<()> {
     for (workflow, required) in POLICIES {
         let path = root.join(".github/workflows").join(workflow);
         let yaml: Value = serde_yaml_ng::from_str(&fs::read_to_string(&path)?)?;
+        if yaml["on"]["pull_request"].is_null() {
+            bail!("{workflow}: missing pull_request benchmark trigger");
+        }
         for event in ["pull_request", "push"] {
             if yaml["on"][event].is_null() {
                 continue;
@@ -109,6 +112,20 @@ pub fn check(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn detects_removed_pr_trigger() {
+        let temporary = tempfile::tempdir().unwrap();
+        let directory = temporary.path().join(".github/workflows");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("benchmark-ibt.yml"), "on: {}\n").unwrap();
+        assert!(
+            check(temporary.path())
+                .unwrap_err()
+                .to_string()
+                .contains("missing pull_request")
+        );
+    }
+
     #[test]
     fn current_policy() {
         check(Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()).unwrap();
