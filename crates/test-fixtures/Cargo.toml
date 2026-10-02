@@ -22,7 +22,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 iracing-irsdk = { workspace = true }
 iracing-sdk = { version = "0.1.0", path = "../iracing-sdk", default-features = false }
-rand = "0.9"
+rand = "0.10"
 rand_chacha = "0.9"
 serde = { workspace = true }
 serde_json = { workspace = true }
