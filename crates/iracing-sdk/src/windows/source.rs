@@ -29,6 +29,52 @@ unsafe extern "system" {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::System::Threading::SetEvent;
+
+    #[tokio::test]
+    async fn canceled_async_wait_retains_event_until_worker_finishes() {
+        let source = LiveSource::test_source(&[0; 112]);
+        let weak = Arc::downgrade(&source.event);
+        let mut wait = Box::pin(source.wait_for_update_async(Duration::from_secs(5)));
+        // Poll once to submit the blocking worker, then cancel its awaiting future.
+        assert!(matches!(
+            futures::poll!(wait.as_mut()),
+            std::task::Poll::Pending
+        ));
+        drop(wait);
+        drop(source);
+        let event = weak.upgrade().expect("worker must retain the event");
+        // SAFETY: The upgraded owner keeps the private event open.
+        unsafe { SetEvent(event.0).unwrap() };
+        drop(event);
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while weak.upgrade().is_some() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("worker must release the event after signaling");
+    }
+
+    #[test]
+    fn private_event_wait_times_out_and_signals() {
+        let source = LiveSource::test_source(&[0; 112]);
+        assert_eq!(
+            source.wait_for_update(Duration::ZERO).unwrap(),
+            WaitResult::Timeout
+        );
+        // SAFETY: source owns this private event.
+        unsafe { SetEvent(source.event.0).unwrap() };
+        assert_eq!(
+            source.wait_for_update(Duration::ZERO).unwrap(),
+            WaitResult::Signaled
+        );
+    }
+}
+
 /// Result of waiting for data updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitResult {
@@ -100,6 +146,43 @@ pub(crate) struct LiveSource {
 }
 
 impl LiveSource {
+    #[cfg(test)]
+    pub(crate) fn test_source(bytes: &[u8]) -> Self {
+        use windows::Win32::{
+            Foundation::INVALID_HANDLE_VALUE,
+            System::{
+                Memory::{CreateFileMappingW, FILE_MAP_WRITE, PAGE_READWRITE},
+                Threading::CreateEventW,
+            },
+        };
+        assert!(!bytes.is_empty());
+        // SAFETY: Create a private, page-file-backed mapping and unnamed event.
+        // The view is writable while initialized here, then only read by tests.
+        unsafe {
+            let mapping = OwnedHandle(
+                CreateFileMappingW(
+                    INVALID_HANDLE_VALUE,
+                    None,
+                    PAGE_READWRITE,
+                    0,
+                    u32::try_from(bytes.len()).unwrap(),
+                    PCWSTR::null(),
+                )
+                .unwrap(),
+            );
+            let raw = MapViewOfFile(mapping.0, FILE_MAP_WRITE, 0, 0, bytes.len());
+            let view = MappedView(NonNull::new(raw.Value.cast()).unwrap());
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), view.0.as_ptr(), bytes.len());
+            Self {
+                view,
+                _mapping: mapping,
+                event: Arc::new(OwnedHandle(
+                    CreateEventW(None, true, false, PCWSTR::null()).unwrap(),
+                )),
+                len: bytes.len(),
+            }
+        }
+    }
     pub fn try_connect() -> Result<Self> {
         let name = wide_string(IRSDK_MEMMAPFILENAME);
         // SAFETY: name is a live NUL-terminated UTF-16 string.

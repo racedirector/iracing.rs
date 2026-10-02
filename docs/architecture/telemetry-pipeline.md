@@ -57,6 +57,26 @@ Telemetry is little-endian. `VarData::from_bytes` and `TelemetryValue::decode`
 are the authoritative decoding paths; consumers should not reproduce byte
 slicing or discriminant handling.
 
+### Windows source ownership and validation
+
+An internal `LiveSource` owns the mapping handle, mapped view, and event.
+`VirtualQuery` bounds access to the mapped region; connection activation rejects
+regions shorter than the fixed header before unchecked scalar accessors become
+available. Scalar words use aligned volatile reads, while bulk copies use a
+native routine into owned storage. Frame and metadata ranges are checked before
+copying, including negative geometry and overflow. Mutable header geometry is
+validated on each acquisition rather than trusted from connection setup.
+
+An asynchronous wait retains the event through an `Arc` in its blocking worker.
+Canceling the awaiting future or dropping the connection does not close the event
+while that worker is waiting. Requested timeouts are capped below Windows'
+`INFINITE` sentinel; cancellation does not interrupt the underlying wait.
+
+Windows unit tests use private mappings and events to exercise acquisition,
+malformed regions, cancellation, and handle release without iRacing. Simulator
+publication timing and performance require an active simulator and remain manual
+verification; the ignored `iracing_required` tests provide connection smoke tests.
+
 ## `FramePacket`
 
 Providers return `FramePacket`, the common data unit:
@@ -106,19 +126,21 @@ observable intermediate state.
 
 The current live read path is:
 
-1. `WindowsConnection::get_new_data` selects the telemetry buffer with the
-   highest tick count. It checks that buffer's tick before and after creating a
-   borrowed byte slice and returns the slice when the two reads agree.
-2. `LiveProvider::next_frame_impl` immediately copies that slice into an owned
-   `Vec<u8>`. It then reads the shared-memory header again, selects the latest
-   telemetry buffer again, and takes both the packet tick and
-   `session_info_update` from that later header view.
+1. `WindowsConnection::get_new_data` selects the published `current_buffer`,
+   falling back to buffer zero for invalid indices/counts. The first tick or an
+   older tick establishes a baseline without delivery; equal ticks yield no data.
+   It copies into reusable connection-owned storage, accepting the frame only
+   when the completed tick before copying equals the begin tick afterward,
+   with at most two attempts using the same descriptor.
+2. `LiveProvider::next_frame_impl` copies the accepted bytes into its owned
+   packet. It reads a separate owned header snapshot for the session version
+   and uses the connection's accepted `last_tick_count` for the packet tick.
 3. The provider returns an owned `FramePacket` containing the frame bytes, tick,
    and observed session version. `Telemetry::read_task` passes the packet to
    `LiveSessionPolicy::observe` before publishing the frame.
 4. When the packet's session version differs from the last observed version,
    the policy immediately calls `Provider::session_yaml`. For `LiveProvider`,
-   this calls `WindowsConnection::session_info`, which reads the offset and
+   this calls `WindowsConnection::session_info_buffer`, which reads the offset and
    length from the current header and copies/extracts the one current YAML
    region into an owned `String`.
 5. `LiveProvider` performs iRacing YAML preprocessing on that owned string.
@@ -136,13 +158,13 @@ session version.
 The current implementation has several consistency limits that matter when
 reasoning about session ordering:
 
-- `get_new_data` returns a borrowed slice; its tick consistency check finishes
-  before `LiveProvider` copies the bytes. The provider also selects the latest
-  buffer again for packet metadata, so the owned bytes and later tick/version
-  reads are not one atomic snapshot.
+- `get_new_data` returns a slice of connection-owned bytes whose copy was
+  checked against synchronization words. Packet session metadata comes from a
+  later header snapshot; the bytes and session version are not one atomic
+  snapshot. Header snapshots themselves can span publication instants.
 - The `Provider::session_yaml` version argument is only a change trigger for
   `LiveProvider`; it is intentionally ignored rather than treated as a lookup
-  key. `WindowsConnection::session_info` copies whichever YAML occupies the
+  key. `WindowsConnection::session_info_buffer` copies whichever YAML occupies the
   single current session region at that moment. That copy does not compare
   `session_info_update` before and after reading the region.
 - The data-valid event can signal a session-only change, but

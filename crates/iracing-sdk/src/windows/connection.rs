@@ -25,21 +25,35 @@ pub struct Connection {
 
 impl Connection {
     /// Attempt to connect to iRacing shared memory
+    ///
+    /// # Errors
+    /// Returns an error when opening the mapping/event fails or the mapped
+    /// extent cannot hold the complete fixed SDK header.
     pub fn try_connect() -> Result<Self> {
         tracing::trace!("Attempting to connect to iRacing shared memory");
 
         // Initialize with i32::MAX to match C++ SDK's INT_MAX
         // The first observed tick establishes the baseline without a frame.
-        let connection = Self {
-            source: LiveSource::try_connect()?,
-
-            frame_data: Vec::new(),
-            last_tick_count: i32::MAX,
-        };
+        let connection = Self::from_source(LiveSource::try_connect()?)?;
 
         tracing::trace!("Successfully connected to iRacing shared memory");
 
         Ok(connection)
+    }
+
+    fn from_source(source: LiveSource) -> Result<Self> {
+        if source.len() < size_of::<Header>() {
+            return Err(IRacingSDKError::parse_error(
+                "Header",
+                "Mapped header is truncated",
+            ));
+        }
+        Ok(Self {
+            source,
+
+            frame_data: Vec::new(),
+            last_tick_count: i32::MAX,
+        })
     }
 
     /// Borrows the legacy header directly from the shared-memory mapping.
@@ -299,6 +313,7 @@ unsafe impl Sync for Connection {}
 mod tests {
     use super::*;
     use crate::irsdk::{StatusField, VariableBuffer, constants::IRSDK_VER};
+    use zerocopy::IntoBytes;
 
     fn test_header(num_buf: i32) -> Header {
         Header::new(
@@ -321,6 +336,56 @@ mod tests {
                 VariableBuffer::new(2, 268, 2),
             ],
         )
+    }
+
+    fn connection_with_header(header: Header, len: usize) -> Connection {
+        let mut bytes = vec![0; len];
+        bytes[..size_of::<Header>()].copy_from_slice(header.as_bytes());
+        bytes[264..268].copy_from_slice(&[1, 2, 3, 4]);
+        Connection::from_source(LiveSource::test_source(&bytes)).unwrap()
+    }
+
+    #[test]
+    fn activation_rejects_truncated_headers() {
+        for len in [1, offset_of!(Header, tick_rate), size_of::<Header>() - 1] {
+            assert!(Connection::from_source(LiveSource::test_source(&vec![0; len])).is_err());
+        }
+    }
+
+    #[test]
+    fn acquisition_copies_published_frame_and_tracks_ticks() {
+        let mut connection = connection_with_header(test_header(4), 272);
+        assert_eq!(connection.tick_rate(), 60);
+        assert_eq!(connection.session_info_update(), 0);
+        assert!(connection.get_new_data().is_none());
+        assert_eq!(connection.last_tick_count(), 3);
+        connection.last_tick_count = 2;
+        assert_eq!(connection.get_new_data().unwrap(), &[1, 2, 3, 4]);
+        assert!(connection.get_new_data().is_none());
+        connection.last_tick_count = 4;
+        assert!(connection.get_new_data().is_none());
+        assert_eq!(connection.last_tick_count(), 3);
+    }
+
+    #[test]
+    fn acquisition_rejects_torn_frames_and_invalid_regions() {
+        for (offset, len, begin) in [(264, 4, 9), (-1, 4, 3), (270, 4, 3), (264, -1, 3)] {
+            let mut header = test_header(4);
+            header.buffers[2].buffer_offset = offset;
+            header.buffers[2].tick_count_begin = begin;
+            header.buffer_length = len;
+            let mut connection = connection_with_header(header, 272);
+            connection.last_tick_count = 2;
+            assert!(connection.get_new_data().is_none());
+            assert_eq!(connection.last_tick_count(), 2);
+        }
+        let mut header = test_header(4);
+        header.session_info_offset = 270;
+        header.session_info_length = 4;
+        header.variable_header_offset = 270;
+        let connection = connection_with_header(header, 272);
+        assert!(connection.session_info_buffer().is_none());
+        assert!(connection.variable_headers_buffer().is_none());
     }
 
     #[test]

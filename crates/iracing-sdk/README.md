@@ -216,3 +216,22 @@ impl FrameAdapter for Row {
   - Live shared memory APIs are Windows-only.
 - No session snapshot available:
   - `session snapshot` reports an error when the source contains no session information.
+
+## Migrating low-level Windows connections
+
+Import `WaitResult` from `iracing_sdk::windows::WaitResult` instead of the crate
+root. Replace deprecated `WindowsConnection::header()` with `header_snapshot()`
+for an owned header, or `status()`, `tick_rate()`, and `session_info_update()`
+for scalar reads. A header snapshot is stable after copying but may span simulator
+updates. The legacy borrowed header has no concurrent-mutation guarantee.
+
+`WindowsConnection` no longer implements `ByteParser`. Use
+`session_info_buffer()` and `variable_headers_buffer()` for copied metadata.
+`get_new_data()` returns connection-owned bytes; its borrow lasts until the next
+mutable connection operation. It follows the published current buffer instead
+of deprecated `find_latest_buffer()`'s highest-tick selection. The first observed
+or reset tick establishes a baseline without returning a frame.
+
+See [the telemetry architecture](../../docs/architecture/telemetry-pipeline.md)
+for publication checks, resource ownership, and session consistency limits.
+CLI commands and flags are unchanged; CLI header inspection uses owned snapshots.
