@@ -121,6 +121,11 @@ impl Connection {
         }
     }
 
+    /// The last processed tick count
+    pub fn last_tick_count(&self) -> i32 {
+        self.last_tick_count
+    }
+
     /// Wait for new telemetry data (synchronous - blocks thread)
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
         self.source.wait_for_update(timeout)

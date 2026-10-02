@@ -130,11 +130,7 @@ impl LiveProvider {
             if let Some(data) = self.connection.get_new_data() {
                 let frame_data = data.to_vec();
                 let header = self.connection.header_snapshot()?;
-                let Some(buffer) = header.current_variable_buffer() else {
-                    unreachable!("Buffers should exist")
-                };
-
-                let tick = buffer.tick_count as u32;
+                let tick = self.connection.last_tick_count();
                 let session_version = header.session_info_update as u32;
 
                 tracing::trace!(
@@ -146,7 +142,8 @@ impl LiveProvider {
 
                 return Ok(Some(FramePacket::new(
                     frame_data,
-                    tick,
+                    // If the tick is negative, we have way bigger problems; this unwrap is fine.
+                    tick.try_into().unwrap(),
                     session_version,
                     self.shared_schema(),
                 )));
