@@ -1,0 +1,12 @@
+{
+  "id": "case-04",
+  "control": false,
+  "atoms": {
+    "a1": "Read-only local permissions do not make simulator storage immutable.",
+    "a2": "Disk mapping relies on no backing mutation/truncation; live requires a different external-writer/protocol proof.",
+    "a3": "The arbitrary output lifetime must be tied to an owner and external-mutation assumptions before a safe wrapper is possible."
+  },
+  "hard_failures": {
+    "h1": "Collapsing disk and live memory semantics"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "case-02",
+  "control": false,
+  "atoms": {
+    "a1": "Safe Region::new permits ends beyond bytes.len(); order is not source boundedness.",
+    "a2": "Safe read reaches get_unchecked without establishing its bound precondition; show a concrete violating call."
+  },
+  "hard_failures": {
+    "h1": "Calling ordered geometry source-bound validation"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "case-05",
+  "control": true,
+  "atoms": {
+    "a1": "deliver dispatches to read_into with caller-owned reused storage and never calls allocating read.",
+    "a2": "Owned::read_into copies into the existing destination; do not invent a hot-path allocation.",
+    "a3": "Any latency/throughput conclusion still requires appropriate measurements."
+  },
+  "hard_failures": {
+    "h1": "Reporting an allocation regression from the unused trait default"
+  }
+}

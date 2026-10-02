@@ -111,3 +111,7 @@ flake.lock
 /default.nix
 
 # Before adding new lines, see the comment at the top.
+
+/evals/agent/runs/
+
+/evals/agent/__pycache__/

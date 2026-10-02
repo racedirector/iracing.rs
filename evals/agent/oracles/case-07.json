@@ -1,0 +1,13 @@
+{
+  "id": "case-07",
+  "control": true,
+  "atoms": {
+    "a1": "Current frame uses bounds-checked access to owned immutable storage; identify the actual absence of lifecycle transitions.",
+    "a2": "Do not accept the typestate/performance premise without requirements; retaining the current accessor is a concrete justified recommendation.",
+    "a3": "No measured performance benefit follows from the proposal alone."
+  },
+  "hard_failures": {
+    "h1": "Certifying an unimplemented design",
+    "h2": "Claiming speedup without measurements"
+  }
+}
