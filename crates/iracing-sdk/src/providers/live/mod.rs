@@ -10,8 +10,8 @@ use std::{
 };
 
 use crate::{
-    FramePacket, Result, SchemaProvider, VariableSchema, WindowsConnection, provider::Provider,
-    windows::WaitResult,
+    FramePacket, IRacingSDKError, IRacingSessionString, Result, SchemaProvider, VariableSchema,
+    WindowsConnection, provider::Provider, windows::WaitResult,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -59,19 +59,22 @@ impl LiveProvider {
         max_no_connection_attempts: Option<u32>,
     ) -> Result<Self> {
         let header = connection.header_snapshot()?;
-        let variables = connection.get_variables()?;
-        let mut variable_map = std::collections::HashMap::new();
 
-        for var_info in variables {
-            variable_map.insert(var_info.name.clone(), var_info);
-        }
+        let frame_size = usize::try_from(header.buffer_length).map_err(|_| {
+            IRacingSDKError::parse_error(
+                "LiveProvider::from_parts",
+                "Could not parse frame size to usize",
+            )
+        })?;
 
-        let frame_size = header.buffer_length as usize;
-        let schema = Arc::new(VariableSchema::new(variable_map, frame_size)?);
+        let schema = match connection.variable_headers_buffer() {
+            Some(buffer) => VariableSchema::from_snapshot(buffer, frame_size),
+            None => VariableSchema::from_headers(&[], frame_size),
+        }?;
 
         Ok(Self {
             connection,
-            schema,
+            schema: Arc::new(schema),
             poll_interval,
             max_no_connection_attempts,
         })
@@ -175,8 +178,13 @@ impl LiveProvider {
     async fn session_yaml_impl(&mut self) -> Result<Option<String>> {
         tracing::debug!("Fetching session YAML from shared memory");
 
-        // Get raw YAML from shared memory
-        Ok(self.connection.session_info())
+        let Some(buffer) = self.connection.session_info_buffer() else {
+            return Ok(None);
+        };
+
+        let session_info = IRacingSessionString::try_from(buffer)?;
+
+        Ok(Some(session_info.into()))
     }
 }
 

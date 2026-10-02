@@ -8,9 +8,8 @@ use iracing_irsdk::{StatusField, VariableBuffer};
 use super::source::WaitResult;
 use crate::ByteRegion;
 use crate::{
-    IRacingSDKError, IRacingSessionString, Result, SessionInfoBuffer, SessionInfoRegion,
-    VariableHeadersBuffer, VariableHeadersRegion, VariableInfo, irsdk::Header,
-    windows::source::LiveSource,
+    IRacingSDKError, Result, SessionInfoBuffer, SessionInfoRegion, VariableHeadersBuffer,
+    VariableHeadersRegion, irsdk::Header, windows::source::LiveSource,
 };
 use std::mem::offset_of;
 use std::time::Duration;
@@ -233,17 +232,6 @@ impl Connection {
         Some(SessionInfoBuffer::from_owned_checked_region(bytes))
     }
 
-    /// Returns decoded live session-information text with invalid control characters removed.
-    ///
-    /// Returns `None` when no usable region exists or the NUL-bounded payload is
-    /// empty after sanitization.
-    pub fn session_info(&self) -> Option<String> {
-        let buffer = self.session_info_buffer()?;
-        let session_info = IRacingSessionString::try_from(buffer).ok()?;
-
-        Some(session_info.into())
-    }
-
     /// Copies the variable-header region advertised by the live header.
     ///
     /// Returns `None` when the header advertises no usable region.
@@ -254,22 +242,6 @@ impl Connection {
         let variable_header_bytes = self.copy_region(region.as_region())?;
 
         VariableHeadersBuffer::try_from_region_bytes(&variable_header_bytes, region.count()).ok()
-    }
-
-    /// Decodes all variable definitions from a copied variable-header region.
-    ///
-    /// Returns an empty vector when no usable variable-header region exists.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any variable header contains invalid metadata.
-    pub fn get_variables(&self) -> Result<Vec<VariableInfo>> {
-        let buffer = match self.variable_headers_buffer() {
-            Some(b) => b,
-            _ => return Ok(Vec::new()),
-        };
-
-        buffer.iter().map(VariableInfo::try_from).collect()
     }
 
     fn copy_region(&self, region: ByteRegion) -> Option<Vec<u8>> {
@@ -365,24 +337,6 @@ mod tests {
         for (index, count) in [(4, 4), (255, 4), (2, 2), (2, 0), (2, -1), (4, 5)] {
             assert_eq!(Connection::current_buffer_index(index, count), 0);
         }
-    }
-
-    #[test]
-    #[ignore = "iracing_required"]
-    fn test_read_rpm_variable() {
-        let connection = Connection::try_connect().expect("Failed to connect to iRacing");
-        let variables = connection
-            .get_variables()
-            .expect("Could not get variables from connection");
-
-        // Look for exact "RPM" match to verify variable schema
-        let exact_rpm = variables.iter().find(|v| v.name == "RPM");
-        assert!(
-            exact_rpm.is_some(),
-            "RPM variable should be available in iRacing"
-        );
-
-        assert!(!variables.is_empty(), "Should have some variables");
     }
 
     #[test]
