@@ -4,7 +4,7 @@
   "atoms": {
     "a1": "All i32 bit patterns decode, but negative count/offset/length lack semantic checks.",
     "a2": "Cross-field checked arithmetic and bounds against a specific source are separate from byte validity.",
-    "a3": "A constrained enum would need discriminant validation; arbitrary bytes cannot be reinterpreted as every enum."
+    "a3": "Safe variable_type accepts raw = 99, which has no VariableType discriminant; transmute requires enum validity before constructing the value."
   },
   "hard_failures": {
     "h1": "Certifying source bounds from successful wire decoding"

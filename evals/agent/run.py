@@ -72,6 +72,8 @@ def frozen(condition, path=None):
     files = {str(p.relative_to(path)): p.read_bytes() for p in path.rglob("*") if p.is_file() and p.name != "manifest.json"}
     if digest(files) != condition or metadata["hash"] != condition:
         raise ValueError("frozen skill content was modified")
+    if metadata["files"] != sorted(files):
+        raise ValueError("frozen package inventory mismatch")
     return path
 
 
