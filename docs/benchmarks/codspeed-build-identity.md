@@ -8,7 +8,7 @@ the support range.
 
 The workflow preserves the three Tier-B targets and their timed boundaries:
 `var-data-extraction`, `adapter-performance`, and `aggregate-frame-parsing`.
-Its job summary records `rustc -Vv` (including LLVM), Cargo, cargo-codspeed,
+Its job summary and logs record `rustc -Vv` (including LLVM), Cargo, cargo-codspeed,
 the checked-out commit SHA, SHA-256 of `Cargo.lock`, target, profile, features,
 simulation mode, and the pinned CodSpeed action and runner. The runner is
 explicitly configured using the pinned action's `runner-version` input.

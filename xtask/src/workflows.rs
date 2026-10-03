@@ -151,12 +151,34 @@ fn validate_codspeed(yaml: &Value) -> Result<()> {
         bail!("CodSpeed runner must be an exact version");
     }
     let action = runner["uses"].as_str().unwrap();
+    for step in [toolchain, runner] {
+        let uses = step["uses"].as_str().unwrap();
+        let revision = uses.split_once('@').unwrap().1;
+        if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            bail!("CodSpeed build actions must use immutable full commit revisions: {uses}");
+        }
+    }
+    if runner["with"]["mode"].as_str() != Some("simulation") {
+        bail!("Tier-B CodSpeed must use simulation mode");
+    }
     let summary = steps
         .iter()
         .find(|step| step["name"].as_str() == Some("Record benchmark build identity"))
         .context("CodSpeed build identity step missing")?["run"]
         .as_str()
         .context("CodSpeed identity script missing")?;
+    // Narrow checks for this workflow's straight-line script, not a shell parser.
+    let summary = summary
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    for command in ["rustc -Vv", "cargo -V", "sha256sum Cargo.lock"] {
+        if !summary.lines().any(|line| line == command) {
+            bail!("CodSpeed build identity must execute {command}");
+        }
+    }
     for required in [
         "rustc -Vv",
         "cargo -V",
@@ -188,7 +210,12 @@ fn validate_codspeed(yaml: &Value) -> Result<()> {
         .context("CodSpeed build step missing")?["run"]
         .as_str()
         .context("CodSpeed build command missing")?;
-    for required in ["--locked", "--profile bench", "--features benchmark"] {
+    for required in [
+        "cargo codspeed build",
+        "--locked",
+        "--profile bench",
+        "--features benchmark",
+    ] {
         if !build.contains(required) {
             bail!("CodSpeed build must preserve {required}");
         }
@@ -216,6 +243,17 @@ mod tests {
             ("runner-version: \"5.2.1\"", "runner-version: latest"),
             ("codspeed-runner=5.2.1", "codspeed-runner=5.0.0"),
             ("--locked", "--offline"),
+            ("rustc -Vv", "# rustc -Vv"),
+            ("cargo codspeed build", "cargo build"),
+            ("mode: simulation", "mode: walltime"),
+            (
+                "CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea",
+                "CodSpeedHQ/action@v5",
+            ),
+            (
+                "dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d",
+                "dtolnay/rust-toolchain@stable",
+            ),
         ] {
             let serialized = serde_yaml_ng::to_string(&yaml).unwrap();
             // Mutate the original source so quoting cannot hide a lost contract.
