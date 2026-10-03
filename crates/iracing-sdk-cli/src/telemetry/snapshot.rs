@@ -101,10 +101,11 @@ pub(super) async fn handle_command(command: Command) -> Result<()> {
                 .frame(frame_index)
                 .with_context(|| format!("Could not read IBT frame {frame_index}"))?;
 
-            let schema = VariableSchema::from_headers(
-                &reader.variable_headers()?,
-                reader.layout().frame_size(),
-            )?;
+            let headers = reader.variable_headers()?;
+            if headers.is_empty() {
+                bail!("IBT contains no telemetry variable headers");
+            }
+            let schema = VariableSchema::from_headers(&headers, reader.layout().frame_size())?;
 
             let frame = FramePacket::new(
                 data,
