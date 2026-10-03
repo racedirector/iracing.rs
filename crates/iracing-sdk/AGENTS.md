@@ -28,7 +28,7 @@
 - `SessionInfoBuffer` bounds and decodes captured session bytes; `IRacingSessionString` removes invalid control characters before parsing. Keep that cleanup in the source path.
 
 - Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.
-- `TelemetryLayout::try_from_headers` is the runtime-layout foundation. It owns published-order `FieldLayout` records and layout-local `FieldId` lookup; geometry lives only in the copyable `VariableRegion`. Preserve authoritative header order and accept bounded overlapping fields. Current providers/decoders/adapters still use the legacy schema until their separate migration.
+- `TelemetryLayout::try_from_headers` is the runtime-layout foundation. It owns published-order `FieldLayout` records and layout-local `FieldId` lookup; geometry lives only in the copyable `VariableRegion`. Preserve authoritative header order and accept bounded overlapping fields. `FieldData` provides field-based scalar/array decoding; current providers/adapters still use the legacy schema until their separate migration.
 
 ## Platform & Feature Guardrails
 
