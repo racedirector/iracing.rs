@@ -25,28 +25,29 @@ same.
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
 private read-only memory map plus decoded headers and layout, and reads one owned
-frame on demand; `from_bytes` uses the same parser over an owned in-memory
-cursor. `IbtLayout` is the canonical physical source description, exposing total
+frame on demand; `from_bytes` uses the same parser over an owned byte vector.
+`IbtLayout` is the canonical physical source description, exposing total
 source length, main-header/disk-header/preamble regions, optional metadata bounds,
 frame start/size/count, and O(1) indexed frame geometry. `IbtReader::layout()`
 exposes the same validated description for inspection without additional reads
-or cursor changes. Fixed regions are derived from the wire types; source length
-comes from the EOF-delimited frame region. No duplicate coordinates are stored.
+or changes to source state. Fixed regions are derived from the wire types;
+source length comes from the EOF-delimited frame region. No duplicate coordinates are stored.
 The layout describes byte geometry, not telemetry fields, replay state, or CLI
-formatting. Source I/O uses checked conversions between `u64` seek offsets
-and `usize` layout coordinates. Unlike the earlier `u64` file navigation, this
-rejects sources larger than `usize::MAX` bytes: files of 4 GiB or more cannot be
-opened on 32-bit targets. Supporting those files would require a separately
+formatting. `IbtSource` provides direct byte-range access using `usize` layout
+coordinates. Sources larger than `usize::MAX` bytes are rejected: files of 4 GiB
+or more cannot be opened on 32-bit targets. Supporting those files would require a separately
 scoped wider layout API. File-backed readers require completed, immutable
 recordings: no process may modify or truncate the file until the reader (or
 owning provider/connection) is dropped. Use `from_bytes` with an owned copy when
 that lifetime requirement cannot be met.
 
-`frame(index)`, `session_info_snapshot()`, and `VariableHeadersProvider::variable_headers()` read
-owned data from the source on each call. They may move its physical cursor;
-there is no reader-owned logical cursor, schema, or session cache. Every indexed
-read seeks to its validated region. Live `WindowsConnection` interprets the
-related shared-memory header and rotating buffers.
+`frame(index)`, `session_info_snapshot()`, and
+`VariableHeadersProvider::variable_headers()` access validated byte ranges directly
+through `IbtSource` and return owned data on each call. Both mapped and owned
+sources use bounds-checked slice access without seeking or moving a physical
+cursor. There is no reader-owned logical cursor, schema, or session cache. Live
+`WindowsConnection` interprets the related shared-memory header and rotating
+buffers.
 
 `VariableSchema` maps names to `VariableInfo` and records the frame size. A
 `VariableInfo` carries type, byte offset, element count, time-count marker,

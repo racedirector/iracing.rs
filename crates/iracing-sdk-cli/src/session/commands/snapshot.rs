@@ -2,7 +2,7 @@ use crate::{
     utils::get_disk_reader,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use iracing_sdk::provider::{SessionInformationBytesProvider, SessionInformationProvider};
 use std::path::PathBuf;
@@ -65,7 +65,10 @@ fn write_session_info(
     output: OutputTarget,
     format: DocumentFormat,
 ) -> Result<()> {
+    let session_info = provider
+        .session_info()?
+        .context("Session information is unavailable")?;
     let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-    writer.write(&provider.session_info()?)?;
+    writer.write(&session_info)?;
     writer.finalize()
 }
