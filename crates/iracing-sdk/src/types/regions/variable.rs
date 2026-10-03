@@ -6,12 +6,34 @@ use crate::{IRacingSDKError, Result, VariableInfo};
 use super::ByteRegion;
 
 /// Frame-relative byte region occupied by one telemetry variable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VariableRegion {
     region: ByteRegion,
     count: NonZeroUsize,
 }
 
 impl VariableRegion {
+    /// Converts a wire header into geometry bounded by the advertised frame size.
+    ///
+    /// # Errors
+    ///
+    /// Rejects negative offsets, nonpositive counts, arithmetic overflow, and
+    /// extents beyond `frame_size`. Ordering and overlap with other fields are
+    /// not constraints on an individual variable region.
+    pub fn try_from_header(header: &VariableHeader, frame_size: usize) -> Result<Self> {
+        let region = Self::try_from(header)?;
+        if region.as_region().end() > frame_size {
+            return Err(IRacingSDKError::parse_error(
+                "VariableRegion::try_from_header",
+                format!(
+                    "Variable region ends at {}, past frame size {frame_size}",
+                    region.as_region().end()
+                ),
+            ));
+        }
+        Ok(region)
+    }
+
     /// Creates a variable region contained within a frame.
     ///
     /// # Errors
