@@ -2,4 +2,6 @@
 mod frame_adapter;
 mod validation;
 pub use frame_adapter::FrameAdapter;
-pub use validation::{AdapterValidation, FieldExtraction, telemetry_type_mismatch_details};
+pub use validation::{
+    AdapterValidation, FieldExtraction, ValidatedFrame, telemetry_type_mismatch_details,
+};

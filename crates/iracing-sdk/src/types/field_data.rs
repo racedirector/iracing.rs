@@ -6,6 +6,8 @@ use crate::{BitField, FieldLayout, IRacingSDKError, Result, TelemetryValue, irsd
 /// Implementations must decode the advertised SDK width with explicit
 /// little-endian semantics. This also enables arrays of domain enum/flag types.
 pub trait TelemetryElement: Sized {
+    /// SDK byte width shared by all accepted storage types.
+    const BYTE_WIDTH: usize;
     /// Returns whether this Rust type accepts the advertised SDK storage type.
     fn accepts(data_type: VariableType) -> bool;
     /// Decodes one isolated element, rejecting incorrect byte lengths.
@@ -17,6 +19,7 @@ pub trait VarData: Sized {
     /// Checks storage compatibility and scalar/array shape without reading data.
     fn validate_field(field: &FieldLayout) -> Result<()>;
     /// Validates the requested type and decodes one complete bounded field slice.
+    #[inline]
     fn decode_field(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         Self::validate_field(field)?;
         Self::decode_prevalidated(frame, field)
@@ -29,6 +32,7 @@ pub trait VarData: Sized {
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self>;
 }
 
+#[inline]
 pub(crate) fn field_bytes<'a>(frame: &'a [u8], field: &FieldLayout) -> Result<&'a [u8]> {
     let region = field.region();
     frame.get(region.as_range()).ok_or_else(|| {
@@ -40,6 +44,7 @@ pub(crate) fn field_bytes<'a>(frame: &'a [u8], field: &FieldLayout) -> Result<&'
     })
 }
 
+#[inline]
 fn validate_element<T: TelemetryElement>(field: &FieldLayout) -> Result<()> {
     if !T::accepts(field.data_type()) {
         return Err(IRacingSDKError::type_conversion(
@@ -53,9 +58,11 @@ fn validate_element<T: TelemetryElement>(field: &FieldLayout) -> Result<()> {
 macro_rules! scalar {
     ($type:ty, $storage:ident, $width:literal, $decode:expr) => {
         impl TelemetryElement for $type {
+            const BYTE_WIDTH: usize = $width;
             fn accepts(data_type: VariableType) -> bool {
                 data_type == VariableType::$storage
             }
+            #[inline]
             fn decode_element(bytes: &[u8]) -> Result<Self> {
                 let bytes: [u8; $width] =
                     bytes.try_into().map_err(|_| IRacingSDKError::WireSize {
@@ -66,6 +73,7 @@ macro_rules! scalar {
             }
         }
         impl VarData for $type {
+            #[inline]
             fn validate_field(field: &FieldLayout) -> Result<()> {
                 validate_element::<Self>(field)?;
                 if field.count() != 1 {
@@ -76,6 +84,7 @@ macro_rules! scalar {
                 }
                 Ok(())
             }
+            #[inline]
             fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self> {
                 Self::decode_element(field_bytes(frame, field)?)
             }
@@ -92,21 +101,27 @@ scalar!(f32, Float, 4, f32::from_le_bytes);
 scalar!(f64, Double, 8, f64::from_le_bytes);
 
 impl<T: TelemetryElement> VarData for Vec<T> {
+    #[inline]
     fn validate_field(field: &FieldLayout) -> Result<()> {
         validate_element::<T>(field)
     }
+    #[inline]
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self> {
-        field_bytes(frame, field)?
-            .chunks_exact(field.data_type().byte_size())
-            .map(T::decode_element)
-            .collect()
+        let bytes = field_bytes(frame, field)?;
+        let mut values = Vec::with_capacity(field.count());
+        for chunk in bytes.chunks_exact(T::BYTE_WIDTH) {
+            values.push(T::decode_element(chunk)?);
+        }
+        Ok(values)
     }
 }
 
 impl TelemetryValue {
     /// Decodes a selected field with one bounded slice and explicit little-endian values.
+    #[inline]
     pub fn decode_field(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         let bytes = field_bytes(frame, field)?;
+        #[inline]
         fn values<T: TelemetryElement>(
             bytes: &[u8],
             field: &FieldLayout,
@@ -115,11 +130,11 @@ impl TelemetryValue {
             if field.count() == 1 {
                 return T::decode_element(bytes).map(wrap);
             }
-            bytes
-                .chunks_exact(field.data_type().byte_size())
-                .map(|chunk| T::decode_element(chunk).map(wrap))
-                .collect::<Result<Vec<_>>>()
-                .map(TelemetryValue::Array)
+            let mut values = Vec::with_capacity(field.count());
+            for chunk in bytes.chunks_exact(T::BYTE_WIDTH) {
+                values.push(wrap(T::decode_element(chunk)?));
+            }
+            Ok(TelemetryValue::Array(values))
         }
         match field.data_type() {
             VariableType::Character => values(bytes, field, Self::Char),

@@ -130,8 +130,8 @@ impl FrameAdapter for Row {
     }
 
     fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
-        validation.ensure_packet(packet).expect("adapter layout mismatch");
-        Self { speed: validation.decode(packet, 0).expect("decode").expect("required field") }
+        let frame = validation.for_packet(packet).expect("adapter layout mismatch");
+        Self { speed: frame.decode(0).expect("decode").expect("required field") }
     }
 }
 ```

@@ -41,10 +41,12 @@ impl FramePacket {
         })
     }
     /// Borrows the immutable complete frame bytes.
+    #[inline]
     pub fn data(&self) -> &Arc<[u8]> {
         &self.data
     }
     /// Returns the originating shared layout.
+    #[inline]
     pub fn layout(&self) -> &Arc<TelemetryLayout> {
         &self.layout
     }

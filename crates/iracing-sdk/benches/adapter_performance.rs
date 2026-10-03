@@ -173,14 +173,14 @@ fn bench_dynamic_frame(c: &mut Criterion) {
     assert_eq!(lap_dist.as_ref().map(Vec::len), Some(72));
     group.bench_function("scalar_hit", |b| {
         b.iter(|| {
-            let speed = black_box(frame.f32("Speed"));
+            let speed = black_box(black_box(&frame).f32("Speed"));
             black_box(speed)
         })
     });
 
     group.bench_function("array_hit_72", |b| {
         b.iter(|| {
-            let lap_dist: Option<Vec<f32>> = black_box(frame.get("CarIdxLapDistPct"));
+            let lap_dist: Option<Vec<f32>> = black_box(black_box(&frame).get("CarIdxLapDistPct"));
             black_box(lap_dist)
         })
     });

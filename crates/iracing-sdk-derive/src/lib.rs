@@ -222,7 +222,7 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
             }
 
             fn adapt(packet: &::iracing_sdk::types::FramePacket, validation: &::iracing_sdk::adapters::AdapterValidation) -> Self {
-                validation.ensure_packet(packet).expect("adapter layout mismatch");
+                let validated_frame = validation.for_packet(packet).expect("adapter layout mismatch");
 
                 Self {
                     #(#extraction_assignments),*
@@ -856,7 +856,7 @@ fn generate_validation_phase(
 /// calls that fetch or default their extracted values at runtime.
 ///
 /// Identifiers in `expr` that match keys in `field_map` are replaced with
-/// `validation.fetch_or_default::<T>(packet, "Name")`-style expressions where `T` is
+/// `validated_frame.fetch_or_default::<T>(slot)` expressions where `T` is
 /// the associated `Type` from `field_map`.
 ///
 /// # Examples
@@ -895,7 +895,7 @@ struct CalculatedExprFolder<'a> {
 
 impl<'a> Fold for CalculatedExprFolder<'a> {
     /// Rewrites simple identifier paths that match known telemetry fields into
-    /// `validation.fetch_or_default::<Type>(packet, "FieldName")` calls; all other
+    /// `validated_frame.fetch_or_default::<Type>(slot)` calls; all other
     /// expressions are folded unchanged.
     ///
     /// # Examples
@@ -913,7 +913,7 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     ///
     /// // Manually perform the transformation the folder would do:
     /// let transformed: Expr = parse_quote! {
-    ///     validation.fetch_or_default::<i32>(packet, LitStr::new("speed", proc_macro2::Span::call_site()))
+    ///     validated_frame.fetch_or_default::<i32>(0)
     /// };
     ///
     /// let rendered = quote::quote!(#transformed).to_string();
@@ -931,7 +931,7 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
                         let index = *index;
                         let ty = ty.clone();
                         return syn::parse_quote! {
-                            validation.fetch_or_default::<#ty>(packet, #index)
+                            validated_frame.fetch_or_default::<#ty>(#index)
                         };
                     }
                 }
@@ -950,7 +950,7 @@ fn generate_type_default_assignment(
     field_name: &str,
 ) -> proc_macro2::TokenStream {
     let _ = field_name;
-    quote!(#field_ident: validation.fetch_or_default::<#field_type>(packet, #index))
+    quote!(#field_ident: validated_frame.fetch_or_default::<#field_type>(#index))
 }
 
 /// Generates a positional field assignment against the retained validated layout.
@@ -962,7 +962,7 @@ fn generate_with_default_assignment(
     field_name: &str,
 ) -> proc_macro2::TokenStream {
     let _ = field_name;
-    quote!(#field_ident: validation.decode::<#field_type>(packet, #index).ok().flatten().unwrap_or_else(|| #default_expr))
+    quote!(#field_ident: validated_frame.decode::<#field_type>(#index).ok().flatten().unwrap_or_else(|| #default_expr))
 }
 
 /// Generates a positional field assignment against the retained validated layout.
@@ -973,7 +973,7 @@ fn generate_optional_assignment(
     field_name: &str,
 ) -> proc_macro2::TokenStream {
     let _ = field_name;
-    quote!(#field_ident: validation.decode::<#inner_type>(packet, #index).ok().flatten())
+    quote!(#field_ident: validated_frame.decode::<#inner_type>(#index).ok().flatten())
 }
 
 /// Generates a positional field assignment against the retained validated layout.
@@ -983,7 +983,7 @@ fn generate_critical_assignment(
     field_type: &syn::Type,
     field_name: &str,
 ) -> proc_macro2::TokenStream {
-    quote!(#field_ident: validation.decode::<#field_type>(packet, #index).expect(concat!("Failed to decode critical field ", #field_name)).expect("missing required plan slot"))
+    quote!(#field_ident: validated_frame.decode::<#field_type>(#index).expect(concat!("Failed to decode critical field ", #field_name)).expect("missing required plan slot"))
 }
 
 /// Generates a positional field assignment against the retained validated layout.
@@ -997,7 +997,7 @@ fn generate_bitfield_has_assignment(
     fail_if_missing: bool,
 ) -> proc_macro2::TokenStream {
     let _ = field_name;
-    let value = quote!(validation.decode::<::iracing_sdk::BitField>(packet, #index));
+    let value = quote!(validated_frame.decode::<::iracing_sdk::BitField>(#index));
     if target_is_option {
         quote!(#field_ident: #value.ok().flatten().map(|bits| bits.has_flag(#mask_expr)))
     } else if fail_if_missing {
@@ -1022,7 +1022,7 @@ fn generate_bitfield_map_assignment(
     fail_if_missing: bool,
 ) -> proc_macro2::TokenStream {
     let _ = field_name;
-    let value = quote!(validation.decode::<::iracing_sdk::BitField>(packet, #index));
+    let value = quote!(validated_frame.decode::<::iracing_sdk::BitField>(#index));
     if target_is_option {
         quote!(#field_ident: #value.ok().flatten().map(#decoder_expr))
     } else if fail_if_missing {
