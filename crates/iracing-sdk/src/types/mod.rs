@@ -46,6 +46,7 @@
 //! ```
 
 mod dynamic_frame;
+mod field_data;
 mod frame;
 mod ibt;
 mod iracing_session_string;
@@ -60,6 +61,7 @@ mod variable_headers;
 
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
+pub use field_data::{FieldData, TelemetryElement};
 pub use frame::FramePacket;
 pub use ibt::IbtLayout;
 pub use iracing_irsdk::BitField;
