@@ -75,6 +75,7 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo iracing-sdk session schema type` | Emit the baseline session schema. |
 | `cargo iracing-sdk session schema ibt --path <FILE.ibt>` | Generate session schema from a recording. |
 | `cargo iracing-sdk session schema live` | Generate live session schema (Windows). |
+| `cargo iracing-sdk headers layout --path <FILE.ibt>` | Inspect physical source regions and runtime frame fields in published header order; use `--format json` or `--format yaml` for structured output. |
 | `cargo iracing-sdk variables ibt --path <FILE.ibt>` | Export variable metadata. |
 | `cargo iracing-sdk broadcast --help` | Inspect simulator broadcast commands (Windows). |
 
