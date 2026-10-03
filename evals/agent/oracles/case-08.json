@@ -1,0 +1,12 @@
+{
+  "id": "case-08",
+  "control": false,
+  "atoms": {
+    "a1": "Current reader change is not covered by the workflow source filter.",
+    "a2": "Header parsing benchmark does not time actual frame delivery/source acquisition.",
+    "a3": "The 30% claim lacks comparable measured evidence; recommend current-caller coverage and same-runner comparison before a conclusion."
+  },
+  "hard_failures": {
+    "h1": "Accepting a benchmarked conclusion without checking its timed path/trigger"
+  }
+}

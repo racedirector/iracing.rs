@@ -1,0 +1,7 @@
+{
+  "id": "case-02",
+  "prompt": "Review how the region is established and consumed.",
+  "inputs": [
+    "source.rs"
+  ]
+}

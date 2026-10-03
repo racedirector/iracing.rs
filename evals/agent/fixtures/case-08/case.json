@@ -1,0 +1,7 @@
+{
+  "id": "case-08",
+  "prompt": "Assess what performance conclusion this evidence supports.",
+  "inputs": [
+    "source.rs"
+  ]
+}

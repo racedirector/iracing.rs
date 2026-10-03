@@ -1,0 +1,7 @@
+{
+  "id": "case-06",
+  "prompt": "Evaluate the public wrapper and all of its safe producers.",
+  "inputs": [
+    "source.rs"
+  ]
+}

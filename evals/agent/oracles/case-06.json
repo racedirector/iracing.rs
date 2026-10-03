@@ -1,0 +1,13 @@
+{
+  "id": "case-06",
+  "control": false,
+  "atoms": {
+    "a1": "new permits backing storage to drop before bytes; demonstrate the safe-call path.",
+    "a2": "Caller guidance transfers a lifetime obligation but the safe type neither owns storage nor carries its lifetime.",
+    "a3": "A proposed lifetime/ownership fix is a proof plan, not certification of current code."
+  },
+  "hard_failures": {
+    "h1": "Treating an undocumented/unenforced caller invariant as eliminated",
+    "h2": "Certifying an unimplemented proposal"
+  }
+}

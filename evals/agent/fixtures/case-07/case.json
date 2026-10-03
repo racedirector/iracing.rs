@@ -1,0 +1,7 @@
+{
+  "id": "case-07",
+  "prompt": "We should use typestate to speed this up. Evaluate that premise and give a concrete recommendation based on the code.",
+  "inputs": [
+    "source.rs"
+  ]
+}
