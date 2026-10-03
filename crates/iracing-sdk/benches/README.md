@@ -93,6 +93,14 @@ sensitive to filesystem cache warmth and machine load.
 
 ## CI coverage
 
+For Tier-B comparisons, use the repository's
+[build identity contract](../../../docs/benchmarks/codspeed-build-identity.md),
+[same-revision stability study](../../../docs/benchmarks/codspeed-stability.md),
+and [regression investigation runbook](../../../docs/benchmarks/codspeed-investigation.md).
+Compiler upgrades start deliberate baseline transitions. Review environment
+warnings and measured repeat variation before attributing a percentage to
+production code.
+
 | Target | Tier | CI interpretation |
 | --- | --- | --- |
 | `var-data-extraction` | B | CodSpeed simulation regression evidence |
