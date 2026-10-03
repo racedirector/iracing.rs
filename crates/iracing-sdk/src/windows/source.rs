@@ -54,9 +54,8 @@ impl Drop for OwnedHandle {
 #[derive(Debug)]
 struct MappedView(NonNull<u8>);
 // SAFETY: The view is external memory accessed only through bounded volatile
-// scalar reads and native copies, except for the explicitly unsafe legacy
-// pointer passthrough. Ownership keeps it mapped during synchronous reads;
-// legacy callers are responsible for the references they construct.
+// scalar reads and native copies. Ownership keeps it mapped throughout
+// every synchronous read and copy.
 unsafe impl Send for MappedView {}
 unsafe impl Sync for MappedView {}
 impl Drop for MappedView {
@@ -135,6 +134,20 @@ impl LiveSource {
                 )),
                 len: bytes.len(),
             }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_write(&self, offset: usize, bytes: &[u8]) {
+        assert!(offset.checked_add(bytes.len()).unwrap() <= self.len);
+        // SAFETY: Only private writable test mappings call this synchronous
+        // helper; the checked destination fits and the input is disjoint.
+        unsafe {
+            RtlMoveMemory(
+                self.view.0.as_ptr().add(offset).cast(),
+                bytes.as_ptr().cast(),
+                bytes.len(),
+            );
         }
     }
 
@@ -219,20 +232,6 @@ impl LiveSource {
 
     pub fn len(&self) -> usize {
         self.len
-    }
-
-    /// Legacy escape hatch solely for preserving `Connection::header()`.
-    ///
-    /// Do not use this for any other access. New operations must use volatile
-    /// scalar reads or native copies into owned storage instead.
-    ///
-    /// # Safety
-    /// The caller must validate the extent and alignment of any access and
-    /// keep this source alive for its duration. Creating a Rust reference also
-    /// requires that the simulator not mutate its referent while it is alive.
-    /// This pointer does not make reference reads volatile or synchronized.
-    pub(crate) unsafe fn legacy_header_ptr(&self) -> *const u8 {
-        self.view.0.as_ptr()
     }
 
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {

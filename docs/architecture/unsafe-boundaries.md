@@ -2,41 +2,35 @@
 
 This is a map of obligations in current source, not a soundness certificate.
 Use `.agents/skills/rust-soundness-review/` to audit complete producer/consumer
-paths. Proposed `MappedView`/RAII handle wrappers are not implemented on main;
-the current live boundary is `windows::Connection`.
+paths.
 
 ## Live shared memory
 
-[`Connection`](../../crates/iracing-sdk/src/windows/connection.rs) opens a mapping,
-maps its whole view and opens an update event. Successful construction retains
-handles and a `NonNull<u8>`; Drop unmaps/closes them. Partial-construction failure
-paths need separate cleanup review. The type stores no mapped byte extent.
-`header`, `get_new_data` and `ByteParser::bytes_at_region` form Rust references
-from pointers. Non-nullness alone does not prove extent, alignment, valid header
-contents or freedom from external mutation. OS page alignment does not establish
-all dynamically offset accesses. Header-advertised ranges need mapping bounds
-and fresh cross-field validation before pointer arithmetic.
+[`LiveSource`](../../crates/iracing-sdk/src/windows/source.rs) owns the mapping,
+view and event through RAII wrappers. It retains a mapped extent from
+`VirtualQuery`; activation requires the complete fixed header. Scalar reads use
+bounded volatile loads, and native `RtlMoveMemory` copies into disjoint owned
+storage without constructing Rust references into simulator memory. Header,
+session-info and exact typed variable-header snapshots remain stable after
+copying; a header copy alone is not an atomic multi-field observation.
 
-The simulator is a separate writer; FILE_MAP_READ describes this process's
-permissions and does not make that memory immutable. Manual Send/Sync currently
-justify handles and a pointer as read-only. A complete proof must also cover
-shared access, external writes, reference validity and destruction. Async waits
-copy the event handle into spawn_blocking; cancellation can outlive the borrowed
-future, so the worker's handle lifetime is an independent obligation.
+[`Connection`](../../crates/iracing-sdk/src/windows/connection.rs) validates
+positive live frame length and signed slot offsets through `FrameRegion`, then
+independently proves containment in the retained mapping before copying. It
+retains native current-buffer selection and two attempts. Tick, session version
+and selected-slot geometry checks bracket the copy; acceptance returns owned
+bytes and matching metadata together as `LiveFrameSnapshot`. `LiveProvider`
+consumes it into `FramePacket` without a second copy or shared-header read.
+No safe borrowed live header or mapped byte slice escapes this boundary.
 
-The current frame method reads ticks around *forming a borrowed slice*, not an
-owned copy, using ordinary loads. It has no volatile accesses or explicit
-compiler/hardware read barriers. The returned bytes can change after the tick
-check; do not describe this as a stable owned snapshot. Resolving these live
-obligations belongs to live-source work, not this documentation change.
-
-For future raw read implementations, volatile access makes individual accesses
-observable; it does not provide Rust atomic synchronization, prevent data races
-or prove a coherent multi-byte snapshot. Compiler fences constrain compiler
-reordering and hardware barriers constrain specified CPU ordering; neither
-proves source extent/lifetime or an external producer's update protocol. An
-owned copy plus protocol-aware metadata/tick rechecks must establish snapshot
-consistency above raw source access. An update event alone is not a snapshot lock.
+The simulator is a separate writer. FILE_MAP_READ describes this process's
+permissions, not immutability. Volatile reads make scalar observations visible;
+they do not make the whole header atomic. Snapshot acceptance depends on the
+native producer's tick publication protocol and version counters, including
+that a transition is not hidden by counter reuse during an attempt. An update
+event alone is not a snapshot lock. Manual Send/Sync depends on retaining the
+mapping throughout reads and copies. Async blocking waits own an Arc to the
+event, so cancellation cannot close the handle while the worker waits.
 
 ## Disk mappings
 

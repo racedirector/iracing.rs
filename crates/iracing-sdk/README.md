@@ -96,8 +96,8 @@ fn main() -> iracing_sdk::Result<()> {
     let mut connection = WindowsConnection::try_connect()?;
     match connection.wait_for_update(Duration::from_millis(100))? {
         WaitResult::Signaled => {
-            if let Some(frame) = connection.get_new_data() {
-                println!("Received {} bytes", frame.len());
+            if let Some(frame) = connection.get_new_data()? {
+                println!("Received {} bytes", frame.data.len());
             }
         }
         WaitResult::Timeout => {}
@@ -105,6 +105,13 @@ fn main() -> iracing_sdk::Result<()> {
     Ok(())
 }
 ```
+
+`get_new_data()` returns `Result<Option<LiveFrameSnapshot>>`. A successful
+snapshot owns the accepted bytes together with their tick and session update
+counter. Consume these fields together; no later shared-header read is needed.
+Ordinary absence (including baseline/reset ticks and exhausted consistency
+retries) returns `Ok(None)`; malformed live geometry or acquisition failures
+return `Err`. Use `header_snapshot()` for an owned header observation.
 
 ### Streaming Adapters
 

@@ -26,7 +26,7 @@
 //! // Wait for telemetry updates
 //! match connection.wait_for_update(Duration::from_millis(100))? {
 //!     WaitResult::Signaled => {
-//!         if let Some(data) = connection.get_new_data() {
+//!         if let Some(data) = connection.get_new_data()? {
 //!             // Process telemetry data
 //!         }
 //!     }
@@ -42,6 +42,6 @@ mod source;
 mod utils;
 
 pub use broadcast::{Broadcast, BroadcastCommand};
-pub use connection::Connection;
+pub use connection::{Connection, LiveFrameSnapshot};
 pub use source::WaitResult;
 pub use utils::wide_string;

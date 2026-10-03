@@ -6,8 +6,8 @@
 use iracing_irsdk::{StatusField, VariableBuffer};
 
 use super::source::WaitResult;
-use crate::ByteRegion;
 use crate::provider::{SessionInformationBytesProvider, VariableHeadersProvider};
+use crate::{ByteRegion, FrameRegion};
 use crate::{
     IRacingSDKError, Result, SessionInfoBytes, SessionInfoRegion, VariableHeaders,
     VariableHeadersRegion, windows::source::LiveSource,
@@ -22,8 +22,19 @@ use iracing_irsdk::Header;
 pub struct Connection {
     source: LiveSource,
 
-    frame_data: Vec<u8>,
     last_tick_count: i32,
+}
+
+/// Owned telemetry bytes and metadata from one accepted live acquisition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct LiveFrameSnapshot {
+    /// Stable telemetry bytes copied inside the consistency window.
+    pub data: Vec<u8>,
+    /// Accepted native SDK tick count.
+    pub tick: i32,
+    /// Session update counter observed throughout the accepted attempt.
+    pub session_info_update: i32,
 }
 
 impl Connection {
@@ -45,30 +56,8 @@ impl Connection {
         }
         Ok(Self {
             source,
-            frame_data: Vec::new(),
             last_tick_count: i32::MAX,
         })
-    }
-
-    /// Borrows the legacy header directly from the shared-memory mapping.
-    ///
-    /// The header contents are volatile: iRacing can change them independently
-    /// of this connection. This compatibility accessor does not perform volatile
-    /// loads or provide a coherent snapshot. Ordinary Rust references require
-    /// the referent to remain unchanged, which the live simulator does not
-    /// guarantee; retaining this API does not resolve that legacy limitation.
-    /// New code should use [`Self::header_snapshot`] or scalar accessors.
-    #[deprecated(
-        note = "use header_snapshot() or scalar accessors; mapped header contents can change"
-    )]
-    pub fn header(&self) -> &Header {
-        assert!(
-            self.source.len() >= size_of::<Header>(),
-            "mapped header is truncated"
-        );
-        // Legacy compatibility only: bounds and page alignment are established,
-        // but concurrent simulator mutation remains the documented limitation.
-        unsafe { &*self.source.legacy_header_ptr().cast::<Header>() }
     }
 
     /// Copies the live header into an owned value.
@@ -143,88 +132,101 @@ impl Connection {
         self.source.wait_for_update_async(timeout).await
     }
 
-    /// Copies the published current telemetry buffer into connection-owned storage.
+    /// Acquires owned bytes and coherent metadata for the published current frame.
     ///
-    /// Returns a slice only after the completed tick read before the copy matches
-    /// the begin tick read afterward, retrying acquisition at most twice. Equal
-    /// ticks return no data; older ticks establish a new baseline without a frame.
-    pub fn get_new_data(&mut self) -> Option<&[u8]> {
-        if !self.is_connected() {
-            tracing::debug!("Not connected to iRacing");
-            self.last_tick_count = i32::MAX;
-            return None;
-        }
+    /// `Ok(None)` means disconnected, equal/reset ticks, or two unsuccessful
+    /// consistency attempts. The initial tick establishes a baseline without
+    /// returning a frame. Each attempt checks ticks, session version and selected
+    /// slot geometry around the actual copy; accepted bytes remain stable even
+    /// when the simulator changes its mapping afterward.
+    ///
+    /// # Errors
+    /// Returns malformed advertised geometry or bounded acquisition failures.
+    /// This replaces the former borrowed-byte `Option` result: callers consume
+    /// the snapshot directly rather than re-reading metadata after acceptance.
+    pub fn get_new_data(&mut self) -> Result<Option<LiveFrameSnapshot>> {
+        self.acquire_frame(|_, _| {})
+    }
 
-        let header = self.header_snapshot().ok()?;
-        // Use the published current buffer, with the native fallback to zero.
-        // The backing array also bounds malformed advertised buffer counts.
-        let current_buffer = self.source.read_u8(offset_of!(Header, current_buffer))?;
-        let latest_buf_idx = Self::current_buffer_index(current_buffer, header.buffer_count);
-        let descriptor_offset =
-            offset_of!(Header, buffers) + latest_buf_idx * size_of::<VariableBuffer>();
+    fn acquire_frame(
+        &mut self,
+        mut after_copy: impl FnMut(&LiveSource, usize),
+    ) -> Result<Option<LiveFrameSnapshot>> {
+        let invalid = || {
+            IRacingSDKError::parse_error(
+                "Connection::get_new_data",
+                "Invalid live frame geometry or scalar access",
+            )
+        };
+        if !self.is_connected() {
+            self.last_tick_count = i32::MAX;
+            return Ok(None);
+        }
+        let header = self.header_snapshot()?;
+        if header.buffer_count <= 0 || header.buffer_count > Header::MAX_BUFFERS as i32 {
+            return Err(invalid());
+        }
+        let current_buffer = self
+            .source
+            .read_u8(offset_of!(Header, current_buffer))
+            .ok_or_else(invalid)?;
+        let index = Self::current_buffer_index(current_buffer, header.buffer_count);
+        let descriptor_offset = offset_of!(Header, buffers) + index * size_of::<VariableBuffer>();
         let tick_offset = descriptor_offset + offset_of!(VariableBuffer, tick_count);
         let begin_offset = descriptor_offset + offset_of!(VariableBuffer, tick_count_begin);
-
-        let latest_tick = self.source.read_i32(tick_offset)?;
-
+        let offset_word = descriptor_offset + offset_of!(VariableBuffer, buffer_offset);
+        let read = |offset| self.source.read_i32(offset).ok_or_else(invalid);
+        let latest_tick = read(tick_offset)?;
         if self.last_tick_count == latest_tick {
-            return None;
+            return Ok(None);
         }
-
-        // Match the native SDK, including its initial INT_MAX sentinel:
-        // record an older tick, but do not return that frame.
         if self.last_tick_count > latest_tick {
-            tracing::trace!(
-                "Tick count reset detected: {} -> {}",
-                self.last_tick_count,
-                latest_tick
-            );
             self.last_tick_count = latest_tick;
-            return None;
+            return Ok(None);
         }
 
-        let frame_offset = usize::try_from(header.buffers[latest_buf_idx].buffer_offset).ok()?;
-        let frame_len = usize::try_from(header.buffer_length).ok()?;
-
-        if frame_offset.checked_add(frame_len)? > self.source.len() {
-            return None;
-        }
-
-        self.frame_data.resize(frame_len, 0);
-
-        // Keep the selected descriptor fixed across both attempts,
-        // as the native SDK does.
+        // Retain the native selected slot across both attempts. Geometry is
+        // captured and bounded afresh for each attempt, then validated afterward.
         for attempt in 0..2 {
-            let tick_count = self.source.read_i32(tick_offset)?;
-
-            // SAFETY: The source range was checked above. frame_data is
-            // initialized Rust-owned storage, disjoint from the mapping.
-            // Geometry is assumed stable during this acquisition, as in
-            // the native SDK.
+            let session_info_update = read(offset_of!(Header, session_info_update))?;
+            let buffer_count = read(offset_of!(Header, buffer_count))?;
+            let frame_length = read(offset_of!(Header, buffer_length))?;
+            let frame_offset = read(offset_word)?;
+            if buffer_count <= 0 || buffer_count > Header::MAX_BUFFERS as i32 || frame_length <= 0 {
+                return Err(invalid());
+            }
+            let region = FrameRegion::new(
+                usize::try_from(frame_offset).map_err(|_| invalid())?,
+                usize::try_from(frame_length).map_err(|_| invalid())?,
+            )?;
+            if region.end() > self.source.len() {
+                return Err(invalid());
+            }
+            let tick = read(tick_offset)?;
+            let mut data = vec![0; region.len()];
+            // SAFETY: FrameRegion proves non-overflowing geometry and the extent
+            // check proves containment. data is initialized, disjoint owned storage.
             unsafe {
-                self.source
-                    .copy_unchecked(frame_offset, &mut self.frame_data)
-                    .ok()?;
+                self.source.copy_unchecked(region.offset(), &mut data)?;
             }
-
-            let tick_count_begin = self.source.read_i32(begin_offset)?;
-
-            if tick_count == tick_count_begin {
-                self.last_tick_count = tick_count;
-                return Some(self.frame_data.as_slice());
+            after_copy(&self.source, attempt);
+            let begin = read(begin_offset)?;
+            if tick == begin
+                && tick == read(tick_offset)?
+                && session_info_update == read(offset_of!(Header, session_info_update))?
+                && frame_offset == read(offset_word)?
+                && frame_length == read(offset_of!(Header, buffer_length))?
+                && buffer_count == read(offset_of!(Header, buffer_count))?
+            {
+                self.last_tick_count = tick;
+                return Ok(Some(LiveFrameSnapshot {
+                    data,
+                    tick,
+                    session_info_update,
+                }));
             }
-
-            tracing::trace!(
-                "Data consistency check failed on attempt {}: \
-             tick_count={}, tick_count_begin={}",
-                attempt + 1,
-                tick_count,
-                tick_count_begin
-            );
         }
-
-        tracing::warn!("Failed consistency checks, no data returned");
-        None
+        Ok(None)
     }
 
     /// Copies session bytes, returning None on absence or acquisition failure.
@@ -381,26 +383,39 @@ mod tests {
         let mut connection = connection_with_header(test_header(4), 272);
         assert_eq!(connection.tick_rate(), 60);
         assert_eq!(connection.session_info_update(), 0);
-        assert!(connection.get_new_data().is_none());
+        assert!(connection.get_new_data().unwrap().is_none());
         assert_eq!(connection.last_tick_count(), 3);
         connection.last_tick_count = 2;
-        assert_eq!(connection.get_new_data().unwrap(), &[1, 2, 3, 4]);
-        assert!(connection.get_new_data().is_none());
+        assert_eq!(
+            connection.get_new_data().unwrap().unwrap().data,
+            &[1, 2, 3, 4]
+        );
+        assert!(connection.get_new_data().unwrap().is_none());
         connection.last_tick_count = 4;
-        assert!(connection.get_new_data().is_none());
+        assert!(connection.get_new_data().unwrap().is_none());
         assert_eq!(connection.last_tick_count(), 3);
     }
 
     #[test]
     fn acquisition_rejects_torn_frames_and_invalid_regions() {
-        for (offset, len, begin) in [(264, 4, 9), (-1, 4, 3), (270, 4, 3), (264, -1, 3)] {
+        for (offset, len, begin) in [
+            (264, 4, 9),
+            (-1, 4, 3),
+            (270, 4, 3),
+            (264, -1, 3),
+            (264, 0, 3),
+        ] {
             let mut header = test_header(4);
             header.buffers[2].buffer_offset = offset;
             header.buffers[2].tick_count_begin = begin;
             header.buffer_length = len;
             let mut connection = connection_with_header(header, 272);
             connection.last_tick_count = 2;
-            assert!(connection.get_new_data().is_none());
+            if begin == 9 {
+                assert!(connection.get_new_data().unwrap().is_none());
+            } else {
+                assert!(connection.get_new_data().is_err());
+            }
             assert_eq!(connection.last_tick_count(), 2);
         }
         let mut header = test_header(4);
@@ -410,6 +425,119 @@ mod tests {
         let connection = connection_with_header(header, 272);
         assert!(connection.session_info_snapshot().is_err());
         assert!(connection.variable_headers().is_err());
+    }
+
+    #[test]
+    fn accepted_snapshot_owns_bytes_and_matching_metadata() {
+        let mut header = test_header(4);
+        header.session_info_update = 7;
+        let mut connection = connection_with_header(header, 268); // exact end
+        connection.last_tick_count = 2;
+        let frame = connection.get_new_data().unwrap().unwrap();
+        connection.source.test_write(264, &[9; 4]);
+        assert_eq!(frame.data, [1, 2, 3, 4]);
+        assert_eq!(frame.tick, 3);
+        assert_eq!(frame.session_info_update, 7);
+    }
+
+    #[test]
+    fn session_transition_retries_with_metadata_from_the_accepted_attempt() {
+        let mut connection = connection_with_header(test_header(4), 272);
+        connection.last_tick_count = 2;
+        let mut attempts = 0;
+        let frame = connection
+            .acquire_frame(|source, attempt| {
+                attempts += 1;
+                if attempt == 0 {
+                    source.test_write(offset_of!(Header, session_info_update), &7i32.to_le_bytes());
+                    source.test_write(264, &[9; 4]);
+                }
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(attempts, 2);
+        assert_eq!(frame.data, [9; 4]);
+        assert_eq!(frame.session_info_update, 7);
+        assert_eq!(frame.tick, 3);
+    }
+
+    #[test]
+    fn repeated_session_transitions_exhaust_two_attempts_without_accepting() {
+        let mut connection = connection_with_header(test_header(4), 272);
+        connection.last_tick_count = 2;
+        let mut attempts = 0;
+        assert!(
+            connection
+                .acquire_frame(|source, attempt| {
+                    attempts += 1;
+                    source.test_write(
+                        offset_of!(Header, session_info_update),
+                        &((attempt + 1) as i32).to_le_bytes(),
+                    );
+                })
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(attempts, 2);
+        assert_eq!(connection.last_tick_count(), 2);
+    }
+
+    #[test]
+    fn tick_transition_retries_and_returns_the_new_copied_frame() {
+        let mut connection = connection_with_header(test_header(4), 272);
+        connection.last_tick_count = 2;
+        let descriptor = offset_of!(Header, buffers) + 2 * size_of::<VariableBuffer>();
+        let mut attempts = 0;
+        let frame = connection
+            .acquire_frame(|source, attempt| {
+                attempts += 1;
+                if attempt == 0 {
+                    source.test_write(
+                        descriptor + offset_of!(VariableBuffer, tick_count),
+                        &4i32.to_le_bytes(),
+                    );
+                    source.test_write(
+                        descriptor + offset_of!(VariableBuffer, tick_count_begin),
+                        &4i32.to_le_bytes(),
+                    );
+                    source.test_write(264, &[8; 4]);
+                }
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(attempts, 2);
+        assert_eq!(frame.tick, 4);
+        assert_eq!(frame.data, [8; 4]);
+    }
+
+    #[test]
+    fn changed_slot_geometry_retries_before_accepting() {
+        let mut connection = connection_with_header(test_header(4), 272);
+        connection.last_tick_count = 2;
+        let offset = offset_of!(Header, buffers)
+            + 2 * size_of::<VariableBuffer>()
+            + offset_of!(VariableBuffer, buffer_offset);
+        let mut attempts = 0;
+        let frame = connection
+            .acquire_frame(|source, attempt| {
+                attempts += 1;
+                if attempt == 0 {
+                    source.test_write(offset, &268i32.to_le_bytes());
+                    source.test_write(268, &[6; 4]);
+                }
+            })
+            .unwrap()
+            .unwrap();
+        assert_eq!(attempts, 2);
+        assert_eq!(frame.data, [6; 4]);
+    }
+
+    #[test]
+    fn invalid_buffer_counts_are_errors() {
+        for count in [-1, 0, 5] {
+            let mut connection = connection_with_header(test_header(count), 272);
+            assert!(connection.get_new_data().is_err());
+        }
     }
 
     #[test]

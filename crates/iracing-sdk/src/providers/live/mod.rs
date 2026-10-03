@@ -129,28 +129,16 @@ impl LiveProvider {
 
             // Try to get data BEFORE waiting (C++ SDK pattern)
             // This catches frames that arrived since our last check
-            if let Some(data) = self.connection.get_new_data() {
-                let frame_data = data.to_vec();
-                let header = self.connection.header_snapshot()?;
-                let tick = self.connection.last_tick_count();
-                let session_version = header.session_info_update as u32;
-
-                tracing::trace!(
-                    "Frame: tick={}, session_version={}, size={}",
-                    tick,
-                    session_version,
-                    frame_data.len()
-                );
-
+            if let Some(frame) = self.connection.get_new_data()? {
                 return Ok(Some(FramePacket::new(
-                    frame_data,
-                    u32::try_from(tick).map_err(|_| {
+                    frame.data,
+                    u32::try_from(frame.tick).map_err(|_| {
                         IRacingSDKError::parse_error(
                             "LiveProvider::next_frame",
                             "Negative tick count",
                         )
                     })?,
-                    session_version,
+                    frame.session_info_update as u32,
                     self.shared_schema(),
                 )));
             }
