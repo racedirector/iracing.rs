@@ -372,6 +372,52 @@ pub fn require_test_data_file(file_name: &str) -> Result<PathBuf, FixtureError> 
     require_fixture(test_data_dir.join(file_name))
 }
 
+/// Builds a single field through the wire-to-runtime validation boundary.
+#[allow(clippy::too_many_arguments)]
+pub fn field(
+    name: String,
+    data_type: crate::irsdk::VariableType,
+    offset: usize,
+    count: usize,
+    count_as_time: bool,
+    units: String,
+    description: String,
+) -> crate::FieldLayout {
+    let header = crate::irsdk::VariableHeader::new(
+        data_type,
+        i32::try_from(offset).unwrap(),
+        i32::try_from(count).unwrap(),
+        count_as_time,
+        &name,
+        &description,
+        &units,
+    )
+    .unwrap();
+    crate::FieldLayout::try_from_header(&header, usize::MAX).unwrap()
+}
+/// Builds a validated layout from synthetic test field descriptions.
+pub fn layout(
+    fields: impl IntoIterator<Item = crate::FieldLayout>,
+    frame_size: usize,
+) -> crate::Result<crate::TelemetryLayout> {
+    let headers = fields
+        .into_iter()
+        .map(|field| {
+            crate::irsdk::VariableHeader::new(
+                field.data_type(),
+                i32::try_from(field.region().offset()).unwrap(),
+                i32::try_from(field.count()).unwrap(),
+                field.metadata().count_as_time(),
+                field.name(),
+                field.metadata().description(),
+                field.metadata().unit(),
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    crate::TelemetryLayout::try_from_headers(&crate::VariableHeaders::from(headers), frame_size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

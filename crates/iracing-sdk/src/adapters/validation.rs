@@ -1,242 +1,138 @@
-//! Validation types and field extraction strategies for adapters
+//! Layout-bound positional adapter plans.
+use crate::{FieldId, FieldLayout, FramePacket, IRacingSDKError, Result, TelemetryLayout, VarData};
+use std::sync::Arc;
 
-#[allow(unused_imports)] // Used by generated derive macro code
-use crate::{IRacingSDKError, VariableInfo, VariableSchema};
-#[allow(unused_imports)] // Used by generated derive macro code and tests
-use std::collections::HashMap;
-
-/// Pre-computed extraction plan built during connection-time validation.
-///
-/// Contains all information needed for efficient runtime extraction:
-/// - Field offsets and type information
-/// - Default values for missing optional fields
-/// - Calculated field expressions (pre-parsed)
-/// - Field extraction strategies per adapter field
-#[derive(Debug, Clone)]
-pub struct AdapterValidation {
-    /// Ordered list of field extraction operations
-    pub extraction_plan: Vec<FieldExtraction>,
-    /// Fast lookup from telemetry field name to extraction index
-    index_map: HashMap<String, usize>,
+/// Extraction strategy in adapter declaration order. No names or geometry are copied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldExtraction {
+    /// Required, validated telemetry field.
+    Required(FieldId),
+    /// Optional telemetry field, absent when missing or incompatible.
+    Optional(Option<FieldId>),
+    /// Field with a generated fallback expression.
+    WithDefault(Option<FieldId>),
+    /// Computed by generated Rust code.
+    Calculated,
+    /// Managed by application code.
+    Skipped,
 }
-
-impl AdapterValidation {
-    /// Create a new validation plan with the given extraction operations.
-    pub fn new(extraction_plan: Vec<FieldExtraction>) -> Self {
-        let index_map = extraction_plan
-            .iter()
-            .enumerate()
-            .filter_map(|(index, extraction)| {
-                extraction
-                    .field_name()
-                    .map(|name| (name.to_string(), index))
-            })
-            .collect();
-
-        Self {
-            extraction_plan,
-            index_map,
+impl FieldExtraction {
+    /// Returns the selected telemetry ID, when present.
+    pub fn field_id(&self) -> Option<FieldId> {
+        match self {
+            Self::Required(id) => Some(*id),
+            Self::Optional(id) | Self::WithDefault(id) => *id,
+            _ => None,
         }
     }
+    /// Whether this entry requires a telemetry value.
+    pub fn is_required(&self) -> bool {
+        matches!(self, Self::Required(_))
+    }
+}
 
-    /// Get the number of fields that will be extracted.
+/// Validated extraction slots bound to one shared layout's identity.
+#[derive(Debug, Clone)]
+pub struct AdapterValidation {
+    layout: Arc<TelemetryLayout>,
+    extraction_plan: Box<[FieldExtraction]>,
+}
+impl AdapterValidation {
+    /// Retains the validated layout and declaration-ordered extraction plan.
+    ///
+    /// IDs must originate from this layout. Use `resolve` to validate type/shape.
+    pub fn new(layout: Arc<TelemetryLayout>, extraction_plan: Vec<FieldExtraction>) -> Self {
+        Self {
+            layout,
+            extraction_plan: extraction_plan.into_boxed_slice(),
+        }
+    }
+    /// Resolves and validates a field once, with diagnostics at validation time.
+    pub fn resolve<T: VarData>(
+        layout: &TelemetryLayout,
+        name: &str,
+        required: bool,
+    ) -> Result<Option<FieldId>> {
+        match layout.field_by_name(name) {
+            Some((id, field)) => match T::validate_field(field) {
+                Ok(()) => Ok(Some(id)),
+                Err(_) if !required => Ok(None),
+                Err(error) => Err(IRacingSDKError::parse_error(
+                    "Frame adapter validation",
+                    format!("Field '{name}' has incompatible telemetry type or shape: {error}"),
+                )),
+            },
+            None if !required => Ok(None),
+            None => Err(IRacingSDKError::parse_error(
+                "Frame adapter validation",
+                format!(
+                    "Critical field '{name}' is missing. Available fields: {}",
+                    layout
+                        .fields()
+                        .map(|(_, f)| f.name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            )),
+        }
+    }
+    /// Returns the retained layout.
+    pub fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
+    }
+    /// Returns immutable plan slots for diagnostics and testing.
+    pub fn extraction_plan(&self) -> &[FieldExtraction] {
+        &self.extraction_plan
+    }
+    /// Number of adapter slots, including calculated/skipped fields.
     pub fn field_count(&self) -> usize {
         self.extraction_plan.len()
     }
-
-    /// Check if the validation plan contains any required fields.
+    /// Whether a required slot exists.
     pub fn has_required_fields(&self) -> bool {
         self.extraction_plan
             .iter()
-            .any(|field| matches!(field, FieldExtraction::Required { .. }))
+            .any(FieldExtraction::is_required)
     }
-
-    /// Lookup the extraction index for a telemetry field name.
-    pub fn index_of(&self, name: &str) -> Option<usize> {
-        self.index_map.get(name).copied()
+    /// Rejects use with a different layout, even when its field geometry matches.
+    pub fn ensure_packet(&self, packet: &FramePacket) -> Result<()> {
+        if !Arc::ptr_eq(&self.layout, packet.layout()) {
+            return Err(IRacingSDKError::parse_error(
+                "AdapterValidation",
+                "Packet layout differs from validation layout",
+            ));
+        }
+        Ok(())
     }
-
-    /// Fetches a telemetry value by name using the adapter's extraction plan, falling back to the packet schema and ultimately the type default when unavailable.
-    ///
-    /// Attempts to decode the value using the precomputed extraction plan entry for `name` (if present) and its associated `VariableInfo`; if that fails, attempts to decode using `packet.schema.get_variable(name)`. If decoding succeeds returns the decoded value; otherwise returns `T::default()`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use iracing_sdk::{
-    ///     AdapterValidation, FieldExtraction, FramePacket, VariableInfo, VariableSchema,
-    ///     irsdk::VariableType,
-    /// };
-    /// use std::{collections::HashMap, sync::Arc};
-    ///
-    /// let speed_info = VariableInfo {
-    ///     name: "Speed".to_string(),
-    ///     data_type: VariableType::Float,
-    ///     offset: 0,
-    ///     count: 1,
-    ///     count_as_time: false,
-    ///     units: "m/s".to_string(),
-    ///     description: "Car speed".to_string(),
-    /// };
-    ///
-    /// let validation = AdapterValidation::new(vec![FieldExtraction::Required {
-    ///     name: "Speed".to_string(),
-    ///     var_info: speed_info.clone(),
-    /// }]);
-    /// let schema = VariableSchema::new(HashMap::from([("Speed".to_string(), speed_info)]), 4)?;
-    /// let packet = FramePacket::new(42.0f32.to_le_bytes().to_vec(), 0, 0, Arc::new(schema));
-    ///
-    /// let speed: f32 = validation.fetch_or_default(&packet, "Speed");
-    /// assert_eq!(speed, 42.0);
-    /// # Ok::<(), iracing_sdk::IRacingSDKError>(())
-    /// ```
-    pub fn fetch_or_default<T>(&self, packet: &crate::FramePacket, name: &str) -> T
-    where
-        T: crate::VarData + ::core::default::Default,
-    {
-        let data = packet.data.as_ref();
-
-        if let Some(index) = self.index_of(name)
-            && let Some(entry) = self.extraction_plan.get(index)
-            && let Some(var_info) = entry.var_info()
-            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
-        {
-            return value;
-        }
-
-        if let Some(var_info) = packet.schema.get_variable(name)
-            && let Ok(value) = <T as crate::VarData>::from_bytes(data, var_info)
-        {
-            return value;
-        }
-
-        T::default()
+    /// Decodes a declaration-ordered slot without name lookup or geometry recomputation.
+    pub fn decode<T: VarData>(&self, packet: &FramePacket, slot: usize) -> Result<Option<T>> {
+        self.ensure_packet(packet)?;
+        let entry = self.extraction_plan.get(slot).ok_or_else(|| {
+            IRacingSDKError::parse_error("AdapterValidation", "Invalid plan slot")
+        })?;
+        entry
+            .field_id()
+            .map(|id| {
+                let field = self.layout.field(id).ok_or_else(|| {
+                    IRacingSDKError::parse_error("AdapterValidation", "Invalid field ID")
+                })?;
+                T::decode_prevalidated(packet.data(), field)
+            })
+            .transpose()
+    }
+    /// Returns a type default for a missing or undecodable slot.
+    pub fn fetch_or_default<T: VarData + Default>(&self, packet: &FramePacket, slot: usize) -> T {
+        self.ensure_packet(packet).expect("adapter layout mismatch");
+        self.decode(packet, slot).ok().flatten().unwrap_or_default()
     }
 }
 
-/// Determine whether a schema variable is incompatible with a target `VarData` type.
-///
-/// This probes type compatibility by calling `<T as VarData>::from_bytes(&[], var_info)`,
-/// which performs type checks without requiring a real frame buffer.
-///
-/// # Returns
-///
-/// - `Ok(None)` if the variable can be mapped to `T` (including when the probe hits a memory/bounds condition).
-/// - `Ok(Some(details))` if the probe fails with a type-conversion error; `details` contains the diagnostic message.
-/// - `Err(err)` for any other error encountered while probing.
-///
-/// # Examples
-///
-/// ```no_run
-/// # use iracing_sdk::adapters::telemetry_type_mismatch_details;
-/// # use iracing_sdk::{VariableInfo, irsdk::VariableType};
-/// let var_info = VariableInfo {
-///     name: "Speed".to_string(),
-///     data_type: VariableType::Float,
-///     offset: 0,
-///     count: 1,
-///     count_as_time: false,
-///     units: "m/s".to_string(),
-///     description: "Car speed".to_string(),
-/// };
-/// let _ = telemetry_type_mismatch_details::<f32>(&var_info);
-/// ```
+/// Checks type/shape compatibility without probing an empty byte buffer.
 #[doc(hidden)]
-pub fn telemetry_type_mismatch_details<T>(var_info: &VariableInfo) -> crate::Result<Option<String>>
-where
-    T: crate::VarData,
-{
-    match <T as crate::VarData>::from_bytes(&[], var_info) {
-        Ok(_) | Err(IRacingSDKError::Memory { .. }) => Ok(None),
+pub fn telemetry_type_mismatch_details<T: VarData>(field: &FieldLayout) -> Result<Option<String>> {
+    match T::validate_field(field) {
+        Ok(()) => Ok(None),
         Err(IRacingSDKError::TypeConversion { details }) => Ok(Some(details)),
         Err(err) => Err(err),
-    }
-}
-
-/// Extraction strategy for a single adapter field.
-///
-/// Strategy is determined at connection time based on field annotations,
-/// field type (`Option<T>` vs `T`), and schema availability.
-#[derive(Debug, Clone)]
-pub enum FieldExtraction {
-    /// Required field that must exist in schema - connection fails if missing.
-    Required {
-        /// Field name in telemetry schema
-        name: String,
-        /// Variable metadata from schema
-        var_info: VariableInfo,
-    },
-
-    /// Optional field that may or may not exist in schema.
-    Optional {
-        /// Field name in telemetry schema
-        name: String,
-        /// Variable metadata if field exists, None if missing
-        var_info: Option<VariableInfo>,
-    },
-
-    /// Field with custom default value when missing from schema.
-    WithDefault {
-        /// Field name in telemetry schema
-        name: String,
-        /// Variable metadata if field exists, None if missing
-        var_info: Option<VariableInfo>,
-        /// Strategy used to produce the fallback value
-        default_value: DefaultValue,
-    },
-
-    /// Calculated field derived from other fields or expressions.
-    Calculated {
-        /// Expression to evaluate (e.g., "speed_mph * 1.60934")
-        expression: String,
-    },
-
-    /// Field to skip during extraction (application-managed).
-    Skipped,
-}
-
-impl FieldExtraction {
-    /// Get the telemetry field name if this extraction involves a telemetry field.
-    pub fn field_name(&self) -> Option<&str> {
-        match self {
-            FieldExtraction::Required { name, .. }
-            | FieldExtraction::Optional { name, .. }
-            | FieldExtraction::WithDefault { name, .. } => Some(name),
-            FieldExtraction::Calculated { .. } | FieldExtraction::Skipped => None,
-        }
-    }
-
-    /// Check if this field extraction requires the field to exist in the schema.
-    pub fn is_required(&self) -> bool {
-        matches!(self, FieldExtraction::Required { .. })
-    }
-
-    /// Get the variable info for this field if available.
-    pub fn var_info(&self) -> Option<&VariableInfo> {
-        match self {
-            FieldExtraction::Required { var_info, .. } => Some(var_info),
-            FieldExtraction::Optional { var_info, .. }
-            | FieldExtraction::WithDefault { var_info, .. } => var_info.as_ref(),
-            FieldExtraction::Calculated { .. } | FieldExtraction::Skipped => None,
-        }
-    }
-}
-
-/// Describes how a default value should be produced when telemetry data is unavailable.
-#[derive(Debug, Clone)]
-pub enum DefaultValue {
-    /// Use the `Default` implementation of the target field type.
-    TypeDefault,
-    /// Evaluate a user-provided expression supplied via `#[missing = "..."]`.
-    ExplicitExpression(String),
-}
-
-impl DefaultValue {
-    /// Human readable description of the defaulting strategy.
-    pub fn describe(&self) -> &'static str {
-        match self {
-            DefaultValue::TypeDefault => "type default",
-            DefaultValue::ExplicitExpression(_) => "explicit expression",
-        }
     }
 }

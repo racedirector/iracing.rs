@@ -6,8 +6,8 @@
 //! [`FrameAdapter`] so validation happens once and frame extraction stays cheap.
 
 use crate::{
-    BitField, FramePacket, Result, SchemaProvider, TelemetryValue, VarData, VariableInfo,
-    VariableSchema,
+    BitField, FieldLayout, FramePacket, LayoutProvider, Result, TelemetryLayout, TelemetryValue,
+    VarData,
     adapters::{AdapterValidation, FrameAdapter},
     types::telemetry_value::TelemetryValueProvider,
 };
@@ -18,15 +18,15 @@ use std::sync::Arc;
 pub struct DynamicFrame {
     data: Arc<[u8]>,
     tick_count: u32,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
 }
 
 impl DynamicFrame {
     /// Generic typed lookup by variable name.
     /// Returns None if the variable is missing or type conversion fails.
     pub fn get<T: VarData>(&self, name: &str) -> Option<T> {
-        let info = self.variable(name)?;
-        T::from_bytes(self.data.as_ref(), info).ok()
+        let info = self.field_named(name)?;
+        T::decode_field(self.data.as_ref(), info).ok()
     }
 
     /// Look up a variable as `f32`, or `None` if missing or the wrong type.
@@ -61,7 +61,7 @@ impl DynamicFrame {
 
     /// Retrieves the variable from the frame by name.
     pub fn value(&self, name: &str) -> Result<Option<TelemetryValue>> {
-        let Some(info) = self.variable(name) else {
+        let Some(info) = self.field_named(name) else {
             return Ok(None);
         };
 
@@ -69,29 +69,32 @@ impl DynamicFrame {
     }
 }
 
-impl SchemaProvider for DynamicFrame {
-    fn schema(&self) -> &VariableSchema {
-        &self.schema
+impl LayoutProvider for DynamicFrame {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 
 impl TelemetryValueProvider for DynamicFrame {
-    fn telemetry_value(&self, info: &VariableInfo) -> Result<TelemetryValue> {
-        TelemetryValue::decode(self.data.as_ref(), info)
+    fn telemetry_value(&self, info: &FieldLayout) -> Result<TelemetryValue> {
+        TelemetryValue::decode_field(self.data.as_ref(), info)
     }
 }
 
 impl FrameAdapter for DynamicFrame {
-    fn validate_schema(_schema: &VariableSchema) -> Result<AdapterValidation> {
+    fn validate_layout(layout: &Arc<TelemetryLayout>) -> Result<AdapterValidation> {
         // No pre-validation or extraction plan needed for dynamic lookups
-        Ok(AdapterValidation::new(Vec::new()))
+        Ok(AdapterValidation::new(Arc::clone(layout), Vec::new()))
     }
 
-    fn adapt(packet: &FramePacket, _validation: &AdapterValidation) -> Self {
+    fn adapt(packet: &FramePacket, validation: &AdapterValidation) -> Self {
+        validation
+            .ensure_packet(packet)
+            .expect("adapter layout mismatch");
         Self {
-            data: Arc::clone(&packet.data),
+            data: Arc::clone(packet.data()),
             tick_count: packet.tick,
-            schema: Arc::clone(&packet.schema),
+            layout: Arc::clone(packet.layout()),
         }
     }
 }
@@ -99,53 +102,50 @@ impl FrameAdapter for DynamicFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VariableInfo, VariableSchema, irsdk::VariableType};
+    use crate::irsdk::VariableType;
     use std::collections::HashMap;
 
     #[test]
     fn dynamic_frame_basic_lookup() {
-        // Build minimal schema
+        // Build minimal layout
         let mut vars = HashMap::new();
         vars.insert(
             "RPM".to_string(),
-            VariableInfo {
-                name: "RPM".into(),
-                data_type: VariableType::Integer,
-                offset: 0,
-                count: 1,
-                count_as_time: false,
-                units: "rev/min".into(),
-                description: "Engine RPM".into(),
-            },
+            crate::test_utils::field(
+                "RPM".into(),
+                VariableType::Integer,
+                0,
+                1,
+                false,
+                "rev/min".into(),
+                "Engine RPM".into(),
+            ),
         );
         vars.insert(
             "Speed".to_string(),
-            VariableInfo {
-                name: "Speed".into(),
-                data_type: VariableType::Float,
-                offset: 4,
-                count: 1,
-                count_as_time: false,
-                units: "m/s".into(),
-                description: "Vehicle speed".into(),
-            },
+            crate::test_utils::field(
+                "Speed".into(),
+                VariableType::Float,
+                4,
+                1,
+                false,
+                "m/s".into(),
+                "Vehicle speed".into(),
+            ),
         );
         vars.insert(
             "CarIdxLapDistPct".to_string(),
-            VariableInfo {
-                name: "CarIdxLapDistPct".into(),
-                data_type: VariableType::Float,
-                offset: 8,
-                count: 4,
-                count_as_time: false,
-                units: "%".into(),
-                description: "Per-car lap distance percentage".into(),
-            },
+            crate::test_utils::field(
+                "CarIdxLapDistPct".into(),
+                VariableType::Float,
+                8,
+                4,
+                false,
+                "%".into(),
+                "Per-car lap distance percentage".into(),
+            ),
         );
-        let schema = VariableSchema {
-            variables: vars,
-            frame_size: 24,
-        };
+        let layout = crate::test_utils::layout((vars).into_values(), 24).unwrap();
 
         // Build frame bytes (Int32 + Float32 + four Float32 array elements)
         let mut data = vec![0u8; 24];
@@ -157,14 +157,17 @@ mod tests {
             data[start..start + 4].copy_from_slice(&value.to_le_bytes());
         }
 
-        let packet = FramePacket::new(data, 10, 0, Arc::new(schema));
-        let df = DynamicFrame::adapt(&packet, &AdapterValidation::new(vec![]));
+        let packet = FramePacket::new(data, 10, 0, Arc::new(layout)).unwrap();
+        let df = DynamicFrame::adapt(
+            &packet,
+            &DynamicFrame::validate_layout(packet.layout()).unwrap(),
+        );
 
-        assert!(std::ptr::eq(df.schema(), packet.schema.as_ref()));
-        assert!(df.has_variable("RPM"));
-        assert!(!df.has_variable("Missing"));
+        assert!(Arc::ptr_eq(df.layout(), packet.layout()));
+        assert!(df.has_field("RPM"));
+        assert!(!df.has_field("Missing"));
 
-        let rpm_info = df.variable("RPM").unwrap();
+        let rpm_info = df.field_named("RPM").unwrap();
         assert_eq!(
             df.telemetry_value(rpm_info).unwrap(),
             TelemetryValue::Int32(1234)

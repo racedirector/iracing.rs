@@ -1,4 +1,4 @@
-//! Integration between wire-contract values and telemetry schema decoding.
+//! Integration between wire-contract values and telemetry layout decoding.
 
 use iracing_irsdk::{
     BitField, BroadcastMessage, CameraState, CameraSwitchFocusMode, CarLeftRight, ChatCommandMode,
@@ -8,25 +8,34 @@ use iracing_irsdk::{
     TrackWetness, VideoCaptureMode,
 };
 
-use crate::{IRacingSDKError, VarData, VariableInfo};
-
-macro_rules! impl_enum_var_data {
-    ($($type:ty),+ $(,)?) => {$ (
-        impl VarData for $type {
-            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                let raw = <i32 as VarData>::from_bytes(data, info)?;
-                Self::try_from(raw).map_err(|raw| {
-                    IRacingSDKError::parse_error(
-                        concat!("unknown ", stringify!($type), " value"),
-                        raw.to_string(),
-                    )
-                })
+use crate::{FieldLayout, IRacingSDKError, TelemetryElement, VarData};
+use iracing_irsdk::VariableType;
+macro_rules! scalar_domain {
+    ($type:ty, $raw:ty, $convert:expr) => {
+        impl TelemetryElement for $type {
+            fn accepts(storage: VariableType) -> bool {
+                <$raw as TelemetryElement>::accepts(storage)
+            }
+            fn decode_element(bytes: &[u8]) -> crate::Result<Self> {
+                ($convert)(<$raw as TelemetryElement>::decode_element(bytes)?)
             }
         }
+        impl VarData for $type {
+            fn validate_field(field: &FieldLayout) -> crate::Result<()> {
+                <$raw as VarData>::validate_field(field)
+            }
+            fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> crate::Result<Self> {
+                Self::decode_element(crate::types::field_data::field_bytes(frame, field)?)
+            }
+        }
+    };
+}
+macro_rules! enums {
+    ($($type:ty),+ $(,)?) => {$ (
+        scalar_domain!($type,i32,|raw| Self::try_from(raw).map_err(|raw:i32| IRacingSDKError::parse_error(concat!("unknown ", stringify!($type), " value"),raw.to_string())));
     )+};
 }
-
-impl_enum_var_data!(
+enums!(
     BroadcastMessage,
     CameraSwitchFocusMode,
     CarLeftRight,
@@ -44,69 +53,62 @@ impl_enum_var_data!(
     TrackLocation,
     TrackSurface,
     TrackWetness,
-    VideoCaptureMode,
+    VideoCaptureMode
 );
-
-macro_rules! impl_bitmask_var_data {
-    ($($type:ty),+ $(,)?) => {$ (
-        impl VarData for $type {
-            fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-                if info.data_type != iracing_irsdk::VariableType::BitField {
-                    return Err(IRacingSDKError::type_conversion("BitField", info.data_type));
-                }
-
-                <BitField as VarData>::from_bytes(data, info).map(Self::from)
-            }
-        }
-    )+};
+macro_rules! masks {
+    ($($type:ty),+ $(,)?) => {$ (scalar_domain!($type,BitField,|raw| Ok(Self::from(raw)));)+};
 }
-
-impl_bitmask_var_data!(
+masks!(
     CameraState,
     EngineWarnings,
     PaceFlags,
     PitServiceFlags,
-    SessionFlags,
+    SessionFlags
 );
-
-impl VarData for IncidentFlags {
-    fn from_bytes(data: &[u8], info: &VariableInfo) -> crate::Result<Self> {
-        match info.data_type {
-            iracing_irsdk::VariableType::BitField => {
-                <BitField as VarData>::from_bytes(data, info).map(Self::from)
-            }
-            iracing_irsdk::VariableType::Integer => {
-                <i32 as VarData>::from_bytes(data, info).map(|value| Self::from(value as u32))
-            }
-            actual => Err(IRacingSDKError::type_conversion(
-                "BitField or Int32",
-                actual,
-            )),
-        }
+impl TelemetryElement for IncidentFlags {
+    fn accepts(storage: VariableType) -> bool {
+        matches!(storage, VariableType::Integer | VariableType::BitField)
+    }
+    fn decode_element(bytes: &[u8]) -> crate::Result<Self> {
+        BitField::decode_element(bytes).map(Self::from)
     }
 }
-
+impl VarData for IncidentFlags {
+    fn validate_field(field: &FieldLayout) -> crate::Result<()> {
+        if Self::accepts(field.data_type()) && field.count() == 1 {
+            Ok(())
+        } else {
+            Err(IRacingSDKError::type_conversion(
+                "scalar BitField or Integer",
+                field.data_type(),
+            ))
+        }
+    }
+    fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> crate::Result<Self> {
+        Self::decode_element(crate::types::field_data::field_bytes(frame, field)?)
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use iracing_irsdk::VariableType;
 
-    fn variable_info(data_type: VariableType) -> VariableInfo {
-        VariableInfo {
-            name: "test".to_owned(),
+    fn variable_info(data_type: VariableType) -> FieldLayout {
+        crate::test_utils::field(
+            "test".to_owned(),
             data_type,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: String::new(),
-            description: String::new(),
-        }
+            0,
+            1,
+            false,
+            String::new(),
+            String::new(),
+        )
     }
 
     #[test]
     fn enum_and_bitmask_wire_types_still_decode_through_var_data() {
         assert_eq!(
-            SessionState::from_bytes(
+            SessionState::decode_field(
                 &i32::from(SessionState::Racing).to_le_bytes(),
                 &variable_info(VariableType::Integer),
             )
@@ -114,7 +116,7 @@ mod tests {
             SessionState::Racing
         );
         assert_eq!(
-            SessionFlags::from_bytes(
+            SessionFlags::decode_field(
                 &SessionFlags::GREEN.bits().to_le_bytes(),
                 &variable_info(VariableType::BitField),
             )
@@ -128,7 +130,7 @@ mod tests {
         const RAW: u32 = 0x8000_0408;
         for data_type in [VariableType::BitField, VariableType::Integer] {
             let decoded =
-                IncidentFlags::from_bytes(&RAW.to_le_bytes(), &variable_info(data_type)).unwrap();
+                IncidentFlags::decode_field(&RAW.to_le_bytes(), &variable_info(data_type)).unwrap();
             assert_eq!(decoded.bits(), RAW);
         }
     }

@@ -79,6 +79,12 @@ impl Serialize for VariableHeaders {
     }
 }
 
+impl From<Vec<VariableHeader>> for VariableHeaders {
+    fn from(headers: Vec<VariableHeader>) -> Self {
+        Self(headers.into_boxed_slice())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

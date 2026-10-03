@@ -10,15 +10,15 @@
 ## Key APIs & Layout
 
 - Mapped IBT recordings must remain unchanged until the reader/provider/connection is dropped. Never mutate or truncate a live mapped test fixture; inject short reads through owned test sources instead.
-- `ibt/`: `IbtReader` provides indexed raw frame reads and fresh metadata snapshots. `IbtProvider` owns schema validation and sequential replay starting at frame zero; rely on `VariableSchema` and `VariableInfo` instead of re-parsing frame bytes.
+- `ibt/`: `IbtReader` provides indexed raw frame reads and fresh metadata snapshots. `IbtProvider` owns schema validation and sequential replay starting at frame zero; rely on `TelemetryLayout` and `FieldLayout` instead of re-parsing frame bytes.
 - `types/ibt/`: `IbtLayout` is the canonical physical IBT description, validated from `Header` and source length without I/O. Use its source-length, fixed-region, metadata, and frame accessors for runtime access and inspection; do not recalculate geometry in tooling. `MetadataRegions` lives in `types/regions/`; `IbtReader` delegates all geometry to the layout. The reader has no schema, session cache, or logical replay cursor. Provider construction rejects frames without variable headers but accepts empty recordings without metadata. Source lengths must fit `usize` (4 GiB files are rejected on 32-bit targets).
-- `types/`: `VariableSchema`, `VariableInfo`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::from_bytes` (little-endian) rather than manual slicing.
+- `types/`: `TelemetryLayout`, `FieldLayout`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::decode_field` (little-endian) rather than manual slicing.
 - `schema/session/`: `SessionInfo::parse` deserializes decoded session YAML; the live telemetry session policy tracks `session_version`, while IBT parses its session once.
-- Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `VariableSchema` for variable metadata.
+- Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `TelemetryLayout` for variable metadata.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML.
 - `connections/`: higher-level `IbtConnection` and `LiveConnection` subscription APIs. `IbtConnection` coordinates one shared cursor across acknowledged subscribers; `LiveConnection` exposes watch-backed latest snapshots.
 - `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.
-- `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `DefaultValue`, and `SchemaProvider` support typed per-frame extraction.
+- `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `LayoutProvider` support typed per-frame extraction.
 - Live activation must validate the full fixed header before unchecked scalar reads. Preserve event ownership in blocking workers after async cancellation; private mapping/event tests run on Windows without the simulator.
 - `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code, and broadcast helpers. Keep everything behind `#[cfg(windows)]`.
 - `../iracing-sdk-cli/src/`: consolidated CLI; session schemas and discovery enable the SDK features through its dependency. Standalone variable, primitive, and car-setup generators are deferred.
@@ -28,7 +28,7 @@
 - `SessionInfoBuffer` bounds and decodes captured session bytes; `IRacingSessionString` removes invalid control characters before parsing. Keep that cleanup in the source path.
 
 - Use the re-exported `irsdk::VariableType` for telemetry metadata. Reject `ElementTypeCount` at input boundaries and use checked SDK byte widths; do not introduce synthetic integer storage kinds.
-- `TelemetryLayout::try_from_headers` is the runtime-layout foundation. It owns published-order `FieldLayout` records and layout-local `FieldId` lookup; geometry lives only in the copyable `VariableRegion`. Preserve authoritative header order and accept bounded overlapping fields. `FieldData` provides field-based scalar/array decoding; current providers/adapters still use the legacy schema until their separate migration.
+- `TelemetryLayout::try_from_headers` is the runtime-layout foundation. It owns published-order `FieldLayout` records and layout-local `FieldId` lookup; geometry lives only in the copyable `VariableRegion`. Preserve authoritative header order and accept bounded overlapping fields. `VarData` provides field-based scalar/array decoding. Providers and packets retain the shared layout; adapter slots retain only layout-local IDs.
 
 ## Platform & Feature Guardrails
 

@@ -65,7 +65,7 @@ Owns the `IRacingTelemetryFrame` procedural macro. It converts field attributes
 into a two-phase `FrameAdapter` implementation:
 
 1. validate field names/types and build an extraction plan once;
-2. adapt each frame using pre-resolved `VariableInfo`.
+2. adapt each frame using pre-resolved `FieldId` slots.
 
 Generated code refers to the public `iracing_sdk` path. The SDK re-exports the
 macro behind its default `derive` feature and provides a hidden tracing re-export

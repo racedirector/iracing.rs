@@ -83,7 +83,7 @@ fn outputs() -> Result<Vec<(&'static str, String)>> {
         ),
         (
             "variable-schema.yml",
-            serde_json::to_value(schema_for!(iracing_sdk::VariableInfo))?,
+            serde_json::to_value(schema_for!(crate::reference_variable::ReferenceVariable))?,
         ),
         (
             "primitives-schema.yml",

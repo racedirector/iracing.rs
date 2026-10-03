@@ -7,7 +7,7 @@
 //! This CLI utility:
 //!
 //! 1. Opens an iRacing IBT telemetry file
-//! 2. Resolves required telemetry variables from the file schema
+//! 2. Resolves required telemetry variables from the file layout
 //! 3. Iterates through all telemetry frames
 //! 4. Extracts positional and pit-state fields
 //! 5. Serializes them to a CSV file
@@ -45,7 +45,7 @@ use clap::Parser;
 use csv::Writer;
 use futures::executor::block_on;
 use iracing_sdk::provider::Provider;
-use iracing_sdk::{SchemaProvider, providers::ibt::IbtProvider, types::VarData};
+use iracing_sdk::{LayoutProvider, providers::ibt::IbtProvider, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -66,7 +66,7 @@ struct Args {
 
 /// CSV row representation of positional telemetry.
 ///
-/// This struct defines the output schema written per frame.
+/// This struct defines the output layout written per frame.
 #[derive(serde::Serialize)]
 struct Row {
     /// Distance traveled around the lap (meters).
@@ -98,7 +98,7 @@ struct Row {
 /// 1. Initialize logging
 /// 2. Parse CLI arguments
 /// 3. Open IBT reader
-/// 4. Resolve required schema variables
+/// 4. Resolve required layout variables
 /// 5. Iterate frames
 /// 6. Serialize CSV rows
 fn main() -> Result<()> {
@@ -125,35 +125,48 @@ fn main() -> Result<()> {
     let mut reader = IbtProvider::open(&ibt_path).expect("Failed to open IBT file");
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    tracing::info!("Resolving telemetry schema");
+    tracing::info!("Resolving telemetry layout");
 
-    // Clone the schema once to avoid repeated lookups.
-    let schema = reader.schema().clone();
+    // Clone the layout once to avoid repeated lookups.
+    let layout = reader.layout().clone();
 
     // ------------------------------------------------------------
     // Resolve required variable metadata
     // ------------------------------------------------------------
-    let lap_distance_meters_info = schema
-        .get_variable("LapDist")
-        .expect("No `LapDist` in schema");
+    let lap_distance_meters_info = layout
+        .field_by_name("LapDist")
+        .map(|(_, field)| field)
+        .expect("No `LapDist` in layout");
 
-    let lap_distance_percentage_info = schema
-        .get_variable("LapDistPct")
-        .expect("No `LapDistPct` in schema");
+    let lap_distance_percentage_info = layout
+        .field_by_name("LapDistPct")
+        .map(|(_, field)| field)
+        .expect("No `LapDistPct` in layout");
 
-    let latitude_info = schema.get_variable("Lat").expect("No `Lat` in schema");
+    let latitude_info = layout
+        .field_by_name("Lat")
+        .map(|(_, field)| field)
+        .expect("No `Lat` in layout");
 
-    let longitude_info = schema.get_variable("Lon").expect("No `Lon` in schema");
+    let longitude_info = layout
+        .field_by_name("Lon")
+        .map(|(_, field)| field)
+        .expect("No `Lon` in layout");
 
-    let altitude_info = schema.get_variable("Alt").expect("No `Alt` in schema");
+    let altitude_info = layout
+        .field_by_name("Alt")
+        .map(|(_, field)| field)
+        .expect("No `Alt` in layout");
 
-    let is_on_pit_road_info = schema
-        .get_variable("OnPitRoad")
-        .expect("No `OnPitRoad` in schema");
+    let is_on_pit_road_info = layout
+        .field_by_name("OnPitRoad")
+        .map(|(_, field)| field)
+        .expect("No `OnPitRoad` in layout");
 
-    let is_in_pit_box_info = schema
-        .get_variable("PlayerCarInPitStall")
-        .expect("No `PlayerCarInPitStall` in schema");
+    let is_in_pit_box_info = layout
+        .field_by_name("PlayerCarInPitStall")
+        .map(|(_, field)| field)
+        .expect("No `PlayerCarInPitStall` in layout");
 
     tracing::info!("Beginning frame iteration");
 
@@ -169,21 +182,22 @@ fn main() -> Result<()> {
     // - Ok(Some(...))=> next frame
     //
     while let Some(packet) = block_on(reader.next_frame())? {
-        let data = packet.data;
+        let data = packet.data();
         // Extract strongly-typed values from raw frame bytes.
-        let lap_distance_meters = f32::from_bytes(&data, lap_distance_meters_info).unwrap();
+        let lap_distance_meters = f32::decode_field(data, lap_distance_meters_info).unwrap();
 
-        let lap_distance_percentage = f32::from_bytes(&data, lap_distance_percentage_info).unwrap();
+        let lap_distance_percentage =
+            f32::decode_field(data, lap_distance_percentage_info).unwrap();
 
-        let latitude = f64::from_bytes(&data, latitude_info).unwrap();
+        let latitude = f64::decode_field(data, latitude_info).unwrap();
 
-        let longitude = f64::from_bytes(&data, longitude_info).unwrap();
+        let longitude = f64::decode_field(data, longitude_info).unwrap();
 
-        let altitude = f32::from_bytes(&data, altitude_info).unwrap();
+        let altitude = f32::decode_field(data, altitude_info).unwrap();
 
-        let is_on_pit_road = bool::from_bytes(&data, is_on_pit_road_info).unwrap();
+        let is_on_pit_road = bool::decode_field(data, is_on_pit_road_info).unwrap();
 
-        let is_in_pit_box = bool::from_bytes(&data, is_in_pit_box_info).unwrap();
+        let is_in_pit_box = bool::decode_field(data, is_in_pit_box_info).unwrap();
 
         // Serialize row to CSV.
         writer.serialize(Row {

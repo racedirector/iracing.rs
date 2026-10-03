@@ -49,14 +49,14 @@ cursor. There is no reader-owned logical cursor, schema, or session cache. Live
 `WindowsConnection` interprets the related shared-memory header and rotating
 buffers.
 
-`VariableSchema` maps names to `VariableInfo` and records the frame size. A
-`VariableInfo` carries type, byte offset, element count, time-count marker,
-units, and description. Schema construction is the boundary at which ranges
-should be validated.
+`TelemetryLayout` retains header publication order, a name-to-`FieldId` index,
+and the authoritative frame size. Each `FieldLayout` owns type and descriptive
+metadata while its `VariableRegion` is the sole source of field geometry.
+Construction validates the complete field extent against the frame size.
 
-Telemetry is little-endian. `VarData::from_bytes` and `TelemetryValue::decode`
-are the authoritative decoding paths; consumers should not reproduce byte
-slicing or discriminant handling.
+Telemetry is little-endian. `VarData::decode_field` and
+`TelemetryValue::decode_field` slice one bounded region and decode scalar values
+or arrays from that relative slice. Consumers should use these paths.
 
 ### Windows source ownership and validation
 
@@ -85,7 +85,7 @@ Providers return `FramePacket`, the common data unit:
 - owned, reference-counted frame bytes (`Arc<[u8]>`);
 - monotonic source tick;
 - session version;
-- shared `VariableSchema`.
+- shared `Arc<TelemetryLayout>`.
 
 The packet can decode a named value directly. `DynamicFrame` wraps the same
 bytes and schema for exploratory name-based lookup. Hot paths should implement
@@ -281,7 +281,7 @@ to copy into new fallible boundaries.
 
 `FrameAdapter` has a deliberate two-phase contract:
 
-1. `validate_schema` maps requested fields to `VariableInfo` and returns
+1. `validate_layout` resolves requested names, types, and shapes to `FieldId` slots and returns
    `AdapterValidation`;
 2. `adapt` decodes each `FramePacket` using that precomputed plan.
 
@@ -291,8 +291,9 @@ skipped strategies. The derive crate generates this plan from
 
 Invariants:
 
-- required schema mismatches fail during validation;
-- per-frame adaptation should avoid schema hash-map lookup;
+- required layout mismatches fail during validation;
+- per-frame adaptation uses positional IDs without name lookup or metadata cloning;
+- validation retains the originating layout and rejects different packet layouts;
 - decoding goes through `VarData`;
 - `DynamicFrame` is for flexibility, not the default hot-path design.
 

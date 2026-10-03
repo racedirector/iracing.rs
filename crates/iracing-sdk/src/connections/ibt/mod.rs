@@ -16,7 +16,7 @@ use tokio_stream::wrappers::WatchStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    FrameAdapter, FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    FrameAdapter, FramePacket, IRacingSDKError, LayoutProvider, Result, TelemetryLayout,
     provider::Provider, providers::ibt::IbtProvider, schema::SessionInfo, telemetry::Telemetry,
 };
 use coordinator::ReplayControl;
@@ -36,8 +36,8 @@ pub struct IbtConnection {
     /// Monotonic subscriber identifier allocator
     next_subscriber_id: AtomicU64,
 
-    /// Variable schema
-    schema: Arc<VariableSchema>,
+    /// Variable layout
+    layout: Arc<TelemetryLayout>,
 
     /// Source frequency
     source_hz: f64,
@@ -53,15 +53,15 @@ impl IbtConnection {
     }
 
     async fn from_provider(provider: IbtProvider) -> Result<Self> {
-        let schema = provider.shared_schema();
+        let layout = provider.shared_layout();
         let source_hz = provider.tick_rate();
 
-        Self::from_provider_parts(provider, schema, source_hz).await
+        Self::from_provider_parts(provider, layout, source_hz).await
     }
 
     async fn from_provider_parts<P>(
         provider: P,
-        schema: Arc<VariableSchema>,
+        layout: Arc<TelemetryLayout>,
         source_hz: f64,
     ) -> Result<Self>
     where
@@ -79,7 +79,7 @@ impl IbtConnection {
             sessions: channels.sessions,
             controls,
             next_subscriber_id: AtomicU64::new(0),
-            schema,
+            layout,
             source_hz,
             cancel: channels.cancel,
         })
@@ -99,7 +99,7 @@ impl IbtConnection {
     where
         T: FrameAdapter + Send + 'static,
     {
-        let validation = T::validate_schema(&self.schema)?;
+        let validation = T::validate_layout(&self.layout)?;
         let subscriber_id = self.next_subscriber_id.fetch_add(1, Ordering::Relaxed);
 
         let _ = self.controls.send(ReplayControl::Join { subscriber_id });
@@ -143,9 +143,9 @@ impl IbtConnection {
     }
 }
 
-impl SchemaProvider for IbtConnection {
-    fn schema(&self) -> &VariableSchema {
-        self.schema.as_ref()
+impl LayoutProvider for IbtConnection {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 
@@ -164,7 +164,6 @@ mod tests {
     use crate::{DynamicFrame, IRacingSDKError};
     use futures::StreamExt;
     use std::{
-        collections::HashMap,
         future::pending,
         time::{Duration, Instant},
     };
@@ -182,10 +181,10 @@ mod tests {
         Ok(data)
     }
 
-    fn empty_schema() -> Arc<VariableSchema> {
+    fn empty_schema() -> Arc<TelemetryLayout> {
         Arc::new(
-            VariableSchema::new(HashMap::new(), 0)
-                .expect("an empty schema should be valid for lifecycle tests"),
+            crate::test_utils::layout([], 1)
+                .expect("an empty layout should be valid for lifecycle tests"),
         )
     }
 
@@ -227,7 +226,7 @@ mod tests {
         next_tick: u32,
         frame_count: u32,
         reads: mpsc::UnboundedSender<Option<u32>>,
-        schema: Arc<VariableSchema>,
+        layout: Arc<TelemetryLayout>,
     }
 
     struct ControlledProvider {
@@ -263,12 +262,9 @@ mod tests {
             self.next_tick += 1;
             let _ = self.reads.send(Some(tick));
 
-            Ok(Some(FramePacket::new(
-                Vec::new(),
-                tick,
-                0,
-                Arc::clone(&self.schema),
-            )))
+            Ok(Some(
+                FramePacket::new(vec![0], tick, 0, Arc::clone(&self.layout)).unwrap(),
+            ))
         }
 
         async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
@@ -283,15 +279,15 @@ mod tests {
     async fn tracking_connection(
         frame_count: u32,
     ) -> Result<(IbtConnection, mpsc::UnboundedReceiver<Option<u32>>)> {
-        let schema = empty_schema();
+        let layout = empty_schema();
         let (reads, observed_reads) = mpsc::unbounded_channel();
         let provider = TrackingProvider {
             next_tick: 0,
             frame_count,
             reads,
-            schema: Arc::clone(&schema),
+            layout: Arc::clone(&layout),
         };
-        let connection = IbtConnection::from_provider_parts(provider, schema, 60.0).await?;
+        let connection = IbtConnection::from_provider_parts(provider, layout, 60.0).await?;
 
         Ok((connection, observed_reads))
     }
@@ -546,7 +542,7 @@ mod tests {
 
     #[tokio::test]
     async fn dropping_all_subscribers_during_a_read_retains_its_response() -> Result<()> {
-        let schema = empty_schema();
+        let layout = empty_schema();
         let (source, source_frames) = mpsc::channel(1);
         let (reads, mut observed_reads) = mpsc::unbounded_channel();
         let provider = ControlledProvider {
@@ -554,7 +550,7 @@ mod tests {
             reads,
         };
         let connection =
-            IbtConnection::from_provider_parts(provider, Arc::clone(&schema), 60.0).await?;
+            IbtConnection::from_provider_parts(provider, Arc::clone(&layout), 60.0).await?;
         let first = connection.subscribe::<DynamicFrame>();
         connection.start()?;
 
@@ -565,7 +561,7 @@ mod tests {
         drop(first);
 
         source
-            .send(FramePacket::new(Vec::new(), 0, 0, Arc::clone(&schema)))
+            .send(FramePacket::new(vec![0], 0, 0, Arc::clone(&layout)).unwrap())
             .await
             .expect("the in-flight provider read should remain connected");
 
@@ -612,7 +608,7 @@ mod tests {
             .expect("the provider should report its second read");
 
         source
-            .send(FramePacket::new(Vec::new(), 1, 0, schema))
+            .send(FramePacket::new(vec![0], 1, 0, layout).unwrap())
             .await
             .expect("the resumed provider read should remain connected");
         assert_eq!(
