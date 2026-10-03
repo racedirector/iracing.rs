@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-03",
+  "commit": "6d4a6cec2dbf77f3add8556f20a162d4362e97c8",
+  "build_identity": {
+    "rustc": "1.88.0 (6b00bc388 2025-06-23)",
+    "rustc_commit": "6b00bc3880198600130e1cf62b8f8a93494488cc",
+    "llvm": "20.1.5",
+    "cargo": "1.88.0 (873a06493 2025-05-10)",
+    "cargo_codspeed": "5.0.2",
+    "codspeed_action": "373d6868929f444bc08d901fd0eb0ad52a8875ea",
+    "codspeed_runner": "5.2.1",
+    "target": "x86_64-unknown-linux-gnu",
+    "profile": "bench",
+    "features": [
+      "default",
+      "benchmark"
+    ],
+    "mode": "simulation",
+    "cargo_lock_sha256": "5190700d43d3bd0d49f7e5ac498e1de028204a12c99b10cecbd725bf550ff0d9"
+  },
+  "metrics": {
+    "primary": "CodSpeed displayed simulated duration, converted to ns",
+    "instructions": "unavailable in the inspected public result views and retained job logs",
+    "l1_misses": "unavailable in the inspected public result views and retained job logs",
+    "last_level_misses": "unavailable in the inspected public result views and retained job logs",
+    "environment_compatibility": "no repository-consumable full classification; not inferred from runner labels",
+    "profiles": "per-case CPU profiles available on linked CodSpeed run pages"
+  },
+  "runs": [
+    {
+      "id": "A1",
+      "github_run": 37142209362,
+      "attempt": 1,
+      "codspeed_run": "6ac141795a7c12fc841dd1b6",
+      "note": "Display transcribed before rerun. CodSpeed page now shows A2; GitHub attempt 1 retains build provenance."
+    },
+    {
+      "id": "B",
+      "github_run": 37142235307,
+      "attempt": 1,
+      "codspeed_run": "6ac1418ad7c76c0a90c6bc94"
+    },
+    {
+      "id": "A2",
+      "github_run": 37142209362,
+      "attempt": 2,
+      "codspeed_run": "6ac141795a7c12fc841dd1b6"
+    },
+    {
+      "id": "C",
+      "github_run": 37142520863,
+      "attempt": 1,
+      "codspeed_run": "6ac14303f4eddb2aa0ba40bb"
+    },
+    {
+      "id": "D",
+      "github_run": 37142728248,
+      "attempt": 1,
+      "codspeed_run": "6ac1437484a65ad720526844"
+    }
+  ],
+  "limitations": [
+    "Small exploratory hosted-run sample, not a universal noise bound or confidence interval.",
+    "Primary values are rounded public UI values, not raw CodSpeed numeric exports.",
+    "PR merge measurements and earlier pilot revisions are excluded.",
+    "Build identity was checked in each recorded attempt's job logs; runtime compatibility remains separately unresolved."
+  ],
+  "cases": [
+    {
+      "id": "derived_adapters/large_frame[47_fields]",
+      "duration_ns": [
+        23300,
+        23400,
+        23400,
+        23500,
+        23200
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "derived_adapters/medium_frame[20_fields]",
+      "duration_ns": [
+        9900,
+        9900,
+        9900,
+        10000,
+        9900
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "derived_adapters/small_frame[5_fields]",
+      "duration_ns": [
+        2900,
+        2900,
+        2900,
+        2900,
+        2800
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "dynamic_frame/adapt",
+      "duration_ns": [
+        719.6,
+        719.6,
+        719.6,
+        719.6,
+        719.6
+      ],
+      "display_unit": "ns",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "dynamic_frame/array_hit_72",
+      "duration_ns": [
+        11900,
+        11900,
+        11900,
+        11900,
+        11900
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "dynamic_frame/scalar_hit",
+      "duration_ns": [
+        3000,
+        3000,
+        3000,
+        3000,
+        3000
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "aggregate_full_frame/representative_consumer/fresh_outputs_47_fields_3_arrays",
+      "duration_ns": [
+        44100,
+        44200,
+        44200,
+        43900,
+        44000
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "aggregate_full_frame/telemetry_value_all/fresh_outputs",
+      "duration_ns": [
+        315900,
+        315300,
+        315900,
+        316000,
+        315600
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "aggregate_full_frame/telemetry_value_scalars/fresh_outputs",
+      "duration_ns": [
+        59200,
+        59000,
+        59100,
+        59500,
+        59800
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "array_extraction/bool_array[72]",
+      "duration_ns": [
+        8700,
+        8600,
+        8700,
+        8700,
+        8700
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "array_extraction/f32_array[72]",
+      "duration_ns": [
+        9900,
+        9700,
+        9900,
+        9700,
+        9800
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "array_extraction/i32_array[72]",
+      "duration_ns": [
+        9600,
+        9500,
+        9500,
+        9600,
+        9700
+      ],
+      "display_unit": "us",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "scalar_extraction/bool_driver_marker",
+      "duration_ns": [
+        693.7,
+        693.7,
+        693.7,
+        747.9,
+        693.7
+      ],
+      "display_unit": "ns",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "scalar_extraction/f32_speed",
+      "duration_ns": [
+        638.8,
+        638.8,
+        638.8,
+        638.8,
+        693
+      ],
+      "display_unit": "ns",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "scalar_extraction/f64_session_time",
+      "duration_ns": [
+        527.8,
+        582,
+        527.8,
+        527.8,
+        527.8
+      ],
+      "display_unit": "ns",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    },
+    {
+      "id": "scalar_extraction/i32_gear",
+      "duration_ns": [
+        693.9,
+        693.9,
+        693.9,
+        693.9,
+        693.9
+      ],
+      "display_unit": "ns",
+      "display_note": "UI strips trailing zeroes; primary values retained at displayed precision"
+    }
+  ],
+  "diagnostic_profile": {
+    "run": "B",
+    "case": "scalar_extraction/f64_session_time",
+    "observed_percent": {
+      "black_box<&[u8]>": 20.32,
+      "f64::from_bytes": 69.49,
+      "get<u8>": 9.58
+    },
+    "note": "Function-origin view; percentages do not establish instruction counts or cache causes."
+  }
+}
