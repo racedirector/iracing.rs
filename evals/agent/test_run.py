@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('agent_run', Path(__file__).with_name('run.py'))
 runner = importlib.util.module_from_spec(spec)
@@ -61,6 +62,65 @@ class CorpusTests(unittest.TestCase):
             runner.write(path / 'judgments.json', judgments)
             with self.assertRaisesRegex(ValueError, 'unadjudicated'):
                 runner.score(path)
+
+    def completed_run(self, path, condition='baseline'):
+        runner.prepare(SimpleNamespace(run=path, condition=condition, model='model', tools='tools'))
+        judgments = runner.read(path / 'judgments.json')
+        for ident, value in judgments.items():
+            (path / 'responses' / (ident + '.md')).write_text('Synthetic response')
+            for item in value['atoms'].values():
+                item.update({'pass': True, 'evidence': 'Synthetic evidence'})
+            for item in value['hard_failures'].values():
+                item.update(triggered=False, evidence='Synthetic evidence')
+        runner.write(path / 'judgments.json', judgments)
+
+    def test_copied_skill_integrity(self):
+        condition = next((runner.HERE / 'frozen-skills').iterdir()).name
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary) / 'run'
+            self.completed_run(run, condition)
+            runner.score(run)
+            source = next((run / 'skills').rglob('SKILL.md'))
+            source.write_text(source.read_text() + '\nModified')
+            with self.assertRaisesRegex(ValueError, 'frozen skill content'):
+                runner.score(run)
+            runner.frozen(condition)
+
+    def test_corpus_and_oracle_drift(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = Path(temporary) / 'suite'
+            shutil.copytree(runner.HERE / 'fixtures', suite / 'fixtures')
+            shutil.copytree(runner.HERE / 'oracles', suite / 'oracles')
+            with patch.object(runner, 'HERE', suite):
+                for relative, message in (('fixtures/case-01/source.rs', 'corpus'),
+                                          ('oracles/case-01.json', 'oracle')):
+                    with self.subTest(relative=relative):
+                        run = Path(temporary) / message
+                        self.completed_run(run)
+                        source = suite / relative
+                        original = source.read_bytes()
+                        source.write_bytes(original + b'\n')
+                        with self.assertRaisesRegex(ValueError, message + ' digest differs'):
+                            runner.score(run)
+                        source.write_bytes(original)
+                run = Path(temporary) / 'copied'
+                self.completed_run(run)
+                (run / 'treatments/case-01/source.rs').write_text('Modified')
+                with self.assertRaisesRegex(ValueError, 'corpus digest differs'):
+                    runner.score(run)
+
+    def test_comparison_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            left, right = Path(temporary) / 'left', Path(temporary) / 'right'
+            self.completed_run(left)
+            self.completed_run(right)
+            self.assertEqual(len(runner.compare(left, right)['changes']), 8)
+            original = runner.read(right / 'metadata.json')
+            for field in ('model', 'tools'):
+                with self.subTest(field=field):
+                    runner.write(right / 'metadata.json', {**original, field: 'different'})
+                    with self.assertRaisesRegex(ValueError, 'different ' + field):
+                        runner.compare(left, right)
 
     def test_frozen_packages(self):
         for directory in (runner.HERE / 'frozen-skills').iterdir():

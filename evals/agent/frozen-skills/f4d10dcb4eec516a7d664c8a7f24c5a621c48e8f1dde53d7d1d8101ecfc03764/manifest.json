@@ -1,0 +1,17 @@
+{
+  "files": [
+    ".agents/skills/rust-soundness-review/SKILL.md",
+    ".agents/skills/rust-soundness-review/references/configuration-domain.md",
+    ".agents/skills/rust-soundness-review/references/iracing-boundaries.md",
+    ".agents/skills/rust-soundness-review/references/proof-obligations.md",
+    ".agents/skills/rust-unsafe-ffi/SKILL.md",
+    ".agents/skills/rust-unsafe-ffi/agents/openai.yaml",
+    ".agents/skills/rust-unsafe-ffi/examples/examples.md",
+    ".agents/skills/rust-unsafe-ffi/examples/golden-unsafe/Cargo.toml",
+    ".agents/skills/rust-unsafe-ffi/examples/golden-unsafe/src/lib.rs",
+    ".agents/skills/rust-unsafe-ffi/references/references.md",
+    "docs/architecture/platform-and-features.md",
+    "docs/architecture/unsafe-boundaries.md"
+  ],
+  "hash": "f4d10dcb4eec516a7d664c8a7f24c5a621c48e8f1dde53d7d1d8101ecfc03764"
+}

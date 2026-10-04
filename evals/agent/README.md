@@ -35,7 +35,10 @@ and concrete `evidence`; every hard failure needs boolean `triggered` and eviden
 Then run `score --run PATH` for each and `compare --left PATH --right PATH`.
 Scores count propositions, not keywords. Any triggered hard failure fails the case.
 The driver refuses missing responses or incomplete judgments. Model, tool, source
-revision, skill hash, condition and timestamp are recorded in each run. Runs are
+revision, skill hash, corpus and oracle digests, condition and timestamp are recorded
+in each run. Scoring verifies the copied skills and treatments plus the current
+corpus and oracles against those hashes. Runs prepared without digests must be
+prepared again. Comparisons require matching model and tool values. Runs are
 ignored by Git; preserve/report selected runs deliberately, without secrets.
 
 A passing integrity check is not evidence of agent performance. No model evaluation

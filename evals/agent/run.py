@@ -60,8 +60,14 @@ def digest(files):
     return value.hexdigest()
 
 
-def frozen(condition):
-    path = HERE / "frozen-skills" / condition
+def tree_digest(path):
+    return digest({str(p.relative_to(path)): p.read_bytes()
+                   for p in path.rglob("*") if p.is_file()})
+
+
+def frozen(condition, path=None):
+    if path is None:
+        path = HERE / "frozen-skills" / condition
     metadata = read(path / "manifest.json")
     files = {str(p.relative_to(path)): p.read_bytes() for p in path.rglob("*") if p.is_file() and p.name != "manifest.json"}
     if digest(files) != condition or metadata["hash"] != condition:
@@ -101,6 +107,8 @@ def prepare(args):
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     write(run / "metadata.json", {"model": args.model, "tools": args.tools, "condition": args.condition,
         "skill_revision": None if args.condition == "baseline" else args.condition,
+        "corpus_digest": tree_digest(HERE / "fixtures"),
+        "oracle_digest": tree_digest(HERE / "oracles"),
         "repository_revision": revision, "timestamp": datetime.now(timezone.utc).isoformat()})
     judgments = {}
     for case, oracle, directory in suite:
@@ -119,7 +127,12 @@ def score(run):
     if not all(metadata.get(key) for key in ("model", "tools", "condition", "repository_revision", "timestamp")):
         raise ValueError("incomplete run provenance")
     if metadata["condition"] != "baseline":
-        frozen(metadata["condition"])
+        frozen(metadata["condition"], run / "skills")
+    if (metadata.get("corpus_digest") != tree_digest(HERE / "fixtures")
+            or metadata.get("corpus_digest") != tree_digest(run / "treatments")):
+        raise ValueError("run corpus digest differs")
+    if metadata.get("oracle_digest") != tree_digest(HERE / "oracles"):
+        raise ValueError("run oracle digest differs")
     judgments = read(run / "judgments.json")
     report = {}
     for case, oracle, _ in cases():
@@ -142,6 +155,16 @@ def score(run):
     return result
 
 
+def compare(left_run, right_run):
+    left, right = score(left_run), score(right_run)
+    for field in ("model", "tools"):
+        if left["metadata"][field] != right["metadata"][field]:
+            raise ValueError(f"cannot compare runs with different {field}")
+    return {"left": left["metadata"], "right": right["metadata"], "changes": {
+        key: {"left": left["cases"][key], "right": right["cases"][key]}
+        for key in left["cases"]}}
+
+
 def main():
     # Internal JSON protocol: the public CLI is cargo xtask agent (clap).
     request = json.load(sys.stdin)
@@ -161,10 +184,7 @@ def main():
     elif args.command == "score":
         print(json.dumps(score(args.run), indent=2))
     elif args.command == "compare":
-        left, right = score(args.left), score(args.right)
-        print(json.dumps({"left": left["metadata"], "right": right["metadata"], "changes": {
-            key: {"left": left["cases"][key], "right": right["cases"][key]}
-            for key in left["cases"]}}, indent=2))
+        print(json.dumps(compare(args.left, args.right), indent=2))
 
     else:
         raise ValueError(f"unknown backend command: {args.command}")

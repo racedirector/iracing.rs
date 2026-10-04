@@ -1,7 +1,7 @@
 name: Modeled Rust memory verification
 on:
   pull_request:
-    paths: ['crates/iracing-irsdk/**', 'crates/iracing-sdk/**', 'Cargo.toml', 'Cargo.lock', '.github/workflows/miri.yml']
+    paths: ['crates/iracing-irsdk/**', 'crates/iracing-sdk/**', 'crates/iracing-sdk-derive/**', 'Cargo.toml', 'Cargo.lock', '.github/workflows/miri.yml']
   push:
     branches: [main]
   workflow_dispatch:

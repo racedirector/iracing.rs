@@ -2,8 +2,8 @@
 
 `miri.yml` pins nightly-2026-10-01 and runs only modeled Rust surfaces: native wire
 encoding/decoding, byte and specialized regions, pure physical IbtLayout geometry,
-and owned-source exact reads/short-read recovery. Run the same five Miri commands
-from that workflow locally. No simulator, OS-backed mmap or Win32 transport is
+and owned-source exact reads/short-read recovery. Run the same four Miri test
+commands and the separate setup step from that workflow locally. No simulator, OS-backed mmap or Win32 transport is
 executed. Default Miri provenance/race checks are retained without experimental
 flags; review nightly updates and rerun this subset deliberately.
 
