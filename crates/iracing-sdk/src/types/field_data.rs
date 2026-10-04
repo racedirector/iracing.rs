@@ -1,4 +1,4 @@
-//! Field-based telemetry decoding, independent of the legacy runtime schema.
+//! Field-based telemetry decoding, from the canonical runtime layout.
 use crate::{BitField, FieldLayout, IRacingSDKError, Result, TelemetryValue, irsdk::VariableType};
 
 /// A scalar element stored in an SDK telemetry field.
@@ -13,7 +13,7 @@ pub trait TelemetryElement: Sized {
 }
 
 /// Decodes a validated field from a telemetry frame.
-pub trait FieldData: Sized {
+pub trait VarData: Sized {
     /// Checks storage compatibility and scalar/array shape without reading data.
     fn validate_field(field: &FieldLayout) -> Result<()>;
     /// Validates the requested type and decodes one complete bounded field slice.
@@ -65,7 +65,7 @@ macro_rules! scalar {
                 Ok(($decode)(bytes))
             }
         }
-        impl FieldData for $type {
+        impl VarData for $type {
             fn validate_field(field: &FieldLayout) -> Result<()> {
                 validate_element::<Self>(field)?;
                 if field.count() != 1 {
@@ -91,7 +91,7 @@ scalar!(BitField, BitField, 4, |bytes| BitField(u32::from_le_bytes(
 scalar!(f32, Float, 4, f32::from_le_bytes);
 scalar!(f64, Double, 8, f64::from_le_bytes);
 
-impl<T: TelemetryElement> FieldData for Vec<T> {
+impl<T: TelemetryElement> VarData for Vec<T> {
     fn validate_field(field: &FieldLayout) -> Result<()> {
         validate_element::<T>(field)
     }
@@ -180,7 +180,7 @@ mod tests {
             TelemetryValue::Float64(10.0),
         );
     }
-    fn check_scalar<T: FieldData + TelemetryElement + PartialEq + std::fmt::Debug + Clone>(
+    fn check_scalar<T: VarData + TelemetryElement + PartialEq + std::fmt::Debug + Clone>(
         storage: VariableType,
         bytes: &[u8],
         expected: T,
@@ -220,5 +220,38 @@ mod tests {
             Vec::<bool>::decode_field(&[], &field),
             Err(IRacingSDKError::TypeConversion { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn scalar_bit_patterns_round_trip(bits in any::<u32>(), offset in 0..100usize) {
+            let mut data = vec![0; offset + 4];
+            data[offset..].copy_from_slice(&bits.to_le_bytes());
+            for storage in [VariableType::Integer, VariableType::Float, VariableType::BitField] {
+                let field = crate::test_utils::field("Speed".into(), storage, offset, 1, false, String::new(), String::new());
+                let decoded = match storage {
+                    VariableType::Integer => i32::decode_field(&data, &field).unwrap() as u32,
+                    VariableType::Float => f32::decode_field(&data, &field).unwrap().to_bits(),
+                    VariableType::BitField => BitField::decode_field(&data, &field).unwrap().value(),
+                    _ => unreachable!(),
+                };
+                prop_assert_eq!(decoded, bits);
+                prop_assert!(TelemetryValue::decode_field(&data[..data.len()-1], &field).is_err());
+            }
+        }
+        #[test]
+        fn integer_arrays_round_trip(values in prop::collection::vec(any::<i32>(), 1..73), offset in 0..100usize) {
+            let mut data = vec![0; offset];
+            for value in &values { data.extend(value.to_le_bytes()); }
+            let field = crate::test_utils::field("CarIdxLap".into(), VariableType::Integer, offset, values.len(), false, String::new(), String::new());
+            prop_assert_eq!(Vec::<i32>::decode_field(&data, &field).unwrap(), values);
+            prop_assert!(Vec::<i32>::decode_field(&data[..data.len()-1], &field).is_err());
+        }
     }
 }

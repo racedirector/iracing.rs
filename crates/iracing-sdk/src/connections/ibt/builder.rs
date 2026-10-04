@@ -77,7 +77,7 @@ impl IbtConnectionBuilder<ProviderSource> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SchemaProvider;
+    use crate::LayoutProvider;
     use crate::test_utils::require_smallest_ibt_fixture;
 
     #[tokio::test]
@@ -87,7 +87,7 @@ mod tests {
 
         let connection = IbtConnection::builder().with_path(path).build().await?;
 
-        assert!(connection.schema().variable_count() > 0);
+        assert!(!connection.layout().is_empty());
         assert!(connection.source_hz() > 0.0);
         Ok(())
     }
@@ -103,7 +103,7 @@ mod tests {
             .build()
             .await?;
 
-        assert!(connection.schema().variable_count() > 0);
+        assert!(!connection.layout().is_empty());
         Ok(())
     }
 }

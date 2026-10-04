@@ -3,7 +3,7 @@
 //! # What is being measured
 //!
 //! Every group uses the deterministic frame built from the checked-in live
-//! variable-schema capture. Frame generation and adapter schema validation
+//! variable-layout capture. Frame generation and adapter layout validation
 //! happen before Criterion starts timing. The timed operations begin with an
 //! already available [`FramePacket`] and exercise the public adapter or lookup
 //! APIs that an application would call for each frame.
@@ -11,7 +11,7 @@
 //! The groups answer different questions:
 //!
 //! - `dynamic_frame/adapt` measures creation of a dynamic view by cloning the
-//!   packet's shared data and schema handles; it does not decode every value.
+//!   packet's shared data and layout handles; it does not decode every value.
 //! - The remaining `dynamic_frame` cases measure representative scalar and
 //!   array lookups on an existing view. The array case creates a fresh
 //!   `Vec<f32>` per iteration.
@@ -27,7 +27,7 @@
 //! These are in-memory adaptation and lookup measurements, not end-to-end live
 //! telemetry latency. They exclude frame acquisition, connection and provider
 //! work, scheduling, subscription delivery, session parsing, serialization,
-//! and application processing. Results depend on the captured schema, build,
+//! and application processing. Results depend on the captured layout, build,
 //! machine, and allocator.
 //!
 //! Run this target with:
@@ -42,7 +42,7 @@ mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use iracing_sdk::{
-    DynamicFrame, IRacingTelemetryFrame, VariableSchema,
+    DynamicFrame, IRacingTelemetryFrame, TelemetryLayout,
     adapters::{AdapterValidation, FrameAdapter},
     types::FramePacket,
 };
@@ -122,26 +122,26 @@ struct MediumFrame {
 }
 
 /// Get a deterministic packet with the captured full live-frame layout.
-fn get_test_frame() -> (FramePacket, Arc<VariableSchema>) {
+fn get_test_frame() -> (FramePacket, Arc<TelemetryLayout>) {
     let fixture = support::full_frame_fixture();
     let packet = fixture.packet();
-    (packet, fixture.schema)
+    (packet, fixture.layout)
 }
 
 /// Build and verify a fully mapped validation plan outside timed loops.
 fn require_complete_validation<T: FrameAdapter>(
-    schema: &VariableSchema,
+    layout: &Arc<TelemetryLayout>,
     expected_fields: usize,
 ) -> AdapterValidation {
-    let validation = T::validate_schema(schema)
+    let validation = T::validate_layout(layout)
         .unwrap_or_else(|error| panic!("full-frame adapter validation failed: {error}"));
 
     assert_eq!(validation.field_count(), expected_fields);
     assert!(
         validation
-            .extraction_plan
+            .extraction_plan()
             .iter()
-            .all(|extraction| extraction.var_info().is_some()),
+            .all(|extraction| extraction.field_id().is_some()),
         "full-frame adapter benchmark would exercise a missing/default field"
     );
 
@@ -150,11 +150,11 @@ fn require_complete_validation<T: FrameAdapter>(
 
 /// Measure dynamic-view construction and by-name access on an existing view.
 fn bench_dynamic_frame(c: &mut Criterion) {
-    let (packet, schema) = get_test_frame();
+    let (packet, layout) = get_test_frame();
 
     // Pre-validate for DynamicFrame
     let validation =
-        DynamicFrame::validate_schema(&schema).expect("DynamicFrame validation failed");
+        DynamicFrame::validate_layout(&layout).expect("DynamicFrame validation failed");
 
     let mut group = c.benchmark_group("dynamic_frame");
 
@@ -190,11 +190,11 @@ fn bench_dynamic_frame(c: &mut Criterion) {
 
 /// Measure fresh typed outputs for increasing derived-adapter field counts.
 fn bench_derived_adapters(c: &mut Criterion) {
-    let (packet, schema) = get_test_frame();
+    let (packet, layout) = get_test_frame();
 
     let mut group = c.benchmark_group("derived_adapters");
 
-    let small_validation = require_complete_validation::<SmallFrame>(&schema, 5);
+    let small_validation = require_complete_validation::<SmallFrame>(&layout, 5);
     group.bench_function(BenchmarkId::new("small_frame", "5_fields"), |b| {
         b.iter(|| {
             let frame = SmallFrame::adapt(black_box(&packet), black_box(&small_validation));
@@ -202,7 +202,7 @@ fn bench_derived_adapters(c: &mut Criterion) {
         })
     });
 
-    let medium_validation = require_complete_validation::<MediumFrame>(&schema, 20);
+    let medium_validation = require_complete_validation::<MediumFrame>(&layout, 20);
     group.bench_function(BenchmarkId::new("medium_frame", "20_fields"), |b| {
         b.iter(|| {
             let frame = MediumFrame::adapt(black_box(&packet), black_box(&medium_validation));
@@ -210,7 +210,7 @@ fn bench_derived_adapters(c: &mut Criterion) {
         })
     });
 
-    let large_validation = require_complete_validation::<ConsumerFrame47>(&schema, 47);
+    let large_validation = require_complete_validation::<ConsumerFrame47>(&layout, 47);
     group.bench_function(BenchmarkId::new("large_frame", "47_fields"), |b| {
         b.iter(|| {
             let frame = ConsumerFrame47::adapt(black_box(&packet), black_box(&large_validation));

@@ -16,7 +16,7 @@
 //! ```
 //!
 //! It is "end to end" only within that boundary. The provider uses the
-//! deterministic live-schema fixture in memory; no IBT file or Windows shared
+//! deterministic live-layout fixture in memory; no IBT file or Windows shared
 //! memory is read. Simulator pacing, operating-system transport, connection
 //! establishment, session parsing, serialization, and application work are not
 //! measured.
@@ -86,7 +86,7 @@ fn runtime() -> tokio::runtime::Runtime {
 fn bench_latest_paced(c: &mut Criterion) {
     let fixture = support::full_frame_fixture();
     let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
+    let layout = fixture.layout;
     let runtime = runtime();
     let mut group = c.benchmark_group("telemetry_e2e/throughput/latest_paced/47_fields");
 
@@ -99,7 +99,7 @@ fn bench_latest_paced(c: &mut Criterion) {
                     let _runtime_guard = runtime.enter();
                     LatestCase::<TimedConsumerFrame47>::new(
                         Arc::clone(&data),
-                        Arc::clone(&schema),
+                        Arc::clone(&layout),
                         subscribers,
                         None,
                     )
@@ -127,7 +127,7 @@ fn bench_latest_paced(c: &mut Criterion) {
 fn bench_latest_burst(c: &mut Criterion) {
     let fixture = support::full_frame_fixture();
     let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
+    let layout = fixture.layout;
     let runtime = runtime();
     let mut group = c.benchmark_group("telemetry_e2e/coalescing/latest_burst_8/47_fields");
 
@@ -140,7 +140,7 @@ fn bench_latest_burst(c: &mut Criterion) {
                     let _runtime_guard = runtime.enter();
                     LatestCase::<TimedConsumerFrame47>::new(
                         Arc::clone(&data),
-                        Arc::clone(&schema),
+                        Arc::clone(&layout),
                         subscribers,
                         None,
                     )
@@ -168,7 +168,7 @@ fn bench_latest_burst(c: &mut Criterion) {
 fn bench_on_demand(c: &mut Criterion) {
     let fixture = support::full_frame_fixture();
     let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
+    let layout = fixture.layout;
     let runtime = runtime();
     let mut group = c.benchmark_group("telemetry_e2e/throughput/ondemand_acknowledged/47_fields");
 
@@ -181,7 +181,7 @@ fn bench_on_demand(c: &mut Criterion) {
                     let _runtime_guard = runtime.enter();
                     OnDemandCase::<TimedConsumerFrame47>::new(
                         Arc::clone(&data),
-                        Arc::clone(&schema),
+                        Arc::clone(&layout),
                         subscribers,
                         None,
                     )
@@ -208,7 +208,7 @@ fn bench_on_demand(c: &mut Criterion) {
 fn bench_on_demand_slow_ack(c: &mut Criterion) {
     let fixture = support::full_frame_fixture();
     let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
+    let layout = fixture.layout;
     let runtime = runtime();
     let mut group = c.benchmark_group("telemetry_e2e/backpressure/ondemand_slow_ack/47_fields");
 
@@ -221,7 +221,7 @@ fn bench_on_demand_slow_ack(c: &mut Criterion) {
                     let _runtime_guard = runtime.enter();
                     OnDemandCase::<TimedConsumerFrame47>::new(
                         Arc::clone(&data),
-                        Arc::clone(&schema),
+                        Arc::clone(&layout),
                         subscribers,
                         None,
                     )

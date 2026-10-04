@@ -19,14 +19,13 @@ no I/O, schema decoding, or playback management. `IbtReader` uses it as the sole
 authority for source geometry. Fresh snapshot methods read the advertised regions
 on each call and return `None` for absent regions. The reader retains no schema
 or session cache. `IbtProvider` builds its schema once with
-`VariableSchema::from_snapshot(snapshot, frame_size)`; decoded header slices can
-also be validated with `VariableSchema::from_headers`. Missing variable metadata
+`TelemetryLayout::try_from_headers(&headers, frame_size)`. Missing variable metadata
 is accepted only when there are no telemetry frames. Shared validation lives in
 `parse_utils` and uses ordinary functions.
 
 Disk variable headers are parsed from `.ibt` files. Live variable headers are
-discovered from Windows shared memory. Both become `VariableSchema` containing
-named `VariableInfo` entries and a frame size.
+discovered from Windows shared memory. Both become `TelemetryLayout` containing
+ordered `FieldLayout` entries and the authoritative frame size.
 
 Consumers should resolve fields through the schema and decode through `VarData`
 or `TelemetryValue`. This keeps type sizes, arrays, bitfields, bounds, and
@@ -35,9 +34,9 @@ little-endian conversion centralized.
 The live header/variable discovery modules are Windows-gated. The resulting
 schema and frame types are platform-neutral.
 
-`VariableInfo::data_type` uses `irsdk::VariableType`, also re-exported at the
+`FieldLayout::data_type()` uses `irsdk::VariableType`, also re-exported at the
 crate root. Only the six SDK storage kinds are valid telemetry metadata;
-header conversion, schema validation, and runtime decoding reject the count
+header conversion, layout validation, and runtime decoding reject the count
 sentinel. Array strides use SDK byte widths. `VarData` supports `u8` for
 characters, `bool`, `i32`, `BitField`, `f32`, `f64`, and their vectors.
 
@@ -66,13 +65,20 @@ It does not sort fields, reject in-frame overlaps, or normalize names. An empty
 header snapshot is valid with a positive frame size; providers decide whether
 their source requires metadata.
 
-This is a migration foundation, not the current packet/provider contract.
-`VariableSchema`, `VariableInfo`, `SchemaProvider`, and all decoders/adapters
-remain in use until the later runtime cutover. `FieldData` introduces the new
-selected-field decoding boundary independently: validation checks type/shape,
-decoding slices one complete region, and arrays iterate relative exact chunks.
-`TelemetryValue::decode_field` uses the same region boundary. The new types do not add serde
-or reference-schema compatibility requirements.
+Providers, connections, `FramePacket`, and `DynamicFrame` retain one shared
+`Arc<TelemetryLayout>`. `LayoutProvider` exposes it and supports field inspection.
+The legacy `VariableInfo`, `VariableSchema`, and `SchemaProvider` are removed.
+`FramePacket::new` returns an error for short or oversized buffers; its bytes and
+layout are private so this invariant cannot be invalidated after construction.
+
+`VarData::decode_field` validates storage/shape, then slices the complete region
+once. Arrays traverse relative exact chunks with explicit little-endian decoding.
+`TelemetryValue::decode_field` uses the same boundary. Generated adapters resolve
+names, types, and scalar/array shape once and retain declaration-ordered `FieldId`
+slots. Calculated expressions reference slots as well. Adaptation checks shared
+layout identity; IDs cannot silently select fields from a different layout.
+The runtime layout has no serde or reference-schema compatibility contract.
+Historical variable capture DTOs stay local to export/benchmark tooling.
 
 The repository's [IBT specification](../ibt-spec.md) describes positive counts,
 six storage widths, and bounded extents. Unknown/sentinel discriminants are

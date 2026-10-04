@@ -11,10 +11,10 @@
 //!
 //! - Replay/offline path (cross-platform):
 //!   - [`ibt::IbtReader`]
-//!   - [`types::VariableSchema`], [`types::VarData`]
+//!   - [`types::TelemetryLayout`], [`types::VarData`]
 //! - Streaming adapter path:
 //!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
-//!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`SchemaProvider`]
+//!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`LayoutProvider`]
 //! - Session data path:
 //!   - [`schema::SessionInfo`] and [`schema::SessionInfo::parse`] for session YAML
 //!   - [`types::SessionInfoBytes`] for decoding session data from the SDK
@@ -26,21 +26,21 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{SchemaProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
+//! use iracing_sdk::{LayoutProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
 //!
 //! async fn replay() -> iracing_sdk::Result<()> {
 //!     let mut provider = IbtProvider::open("telemetry.ibt")?;
 //!     let speed_info = provider
-//!         .schema()
-//!         .get_variable("Speed")
+//!         .layout()
+//!         .field_by_name("Speed").map(|(_, field)| field)
 //!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-//!             context: "schema lookup".to_string(),
+//!             context: "layout lookup".to_string(),
 //!             details: "missing Speed variable".to_string(),
 //!         })?
 //!         .clone();
 //!
 //!     while let Some(packet) = provider.next_frame().await? {
-//!         let speed_mps = f32::from_bytes(&packet.data, &speed_info)?;
+//!         let speed_mps = f32::decode_field(&packet.data(), &speed_info)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
 //!

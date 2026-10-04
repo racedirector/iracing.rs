@@ -9,9 +9,9 @@ namespace.
 This crate provides:
 
 - Cross-platform `.ibt` indexed reads via `IbtReader` and replay via `IbtProvider`
-- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `SchemaProvider`; `LiveProvider` is the Windows-only live source
+- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `LayoutProvider`; `LiveProvider` is the Windows-only live source
 - Session YAML parsing via `SessionInfo::parse`; telemetry session policies handle source-specific updates
-- Type-safe telemetry extraction helpers (`VariableSchema`, `VarData`, `BitField`)
+- Type-safe telemetry extraction helpers (`TelemetryLayout`, `VarData`, `BitField`)
 - Windows shared-memory access (`WindowsConnection`) when building on Windows
 
 ## Start Here
@@ -50,13 +50,13 @@ use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader}
 ### Offline `.ibt` Replay (Cross-Platform)
 
 ```rust,no_run
-use iracing_sdk::{SchemaProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
+use iracing_sdk::{LayoutProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
 
 async fn replay() -> iracing_sdk::Result<()> {
     let mut provider = IbtProvider::open("telemetry.ibt")?;
     let speed_info = provider
-        .schema()
-        .get_variable("Speed")
+        .layout()
+        .field_by_name("Speed").map(|(_, field)| field)
         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
             context: "schema lookup".to_string(),
             details: "missing Speed variable".to_string(),
@@ -64,7 +64,7 @@ async fn replay() -> iracing_sdk::Result<()> {
         .clone();
 
     while let Some(packet) = provider.next_frame().await? {
-        let speed_mps = f32::from_bytes(&packet.data, &speed_info)?;
+        let speed_mps = f32::decode_field(packet.data(), &speed_info)?;
         let _speed_kph = speed_mps * 3.6;
     }
 
@@ -124,20 +124,14 @@ struct Row {
 }
 
 impl FrameAdapter for Row {
-    fn validate_schema(schema: &iracing_sdk::VariableSchema) -> iracing_sdk::Result<AdapterValidation> {
-        let speed_info = schema.get_variable("Speed").ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-            context: "Field validation".to_string(),
-            details: "Missing required field 'Speed'".to_string(),
-        })?;
-
-        Ok(AdapterValidation::new(vec![FieldExtraction::Required {
-            name: "Speed".to_string(),
-            var_info: speed_info.clone(),
-        }]))
+    fn validate_layout(layout: &std::sync::Arc<iracing_sdk::TelemetryLayout>) -> iracing_sdk::Result<AdapterValidation> {
+        let speed = AdapterValidation::resolve::<f32>(layout, "Speed", true)?.expect("required field");
+        Ok(AdapterValidation::new(std::sync::Arc::clone(layout), vec![FieldExtraction::Required(speed)]))
     }
 
     fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
-        Self { speed: validation.fetch_or_default(packet, "Speed") }
+        validation.ensure_packet(packet).expect("adapter layout mismatch");
+        Self { speed: validation.decode(packet, 0).expect("decode").expect("required field") }
     }
 }
 ```
@@ -153,10 +147,10 @@ impl FrameAdapter for Row {
 
 ## Adapter Surface
 
-- `FramePacket` — raw frame payload plus tick, session version, and schema.
+- `FramePacket` — raw frame payload plus tick, session version, and a shared telemetry layout.
 - `Provider` — frame source abstraction implemented by `IbtProvider`, with `LiveProvider` available only on Windows.
 - `FrameAdapter` — two-phase validation/extraction trait for typed rows.
-- `AdapterValidation`, `FieldExtraction`, `DefaultValue`, `SchemaProvider` — adapter planning helpers.
+- `AdapterValidation`, `FieldExtraction`, `LayoutProvider` — adapter planning helpers.
 - `DynamicFrame` — by-name lookup helper for debugging and exploratory analysis.
 
 ## Platform Matrix

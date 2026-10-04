@@ -3,7 +3,7 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, IRacingSDKError, Result, SchemaProvider, VariableSchema,
+    FramePacket, IRacingSDKError, LayoutProvider, Result, TelemetryLayout,
     ibt::IbtReader,
     provider::{Provider, VariableHeadersProvider},
     types::IRacingSessionString,
@@ -11,17 +11,17 @@ use crate::{
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 ///
-/// Owns the validated variable schema and sequential replay cursor. Construction
+/// Owns the validated variable layout and sequential replay cursor. Construction
 /// always starts at frame zero, regardless of previous indexed reader operations.
 pub struct IbtProvider {
     reader: IbtReader,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     current_frame: usize,
     tick_rate: f64,
 }
 
 impl IbtProvider {
-    /// Open an `.ibt` file and validate its replay schema.
+    /// Open an `.ibt` file and validate its replay layout.
     ///
     /// The recording must remain unchanged while the provider is alive, as
     /// required by [`IbtReader::open`].
@@ -34,18 +34,18 @@ impl IbtProvider {
     /// # Errors
     /// Returns an error if variable headers cannot be read or validated against
     /// the layout's frame size, or if telemetry frames have no variable metadata.
-    /// A zero-frame recording may have an empty schema.
+    /// A zero-frame recording may have an empty layout.
     pub fn from_reader(reader: IbtReader) -> Result<Self> {
         let frame_size = reader.frame_size();
 
         let headers = reader.variable_headers()?;
         if headers.is_empty() && reader.frame_count() > 0 {
             return Err(IRacingSDKError::parse_error(
-                "IBT replay schema",
+                "IBT replay layout",
                 "Telemetry frames require variable-header metadata",
             ));
         }
-        let schema = VariableSchema::from_headers(&headers, frame_size)?;
+        let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
 
         let tick_rate = if reader.header().tick_rate > 0 {
             f64::from(reader.header().tick_rate)
@@ -54,15 +54,15 @@ impl IbtProvider {
         };
         Ok(Self {
             reader,
-            schema: Arc::new(schema),
+            layout: Arc::new(layout),
             current_frame: 0,
             tick_rate,
         })
     }
 
-    /// Returns an ownable schema.
-    pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
-        Arc::clone(&self.schema)
+    /// Returns an ownable layout.
+    pub(crate) fn shared_layout(&self) -> Arc<TelemetryLayout> {
+        Arc::clone(&self.layout)
     }
 
     /// Returns the total number of telemetry frames in the recording.
@@ -80,9 +80,9 @@ impl IbtProvider {
     }
 }
 
-impl SchemaProvider for IbtProvider {
-    fn schema(&self) -> &VariableSchema {
-        self.schema.as_ref()
+impl LayoutProvider for IbtProvider {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 
@@ -103,8 +103,8 @@ impl Provider for IbtProvider {
             frame_data,
             tick,
             self.reader.header().session_info_update as u32,
-            self.shared_schema(),
-        );
+            self.shared_layout(),
+        )?;
         self.current_frame += 1;
         Ok(Some(packet))
     }
@@ -151,17 +151,18 @@ mod tests {
                 IbtProvider::from_reader(moved)?,
             ] {
                 assert_eq!(provider.total_frames(), fixture.num_frames);
-                assert_eq!(provider.schema().frame_size, fixture.frame_size);
-                assert_eq!(
-                    provider.schema().variable_count(),
-                    fixture.num_vars as usize
-                );
+                assert_eq!(provider.layout().frame_size(), fixture.frame_size);
+                assert_eq!(provider.layout().len(), fixture.num_vars as usize);
                 assert_eq!(provider.tick_rate(), f64::from(fixture.tick_rate));
                 for expected in &fixture.required_variables {
-                    let actual = provider.schema().get_variable(&expected.name).unwrap();
-                    assert_eq!(actual.offset, expected.offset);
-                    assert_eq!(actual.count, expected.count);
-                    assert_eq!(actual.units, expected.units);
+                    let actual = provider
+                        .layout()
+                        .field_by_name(&expected.name)
+                        .map(|(_, field)| field)
+                        .unwrap();
+                    assert_eq!(actual.region().offset(), expected.offset);
+                    assert_eq!(actual.count(), expected.count);
+                    assert_eq!(actual.metadata().unit(), expected.units);
                 }
                 for index in 0..reference.frame_count() {
                     // Session snapshots move the source cursor between frame reads.
@@ -173,8 +174,8 @@ mod tests {
                     let packet = block_on(provider.next_frame())?.unwrap();
                     assert_eq!(packet.tick as usize, index);
                     assert_eq!(packet.session_version, fixture.session_info_update as u32);
-                    assert_eq!(packet.data.as_ref(), reference.frame(index)?);
-                    assert!(Arc::ptr_eq(&packet.schema, &provider.schema));
+                    assert_eq!(packet.data().as_ref(), reference.frame(index)?);
+                    assert!(Arc::ptr_eq(packet.layout(), &provider.layout));
                 }
                 assert!(block_on(provider.next_frame())?.is_none());
                 assert!(block_on(provider.next_frame())?.is_none());
@@ -197,7 +198,7 @@ mod tests {
         *provider.reader.owned_bytes_mut() = bytes;
         let frame = block_on(provider.next_frame())?.unwrap();
         assert_eq!(frame.tick, 0);
-        assert_eq!(frame.data.as_ref(), expected);
+        assert_eq!(frame.data().as_ref(), expected);
         Ok(())
     }
 
@@ -219,7 +220,7 @@ mod tests {
         // Byte geometry remains valid; the provider owns semantic validation.
         let reader = IbtReader::from_bytes(bytes)?;
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
-        assert!(error.contains("beyond frame size"), "{error}");
+        assert!(error.contains("past frame size"), "{error}");
         Ok(())
     }
 
@@ -285,8 +286,8 @@ mod tests {
                 .variable_headers()
                 .is_none()
         );
-        assert_eq!(provider.schema().variable_count(), 0);
-        assert_eq!(provider.schema().frame_size, frame_size);
+        assert_eq!(provider.layout().len(), 0);
+        assert_eq!(provider.layout().frame_size(), frame_size);
         assert!(block_on(provider.next_frame())?.is_none());
         Ok(())
     }

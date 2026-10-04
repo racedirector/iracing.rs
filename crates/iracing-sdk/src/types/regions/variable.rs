@@ -1,7 +1,7 @@
 use iracing_irsdk::VariableHeader;
 use std::{num::NonZeroUsize, ops::Range};
 
-use crate::{IRacingSDKError, Result, VariableInfo};
+use crate::{IRacingSDKError, Result};
 
 use super::ByteRegion;
 
@@ -145,38 +145,6 @@ impl TryFrom<&VariableHeader> for VariableRegion {
             })?;
 
         let region = ByteRegion::new(offset, length)?;
-        Ok(Self { region, count })
-    }
-}
-
-impl TryFrom<&VariableInfo> for VariableRegion {
-    type Error = IRacingSDKError;
-
-    /// Derives the frame-relative region described by parsed variable metadata.
-    ///
-    /// # Errors
-    ///
-    /// Returns a parse error if the variable type has no storage width or if a
-    /// size calculation overflows `usize`.
-    fn try_from(value: &VariableInfo) -> Result<Self> {
-        let count = NonZeroUsize::new(value.count).ok_or_else(|| {
-            IRacingSDKError::parse_error(
-                "VariableRegion::try_from",
-                "Variable count must be positive",
-            )
-        })?;
-        let length = value
-            .data_type
-            .byte_size()
-            .checked_mul(value.count)
-            .ok_or_else(|| {
-                IRacingSDKError::parse_error(
-                    "VariableRegion::try_from",
-                    "Variable region size calculation overflowed",
-                )
-            })?;
-
-        let region = ByteRegion::new(value.offset, length)?;
         Ok(Self { region, count })
     }
 }

@@ -7,7 +7,7 @@ use anyhow::bail;
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use futures::StreamExt;
-use iracing_sdk::{DynamicFrame, IbtConnection, SchemaProvider};
+use iracing_sdk::{DynamicFrame, IbtConnection, LayoutProvider};
 use std::path::PathBuf;
 
 use snapshot::{Command as SnapshotCommand, handle_command as handle_snapshot_command};
@@ -61,11 +61,12 @@ pub(crate) async fn handle_command(command: Command) -> Result<()> {
                 .build()
                 .await
                 .context("Failed to open IBT telemetry file")?;
-            let mut variables = connection.variables();
+            let mut variables = connection.fields_owned();
             variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
+                left.region()
+                    .offset()
+                    .cmp(&right.region().offset())
+                    .then_with(|| left.name().cmp(right.name()))
             });
             let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
             let mut writer =
@@ -92,14 +93,15 @@ pub(crate) async fn handle_command(command: Command) -> Result<()> {
                 .with_connection(get_connection()?)
                 .build()?;
             let connection = LiveConnection::builder().with_provider(provider).build()?;
-            let mut variables = connection.variables();
+            let mut variables = connection.fields_owned();
             if variables.is_empty() {
                 bail!("No telemetry variables were available from the live connection");
             }
             variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
+                left.region()
+                    .offset()
+                    .cmp(&right.region().offset())
+                    .then_with(|| left.name().cmp(right.name()))
             });
             let mut frames = Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
             let mut writer =

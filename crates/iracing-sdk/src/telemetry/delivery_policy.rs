@@ -184,26 +184,27 @@ mod tests {
     //! packets as opaque values. Tick numbers are sufficient to identify which
     //! frame a receiver observed.
 
-    use std::{collections::HashMap, sync::Arc};
+    use std::sync::Arc;
 
     use tokio::sync::{mpsc, oneshot, watch};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, IRacingSDKError, VariableSchema};
+    use crate::{FramePacket, IRacingSDKError};
 
     use super::{DeliveryPolicy, LatestDelivery, OnDemandDelivery, ReplayDemand};
 
     /// Construct a minimal packet whose tick identifies it in assertions.
     fn frame(tick: u32) -> FramePacket {
         FramePacket::new(
-            Vec::new(),
+            vec![0],
             tick,
             0,
             Arc::new(
-                VariableSchema::new(HashMap::new(), 0)
-                    .expect("an empty telemetry schema should be valid"),
+                crate::test_utils::layout([], 1)
+                    .expect("an empty telemetry layout should be valid"),
             ),
         )
+        .unwrap()
     }
 
     /// Create one replay permit and the consumer side of its response channel.

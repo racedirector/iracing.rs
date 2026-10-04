@@ -15,7 +15,7 @@ Rust workspace for working with iRacing telemetry and simulation state:
 ## Crates
 
 - [`crates/iracing-irsdk`](crates/iracing-irsdk) — dependency-light Rust representations of the native SDK wire contract: fixed-layout headers, variable metadata, constants, enums, flags, and broadcast command values.
-- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing (`SessionInfo::parse`), telemetry decoding (`VarData`/`VariableSchema`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
+- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing (`SessionInfo::parse`), telemetry decoding (`VarData`/`TelemetryLayout`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
 - [`crates/iracing-sdk-cli`](crates/iracing-sdk-cli) — the consolidated `iracing-sdk` CLI for telemetry export, snapshots, session schemas, metadata, and broadcast commands.
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-fixtures`](crates/test-fixtures) — unpublished Rust tooling for deterministic `.ibt` fixture generation, verification, and drift checks.
@@ -33,7 +33,7 @@ that one capture is an exhaustive schema for every car and session.
 | Artifact | Purpose | Regenerate from workspace root |
 | --- | --- | --- |
 | [`docs/reference/session-schema.yml`](docs/reference/session-schema.yml) | Baseline schema for `iracing_sdk::schema::SessionInfo`. | `cargo iracing-sdk session schema type --output ./docs/reference/session-schema.yml` |
-| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | Generator deferred during CLI consolidation. |
+| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Historical variable metadata reference schema. | Generator deferred during CLI consolidation. |
 | [`docs/reference/primitives-schema.yml`](docs/reference/primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | Generator deferred during CLI consolidation. |
 | [`docs/reference/disk-variable-schema.yml`](docs/reference/disk-variable-schema.yml) | Telemetry variable schema derived from `.ibt` headers. | Generator deferred during CLI consolidation. |
 | [`docs/reference/live-session-schema.yml`](docs/reference/live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo iracing-sdk session schema live --output ./docs/reference/live-session-schema.yml` |
@@ -81,9 +81,9 @@ Defined in `.cargo/config.toml` for convenience:
 ## Development Notes
 
 - **Platform gates**: Live shared-memory and broadcast subcommands are Windows-only. The consolidated executable also supports portable IBT commands; gate OS-specific implementations with `#[cfg(windows)]`.
-- **Telemetry decoding**: Always use `VarData::from_bytes` and related helpers; frame data is little-endian and manual decoding tends to drift from the authoritative implementation.
+- **Telemetry decoding**: Always use `VarData::decode_field` and related helpers; frame data is little-endian and manual decoding tends to drift from the authoritative implementation.
 - **Session parsing**: Parse provider-supplied YAML with `SessionInfo::parse`. The telemetry session policies handle live version changes and parse IBT session data once.
-- **Adapters**: `FrameAdapter::validate_schema` returns an `AdapterValidation` that should pre-resolve every field offset; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
+- **Adapters**: `FrameAdapter::validate_layout` returns an `AdapterValidation` that should pre-resolve declaration-ordered field IDs and retain their originating layout; `adapt` must avoid schema map lookups for per-frame performance. The primary adapter surface is in `crates/iracing-sdk`.
 - **Schema discovery**: When new fields appear, run `cargo iracing-sdk session discover ibt --path <FILE.ibt>` (or `discover live` on Windows) and incorporate the results back into `iracing-sdk` to improve typings.
 - **Fixtures**: Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json` (see `iracing_sdk::test_utils`). `cargo test-fixtures` regenerates and verifies fixtures, then runs a scoped `git diff --exit-code` check for drift. After intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 

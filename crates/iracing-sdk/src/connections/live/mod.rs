@@ -5,12 +5,12 @@ mod builder;
 pub use builder::LiveConnectionBuilder;
 
 #[cfg(windows)]
-use crate::SchemaProvider;
+use crate::LayoutProvider;
 
 #[cfg(windows)]
 use {
     crate::{
-        FrameAdapter, Result, VariableSchema,
+        FrameAdapter, Result, TelemetryLayout,
         provider::Provider,
         providers::live::LiveProvider,
         schema::SessionInfo,
@@ -34,8 +34,8 @@ pub struct LiveConnection {
     /// Session receiver
     sessions: watch::Receiver<Option<Arc<SessionInfo>>>,
 
-    /// Variable schema
-    schema: Arc<VariableSchema>,
+    /// Variable layout
+    layout: Arc<TelemetryLayout>,
 
     /// Source frequency
     source_hz: f64,
@@ -54,7 +54,7 @@ impl LiveConnection {
     /// Creates a new connection from a given provider
     pub fn from_provider(provider: LiveProvider) -> Self {
         // Extract metadata
-        let schema = provider.shared_schema();
+        let layout = provider.shared_layout();
         let source_hz = provider.tick_rate();
 
         // Spawn telemetry tasks
@@ -68,7 +68,7 @@ impl LiveConnection {
         Self {
             frames: channels.frames,
             sessions: channels.sessions,
-            schema,
+            layout,
             source_hz,
             cancel: channels.cancel,
         }
@@ -79,8 +79,8 @@ impl LiveConnection {
     where
         T: FrameAdapter + Send + 'static,
     {
-        // Validate schema at subscription time.
-        let validation = T::validate_schema(&self.schema)?;
+        // Validate layout at subscription time.
+        let validation = T::validate_layout(&self.layout)?;
 
         // Create base frame stream from watch channel.
         //
@@ -139,10 +139,10 @@ impl LiveConnection {
 }
 
 #[cfg(windows)]
-impl SchemaProvider for LiveConnection {
-    /// Get the variable schema
-    fn schema(&self) -> &VariableSchema {
-        self.schema.as_ref()
+impl LayoutProvider for LiveConnection {
+    /// Get the variable layout
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 

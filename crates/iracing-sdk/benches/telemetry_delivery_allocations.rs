@@ -96,14 +96,14 @@ fn runtime() -> tokio::runtime::Runtime {
 fn allocation_diagnostics(
     runtime: &tokio::runtime::Runtime,
     data: &Arc<Vec<u8>>,
-    schema: &Arc<iracing_sdk::VariableSchema>,
+    layout: &Arc<iracing_sdk::TelemetryLayout>,
 ) {
     for subscribers in SUBSCRIBERS {
         let mut latest = {
             let _guard = runtime.enter();
             LatestCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 None,
             )
@@ -126,7 +126,7 @@ fn allocation_diagnostics(
             let _guard = runtime.enter();
             OnDemandCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 None,
             )
@@ -159,14 +159,14 @@ fn print_latency(policy: &str, subscribers: usize, samples: &mut [u64]) {
 fn latency_diagnostics(
     runtime: &tokio::runtime::Runtime,
     data: &Arc<Vec<u8>>,
-    schema: &Arc<iracing_sdk::VariableSchema>,
+    layout: &Arc<iracing_sdk::TelemetryLayout>,
 ) {
     for subscribers in SUBSCRIBERS {
         let mut latest = {
             let _guard = runtime.enter();
             LatestCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 Some(LATENCY_FRAMES),
             )
@@ -184,7 +184,7 @@ fn latency_diagnostics(
             let _guard = runtime.enter();
             OnDemandCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 Some(LATENCY_FRAMES),
             )
@@ -203,14 +203,14 @@ fn latency_diagnostics(
 fn delivery_diagnostics(
     runtime: &tokio::runtime::Runtime,
     data: &Arc<Vec<u8>>,
-    schema: &Arc<iracing_sdk::VariableSchema>,
+    layout: &Arc<iracing_sdk::TelemetryLayout>,
 ) {
     for subscribers in SUBSCRIBERS {
         let mut latest = {
             let _guard = runtime.enter();
             LatestCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 None,
             )
@@ -228,7 +228,7 @@ fn delivery_diagnostics(
             let _guard = runtime.enter();
             OnDemandCase::<TimedConsumerFrame47>::new(
                 Arc::clone(data),
-                Arc::clone(schema),
+                Arc::clone(layout),
                 subscribers,
                 None,
             )
@@ -248,10 +248,10 @@ fn delivery_diagnostics(
 fn main() {
     let fixture = support::full_frame_fixture();
     let data = Arc::new(fixture.data);
-    let schema = fixture.schema;
+    let layout = fixture.layout;
     let runtime = runtime();
 
-    allocation_diagnostics(&runtime, &data, &schema);
-    latency_diagnostics(&runtime, &data, &schema);
-    delivery_diagnostics(&runtime, &data, &schema);
+    allocation_diagnostics(&runtime, &data, &layout);
+    latency_diagnostics(&runtime, &data, &layout);
+    delivery_diagnostics(&runtime, &data, &layout);
 }
