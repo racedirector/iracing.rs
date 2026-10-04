@@ -49,6 +49,39 @@ and variants for source/serialization compatibility, but SDK decoding only
 produces the supported storage values and arrays. `DynamicFrame::bitfield`
 replaces the former synthetic unsigned-integer shortcut.
 
+## Runtime layout foundation
+
+`TelemetryLayout::try_from_headers(&VariableHeaders, frame_size)` builds an owned
+frame description independently of physical `IbtLayout`. Each `FieldLayout`
+stores its name, SDK `VariableType`, descriptive `FieldMetadata`, and one
+`VariableRegion`; offset and count are not duplicated. The copyable region is
+bounded by the advertised frame size at conversion time.
+
+The canonical field array preserves exact header publication order. `FieldId`
+is its layout-local index; `fields()` exposes that order and `field_by_name()`
+resolves through a name index. IDs must not be transferred between different
+layouts. Construction rejects empty/duplicate names, nonpositive frame size or
+element count, negative offsets, arithmetic overflow, and out-of-frame extents.
+It does not sort fields, reject in-frame overlaps, or normalize names. An empty
+header snapshot is valid with a positive frame size; providers decide whether
+their source requires metadata.
+
+This is a migration foundation, not the current packet/provider contract.
+`VariableSchema`, `VariableInfo`, `SchemaProvider`, and all decoders/adapters
+remain in use until the later runtime cutover. The new types do not add serde
+or reference-schema compatibility requirements.
+
+The repository's [IBT specification](../ibt-spec.md) describes positive counts,
+six storage widths, and bounded extents. Unknown/sentinel discriminants are
+already rejected by wire decoding into `VariableType`. The older public SDK
+[type definitions](https://github.com/vipoo/irsdk/blob/master/irsdk_defines.h)
+and [memory server](https://github.com/vipoo/irsdk/blob/master/irsdk_server/irsdk_memserver.cpp)
+corroborate those widths and append fields at the current buffer end using
+`element_width * count`. That observed producer order is not a new validation
+rule. The configured sibling `irsdk_1_20` source was unavailable when this
+foundation was implemented; verification against that exact version remains
+a review prerequisite before closing the foundation issue.
+
 ## Session YAML path
 
 `SessionInfoBytes` owns the complete captured region. Its `payload()` method
