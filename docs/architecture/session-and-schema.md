@@ -68,7 +68,10 @@ their source requires metadata.
 
 This is a migration foundation, not the current packet/provider contract.
 `VariableSchema`, `VariableInfo`, `SchemaProvider`, and all decoders/adapters
-remain in use until the later runtime cutover. The new types do not add serde
+remain in use until the later runtime cutover. `FieldData` introduces the new
+selected-field decoding boundary independently: validation checks type/shape,
+decoding slices one complete region, and arrays iterate relative exact chunks.
+`TelemetryValue::decode_field` uses the same region boundary. The new types do not add serde
 or reference-schema compatibility requirements.
 
 The repository's [IBT specification](../ibt-spec.md) describes positive counts,
