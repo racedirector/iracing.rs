@@ -29,11 +29,13 @@ impl ByteRegion {
     }
 
     /// Returns the source-relative starting byte offset.
+    #[inline]
     pub fn offset(self) -> usize {
         self.offset
     }
 
     /// Returns the length of the region in bytes.
+    #[inline]
     pub fn len(self) -> usize {
         self.length
     }
@@ -44,6 +46,7 @@ impl ByteRegion {
     }
 
     /// Returns the exclusive end offset of the region.
+    #[inline]
     pub fn end(&self) -> usize {
         self.offset + self.length
     }
@@ -51,6 +54,7 @@ impl ByteRegion {
     /// Returns the region as a half-open byte range.
     ///
     /// Construction guarantees that calculating the range end cannot overflow.
+    #[inline]
     pub fn as_range(&self) -> Range<usize> {
         self.offset..self.end()
     }

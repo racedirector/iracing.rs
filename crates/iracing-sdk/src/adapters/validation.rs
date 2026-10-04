@@ -18,6 +18,7 @@ pub enum FieldExtraction {
 }
 impl FieldExtraction {
     /// Returns the selected telemetry ID, when present.
+    #[inline]
     pub fn field_id(&self) -> Option<FieldId> {
         match self {
             Self::Required(id) => Some(*id),
@@ -95,6 +96,7 @@ impl AdapterValidation {
             .any(FieldExtraction::is_required)
     }
     /// Rejects use with a different layout, even when its field geometry matches.
+    #[inline]
     pub fn ensure_packet(&self, packet: &FramePacket) -> Result<()> {
         if !Arc::ptr_eq(&self.layout, packet.layout()) {
             return Err(IRacingSDKError::parse_error(
@@ -104,26 +106,59 @@ impl AdapterValidation {
         }
         Ok(())
     }
-    /// Decodes a declaration-ordered slot without name lookup or geometry recomputation.
-    pub fn decode<T: VarData>(&self, packet: &FramePacket, slot: usize) -> Result<Option<T>> {
+    /// Binds this plan to a packet, checking shared layout identity once.
+    #[inline]
+    pub fn for_packet<'a>(&'a self, packet: &'a FramePacket) -> Result<ValidatedFrame<'a>> {
         self.ensure_packet(packet)?;
-        let entry = self.extraction_plan.get(slot).ok_or_else(|| {
+        Ok(ValidatedFrame {
+            validation: self,
+            data: packet.data(),
+        })
+    }
+    /// Decodes a declaration-ordered slot after checking layout identity.
+    #[inline]
+    pub fn decode<T: VarData>(&self, packet: &FramePacket, slot: usize) -> Result<Option<T>> {
+        self.for_packet(packet)?.decode(slot)
+    }
+    /// Returns a type default for a missing or undecodable slot.
+    #[inline]
+    pub fn fetch_or_default<T: VarData + Default>(&self, packet: &FramePacket, slot: usize) -> T {
+        self.for_packet(packet)
+            .expect("adapter layout mismatch")
+            .fetch_or_default(slot)
+    }
+}
+
+/// Borrowed packet/plan pair whose originating layout identity has been checked.
+///
+/// Construct with [`AdapterValidation::for_packet`]. Use each slot with the Rust
+/// type validated by the adapter. This retains checked indexing and byte slicing
+/// without repeating packet identity checks for every field.
+pub struct ValidatedFrame<'a> {
+    validation: &'a AdapterValidation,
+    data: &'a [u8],
+}
+impl ValidatedFrame<'_> {
+    /// Decodes a prevalidated slot without name lookup or metadata copies.
+    #[inline(always)]
+    pub fn decode<T: VarData>(&self, slot: usize) -> Result<Option<T>> {
+        let entry = self.validation.extraction_plan.get(slot).ok_or_else(|| {
             IRacingSDKError::parse_error("AdapterValidation", "Invalid plan slot")
         })?;
         entry
             .field_id()
             .map(|id| {
-                let field = self.layout.field(id).ok_or_else(|| {
+                let field = self.validation.layout.field(id).ok_or_else(|| {
                     IRacingSDKError::parse_error("AdapterValidation", "Invalid field ID")
                 })?;
-                T::decode_prevalidated(packet.data(), field)
+                T::decode_prevalidated(self.data, field)
             })
             .transpose()
     }
-    /// Returns a type default for a missing or undecodable slot.
-    pub fn fetch_or_default<T: VarData + Default>(&self, packet: &FramePacket, slot: usize) -> T {
-        self.ensure_packet(packet).expect("adapter layout mismatch");
-        self.decode(packet, slot).ok().flatten().unwrap_or_default()
+    /// Returns a type default for a missing or undecodable prevalidated slot.
+    #[inline(always)]
+    pub fn fetch_or_default<T: VarData + Default>(&self, slot: usize) -> T {
+        self.decode(slot).ok().flatten().unwrap_or_default()
     }
 }
 

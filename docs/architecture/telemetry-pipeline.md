@@ -294,6 +294,8 @@ Invariants:
 - required layout mismatches fail during validation;
 - per-frame adaptation uses positional IDs without name lookup or metadata cloning;
 - validation retains the originating layout and rejects different packet layouts;
+- generated adapters bind a `ValidatedFrame` once, then decode slots without
+  repeating layout identity checks;
 - decoding goes through `VarData`;
 - `DynamicFrame` is for flexibility, not the default hot-path design.
 

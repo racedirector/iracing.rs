@@ -301,6 +301,7 @@ fn validation_rejects_equal_geometry_from_another_layout() {
     let other = Arc::new(make_schema(&[("Speed", VariableType::Float, 0)], 4));
     let packet = make_packet(other, 3f32.to_le_bytes().to_vec());
     assert!(validation.ensure_packet(&packet).is_err());
+    assert!(validation.for_packet(&packet).is_err());
     assert!(validation.decode::<f32>(&packet, 0).is_err());
     assert!(std::panic::catch_unwind(|| CalculatedRow::adapt(&packet, &validation)).is_err());
 }

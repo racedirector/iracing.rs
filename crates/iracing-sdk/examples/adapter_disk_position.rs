@@ -84,17 +84,17 @@ impl FrameAdapter for Row {
     }
 
     fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
-        validation
-            .ensure_packet(packet)
+        let frame = validation
+            .for_packet(packet)
             .expect("adapter layout mismatch");
         Self {
-            lap_distance_meters: validation.fetch_or_default::<f32>(packet, 0),
-            lap_distance_percentage: validation.fetch_or_default::<f32>(packet, 1),
-            latitude: validation.fetch_or_default::<f64>(packet, 2),
-            longitude: validation.fetch_or_default::<f64>(packet, 3),
-            altitude: validation.fetch_or_default::<f32>(packet, 4),
-            is_on_pit_road: validation.fetch_or_default::<bool>(packet, 5),
-            is_in_pit_box: validation.fetch_or_default::<bool>(packet, 6),
+            lap_distance_meters: frame.fetch_or_default::<f32>(0),
+            lap_distance_percentage: frame.fetch_or_default::<f32>(1),
+            latitude: frame.fetch_or_default::<f64>(2),
+            longitude: frame.fetch_or_default::<f64>(3),
+            altitude: frame.fetch_or_default::<f32>(4),
+            is_on_pit_road: frame.fetch_or_default::<bool>(5),
+            is_in_pit_box: frame.fetch_or_default::<bool>(6),
         }
     }
 }

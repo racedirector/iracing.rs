@@ -13,17 +13,21 @@ use iracing_irsdk::VariableType;
 macro_rules! scalar_domain {
     ($type:ty, $raw:ty, $convert:expr) => {
         impl TelemetryElement for $type {
+            const BYTE_WIDTH: usize = <$raw as TelemetryElement>::BYTE_WIDTH;
             fn accepts(storage: VariableType) -> bool {
                 <$raw as TelemetryElement>::accepts(storage)
             }
+            #[inline]
             fn decode_element(bytes: &[u8]) -> crate::Result<Self> {
                 ($convert)(<$raw as TelemetryElement>::decode_element(bytes)?)
             }
         }
         impl VarData for $type {
+            #[inline]
             fn validate_field(field: &FieldLayout) -> crate::Result<()> {
                 <$raw as VarData>::validate_field(field)
             }
+            #[inline]
             fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> crate::Result<Self> {
                 Self::decode_element(crate::types::field_data::field_bytes(frame, field)?)
             }
@@ -66,14 +70,17 @@ masks!(
     SessionFlags
 );
 impl TelemetryElement for IncidentFlags {
+    const BYTE_WIDTH: usize = 4;
     fn accepts(storage: VariableType) -> bool {
         matches!(storage, VariableType::Integer | VariableType::BitField)
     }
+    #[inline]
     fn decode_element(bytes: &[u8]) -> crate::Result<Self> {
         BitField::decode_element(bytes).map(Self::from)
     }
 }
 impl VarData for IncidentFlags {
+    #[inline]
     fn validate_field(field: &FieldLayout) -> crate::Result<()> {
         if Self::accepts(field.data_type()) && field.count() == 1 {
             Ok(())
@@ -84,6 +91,7 @@ impl VarData for IncidentFlags {
             ))
         }
     }
+    #[inline]
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> crate::Result<Self> {
         Self::decode_element(crate::types::field_data::field_bytes(frame, field)?)
     }

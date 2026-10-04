@@ -81,16 +81,19 @@ impl FieldLayout {
     }
 
     /// Returns the SDK storage type.
+    #[inline]
     pub fn data_type(&self) -> VariableType {
         self.data_type
     }
 
     /// Returns the validated frame-relative geometry.
+    #[inline]
     pub fn region(&self) -> VariableRegion {
         self.region
     }
 
     /// Returns the number of elements in this field.
+    #[inline]
     pub fn count(&self) -> usize {
         self.region.count()
     }
@@ -164,6 +167,7 @@ impl TelemetryLayout {
     }
 
     /// Returns a field by its layout-local ID, or `None` for an out-of-range ID.
+    #[inline]
     pub fn field(&self, id: FieldId) -> Option<&FieldLayout> {
         self.fields.get(id.0)
     }
