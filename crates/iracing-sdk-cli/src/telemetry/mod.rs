@@ -10,7 +10,7 @@ use futures::StreamExt;
 use iracing_sdk::{DynamicFrame, IbtConnection, SchemaProvider};
 use std::path::PathBuf;
 
-use snapshot::{Command as SnapshotCommand, handle_command as handle_snapshot_command};
+use snapshot::Command as SnapshotCommand;
 
 use crate::writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter};
 
@@ -48,88 +48,91 @@ pub(crate) enum Command {
     },
 }
 
-pub(crate) async fn handle_command(command: Command) -> Result<()> {
-    match command {
-        Command::Convert {
-            path,
-            output,
-            format,
-        } => {
-            tracing::info!(path = %path.display(), "Opening IBT file");
-            let connection = IbtConnection::builder()
-                .with_path(&path)
-                .build()
-                .await
-                .context("Failed to open IBT telemetry file")?;
-            let mut variables = connection.variables();
-            variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
-            });
-            let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
-            let mut writer =
-                RecordStreamWriter::from_variables(output, format, variables)?.prepare()?;
-            connection.start()?;
+impl Command {
+    pub async fn run(self) -> Result<()> {
+        match self {
+            Command::Convert {
+                path,
+                output,
+                format,
+            } => {
+                tracing::info!(path = %path.display(), "Opening IBT file");
+                let connection = IbtConnection::builder()
+                    .with_path(&path)
+                    .build()
+                    .await
+                    .context("Failed to open IBT telemetry file")?;
+                let mut variables = connection.variables();
+                variables.sort_unstable_by(|left, right| {
+                    left.offset
+                        .cmp(&right.offset)
+                        .then_with(|| left.name.cmp(&right.name))
+                });
+                let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
+                let mut writer =
+                    RecordStreamWriter::from_variables(output, format, variables)?.prepare()?;
+                connection.start()?;
 
-            let mut frame_count = 0usize;
-            while let Some(frame) = frames.next().await {
-                writer.write(&frame)?;
-                frame_count += 1;
-                if frame_count.is_multiple_of(10_000) {
-                    tracing::debug!(frames_exported = frame_count, "IBT export progress");
-                }
-            }
-            writer.finalize()?;
-            tracing::info!(frames_exported = frame_count, "Finished IBT export");
-            Ok(())
-        }
-        #[cfg(windows)]
-        Command::Record { output, format } => {
-            use iracing_sdk::{LiveConnection, UpdateRate, providers::live::LiveProvider};
-
-            let provider = LiveProvider::builder()
-                .with_connection(get_connection()?)
-                .build()?;
-            let connection = LiveConnection::builder().with_provider(provider).build()?;
-            let mut variables = connection.variables();
-            if variables.is_empty() {
-                bail!("No telemetry variables were available from the live connection");
-            }
-            variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
-            });
-            let mut frames = Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
-            let mut writer =
-                RecordStreamWriter::from_variables(output, format, variables)?.prepare()?;
-
-            tracing::info!("Recording live telemetry; press Ctrl+C to stop");
-            let shutdown = tokio::signal::ctrl_c();
-            tokio::pin!(shutdown);
-            let mut frame_count = 0usize;
-            loop {
-                tokio::select! {
-                    result = &mut shutdown => {
-                        result.context("Failed to listen for Ctrl+C")?;
-                        break;
+                let mut frame_count = 0usize;
+                while let Some(frame) = frames.next().await {
+                    writer.write(&frame)?;
+                    frame_count += 1;
+                    if frame_count.is_multiple_of(10_000) {
+                        tracing::debug!(frames_exported = frame_count, "IBT export progress");
                     }
-                    frame = frames.next() => {
-                        let Some(frame) = frame else { break };
-                        writer.write(&frame)?;
-                        frame_count += 1;
-                        if frame_count.is_multiple_of(10_000) {
-                            tracing::debug!(frames_exported = frame_count, "Live export progress");
+                }
+                writer.finalize()?;
+                tracing::info!(frames_exported = frame_count, "Finished IBT export");
+                Ok(())
+            }
+            #[cfg(windows)]
+            Command::Record { output, format } => {
+                use iracing_sdk::{LiveConnection, UpdateRate, providers::live::LiveProvider};
+
+                let provider = LiveProvider::builder()
+                    .with_connection(get_connection()?)
+                    .build()?;
+                let connection = LiveConnection::builder().with_provider(provider).build()?;
+                let mut variables = connection.variables();
+                if variables.is_empty() {
+                    bail!("No telemetry variables were available from the live connection");
+                }
+                variables.sort_unstable_by(|left, right| {
+                    left.offset
+                        .cmp(&right.offset)
+                        .then_with(|| left.name.cmp(&right.name))
+                });
+                let mut frames =
+                    Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
+                let mut writer =
+                    RecordStreamWriter::from_variables(output, format, variables)?.prepare()?;
+
+                tracing::info!("Recording live telemetry; press Ctrl+C to stop");
+                let shutdown = tokio::signal::ctrl_c();
+                tokio::pin!(shutdown);
+                let mut frame_count = 0usize;
+                loop {
+                    tokio::select! {
+                        result = &mut shutdown => {
+                            result.context("Failed to listen for Ctrl+C")?;
+                            break;
+                        }
+                        frame = frames.next() => {
+                            let Some(frame) = frame else { break };
+                            writer.write(&frame)?;
+                            frame_count += 1;
+                            if frame_count.is_multiple_of(10_000) {
+                                tracing::debug!(frames_exported = frame_count, "Live export progress");
+                            }
                         }
                     }
                 }
+                writer.finalize()?;
+                tracing::info!(frames_exported = frame_count, "Finished live export");
+                Ok(())
             }
-            writer.finalize()?;
-            tracing::info!(frames_exported = frame_count, "Finished live export");
-            Ok(())
+            Command::Snapshot { command } => command.run().await,
         }
-        Command::Snapshot { command } => handle_snapshot_command(command).await,
     }
 }
 
@@ -147,11 +150,12 @@ mod tests {
             let output = directory.path().join("export");
             tokio::time::timeout(
                 Duration::from_secs(10),
-                handle_command(Command::Convert {
+                Command::Convert {
                     path: path.clone(),
                     output: OutputTarget::File(output.clone()),
                     format,
-                }),
+                }
+                .run(),
             )
             .await??;
             let text = std::fs::read_to_string(output)?;
@@ -208,20 +212,22 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let output = directory.path().join("existing");
         std::fs::write(&output, "keep this")?;
-        let error = handle_command(Command::Convert {
+        let error = Command::Convert {
             path: directory.path().join("missing.ibt"),
             output: OutputTarget::File(output.clone()),
             format: RecordStreamFormat::Jsonl,
-        })
+        }
+        .run()
         .await
         .unwrap_err();
         assert!(error.to_string().contains("Failed to open IBT"));
         assert_eq!(std::fs::read_to_string(output)?, "keep this");
-        let error = handle_command(Command::Convert {
+        let error = Command::Convert {
             path,
             output: OutputTarget::File(directory.path().join("missing").join("output")),
             format: RecordStreamFormat::Csv,
-        })
+        }
+        .run()
         .await
         .unwrap_err();
         assert!(error.downcast_ref::<std::io::Error>().is_some());

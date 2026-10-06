@@ -36,12 +36,11 @@
 //! }
 //! ```
 
-mod broadcast;
 mod connection;
 mod source;
 mod utils;
 
-pub use broadcast::{Broadcast, BroadcastCommand};
 pub use connection::{Connection, LiveFrameSnapshot};
+pub use iracing_broadcast_sdk::{Client as Broadcast, Command as BroadcastCommand};
 pub use source::WaitResult;
 pub use utils::wide_string;
