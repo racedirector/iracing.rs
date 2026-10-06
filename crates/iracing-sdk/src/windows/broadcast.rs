@@ -1,7 +1,7 @@
 //! iracing-sdk broadcast SDK interface.
 //! Wraps external `iracing-broadcast-sdk` types into `iracing-sdk` domain.
 //!
-use iracing_broadcast_sdk::Client;
+use iracing_broadcast_sdk::{Client, Command};
 
 use crate::{IRacingSDKError, Result};
 
@@ -32,7 +32,7 @@ impl Broadcast {
     ///
     /// Returns [`IRacingSDKError`] if the command cannot be encoded or if
     /// `SendNotifyMessageW` reports a Win32 error.
-    pub fn send_message(&self, message: iracing_broadcast_sdk::Command) -> Result<()> {
+    pub fn send_message(&self, message: Command) -> Result<()> {
         self.client
             .send_message(message)
             .map_err(IRacingSDKError::from)
