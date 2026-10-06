@@ -1,8 +1,6 @@
 use std::io::Read;
 
-use crate::{DiskSubHeader, Header};
-
-use crate::{Error, Result};
+use crate::{DiskSubHeader, Error, Header, Result};
 
 /// The fixed wire preamble of an iRacing `.ibt` recording.
 ///

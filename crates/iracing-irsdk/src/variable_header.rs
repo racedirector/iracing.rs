@@ -1,10 +1,14 @@
 use std::{borrow::Cow, ops::Range};
 
-use crate::parse_utils::{decode, encode, try_from_wire_bytes};
-use crate::{Error, Result};
+use crate::{
+    Error, Result,
+    parse_utils::{decode, encode, try_from_wire_bytes},
+};
 
-use super::VariableType;
-use super::constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING};
+use super::{
+    VariableType,
+    constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING},
+};
 
 /// iRacing variable header structure matching the C SDK layout.
 ///
