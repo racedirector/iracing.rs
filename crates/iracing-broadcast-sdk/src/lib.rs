@@ -2,7 +2,6 @@
 mod client;
 mod command;
 pub mod error;
-mod message_format;
 mod pad_car_number;
 
 #[cfg(windows)]

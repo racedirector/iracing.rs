@@ -1,9 +1,8 @@
 use crate::{
     command::Command,
     error::{Error, Result},
-    message_format::FormattedMessage,
 };
-use iracing_irsdk::constants::IRSDK_BROADCASTMSGNAME;
+use iracing_irsdk::{BroadcastMessage, constants::IRSDK_BROADCASTMSGNAME};
 use widestring::U16CString;
 use windows::{
     Win32::{
@@ -19,32 +18,18 @@ struct WindowsMessage {
     lparam: LPARAM,
 }
 
-impl From<FormattedMessage> for WindowsMessage {
+impl From<BroadcastMessage> for WindowsMessage {
     /// Pack the message ID and three parameter words into Win32 message parameters.
     ///
     /// The ID and first word occupy `WPARAM`; the remaining words occupy `LPARAM`.
-    fn from(message: FormattedMessage) -> Self {
-        let wparam_value = (i32::from(message.0) as usize) | ((message.1 as usize) << 16);
-        let lparam_value = i32::from(message.2) | (i32::from(message.3) << 16);
+    fn from(message: BroadcastMessage) -> Self {
+        let wparam_value = (i32::from(message.kind) as usize) | ((message.var1 as usize) << 16);
+        let lparam_value = i32::from(message.var2) | (i32::from(message.var3) << 16);
 
         Self {
             wparam: WPARAM(wparam_value),
             lparam: LPARAM(lparam_value as isize),
         }
-    }
-}
-
-impl TryFrom<Command> for WindowsMessage {
-    type Error = crate::error::Error;
-
-    /// Encode a typed command as Win32 message parameters.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] if a chat macro index is outside `1..=15`.
-    fn try_from(command: Command) -> Result<Self> {
-        let message = FormattedMessage::try_from(command)?;
-        Ok(WindowsMessage::from(message))
     }
 }
 
@@ -81,7 +66,6 @@ impl MessageDispatcher {
     ///
     /// Returns [`Error::Windows`] if `SendNotifyMessageW` fails.
     fn send_message(&self, message: WindowsMessage) -> Result<()> {
-        tracing::debug!("Sending message: {:?}", message);
         unsafe {
             // Safety: iRacing expects these messages to be delivered to
             // HWND_BROADCAST using the ID obtained from RegisterWindowMessageW.
@@ -126,7 +110,9 @@ impl Client {
     /// Returns [`Error::Validation`] if the command cannot be encoded or
     /// [`Error::Windows`] if `SendNotifyMessageW` reports a Win32 error.
     pub fn send_message(&self, message: Command) -> Result<()> {
-        self.dispatch
-            .send_message(WindowsMessage::try_from(message)?)
+        let broadcast_message = BroadcastMessage::try_from(message)?;
+        let windows_message = WindowsMessage::from(broadcast_message);
+
+        self.dispatch.send_message(windows_message)
     }
 }
