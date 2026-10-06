@@ -1,4 +1,8 @@
-use crate::{command::Command, error::BroadcastError, pad_car_number::pad_car_number};
+use crate::{
+    command::Command,
+    error::{BroadcastError, Result},
+    pad_car_number::pad_car_number,
+};
 use iracing_irsdk::{
     BroadcastMessage, ChatCommandMode, ForceFeedbackCommandMode, PitCommand, PitCommandMode,
     ReloadTexturesMode,
@@ -17,7 +21,7 @@ fn encode_mode<T: Into<i32>>(mode: T) -> u16 {
 impl TryFrom<Command> for FormattedMessage {
     type Error = BroadcastError;
 
-    fn try_from(command: Command) -> std::result::Result<Self, Self::Error> {
+    fn try_from(command: Command) -> Result<Self, Self::Error> {
         let message = match command {
             Command::CameraSwitchPosition(position, group, camera) => (
                 BroadcastMessage::CameraSwitchPosition,
