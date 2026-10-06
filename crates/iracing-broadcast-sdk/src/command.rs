@@ -85,6 +85,7 @@ macro_rules! broadcast_message {
     };
 }
 
+/// Maps a `Command` back to the SDK type `BroadcastMessage`
 impl TryFrom<Command> for BroadcastMessage {
     type Error = crate::error::Error;
 
