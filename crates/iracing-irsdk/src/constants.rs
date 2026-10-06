@@ -22,7 +22,6 @@ pub const IRSDK_MAX_DESC: usize = 64;
 pub const IRSDK_UNLIMITED_LAPS: i32 = 32_767;
 
 /// Session time marker, in seconds, meaning that the session has no time limit.
-
 pub const IRSDK_UNLIMITED_TIME: f32 = 604_800.0;
 
 /// Current telemetry-header version defined by the SDK.

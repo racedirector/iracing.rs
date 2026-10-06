@@ -143,4 +143,14 @@ mod tests {
                 if error.kind() == std::io::ErrorKind::UnexpectedEof
         ));
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialization_round_trip() {
+        let disk = DiskSubHeader::new(123, 1.5, 2.5, 3, 4);
+
+        let decoded_disk: DiskSubHeader =
+            serde_json::from_value(serde_json::to_value(disk).unwrap()).unwrap();
+        assert_eq!(decoded_disk.as_bytes(), disk.as_bytes());
+    }
 }
