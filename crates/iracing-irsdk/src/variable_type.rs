@@ -11,31 +11,30 @@ use std::fmt;
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::Immutable,
     zerocopy::KnownLayout,
     zerocopy::TryFromBytes,
     zerocopy::IntoBytes,
 )]
 #[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VariableType {
     /// `irsdk_char`.
-    #[serde(alias = "Char")]
+    #[cfg_attr(feature = "serde", serde(alias = "Char"))]
     Character = 0,
     /// `irsdk_bool`.
-    #[serde(alias = "Bool")]
+    #[cfg_attr(feature = "serde", serde(alias = "Bool"))]
     Boolean = 1,
     /// `irsdk_int`.
-    #[serde(alias = "Int32")]
+    #[cfg_attr(feature = "serde", serde(alias = "Int32"))]
     Integer = 2,
     /// `irsdk_bitField`.
     BitField = 3,
     /// `irsdk_float`.
-    #[serde(alias = "Float32")]
+    #[cfg_attr(feature = "serde", serde(alias = "Float32"))]
     Float = 4,
     /// `irsdk_double`.
-    #[serde(alias = "Float64")]
+    #[cfg_attr(feature = "serde", serde(alias = "Float64"))]
     Double = 5,
 }
 

@@ -19,14 +19,13 @@ use crate::{Result, parse_utils::read_wire_bytes};
     Eq,
     Hash,
     Default,
-    serde::Deserialize,
-    serde::Serialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
 #[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StatusField(i32);
 
 impl type_layout::TypeLayout for StatusField {
@@ -78,13 +77,12 @@ impl StatusField {
     PartialEq,
     Eq,
     Hash,
-    serde::Deserialize,
-    serde::Serialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EngineWarnings(u32);
 
 bitflags! {
@@ -148,13 +146,12 @@ impl EngineWarnings {
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionFlags(u32);
 
 bitflags! {
@@ -302,13 +299,12 @@ impl SessionFlags {
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CameraState(u32);
 
 bitflags! {
@@ -345,13 +341,12 @@ bitflags! {
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PitServiceFlags(u32);
 
 bitflags! {
@@ -448,13 +443,12 @@ impl PitServiceFlags {
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PaceFlags(u32);
 
 bitflags! {
@@ -552,13 +546,12 @@ impl_flag_interop!(
     PartialEq,
     Eq,
     Hash,
-    serde::Serialize,
-    serde::Deserialize,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IncidentFlags(u32);
 
 /// The low-byte report code in [`IncidentFlags`].
@@ -804,6 +797,16 @@ impl schemars::JsonSchema for IncidentFlags {
         );
         schema
     }
+}
+
+#[cfg(feature = "codegen")]
+fn named_schema_values(values: &[(&str, i64)]) -> serde_json::Value {
+    serde_json::Value::Array(
+        values
+            .iter()
+            .map(|(name, value)| serde_json::json!({ "name": name, "value": value }))
+            .collect(),
+    )
 }
 
 #[cfg(test)]

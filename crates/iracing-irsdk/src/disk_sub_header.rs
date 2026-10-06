@@ -15,14 +15,13 @@ use crate::{
     Debug,
     Clone,
     Copy,
-    serde::Serialize,
-    serde::Deserialize,
     type_layout::TypeLayout,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiskSubHeader {
     /// Unix timestamp (`time_t`) of the session start date.
     pub start_date: i64,

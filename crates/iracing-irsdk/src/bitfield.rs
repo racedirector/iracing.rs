@@ -1,10 +1,9 @@
 //! BitField type for handling iRacing bitfield variables
 
-use serde::{Deserialize, Serialize};
-
 /// BitField type for handling iRacing bitfield variables.
 // #[deprecated]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BitField(pub u32);
 
 impl BitField {

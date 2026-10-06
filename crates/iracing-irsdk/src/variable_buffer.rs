@@ -6,14 +6,13 @@ use crate::{Result, parse_utils::read_wire_bytes};
     Debug,
     Clone,
     Copy,
-    serde::Serialize,
-    serde::Deserialize,
     type_layout::TypeLayout,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariableBuffer {
     /// Tick count when buffer was written
     pub tick_count: i32,
@@ -22,7 +21,7 @@ pub struct VariableBuffer {
     /// Tick count written before a frame write begins, used for torn-read detection
     pub tick_count_begin: i32,
     /// Padding to maintain alignment
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     _pad: [i32; 1],
 }
 

@@ -1,10 +1,5 @@
 use std::{borrow::Cow, ops::Range};
 
-use serde::{
-    Deserialize, Deserializer, Serialize,
-    ser::{SerializeStruct, Serializer},
-};
-
 use crate::parse_utils::{decode, encode, try_from_wire_bytes};
 use crate::{Error, Result};
 
@@ -45,11 +40,14 @@ pub struct VariableHeader {
     unit: [u8; IRSDK_MAX_STRING],
 }
 
-impl Serialize for VariableHeader {
+#[cfg(feature = "serde")]
+impl serde::Serialize for VariableHeader {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
+        use serde::ser::SerializeStruct;
+
         let mut header = serializer.serialize_struct("VariableHeader", 7)?;
         header.serialize_field("variable_type", &self.variable_type)?;
         header.serialize_field("offset", &self.offset)?;
@@ -62,12 +60,13 @@ impl Serialize for VariableHeader {
     }
 }
 
-impl<'de> Deserialize<'de> for VariableHeader {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for VariableHeader {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct Metadata {
             variable_type: VariableType,
             offset: i32,

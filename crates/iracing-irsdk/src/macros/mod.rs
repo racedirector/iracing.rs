@@ -16,9 +16,8 @@ macro_rules! sdk_enum {
             PartialEq,
             Eq,
             Hash,
-            serde::Serialize,
-            serde::Deserialize,
         )]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         $vis enum $name {
             $(
                 #[doc = concat!("SDK member `", stringify!($variant), "`.")]

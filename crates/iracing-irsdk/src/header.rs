@@ -12,14 +12,13 @@ use crate::{
     Debug,
     Clone,
     Copy,
-    serde::Serialize,
-    serde::Deserialize,
     type_layout::TypeLayout,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Header {
     /// API version
     pub version: i32,
@@ -46,7 +45,7 @@ pub struct Header {
     /// Index of most recently written buffer (`irsdk_header::curBuf`)
     pub current_buffer: u8,
     /// Alignment padding (`irsdk_header::pad1`)
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     _pad: [u8; 3],
     /// Telemetry buffer descriptors
     pub buffers: [VariableBuffer; Self::MAX_BUFFERS],

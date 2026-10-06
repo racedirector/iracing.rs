@@ -8,11 +8,11 @@
 //! construct telemetry schemas, decode session YAML, or run telemetry streams.
 
 mod bitfield;
-mod codegen;
 mod macros;
 mod parse_utils;
 
 pub mod broadcast;
+
 pub mod constants;
 pub mod flags;
 pub mod telemetry;
