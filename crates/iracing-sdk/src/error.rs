@@ -192,6 +192,7 @@ impl IRacingSDKError {
             Self::InvalidWireValue { .. } => false,
             Self::Broadcast(e) => match e {
                 iracing_broadcast_sdk::error::Error::Connection { .. } => true,
+                #[cfg(windows)]
                 iracing_broadcast_sdk::error::Error::Windows(_) => true,
                 iracing_broadcast_sdk::error::Error::Validation { .. } => false,
                 iracing_broadcast_sdk::error::Error::Conversion(_) => false,
@@ -277,6 +278,7 @@ impl IRacingSDKError {
                     "Verify iRacing SDK version compatibility",
                     "Try restarting iRacing",
                 ],
+                #[cfg(windows)]
                 iracing_broadcast_sdk::error::Error::Windows(_) => vec![
                     "Check Windows API permissions",
                     "Verify system resources availability",
