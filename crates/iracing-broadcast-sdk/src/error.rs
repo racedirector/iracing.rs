@@ -1,13 +1,13 @@
 use thiserror::Error;
-use windows::core::Error as WindowsError;
 
 #[derive(Error, Debug)]
 pub enum BroadcastError {
     #[error("Failed to connect to iRacing: {reason}")]
     Connection { reason: String },
 
+    #[cfg(windows)]
     #[error("Windows API error")]
-    Windows(#[from] WindowsError),
+    Windows(#[from] windows::core::Error),
 
     #[error("Command validation error: {reason}")]
     Validation { reason: String },

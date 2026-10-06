@@ -19,13 +19,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
           toolchain: "1.88.0"
-      - name: Check workspace MSRV (windows)
-        if: runner.os == 'Windows'
-        run: cargo check --locked --workspace --all-features
-
-      - name: Check workspace MSRV (not windows)
-        if: runner.os != 'Windows'
-        run: cargo check --locked --workspace --exclude iracing-broadcast-sdk --all-features
+      - run: cargo check --locked --workspace --all-features
   features:
     runs-on: ${{ matrix.os }}
     strategy:
