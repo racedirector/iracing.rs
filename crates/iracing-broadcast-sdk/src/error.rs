@@ -12,7 +12,7 @@ pub enum BroadcastError {
     #[error("Command validation error: {reason}")]
     Validation { reason: String },
 
-    #[error("Wide-string conversaion error")]
+    #[error("Wide-string conversion error")]
     Conversion(#[from] widestring::error::ContainsNul<u16>),
 }
 
