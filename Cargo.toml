@@ -2,6 +2,8 @@
 
 members = [
   "xtask",
+  "crates/iracing-broadcast-sdk",
+  "crates/iracing-broadcast-cli",
   "crates/iracing-irsdk",
   "crates/iracing-sdk",
   "crates/iracing-sdk-cli",
@@ -10,7 +12,7 @@ members = [
   "crates/test-fixtures",
   "examples/driver-inputs",
   "examples/iracing-lifecycle-monitor",
-  "crates/iracing-broadcast-sdk",
+
 ]
 
 resolver = "3"
