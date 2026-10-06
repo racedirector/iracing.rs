@@ -56,10 +56,16 @@ pub enum Command {
     VideoCapture(VideoCaptureMode),
 }
 
+/// Returns the low and high 16-bit words, in that order, for broadcast arguments.
 fn split_u32_words(value: u32) -> (u16, u16) {
     ((value & 0xffff) as u16, ((value >> 16) & 0xffff) as u16)
 }
 
+/// Encodes a broadcast mode as a protocol argument word.
+///
+/// # Panics
+///
+/// Panics if the mode's integer value is outside `0..=65535`.
 fn encode_mode<T: Into<i32>>(mode: T) -> u16 {
     u16::try_from(mode.into()).expect("broadcast modes must fit in u16")
 }
@@ -82,6 +88,21 @@ macro_rules! broadcast_message {
 impl TryFrom<Command> for BroadcastMessage {
     type Error = crate::error::Error;
 
+    /// Encodes a command as SDK broadcast arguments without sending it.
+    ///
+    /// Car numbers preserve leading-zero padding; numbers that cannot be parsed
+    /// as `u16` use zero as their numeric value before applying that padding.
+    /// Replay session times are in milliseconds, and force-feedback values retain
+    /// their floating-point bit representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::error::Error::Validation`] if a chat macro number is
+    /// outside `1..=15`.
+    ///
+    /// # Panics
+    ///
+    /// With overflow checks enabled, panics if car-number padding overflows `u16`.
     fn try_from(value: Command) -> Result<Self, Self::Error> {
         let message = match value {
             Command::CameraSwitchPosition(position, group, camera) => broadcast_message!(
