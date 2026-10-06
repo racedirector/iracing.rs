@@ -59,9 +59,12 @@ impl TryFrom<Command> for FormattedMessage {
             Command::ReplaySearch(mode) => {
                 (BroadcastMessageKind::ReplaySearch, encode_mode(mode), 0, 0)
             }
-            Command::ReplaySetState(mode) => {
-                (BroadcastMessageKind::ReplaySetState, encode_mode(mode), 0, 0)
-            }
+            Command::ReplaySetState(mode) => (
+                BroadcastMessageKind::ReplaySetState,
+                encode_mode(mode),
+                0,
+                0,
+            ),
             Command::ReloadAllTextures => (
                 BroadcastMessageKind::ReloadTextures,
                 encode_mode(ReloadTexturesMode::All),
@@ -119,9 +122,12 @@ impl TryFrom<Command> for FormattedMessage {
 
                 (BroadcastMessageKind::PitCommand, var1, var2, 0)
             }
-            Command::Telemetry(mode) => {
-                (BroadcastMessageKind::TelemetryCommand, encode_mode(mode), 0, 0)
-            }
+            Command::Telemetry(mode) => (
+                BroadcastMessageKind::TelemetryCommand,
+                encode_mode(mode),
+                0,
+                0,
+            ),
             Command::ForceFeedback(value) => {
                 let bits = value.to_bits();
                 let (low, high) = split_u32_words(bits);
