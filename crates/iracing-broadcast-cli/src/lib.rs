@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Args, Subcommand, ValueEnum};
 use iracing_broadcast_sdk::{
-    CameraState, ChatCommandMode, Client as Broadcast, Command as BroadcastCommand, PitCommand,
-    ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
+    CameraState, ChatCommandMode, Command as BroadcastCommand, PitCommand, ReplayPositionMode,
+    ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
 };
 
 #[derive(Subcommand, Debug, Clone, PartialEq)]
@@ -425,9 +425,17 @@ impl From<VideoCommand> for BroadcastCommand {
 
 impl Command {
     pub fn run(self) -> Result<()> {
-        let client = Broadcast::new()?;
-        client.send_message(self.try_into()?)?;
-        Ok(())
+        #[cfg(not(windows))]
+        {
+            anyhow::anyhow!("Broadcast commands only run on windows")
+        }
+
+        #[cfg(windows)]
+        {
+            let client = iracing_broadcast_sdk::Client::new()?;
+            client.send_message(self.try_into()?)?;
+            Ok(())
+        }
     }
 }
 
