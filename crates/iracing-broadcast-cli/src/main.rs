@@ -11,13 +11,13 @@ struct Cli {
 }
 
 fn main() -> anyhow::Result<()> {
+    #[cfg(not(windows))]
+    {
+        Err(anyhow::anyhow!("Broadcast commands only run on Windows."))
+    }
+
     #[cfg(windows)]
     {
         Cli::parse().command.run()
-    }
-
-    #[cfg(not(windows))]
-    {
-        anyhow::anyhow!("Broadcast commands only run on Windows.")
     }
 }

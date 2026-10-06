@@ -427,7 +427,7 @@ impl Command {
     pub fn run(self) -> Result<()> {
         #[cfg(not(windows))]
         {
-            anyhow::anyhow!("Broadcast commands only run on windows")
+            Err(anyhow::anyhow!("Broadcast commands only run on windows"))
         }
 
         #[cfg(windows)]
