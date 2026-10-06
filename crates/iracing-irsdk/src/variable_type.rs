@@ -81,6 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn legacy_metadata_names_deserialize_to_sdk_types() {
         for (legacy, expected) in [
             ("Char", VariableType::Character),

@@ -77,7 +77,7 @@ impl<'de> serde::Deserialize<'de> for VariableHeader {
             unit: String,
         }
 
-        let metadata = Metadata::deserialize(deserializer)?;
+        let metadata = <Metadata as serde::Deserialize>::deserialize(deserializer)?;
         Self::new(
             metadata.variable_type,
             metadata.offset,
@@ -276,6 +276,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serializes_header_metadata_without_wire_padding() {
         let header = VariableHeader::new(
             VariableType::Float,

@@ -1,6 +1,6 @@
 # Schema reference
 
-JSON schema snapshots retained as reference data. Session schema generation is available through the [`iracing-sdk` CLI](../../crates/iracing-sdk-cli/src/main.rs); static session, variable and primitive reference generation is maintained by `cargo xtask generate-reference`. Car-setup/live-variable CLI generators remain deferred.
+JSON schema snapshots retained as reference data. Session schema generation is available through the [`iracing-sdk` CLI](../../crates/iracing-sdk-cli/src/main.rs); static session reference generation is maintained by `cargo xtask generate-reference`. Car-setup/live-variable CLI generators remain deferred.
 
 Do not hand-edit.
 
