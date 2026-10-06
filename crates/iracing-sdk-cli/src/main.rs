@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    Cli::parse().command.run().await;
+    Cli::parse().command.run().await?;
 
     Ok(())
 }
