@@ -70,8 +70,8 @@ impl TryFrom<Command> for FormattedMessage {
                 car_index,
                 0,
             ),
-            Command::ChatCommand(mode) => (BroadcastMessage::ChatCommand, encode_mode(mode), 0, 0),
-            Command::ChatCommandMacro(macro_number) => {
+            Command::Chat(mode) => (BroadcastMessage::ChatCommand, encode_mode(mode), 0, 0),
+            Command::ChatMacro(macro_number) => {
                 if !(1..=15).contains(&macro_number) {
                     return Err(BroadcastError::Validation {
                         reason: format!("macro id must be in range 1..=15, got {macro_number}"),
@@ -85,7 +85,7 @@ impl TryFrom<Command> for FormattedMessage {
                     0,
                 )
             }
-            Command::PitCommand(pit_command_mode) => {
+            Command::Pit(pit_command_mode) => {
                 let (var1, var2) = match pit_command_mode {
                     PitCommand::Clear => (encode_mode(PitCommandMode::Clear), 0),
                     PitCommand::Tearoff => (encode_mode(PitCommandMode::WindshieldTearoff), 0),
@@ -115,10 +115,10 @@ impl TryFrom<Command> for FormattedMessage {
 
                 (BroadcastMessage::PitCommand, var1, var2, 0)
             }
-            Command::TelemetryCommand(mode) => {
+            Command::Telemetry(mode) => {
                 (BroadcastMessage::TelemetryCommand, encode_mode(mode), 0, 0)
             }
-            Command::FFBCommand(value) => {
+            Command::ForceFeedback(value) => {
                 let bits = value.to_bits();
                 let (low, high) = split_u32_words(bits);
                 (

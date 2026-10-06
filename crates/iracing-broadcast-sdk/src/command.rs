@@ -12,10 +12,13 @@ use iracing_irsdk::{
 /// # Examples
 ///
 /// ```
-/// use iracing_sdk::{PitCommand, windows::BroadcastCommand};
+/// pub use iracing_irsdk::PitCommand;
+/// pub use client::Client;
+/// pub use command::Command;
+/// pub use error::{BroadcastError, Result};
 ///
-/// let _ = BroadcastCommand::CameraSwitchPosition(0, 0, 0);
-/// let _ = BroadcastCommand::PitCommand(PitCommand::Fuel(8));
+/// let _ = Command::CameraSwitchPosition(0, 0, 0);
+/// let _ = Command::Pit(PitCommand::Fuel(8));
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -38,15 +41,15 @@ pub enum Command {
     /// Reload textures for a specific car index.
     ReloadTextures(u16),
     /// Send a chat command.
-    ChatCommand(ChatCommandMode),
+    Chat(ChatCommandMode),
     /// Send a chat macro by number.
-    ChatCommandMacro(u16),
+    ChatMacro(u16),
     /// Issue a pit command.
-    PitCommand(PitCommand),
+    Pit(PitCommand),
     /// Control telemetry recording.
-    TelemetryCommand(TelemetryCommandMode),
+    Telemetry(TelemetryCommandMode),
     /// Send a force-feedback command.
-    FFBCommand(f32),
+    ForceFeedback(f32),
     /// Search a replay to a specific session time.
     ReplaySearchSessionTime(u16, u32),
     /// Control video capture.

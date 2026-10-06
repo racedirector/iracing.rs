@@ -47,13 +47,21 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Lint workspace
-        run:
-          cargo clippy --workspace --all-targets --all-features --keep-going -- -D
-          warnings
+      - name: Lint workspace (windows)
+        if: runner.os == 'Windows'
+        run: cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings
 
-      - name: Test workspace
+      - name: Lint workspace (not windows)
+        if: runner.os != 'Windows'
+        run: cargo clippy --workspace --exclude iracing-broadcast-sdk --all-targets --all-features --keep-going -- -D warnings
+
+      - name: Test workspace (windows)
+        if: runner.os == 'Windows'
         run: cargo test --workspace --all-targets
+
+      - name: Test workspace (not windows)
+        if: runner.os != 'Windows'
+        run: cargo test --workspace --exclude iracing-broadcast-sdk --all-targets
 
       - name: Compile all benchmarks
         run: cargo bench -p iracing-sdk --features benchmark --no-run
