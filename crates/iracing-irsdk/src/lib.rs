@@ -40,7 +40,7 @@ pub use variable_buffer::VariableBuffer;
 pub use variable_header::VariableHeader;
 pub use variable_type::VariableType;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod serde_tests {
     use super::*;
     use zerocopy::IntoBytes;

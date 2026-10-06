@@ -798,22 +798,6 @@ mod tests {
     }
 
     #[test]
-    fn masks_preserve_unknown_bits() {
-        let raw = SessionFlags::GREEN.bits() | 0x0800_0000;
-        let flags = SessionFlags::from_bits(raw).unwrap();
-        assert!(flags.contains(SessionFlags::GREEN));
-        assert_eq!(flags.bits(), raw);
-        assert_eq!(serde_json::to_string(&flags).unwrap(), raw.to_string());
-        assert_eq!(
-            serde_json::from_str::<SessionFlags>(&raw.to_string()).unwrap(),
-            flags
-        );
-
-        let warnings = EngineWarnings::from_bits(0x8000_0000).unwrap();
-        assert_eq!(warnings.bits(), 0x8000_0000);
-    }
-
-    #[test]
     fn engine_repair_predicates_distinguish_any_from_specific_warnings() {
         let mandatory = EngineWarnings::MANDATORY_REPAIR_NEEDED;
         assert!(mandatory.has_any_repair_warning());
@@ -954,5 +938,26 @@ mod tests {
 
         assert_eq!(incident.report_bits(), 0x00);
         assert_eq!(incident.penalty_bits(), 0x01);
+    }
+
+    #[cfg(feature = "serde")]
+    mod serde_tests {
+        use super::*;
+
+        #[test]
+        fn masks_preserve_unknown_bits() {
+            let raw = SessionFlags::GREEN.bits() | 0x0800_0000;
+            let flags = SessionFlags::from_bits(raw).unwrap();
+            assert!(flags.contains(SessionFlags::GREEN));
+            assert_eq!(flags.bits(), raw);
+            assert_eq!(serde_json::to_string(&flags).unwrap(), raw.to_string());
+            assert_eq!(
+                serde_json::from_str::<SessionFlags>(&raw.to_string()).unwrap(),
+                flags
+            );
+
+            let warnings = EngineWarnings::from_bits(0x8000_0000).unwrap();
+            assert_eq!(warnings.bits(), 0x8000_0000);
+        }
     }
 }
