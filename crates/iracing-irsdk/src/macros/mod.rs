@@ -47,43 +47,6 @@ macro_rules! sdk_enum {
                 Self::try_from(0).expect(concat!(stringify!($name), " must define value 0"))
             }
         }
-
-        #[cfg(feature = "codegen")]
-        impl $name {
-            /// Named variants and their SDK values for schema generation.
-            pub const SCHEMA_VALUES: &'static [(&'static str, i64)] = &[
-                $((stringify!($variant), $value as i64),)+
-            ];
-        }
-
-        #[cfg(feature = "codegen")]
-        impl schemars::JsonSchema for $name {
-            fn schema_name() -> std::borrow::Cow<'static, str> {
-                stringify!($name).into()
-            }
-
-            fn schema_id() -> std::borrow::Cow<'static, str> {
-                concat!(module_path!(), "::", stringify!($name)).into()
-            }
-
-            fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                #[allow(dead_code, clippy::enum_variant_names)]
-                #[derive(schemars::JsonSchema)]
-                $(#[$meta])*
-                enum SchemaRepresentation {
-                    $($variant,)+
-                }
-
-                let mut schema = SchemaRepresentation::json_schema(generator);
-                let schema_object = schema.ensure_object();
-                schema_object.insert("x-irsdk-kind".into(), "enum".into());
-                schema_object.insert(
-                    "x-irsdk-values".into(),
-                    $crate::codegen::named_schema_values(Self::SCHEMA_VALUES),
-                );
-                schema
-            }
-        }
     };
 }
 

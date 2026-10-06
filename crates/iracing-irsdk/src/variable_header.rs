@@ -15,12 +15,12 @@ use super::constants::{IRSDK_MAX_DESC, IRSDK_MAX_STRING};
     Debug,
     Clone,
     Copy,
-    type_layout::TypeLayout,
     zerocopy::TryFromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
+#[cfg_attr(feature = "debug", derive(type_layout::TypeLayout))]
 pub struct VariableHeader {
     /// Variable type (irsdk_VarType enum)
     pub variable_type: VariableType,

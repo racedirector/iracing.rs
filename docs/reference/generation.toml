@@ -6,20 +6,6 @@ command = "cargo xtask generate-reference"
 context = "Deterministic YAML from sorted serde_json values; no simulator input"
 
 [[artifact]]
-file = "variable-schema.yml"
-kind = "generated"
-source = "Current workspace Rust types and locked schemars"
-command = "cargo xtask generate-reference"
-context = "Deterministic YAML from sorted serde_json values; no simulator input"
-
-[[artifact]]
-file = "primitives-schema.yml"
-kind = "generated"
-source = "Current workspace Rust types and locked schemars"
-command = "cargo xtask generate-reference"
-context = "Deterministic YAML from sorted serde_json values; no simulator input"
-
-[[artifact]]
 file = "disk-variable-schema.yml"
 kind = "captured"
 source = "fordmustanggt4_interlagos gp 2026-08-01 11-24-51.ibt (not committed)"

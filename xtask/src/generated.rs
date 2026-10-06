@@ -1,64 +1,8 @@
 use anyhow::{Context, Result, bail};
-use schemars::{JsonSchema, schema_for};
+use schemars::schema_for;
 use serde::Deserialize;
 use serde_json::Value;
 use std::{collections::BTreeSet, fs, path::Path};
-
-#[derive(JsonSchema)]
-#[allow(dead_code)]
-#[schemars(title = "iRacing Enums and BitFlags Schema")]
-struct Primitives {
-    #[serde(rename = "irsdk_BroadcastMsg")]
-    field_0: iracing_irsdk::BroadcastMessage,
-    #[serde(rename = "irsdk_CameraState")]
-    field_1: iracing_irsdk::CameraState,
-    #[serde(rename = "irsdk_CarLeftRight")]
-    field_2: iracing_irsdk::CarLeftRight,
-    #[serde(rename = "irsdk_ChatCommandMode")]
-    field_3: iracing_irsdk::ChatCommandMode,
-    #[serde(rename = "irsdk_EngineWarnings")]
-    field_4: iracing_irsdk::EngineWarnings,
-    #[serde(rename = "irsdk_FFBCommandMode")]
-    field_5: iracing_irsdk::ForceFeedbackCommandMode,
-    #[serde(rename = "irsdk_Flags")]
-    field_6: iracing_irsdk::SessionFlags,
-    #[serde(rename = "irsdk_IncidentFlags")]
-    field_7: iracing_irsdk::IncidentFlags,
-    #[serde(rename = "irsdk_PaceFlags")]
-    field_8: iracing_irsdk::PaceFlags,
-    #[serde(rename = "irsdk_PaceMode")]
-    field_9: iracing_irsdk::PaceMode,
-    #[serde(rename = "irsdk_PitCommandMode")]
-    field_10: iracing_irsdk::PitCommandMode,
-    #[serde(rename = "irsdk_PitSvFlags")]
-    field_11: iracing_irsdk::PitServiceFlags,
-    #[serde(rename = "irsdk_PitSvStatus")]
-    field_12: iracing_irsdk::PitServiceStatus,
-    #[serde(rename = "irsdk_ReloadTexturesMode")]
-    field_13: iracing_irsdk::ReloadTexturesMode,
-    #[serde(rename = "irsdk_RpyPosMode")]
-    field_14: iracing_irsdk::ReplayPositionMode,
-    #[serde(rename = "irsdk_RpySrchMode")]
-    field_15: iracing_irsdk::ReplaySearchMode,
-    #[serde(rename = "irsdk_RpyStateMode")]
-    field_16: iracing_irsdk::ReplayStateMode,
-    #[serde(rename = "irsdk_SessionState")]
-    field_17: iracing_irsdk::SessionState,
-    #[serde(rename = "irsdk_StatusField")]
-    field_18: iracing_irsdk::StatusField,
-    #[serde(rename = "irsdk_TelemetryCommandMode")]
-    field_19: iracing_irsdk::TelemetryCommandMode,
-    #[serde(rename = "irsdk_TrackWetness")]
-    field_20: iracing_irsdk::TrackWetness,
-    #[serde(rename = "irsdk_TrkLoc")]
-    field_21: iracing_irsdk::TrackLocation,
-    #[serde(rename = "irsdk_TrkSurf")]
-    field_22: iracing_irsdk::TrackSurface,
-    #[serde(rename = "irsdk_VideoCaptureMode")]
-    field_23: iracing_irsdk::VideoCaptureMode,
-    #[serde(rename = "irsdk_csMode")]
-    field_24: iracing_irsdk::CameraSwitchFocusMode,
-}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -76,20 +20,10 @@ struct Artifact {
 }
 
 fn outputs() -> Result<Vec<(&'static str, String)>> {
-    let values = [
-        (
-            "session-schema.yml",
-            serde_json::to_value(schema_for!(iracing_sdk::schema::SessionInfo))?,
-        ),
-        (
-            "variable-schema.yml",
-            serde_json::to_value(schema_for!(iracing_sdk::VariableInfo))?,
-        ),
-        (
-            "primitives-schema.yml",
-            serde_json::to_value(schema_for!(Primitives))?,
-        ),
-    ];
+    let values = [(
+        "session-schema.yml",
+        serde_json::to_value(schema_for!(iracing_sdk::schema::SessionInfo))?,
+    )];
     values
         .into_iter()
         .map(|(name, value)| Ok((name, serde_yaml_ng::to_string(&value)?)))

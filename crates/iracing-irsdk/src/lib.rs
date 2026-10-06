@@ -11,6 +11,7 @@ mod bitfield;
 mod macros;
 mod parse_utils;
 
+#[cfg(feature = "broadcast")]
 pub mod broadcast;
 
 pub mod constants;
@@ -26,6 +27,7 @@ mod variable_buffer;
 mod variable_header;
 
 pub use bitfield::BitField;
+#[cfg(feature = "broadcast")]
 pub use broadcast::*;
 pub use disk_sub_header::DiskSubHeader;
 pub use error::{Error, Result};

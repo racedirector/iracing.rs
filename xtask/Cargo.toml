@@ -16,7 +16,7 @@ globset = "0.4"
 toml = "0.9"
 clap.workspace = true
 iracing-sdk = { workspace = true, features = ["codegen", "schema-discovery"] }
-iracing-irsdk = { workspace = true, features = ["codegen"] }
+iracing-irsdk = { workspace = true, features = ["serde"] }
 schemars.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

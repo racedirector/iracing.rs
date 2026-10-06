@@ -16,11 +16,9 @@ all-features = true
 workspace = true
 
 [dependencies]
-schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
-type-layout = { workspace = true }
+type-layout = { workspace = true, optional = true }
 zerocopy = { workspace = true }
 
 [dependencies.bitflags]
@@ -33,5 +31,6 @@ serde_yaml_ng = { workspace = true }
 
 [features]
 default = []
-codegen = ["dep:schemars", "serde"]
-serde = ["dep:serde", "dep:serde_json"]
+serde = ["dep:serde"]
+debug = ["dep:type-layout"]
+broadcast = []

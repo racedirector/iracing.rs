@@ -12,13 +12,13 @@ use crate::{
     Debug,
     Clone,
     Copy,
-    type_layout::TypeLayout,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(type_layout::TypeLayout))]
 pub struct Header {
     /// API version
     pub version: i32,

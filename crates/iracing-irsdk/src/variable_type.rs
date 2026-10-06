@@ -16,7 +16,6 @@ use std::fmt;
     zerocopy::TryFromBytes,
     zerocopy::IntoBytes,
 )]
-#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum VariableType {
     /// `irsdk_char`.
@@ -74,22 +73,6 @@ impl TryFrom<i32> for VariableType {
 impl From<VariableType> for i32 {
     fn from(value: VariableType) -> Self {
         value as i32
-    }
-}
-
-#[cfg(feature = "codegen")]
-impl From<VariableType> for schemars::Schema {
-    fn from(value: VariableType) -> Self {
-        let type_value = match value {
-            VariableType::Character => "string",
-            VariableType::Boolean => "boolean",
-            VariableType::Integer | VariableType::BitField => "integer",
-            VariableType::Float | VariableType::Double => "number",
-        };
-
-        schemars::json_schema!({
-            "type": type_value
-        })
     }
 }
 

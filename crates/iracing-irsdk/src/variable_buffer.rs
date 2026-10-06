@@ -6,13 +6,13 @@ use crate::{Result, parse_utils::read_wire_bytes};
     Debug,
     Clone,
     Copy,
-    type_layout::TypeLayout,
     zerocopy::FromBytes,
     zerocopy::IntoBytes,
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "debug", derive(type_layout::TypeLayout))]
 pub struct VariableBuffer {
     /// Tick count when buffer was written
     pub tick_count: i32,

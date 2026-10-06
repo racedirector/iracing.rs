@@ -24,10 +24,10 @@ use crate::{Result, parse_utils::read_wire_bytes};
     zerocopy::KnownLayout,
     zerocopy::Immutable,
 )]
-#[cfg_attr(feature = "codegen", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StatusField(i32);
 
+#[cfg(feature = "debug")]
 impl type_layout::TypeLayout for StatusField {
     fn type_layout() -> type_layout::TypeLayoutInfo {
         type_layout::TypeLayoutInfo {
@@ -490,40 +490,6 @@ macro_rules! impl_flag_interop {
                     Self::new(flags.bits())
                 }
             }
-
-            #[cfg(feature = "codegen")]
-            impl schemars::JsonSchema for $name {
-                fn schema_name() -> std::borrow::Cow<'static, str> {
-                    stringify!($name).into()
-                }
-
-                fn schema_id() -> std::borrow::Cow<'static, str> {
-                    concat!(module_path!(), "::", stringify!($name)).into()
-                }
-
-                fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                    #[allow(dead_code)]
-                    #[derive(schemars::JsonSchema)]
-                    struct SchemaRepresentation(u32);
-
-                    let mut schema = <SchemaRepresentation as schemars::JsonSchema>::json_schema(generator);
-                    let schema_object = schema.ensure_object();
-                    let named_flags = <$name as bitflags::Flags>::FLAGS
-                        .iter()
-                        .filter(|flag| flag.is_named());
-                    let values: Vec<_> = named_flags
-                        .map(|flag| (flag.name(), i64::from(flag.value().bits())))
-                        .collect();
-                    let known_mask = values.iter().fold(0u32, |mask, (_, bits)| mask | *bits as u32);
-                    schema_object.insert("x-irsdk-kind".into(), "bitflags".into());
-                    schema_object.insert(
-                        "x-irsdk-values".into(),
-                        crate::codegen::named_schema_values(&values),
-                    );
-                    schema_object.insert("x-irsdk-known-mask".into(), (known_mask as u64).into());
-                    schema
-                }
-            }
         )+
     };
 }
@@ -644,30 +610,6 @@ impl IncidentFlags {
     /// `IRSDK_INCIDENT_PEN_MASK`.
     pub const PENALTY_MASK: u32 = 0x0000_ff00;
 
-    #[cfg(feature = "codegen")]
-    /// Named incident-report codes used for schema generation.
-    pub const SCHEMA_REPORT_CODES: &'static [(&'static str, i64)] = &[
-        ("REP_NO_REPORT", 0x00),
-        ("REP_OUT_OF_CONTROL", 0x01),
-        ("REP_OFF_TRACK", 0x02),
-        ("REP_OFF_TRACK_ONGOING", 0x03),
-        ("REP_CONTACT_WITH_WORLD", 0x04),
-        ("REP_COLLISION_WITH_WORLD", 0x05),
-        ("REP_COLLISION_WITH_WORLD_ONGOING", 0x06),
-        ("REP_CONTACT_WITH_CAR", 0x07),
-        ("REP_COLLISION_WITH_CAR", 0x08),
-    ];
-
-    #[cfg(feature = "codegen")]
-    /// Named incident-penalty codes used for schema generation.
-    pub const SCHEMA_PENALTY_CODES: &'static [(&'static str, i64)] = &[
-        ("PEN_NONE", 0x00),
-        ("PEN_0X", 0x01),
-        ("PEN_1X", 0x02),
-        ("PEN_2X", 0x03),
-        ("PEN_4X", 0x04),
-    ];
-
     /// Constructs the packed SDK value without interpreting its fields.
     pub const fn from_bits(bits: u32) -> Self {
         Self(bits)
@@ -764,51 +706,6 @@ impl From<IncidentFlags> for crate::BitField {
     }
 }
 
-#[cfg(feature = "codegen")]
-impl schemars::JsonSchema for IncidentFlags {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "IncidentFlags".into()
-    }
-
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        concat!(module_path!(), "::IncidentFlags").into()
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        #[allow(dead_code)]
-        #[derive(schemars::JsonSchema)]
-        struct SchemaRepresentation(u32);
-
-        let mut schema = SchemaRepresentation::json_schema(generator);
-        let schema_object = schema.ensure_object();
-        schema_object.insert("x-irsdk-kind".into(), "incident-flags".into());
-
-        let mut masks = serde_json::Map::new();
-        masks.insert("report".into(), (Self::REPORT_MASK as u64).into());
-        masks.insert("penalty".into(), (Self::PENALTY_MASK as u64).into());
-        schema_object.insert("x-irsdk-masks".into(), serde_json::Value::Object(masks));
-        schema_object.insert(
-            "x-irsdk-report-codes".into(),
-            crate::codegen::named_schema_values(Self::SCHEMA_REPORT_CODES),
-        );
-        schema_object.insert(
-            "x-irsdk-penalty-codes".into(),
-            crate::codegen::named_schema_values(Self::SCHEMA_PENALTY_CODES),
-        );
-        schema
-    }
-}
-
-#[cfg(feature = "codegen")]
-fn named_schema_values(values: &[(&str, i64)]) -> serde_json::Value {
-    serde_json::Value::Array(
-        values
-            .iter()
-            .map(|(name, value)| serde_json::json!({ "name": name, "value": value }))
-            .collect(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -898,25 +795,6 @@ mod tests {
         assert_eq!(bitfield.value(), SessionFlags::GREEN.bits());
         assert_eq!(SessionFlags::from(bitfield), flags);
         assert_eq!(u32::from(flags), SessionFlags::GREEN.bits());
-    }
-
-    #[cfg(feature = "codegen")]
-    #[test]
-    fn bitflags_provide_schema_metadata() {
-        let schema = schemars::schema_for!(SessionFlags);
-        let object = schema.as_value().as_object().unwrap();
-        assert_eq!(object["x-irsdk-kind"], "bitflags");
-        assert!(
-            object["x-irsdk-values"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|flag| flag["name"] == "GREEN" && flag["value"] == 4)
-        );
-        assert_eq!(
-            object["x-irsdk-known-mask"].as_u64().unwrap() & u64::from(SessionFlags::GREEN.bits()),
-            u64::from(SessionFlags::GREEN.bits())
-        );
     }
 
     #[test]
@@ -1076,38 +954,5 @@ mod tests {
 
         assert_eq!(incident.report_bits(), 0x00);
         assert_eq!(incident.penalty_bits(), 0x01);
-    }
-
-    #[cfg(feature = "codegen")]
-    #[test]
-    fn incident_schema_describes_both_packed_fields() {
-        use serde_json::Value;
-
-        let schema = schemars::schema_for!(IncidentFlags);
-        let object = schema
-            .as_value()
-            .as_object()
-            .expect("incident schema should be an object");
-
-        assert_eq!(
-            object.get("x-irsdk-kind").and_then(Value::as_str),
-            Some("incident-flags")
-        );
-        assert_eq!(
-            object["x-irsdk-masks"]["report"].as_u64(),
-            Some(IncidentFlags::REPORT_MASK as u64)
-        );
-        assert_eq!(
-            object["x-irsdk-masks"]["penalty"].as_u64(),
-            Some(IncidentFlags::PENALTY_MASK as u64)
-        );
-        assert_eq!(
-            object["x-irsdk-report-codes"].as_array().map(Vec::len),
-            Some(IncidentFlags::SCHEMA_REPORT_CODES.len())
-        );
-        assert_eq!(
-            object["x-irsdk-penalty-codes"].as_array().map(Vec::len),
-            Some(IncidentFlags::SCHEMA_PENALTY_CODES.len())
-        );
     }
 }
