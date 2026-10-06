@@ -13,7 +13,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// An error produced while decoding or validating SDK wire data.
 #[derive(Debug, Error)]
-#[non_exhaustive]
 pub enum Error {
     /// A byte buffer does not match a wire type's required size.
     #[error("Invalid wire size: expected {expected} bytes, received {actual}")]

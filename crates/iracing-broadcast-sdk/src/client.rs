@@ -1,6 +1,6 @@
 use crate::{
     command::Command,
-    error::{BroadcastError, Result},
+    error::{Error, Result},
     message_format::FormattedMessage,
 };
 use iracing_irsdk::constants::IRSDK_BROADCASTMSGNAME;
@@ -26,8 +26,7 @@ impl Client {
             // HWND_BROADCAST using the ID obtained from RegisterWindowMessageW.
             // All parameter packing matches the documented protocol, so the
             // Win32 API receives well-formed data.
-            SendNotifyMessageW(HWND_BROADCAST, message_id, wparam, lparam)
-                .map_err(BroadcastError::from)
+            SendNotifyMessageW(HWND_BROADCAST, message_id, wparam, lparam).map_err(Error::from)
         }
     }
 
@@ -42,7 +41,7 @@ impl Client {
         let id = unsafe { RegisterWindowMessageW(PCWSTR::from_raw(message.as_ptr())) };
 
         if id == 0 {
-            return Err(BroadcastError::Connection {
+            return Err(Error::Connection {
                 reason: format!(
                     "Failed to register broadcast window message '{IRSDK_BROADCASTMSGNAME}'"
                 ),

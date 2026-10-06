@@ -322,33 +322,33 @@ fn command_to_messages(command: Command) -> Result<Vec<BroadcastCommand>> {
             ReplayCommand::Pause => vec![BroadcastCommand::ReplaySetPlaySpeed(0, false)],
         },
         Command::Chat { command } => match command {
-            ChatCommand::Cancel => vec![BroadcastCommand::ChatCommand(ChatCommandMode::Cancel)],
-            ChatCommand::Reply => vec![BroadcastCommand::ChatCommand(ChatCommandMode::Reply)],
-            ChatCommand::Begin => vec![BroadcastCommand::ChatCommand(ChatCommandMode::BeginChat)],
-            ChatCommand::Macro { index } => vec![BroadcastCommand::ChatCommandMacro(index)],
+            ChatCommand::Cancel => vec![BroadcastCommand::Chat(ChatCommandMode::Cancel)],
+            ChatCommand::Reply => vec![BroadcastCommand::Chat(ChatCommandMode::Reply)],
+            ChatCommand::Begin => vec![BroadcastCommand::Chat(ChatCommandMode::BeginChat)],
+            ChatCommand::Macro { index } => vec![BroadcastCommand::ChatMacro(index)],
         },
         Command::Pit { command } => match command {
-            PitCliCommand::Clear => vec![BroadcastCommand::PitCommand(PitCommand::Clear)],
+            PitCliCommand::Clear => vec![BroadcastCommand::Pit(PitCommand::Clear)],
             PitCliCommand::Fuel { gallons } => {
-                vec![BroadcastCommand::PitCommand(PitCommand::Fuel(gallons))]
+                vec![BroadcastCommand::Pit(PitCommand::Fuel(gallons))]
             }
-            PitCliCommand::Lf { psi } => vec![BroadcastCommand::PitCommand(PitCommand::LF(psi))],
-            PitCliCommand::Rf { psi } => vec![BroadcastCommand::PitCommand(PitCommand::RF(psi))],
-            PitCliCommand::Lr { psi } => vec![BroadcastCommand::PitCommand(PitCommand::LR(psi))],
-            PitCliCommand::Rr { psi } => vec![BroadcastCommand::PitCommand(PitCommand::RR(psi))],
+            PitCliCommand::Lf { psi } => vec![BroadcastCommand::Pit(PitCommand::LF(psi))],
+            PitCliCommand::Rf { psi } => vec![BroadcastCommand::Pit(PitCommand::RF(psi))],
+            PitCliCommand::Lr { psi } => vec![BroadcastCommand::Pit(PitCommand::LR(psi))],
+            PitCliCommand::Rr { psi } => vec![BroadcastCommand::Pit(PitCommand::RR(psi))],
             PitCliCommand::ClearTires => {
-                vec![BroadcastCommand::PitCommand(PitCommand::ClearTires)]
+                vec![BroadcastCommand::Pit(PitCommand::ClearTires)]
             }
-            PitCliCommand::Ws => vec![BroadcastCommand::PitCommand(PitCommand::Tearoff)],
-            PitCliCommand::Fr => vec![BroadcastCommand::PitCommand(PitCommand::FastRepair)],
+            PitCliCommand::Ws => vec![BroadcastCommand::Pit(PitCommand::Tearoff)],
+            PitCliCommand::Fr => vec![BroadcastCommand::Pit(PitCommand::FastRepair)],
             PitCliCommand::ClearWs => {
-                vec![BroadcastCommand::PitCommand(PitCommand::ClearTearoff)]
+                vec![BroadcastCommand::Pit(PitCommand::ClearTearoff)]
             }
             PitCliCommand::ClearFr => {
-                vec![BroadcastCommand::PitCommand(PitCommand::ClearFastRepair)]
+                vec![BroadcastCommand::Pit(PitCommand::ClearFastRepair)]
             }
             PitCliCommand::ClearFuel => {
-                vec![BroadcastCommand::PitCommand(PitCommand::ClearFuel)]
+                vec![BroadcastCommand::Pit(PitCommand::ClearFuel)]
             }
         },
         Command::Textures { command } => match command {
@@ -359,23 +359,17 @@ fn command_to_messages(command: Command) -> Result<Vec<BroadcastCommand>> {
         },
         Command::Telemetry { command } => match command {
             TelemetryCommand::Stop => {
-                vec![BroadcastCommand::TelemetryCommand(
-                    TelemetryCommandMode::Stop,
-                )]
+                vec![BroadcastCommand::Telemetry(TelemetryCommandMode::Stop)]
             }
             TelemetryCommand::Start => {
-                vec![BroadcastCommand::TelemetryCommand(
-                    TelemetryCommandMode::Start,
-                )]
+                vec![BroadcastCommand::Telemetry(TelemetryCommandMode::Start)]
             }
             TelemetryCommand::Restart => {
-                vec![BroadcastCommand::TelemetryCommand(
-                    TelemetryCommandMode::Restart,
-                )]
+                vec![BroadcastCommand::Telemetry(TelemetryCommandMode::Restart)]
             }
         },
         Command::Ffb { command } => match command {
-            FfbCliCommand::MaxForce { nm } => vec![BroadcastCommand::FFBCommand(nm)],
+            FfbCliCommand::MaxForce { nm } => vec![BroadcastCommand::ForceFeedback(nm)],
         },
         Command::Video { command } => match command {
             VideoCommand::Screenshot => {

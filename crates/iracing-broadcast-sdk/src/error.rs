@@ -1,7 +1,5 @@
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum BroadcastError {
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
     #[error("Failed to connect to iRacing: {reason}")]
     Connection { reason: String },
 
@@ -16,4 +14,4 @@ pub enum BroadcastError {
     Conversion(#[from] widestring::error::ContainsNul<u16>),
 }
 
-pub type Result<T, E = BroadcastError> = std::result::Result<T, E>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;

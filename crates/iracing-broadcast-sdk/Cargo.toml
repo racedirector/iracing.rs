@@ -16,7 +16,7 @@ targets = []
 iracing-irsdk = { workspace = true, features = ["broadcast"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-widestring = "1.2.1"
+widestring = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [

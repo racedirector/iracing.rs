@@ -9,7 +9,8 @@ members = [
   "crates/iracing-simulation",
   "crates/test-fixtures",
   "examples/driver-inputs",
-  "examples/iracing-lifecycle-monitor", "crates/iracing-broadcast-sdk",
+  "examples/iracing-lifecycle-monitor",
+  "crates/iracing-broadcast-sdk",
 ]
 
 resolver = "3"
@@ -27,6 +28,7 @@ anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
 futures = "0.3"
+iracing-broadcast-sdk = { version = "0.1.0", path = "crates/iracing-broadcast-sdk" }
 iracing-irsdk = { version = "0.1.0", path = "crates/iracing-irsdk" }
 iracing-sdk = { version = "0.1.0", path = "crates/iracing-sdk" }
 iracing-sdk-derive = { version = "0.1.0", path = "crates/iracing-sdk-derive" }
@@ -40,6 +42,7 @@ tokio = "1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 type-layout = "0.2.0"
+widestring = "1.2.1"
 windows = "0.62.0"
 zerocopy = { version = "0.8.48", features = ["derive", "std"] }
 

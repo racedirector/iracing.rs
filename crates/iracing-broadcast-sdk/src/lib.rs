@@ -1,7 +1,7 @@
 #[cfg(windows)]
 mod client;
 mod command;
-mod error;
+pub mod error;
 mod message_format;
 mod pad_car_number;
 

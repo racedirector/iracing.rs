@@ -1,6 +1,6 @@
 use crate::{
     command::Command,
-    error::{BroadcastError, Result},
+    error::{Error as BroadcastError, Result},
     pad_car_number::pad_car_number,
 };
 use iracing_irsdk::{

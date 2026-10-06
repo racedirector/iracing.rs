@@ -25,6 +25,7 @@ workspace = true
 [dependencies]
 async-trait = "0.1.85"
 futures = { workspace = true }
+iracing-broadcast-sdk = { workspace = true }
 iracing-irsdk = { workspace = true }
 iracing-sdk-derive = { workspace = true, optional = true }
 memmap2 = "0.9"
@@ -40,6 +41,7 @@ tokio-stream = { version = "0.1", default-features = false, features = [
 ] }
 tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 tracing = { workspace = true }
+widestring = { workspace = true }
 zerocopy = { workspace = true }
 
 # Windows-specific dependencies (for live telemetry)

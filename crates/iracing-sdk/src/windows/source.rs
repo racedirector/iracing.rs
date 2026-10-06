@@ -1,5 +1,6 @@
 use iracing_irsdk::constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME};
 use std::{ptr::NonNull, sync::Arc, time::Duration};
+use widestring::U16CString;
 use windows::{
     Win32::{
         Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT},
@@ -14,7 +15,7 @@ use windows::{
     core::PCWSTR,
 };
 
-use crate::{IRacingSDKError, Result, windows::wide_string};
+use crate::{IRacingSDKError, Result};
 
 // Import the Windows implementation as an opaque external call. Unlike a
 // Rust memcpy intrinsic, the compiler cannot fold this into ordinary Rust
@@ -152,7 +153,8 @@ impl LiveSource {
     }
 
     pub fn try_connect() -> Result<Self> {
-        let name = wide_string(IRSDK_MEMMAPFILENAME);
+        let name = U16CString::from_str(IRSDK_MEMMAPFILENAME)?;
+
         // SAFETY: name is a live NUL-terminated UTF-16 string.
         let mapping = OwnedHandle(
             unsafe { OpenFileMappingW(FILE_MAP_READ.0, false, PCWSTR(name.as_ptr())) }
@@ -187,7 +189,8 @@ impl LiveSource {
                 "Invalid mapped view extent",
             ));
         }
-        let name = wide_string(IRSDK_DATAVALIDEVENTNAME);
+
+        let name = U16CString::from_str(IRSDK_DATAVALIDEVENTNAME)?;
         // SAFETY: name is NUL-terminated; only SYNCHRONIZE access is needed.
         let event = OwnedHandle(
             unsafe {
