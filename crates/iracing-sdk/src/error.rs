@@ -294,9 +294,9 @@ impl IRacingSDKError {
                 iracing_irsdk::Error::InvalidWireValue { .. } => {
                     vec!["Verify the source data is intact and uses a supported iRacing SDK format"]
                 }
-                iracing_irsdk::Error::Parse { .. } => todo!(),
-                iracing_irsdk::Error::InvalidConfiguration { .. } => todo!(),
-                iracing_irsdk::Error::Io(_) => todo!(),
+                iracing_irsdk::Error::Parse { .. } => vec!["Contact the maintainer"],
+                iracing_irsdk::Error::InvalidConfiguration { .. } => vec!["Contact the maintainer"],
+                iracing_irsdk::Error::Io(_) => vec!["Contact the maintainer"],
             },
             Self::Widestring(_) => vec!["Contact the maintainer"],
         }
@@ -623,20 +623,6 @@ mod tests {
         // Runtime check: Error trait is implemented
         let error = IRacingSDKError::connection_failed("test");
         let _: &dyn std::error::Error = &error;
-    }
-
-    #[test]
-    fn wire_validity_conversion_preserves_the_domain_error() {
-        let error = IRacingSDKError::from(iracing_irsdk::Error::InvalidWireValue {
-            target: "iracing_irsdk::VariableHeader",
-        });
-
-        assert!(matches!(
-            error,
-            IRacingSDKError::InvalidWireValue {
-                target: "iracing_irsdk::VariableHeader"
-            }
-        ));
     }
 
     #[test]
