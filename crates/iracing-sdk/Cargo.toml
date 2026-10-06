@@ -25,7 +25,7 @@ workspace = true
 [dependencies]
 async-trait = "0.1.85"
 futures = { workspace = true }
-iracing-irsdk = { workspace = true }
+iracing-irsdk = { workspace = true, features = ["broadcast"] }
 iracing-sdk-derive = { workspace = true, optional = true }
 memmap2 = "0.9"
 pin-project-lite = "0.2"
@@ -35,7 +35,9 @@ serde_json = { workspace = true }
 serde_yaml_ng = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
+tokio-stream = { version = "0.1", default-features = false, features = [
+  "sync",
+] }
 tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 tracing = { workspace = true }
 zerocopy = { workspace = true }
@@ -54,7 +56,10 @@ windows-core = "0.62.0"
 anyhow = { workspace = true }
 clap = { workspace = true }
 csv = { workspace = true }
-criterion = { package = "codspeed-criterion-compat", version = "5.0.2", features = ["cargo_bench_support", "html_reports"] }
+criterion = { package = "codspeed-criterion-compat", version = "5.0.2", features = [
+  "cargo_bench_support",
+  "html_reports",
+] }
 iracing-sdk-derive = { workspace = true }
 proptest = "1.11.0"
 tempfile = { workspace = true }
@@ -65,11 +70,11 @@ tracing-subscriber = { workspace = true }
 windows = { workspace = true, features = ["Win32_Security"] }
 
 [features]
-default = ["derive"]
+default = ["derive", "iracing-irsdk/serde"]
 benchmark = []
 # Fixture helpers for downstream tests without enabling benchmark targets.
 test-utils = []
-codegen = ["dep:schemars", "iracing-irsdk/codegen"]
+codegen = ["dep:schemars", "iracing-irsdk/serde"]
 derive = ["dep:iracing-sdk-derive"]
 schema-discovery = []
 
