@@ -24,6 +24,7 @@ pub enum Command {
 }
 
 impl Command {
+    /// Execute the selected session snapshot, discovery, or schema command and propagate its errors.
     pub(crate) fn run(self) -> Result<()> {
         match self {
             Command::Snapshot { command } => command.run(),

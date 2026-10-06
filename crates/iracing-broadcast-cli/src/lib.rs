@@ -76,6 +76,12 @@ pub enum CameraCommand {
 impl TryFrom<CameraCommand> for BroadcastCommand {
     type Error = anyhow::Error;
 
+    /// Build a camera broadcast command, preserving the supplied camera selectors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if camera state arguments specify both raw bits and flags,
+    /// or neither.
     fn try_from(value: CameraCommand) -> Result<Self, Self::Error> {
         let command = match value {
             CameraCommand::SwitchPosition {
@@ -107,6 +113,7 @@ enum CameraStateFlag {
 }
 
 impl From<CameraStateFlag> for CameraState {
+    /// Return the camera-state bit represented by the CLI flag.
     fn from(value: CameraStateFlag) -> Self {
         match value {
             CameraStateFlag::CamToolActive => CameraState::CAMERA_TOOL_ACTIVE,
@@ -131,6 +138,14 @@ pub struct CameraStateArgs {
 impl TryFrom<CameraStateArgs> for CameraState {
     type Error = anyhow::Error;
 
+    /// Build a camera state from raw bits or the union of named flags.
+    ///
+    /// Raw bits, including unknown flags, are retained unchanged; the CLI parser
+    /// limits them to 16 bits. Repeated named flags have no additional effect.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if both raw bits and flags are supplied, or if neither is supplied.
     fn try_from(args: CameraStateArgs) -> std::prelude::v1::Result<Self, Self::Error> {
         if let Some(raw_bits) = args.raw_bits {
             if !args.flags.is_empty() {
@@ -178,6 +193,7 @@ pub enum ReplaySearchArg {
 }
 
 impl From<ReplaySearchArg> for ReplaySearchMode {
+    /// Return the SDK search mode for the selected replay destination.
     fn from(value: ReplaySearchArg) -> Self {
         match value {
             ReplaySearchArg::ToStart => ReplaySearchMode::ToStart,
@@ -202,6 +218,7 @@ pub enum ReplayPositionArg {
 }
 
 impl From<ReplayPositionArg> for ReplayPositionMode {
+    /// Return the SDK origin relative to which the replay frame is positioned.
     fn from(mode: ReplayPositionArg) -> Self {
         match mode {
             ReplayPositionArg::Begin => ReplayPositionMode::Begin,
@@ -218,6 +235,7 @@ pub enum ReplayStateArg {
 }
 
 impl From<ReplayStateArg> for ReplayStateMode {
+    /// Return the SDK operation for erasing the spooled replay.
     fn from(mode: ReplayStateArg) -> Self {
         match mode {
             ReplayStateArg::EraseTape => ReplayStateMode::EraseTape,
@@ -265,6 +283,10 @@ pub enum ReplayCommand {
 }
 
 impl From<ReplayCommand> for BroadcastCommand {
+    /// Build a replay broadcast command, expanding playback shortcuts.
+    ///
+    /// `Normal`, `Slow16`, and `Pause` select speed/slow-motion pairs `(1, false)`,
+    /// `(16, true)`, and `(0, false)`, respectively. Session times remain in milliseconds.
     fn from(value: ReplayCommand) -> Self {
         match value {
             ReplayCommand::SetPlaySpeed { speed, slow_motion } => {
@@ -302,6 +324,10 @@ pub enum PitCliCommand {
 }
 
 impl From<PitCliCommand> for BroadcastCommand {
+    /// Build a pit-service broadcast command, passing numeric values through unchanged.
+    ///
+    /// `Ws` requests a windshield tearoff and `Fr` requests a fast repair;
+    /// the corresponding clear commands cancel those requests.
     fn from(value: PitCliCommand) -> Self {
         match value {
             PitCliCommand::Clear => BroadcastCommand::Pit(PitCommand::Clear),
@@ -336,6 +362,9 @@ pub enum ChatCommand {
 }
 
 impl From<ChatCommand> for BroadcastCommand {
+    /// Build a chat broadcast command without validating the macro index.
+    ///
+    /// The CLI parser and SDK message encoder enforce the macro range `1..=15`.
     fn from(value: ChatCommand) -> Self {
         match value {
             ChatCommand::Cancel => Self::Chat(ChatCommandMode::Cancel),
@@ -353,6 +382,7 @@ pub enum TextureCommand {
 }
 
 impl From<TextureCommand> for BroadcastCommand {
+    /// Build a texture-reload command targeting all cars or the supplied car index.
     fn from(value: TextureCommand) -> Self {
         match value {
             TextureCommand::ReloadAll => Self::ReloadAllTextures,
@@ -372,6 +402,7 @@ pub enum TelemetryCommand {
 }
 
 impl From<TelemetryCommand> for BroadcastCommand {
+    /// Build a broadcast command to control disk telemetry recording.
     fn from(value: TelemetryCommand) -> Self {
         match value {
             TelemetryCommand::Stop => Self::Telemetry(TelemetryCommandMode::Stop),
@@ -387,6 +418,7 @@ pub enum FfbCliCommand {
 }
 
 impl From<FfbCliCommand> for BroadcastCommand {
+    /// Build a maximum-force command, passing the supplied newton-meter value unchanged.
     fn from(value: FfbCliCommand) -> Self {
         match value {
             FfbCliCommand::MaxForce { nm } => Self::ForceFeedback(nm),
@@ -411,6 +443,7 @@ pub enum VideoCommand {
 }
 
 impl From<VideoCommand> for BroadcastCommand {
+    /// Build a broadcast command for screenshot capture, video recording, or timer visibility.
     fn from(value: VideoCommand) -> Self {
         match value {
             VideoCommand::Screenshot => Self::VideoCapture(VideoCaptureMode::TriggerScreenshot),
@@ -424,6 +457,13 @@ impl From<VideoCommand> for BroadcastCommand {
 }
 
 impl Command {
+    /// Send this command through the Windows broadcast client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-platform error on non-Windows systems. On Windows,
+    /// propagates client initialization, camera-state conversion, command encoding,
+    /// and Win32 dispatch errors.
     pub fn run(self) -> Result<()> {
         #[cfg(not(windows))]
         {
@@ -442,6 +482,12 @@ impl Command {
 impl TryFrom<Command> for BroadcastCommand {
     type Error = anyhow::Error;
 
+    /// Build the selected SDK command without sending it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a camera-state command supplies both raw bits and flags,
+    /// or neither. Other command parameters pass through without validation here.
     fn try_from(command: Command) -> Result<Self, Self::Error> {
         match command {
             Command::Telemetry { command } => Ok(command.into()),

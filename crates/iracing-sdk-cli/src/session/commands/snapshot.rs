@@ -37,6 +37,14 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Write parsed IBT or live session information in the selected output format.
+    ///
+    /// File output creates or truncates the destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when session information is absent. Propagates source access,
+    /// session parsing, serialization, and output errors.
     pub(crate) fn run(self) -> Result<()> {
         match self {
             Command::Ibt {

@@ -49,6 +49,17 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Export IBT frames, record live telemetry on Windows, or capture a snapshot.
+    ///
+    /// Exports use the selected CSV or JSONL format and create or truncate file
+    /// output. Live recording ends on Ctrl+C or stream completion and flushes output.
+    /// Snapshot options control the destination and document format for a single frame.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source setup, subscription, playback startup, telemetry decoding,
+    /// serialization, and output errors. Live recording also fails when no variables
+    /// are available or the Ctrl+C listener fails. Snapshot errors are propagated.
     pub async fn run(self) -> Result<()> {
         match self {
             Command::Convert {

@@ -36,6 +36,15 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Write unknown session fields from the selected IBT or live source.
+    ///
+    /// Absent session information produces an empty list. File output creates or
+    /// truncates the destination using the selected format.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source access, session parsing, serialization, and output errors;
+    /// these failures are not converted to an empty list.
     pub(crate) fn run(self) -> Result<()> {
         match self {
             #[cfg(windows)]

@@ -50,6 +50,14 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Write a schema inferred from IBT or live session data, or the static session type schema.
+    ///
+    /// Uses the selected output format and creates or truncates file destinations.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a source has no session information. Propagates source
+    /// access, session parsing, serialization, and output errors.
     pub(crate) fn run(self) -> Result<()> {
         match self {
             Command::Ibt {

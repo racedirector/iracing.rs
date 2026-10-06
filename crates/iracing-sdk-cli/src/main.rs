@@ -54,6 +54,7 @@ enum Command {
 }
 
 impl Command {
+    /// Execute the selected tool command and propagate its errors.
     pub async fn run(self) -> Result<()> {
         match self {
             Command::Session { command } => command.run(),
@@ -66,6 +67,7 @@ impl Command {
     }
 }
 
+/// Run the selected SDK tool, returning any command execution errors.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));

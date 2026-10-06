@@ -10,6 +10,10 @@ struct Cli {
     command: Command,
 }
 
+/// Parse and execute the broadcast command on Windows.
+///
+/// Returns an unsupported-platform error before argument parsing on non-Windows
+/// systems. On Windows, propagates command execution errors.
 fn main() -> anyhow::Result<()> {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));

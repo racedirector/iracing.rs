@@ -20,6 +20,9 @@ struct WindowsMessage {
 }
 
 impl From<FormattedMessage> for WindowsMessage {
+    /// Pack the message ID and three parameter words into Win32 message parameters.
+    ///
+    /// The ID and first word occupy `WPARAM`; the remaining words occupy `LPARAM`.
     fn from(message: FormattedMessage) -> Self {
         let wparam_value = (i32::from(message.0) as usize) | ((message.1 as usize) << 16);
         let lparam_value = i32::from(message.2) | (i32::from(message.3) << 16);
@@ -34,6 +37,11 @@ impl From<FormattedMessage> for WindowsMessage {
 impl TryFrom<Command> for WindowsMessage {
     type Error = crate::error::Error;
 
+    /// Encode a typed command as Win32 message parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if a chat macro index is outside `1..=15`.
     fn try_from(command: Command) -> Result<Self> {
         let message = FormattedMessage::try_from(command)?;
         Ok(WindowsMessage::from(message))
@@ -46,6 +54,11 @@ struct MessageDispatcher {
 }
 
 impl MessageDispatcher {
+    /// Register the iRacing broadcast window message and retain its identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Connection`] if `RegisterWindowMessageW` fails.
     fn new() -> Result<Self> {
         let message = U16CString::from_str(IRSDK_BROADCASTMSGNAME)?;
 
@@ -62,6 +75,11 @@ impl MessageDispatcher {
         Ok(Self { message_id: id })
     }
 
+    /// Dispatch a packed message through `HWND_BROADCAST` using the registered ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Windows`] if `SendNotifyMessageW` fails.
     fn send_message(&self, message: WindowsMessage) -> Result<()> {
         tracing::debug!("Sending message: {:?}", message);
         unsafe {

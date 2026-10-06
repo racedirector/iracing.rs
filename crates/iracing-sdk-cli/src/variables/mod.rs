@@ -38,6 +38,14 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Write the IBT or live variable headers to the selected destination and format.
+    ///
+    /// File output creates or truncates the destination.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source access, variable-header retrieval, serialization,
+    /// and output creation, write, or flush errors.
     pub fn run(self) -> Result<()> {
         match self {
             Command::Ibt {

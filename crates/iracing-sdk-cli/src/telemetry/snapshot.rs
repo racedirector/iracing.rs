@@ -42,6 +42,17 @@ pub(crate) enum Command {
 }
 
 impl Command {
+    /// Write one IBT frame or the next live frame in the selected document format.
+    ///
+    /// The IBT frame index is zero-based and must be below the frame count and fit
+    /// in `u32`. File output is created or truncated after the snapshot is decoded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty IBT, an invalid frame index, missing variables,
+    /// or a live stream ending before a frame arrives. Propagates source access,
+    /// subscription, frame reading, schema validation, decoding, serialization,
+    /// and output errors.
     pub async fn run(self) -> Result<()> {
         match self {
             #[cfg(windows)]
