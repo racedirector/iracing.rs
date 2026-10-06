@@ -35,28 +35,30 @@ pub(crate) enum Command {
     },
 }
 
-pub(crate) fn handle_command(command: Command) -> Result<()> {
-    match command {
-        #[cfg(windows)]
-        Command::Live { output, format } => {
-            use crate::utils::get_connection;
+impl Command {
+    pub(crate) fn run(self) -> Result<()> {
+        match self {
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use crate::utils::get_connection;
 
-            let connection = get_connection()?;
-            write_unknown_fields(&connection, output.clone(), format)?;
-            tracing::info!(output=%output, format=%format, "Wrote live session unknown fields snapshot.");
+                let connection = get_connection()?;
+                write_unknown_fields(&connection, output.clone(), format)?;
+                tracing::info!(output=%output, format=%format, "Wrote live session unknown fields snapshot.");
+            }
+            Command::Ibt {
+                path,
+                output,
+                format,
+            } => {
+                let reader = get_disk_reader(&path)?;
+                write_unknown_fields(&reader, output.clone(), format)?;
+                tracing::info!(ibt_path=%path.display(), output=%output, format=%format, "Wrote disk session unknown fields snapshot.");
+            }
         }
-        Command::Ibt {
-            path,
-            output,
-            format,
-        } => {
-            let reader = get_disk_reader(&path)?;
-            write_unknown_fields(&reader, output.clone(), format)?;
-            tracing::info!(ibt_path=%path.display(), output=%output, format=%format, "Wrote disk session unknown fields snapshot.");
-        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 fn write_unknown_fields(

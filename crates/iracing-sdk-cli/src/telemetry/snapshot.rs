@@ -41,89 +41,92 @@ pub(crate) enum Command {
     },
 }
 
-pub(super) async fn handle_command(command: Command) -> Result<()> {
-    match command {
-        #[cfg(windows)]
-        Command::Live { output, format } => {
-            use anyhow::anyhow;
-            use futures::StreamExt;
-            use iracing_sdk::{DynamicFrame, LiveConnection, SchemaProvider, UpdateRate};
+impl Command {
+    pub async fn run(self) -> Result<()> {
+        match self {
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use anyhow::anyhow;
+                use futures::StreamExt;
+                use iracing_sdk::{DynamicFrame, LiveConnection, SchemaProvider, UpdateRate};
 
-            let connection = LiveConnection::builder().build()?;
+                let connection = LiveConnection::builder().build()?;
 
-            let mut variables = connection.variables();
-            if variables.is_empty() {
-                return Err(anyhow!(
-                    "No telemetry variables were available from the live connection"
-                ));
+                let mut variables = connection.variables();
+                if variables.is_empty() {
+                    return Err(anyhow!(
+                        "No telemetry variables were available from the live connection"
+                    ));
+                }
+                variables.sort_unstable_by(|left, right| {
+                    left.offset
+                        .cmp(&right.offset)
+                        .then_with(|| left.name.cmp(&right.name))
+                });
+
+                let mut frames =
+                    Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
+
+                let frame = frames
+                    .next()
+                    .await
+                    .ok_or_else(|| anyhow!("Live telemetry ended before a frame was received"))?;
+
+                let snapshot = TelemetrySnapshot::from_provider(&frame, &variables)?;
+                let mut writer = DocumentWriter::from_parts(output, format)?;
+
+                writer.write(&snapshot)?;
+                writer.finalize()
             }
-            variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
-            });
+            Command::Ibt {
+                path,
+                output,
+                format,
+                frame_index,
+            } => {
+                let mut reader = get_disk_reader(&path)?;
 
-            let mut frames = Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
+                use iracing_sdk::{FramePacket, SchemaProvider, VariableSchema};
+                use std::sync::Arc;
 
-            let frame = frames
-                .next()
-                .await
-                .ok_or_else(|| anyhow!("Live telemetry ended before a frame was received"))?;
+                let frame_count = reader.layout().frame_count();
+                if frame_count == 0 {
+                    bail!("IBT file contains no telemetry frames");
+                }
+                if frame_index >= frame_count {
+                    bail!(
+                        "Frame index {frame_index} is out of range; valid range: 0..={}",
+                        frame_count - 1
+                    );
+                }
+                let data = reader
+                    .frame(frame_index)
+                    .with_context(|| format!("Could not read IBT frame {frame_index}"))?;
 
-            let snapshot = TelemetrySnapshot::from_provider(&frame, &variables)?;
-            let mut writer = DocumentWriter::from_parts(output, format)?;
+                let headers = reader.variable_headers()?;
+                if headers.is_empty() {
+                    bail!("IBT contains no telemetry variable headers");
+                }
+                let schema = VariableSchema::from_headers(&headers, reader.layout().frame_size())?;
 
-            writer.write(&snapshot)?;
-            writer.finalize()
-        }
-        Command::Ibt {
-            path,
-            output,
-            format,
-            frame_index,
-        } => {
-            let mut reader = get_disk_reader(&path)?;
-
-            use iracing_sdk::{FramePacket, SchemaProvider, VariableSchema};
-            use std::sync::Arc;
-
-            let frame_count = reader.layout().frame_count();
-            if frame_count == 0 {
-                bail!("IBT file contains no telemetry frames");
-            }
-            if frame_index >= frame_count {
-                bail!(
-                    "Frame index {frame_index} is out of range; valid range: 0..={}",
-                    frame_count - 1
+                let frame = FramePacket::new(
+                    data,
+                    u32::try_from(frame_index)
+                        .context("Frame index exceeds the supported tick range")?,
+                    reader.header().session_info_update as u32,
+                    Arc::new(schema),
                 );
+                let mut variables = frame.variables();
+                variables.sort_unstable_by(|left, right| {
+                    left.offset
+                        .cmp(&right.offset)
+                        .then_with(|| left.name.cmp(&right.name))
+                });
+                let snapshot = TelemetrySnapshot::from_provider(&frame, &variables)?;
+                let mut writer = DocumentWriter::from_parts(output, format)?;
+                writer.write(&snapshot)?;
+                writer.finalize()
             }
-            let data = reader
-                .frame(frame_index)
-                .with_context(|| format!("Could not read IBT frame {frame_index}"))?;
-
-            let headers = reader.variable_headers()?;
-            if headers.is_empty() {
-                bail!("IBT contains no telemetry variable headers");
-            }
-            let schema = VariableSchema::from_headers(&headers, reader.layout().frame_size())?;
-
-            let frame = FramePacket::new(
-                data,
-                u32::try_from(frame_index)
-                    .context("Frame index exceeds the supported tick range")?,
-                reader.header().session_info_update as u32,
-                Arc::new(schema),
-            );
-            let mut variables = frame.variables();
-            variables.sort_unstable_by(|left, right| {
-                left.offset
-                    .cmp(&right.offset)
-                    .then_with(|| left.name.cmp(&right.name))
-            });
-            let snapshot = TelemetrySnapshot::from_provider(&frame, &variables)?;
-            let mut writer = DocumentWriter::from_parts(output, format)?;
-            writer.write(&snapshot)?;
-            writer.finalize()
         }
     }
 }
@@ -145,12 +148,13 @@ mod tests {
                 DocumentFormat::None,
             ] {
                 let output = directory.path().join("snapshot");
-                handle_command(Command::Ibt {
+                Command::Ibt {
                     path: path.clone(),
                     output: OutputTarget::File(output.clone()),
                     format,
                     frame_index,
-                })
+                }
+                .run()
                 .await?;
                 let text = std::fs::read_to_string(output)?;
                 let value: serde_json::Value = match format {
@@ -177,12 +181,13 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let output = directory.path().join("snapshot");
         std::fs::write(&output, "existing output")?;
-        let error = handle_command(Command::Ibt {
+        let error = Command::Ibt {
             path,
             output: OutputTarget::File(output.clone()),
             format: DocumentFormat::Json,
             frame_index: 12,
-        })
+        }
+        .run()
         .await
         .unwrap_err();
         assert!(error.to_string().contains("valid range: 0..=11"));
@@ -194,12 +199,13 @@ mod tests {
     async fn ibt_snapshot_propagates_output_errors() -> Result<()> {
         let path = require_named_ibt_fixture("profile_small.ibt")?;
         let directory = tempfile::tempdir()?;
-        let error = handle_command(Command::Ibt {
+        let error = Command::Ibt {
             path,
             output: OutputTarget::File(directory.path().join("missing").join("snapshot")),
             format: DocumentFormat::Json,
             frame_index: 0,
-        })
+        }
+        .run()
         .await
         .unwrap_err();
         assert!(error.downcast_ref::<std::io::Error>().is_some());

@@ -36,26 +36,28 @@ pub(crate) enum Command {
     },
 }
 
-pub(crate) fn handle_command(command: Command) -> Result<()> {
-    match command {
-        Command::Ibt {
-            path,
-            output,
-            format,
-        } => {
-            let reader = get_disk_reader(&path)?;
-            write_session_info(&reader, output.clone(), format)?;
-            tracing::info!(ibt_path=%path.display(), output=%output, encoding=%format, "Wrote disk session snapshot.");
-            Ok(())
-        }
-        #[cfg(windows)]
-        Command::Live { output, format } => {
-            use crate::utils::get_connection;
+impl Command {
+    pub(crate) fn run(self) -> Result<()> {
+        match self {
+            Command::Ibt {
+                path,
+                output,
+                format,
+            } => {
+                let reader = get_disk_reader(&path)?;
+                write_session_info(&reader, output.clone(), format)?;
+                tracing::info!(ibt_path=%path.display(), output=%output, encoding=%format, "Wrote disk session snapshot.");
+                Ok(())
+            }
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use crate::utils::get_connection;
 
-            let connection = get_connection()?;
-            write_session_info(&connection, output.clone(), format)?;
-            tracing::info!(output=%output, encoding=%format, "Wrote live session snapshot.");
-            Ok(())
+                let connection = get_connection()?;
+                write_session_info(&connection, output.clone(), format)?;
+                tracing::info!(output=%output, encoding=%format, "Wrote live session snapshot.");
+                Ok(())
+            }
         }
     }
 }

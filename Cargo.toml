@@ -2,8 +2,8 @@
 
 members = [
   "xtask",
-  "crates/iracing-broadcast-sdk",
   "crates/iracing-broadcast-cli",
+  "crates/iracing-broadcast-sdk",
   "crates/iracing-irsdk",
   "crates/iracing-sdk",
   "crates/iracing-sdk-cli",
@@ -30,6 +30,7 @@ anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
 futures = "0.3"
+iracing-broadcast-cli = { version = "0.1.0", path = "crates/iracing-broadcast-cli" }
 iracing-broadcast-sdk = { version = "0.1.0", path = "crates/iracing-broadcast-sdk" }
 iracing-irsdk = { version = "0.1.0", path = "crates/iracing-irsdk" }
 iracing-sdk = { version = "0.1.0", path = "crates/iracing-sdk" }

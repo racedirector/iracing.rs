@@ -9,7 +9,7 @@ use schemars::{schema_for, schema_for_value};
 use std::path::PathBuf;
 
 #[derive(Subcommand, Debug)]
-pub(crate) enum Commands {
+pub(crate) enum Command {
     /// Captures the most-recent session string and outputs JSON schema to `output` in
     /// the requested format.
     #[cfg(windows)]
@@ -49,39 +49,41 @@ pub(crate) enum Commands {
     },
 }
 
-pub(crate) fn handle_command(command: Commands) -> Result<()> {
-    match command {
-        Commands::Ibt {
-            path,
-            output,
-            format,
-        } => {
-            let reader = get_disk_reader(&path)?;
-            write_session_info_schema(&reader, output.clone(), format)?;
+impl Command {
+    pub(crate) fn run(self) -> Result<()> {
+        match self {
+            Command::Ibt {
+                path,
+                output,
+                format,
+            } => {
+                let reader = get_disk_reader(&path)?;
+                write_session_info_schema(&reader, output.clone(), format)?;
 
-            tracing::info!(output=%output, format=%format, ibt_path=%path.display(),"Wrote IBT session schema");
+                tracing::info!(output=%output, format=%format, ibt_path=%path.display(),"Wrote IBT session schema");
+            }
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use crate::utils::get_connection;
+
+                let connection = get_connection()?;
+                write_session_info_schema(&connection, output.clone(), format)?;
+
+                tracing::info!(output=%output,format=%format,"Wrote live session schema");
+            }
+            Command::Type { output, format } => {
+                let schema = schema_for!(iracing_sdk::schema::SessionInfo);
+
+                let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+                writer.write(&schema)?;
+                writer.finalize()?;
+
+                tracing::info!(output=%output,format=%format,"Wrote static session schema");
+            }
         }
-        #[cfg(windows)]
-        Commands::Live { output, format } => {
-            use crate::utils::get_connection;
 
-            let connection = get_connection()?;
-            write_session_info_schema(&connection, output.clone(), format)?;
-
-            tracing::info!(output=%output,format=%format,"Wrote live session schema");
-        }
-        Commands::Type { output, format } => {
-            let schema = schema_for!(iracing_sdk::schema::SessionInfo);
-
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&schema)?;
-            writer.finalize()?;
-
-            tracing::info!(output=%output,format=%format,"Wrote static session schema");
-        }
+        Ok(())
     }
-
-    Ok(())
 }
 
 fn write_session_info_schema(

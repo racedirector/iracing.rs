@@ -37,24 +37,26 @@ pub(crate) enum Command {
     },
 }
 
-pub(crate) fn handle_command(command: Command) -> Result<()> {
-    match command {
-        Command::Ibt {
-            path,
-            output,
-            format,
-        } => {
-            let reader = get_disk_reader(&path)?;
+impl Command {
+    pub fn run(self) -> Result<()> {
+        match self {
+            Command::Ibt {
+                path,
+                output,
+                format,
+            } => {
+                let reader = get_disk_reader(&path)?;
 
-            write_headers(reader, output, format)
-        }
-        #[cfg(windows)]
-        Command::Live { output, format } => {
-            use crate::utils::get_connection;
+                write_headers(reader, output, format)
+            }
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use crate::utils::get_connection;
 
-            let connection = get_connection()?;
+                let connection = get_connection()?;
 
-            write_headers(connection, output, format)
+                write_headers(connection, output, format)
+            }
         }
     }
 }

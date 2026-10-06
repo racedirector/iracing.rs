@@ -1156,6 +1156,7 @@ dependencies = [
  "clap",
  "csv",
  "futures",
+ "iracing-broadcast-cli",
  "iracing-irsdk",
  "iracing-sdk",
  "schemars",

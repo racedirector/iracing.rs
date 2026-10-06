@@ -37,53 +37,55 @@ pub(crate) enum Command {
     Type,
 }
 
-pub(crate) fn handle_command(command: Command) -> Result<()> {
-    match command {
-        Command::Ibt {
-            path,
-            output,
-            format,
-        } => {
-            // Open the file
-            let file = File::open(path)?;
-            let mut handle = file.take(size_of::<IbtHeader>() as u64);
+impl Command {
+    pub fn run(self) -> Result<()> {
+        match self {
+            Command::Ibt {
+                path,
+                output,
+                format,
+            } => {
+                // Open the file
+                let file = File::open(path)?;
+                let mut handle = file.take(size_of::<IbtHeader>() as u64);
 
-            // Read the header
-            let header = IbtHeader::try_from_reader(&mut handle)?;
+                // Read the header
+                let header = IbtHeader::try_from_reader(&mut handle)?;
 
-            // Write output
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&header)?;
-            writer.finalize()
-        }
-        #[cfg(windows)]
-        Command::Live { output, format } => {
-            use crate::utils::get_connection;
-
-            // Open the connection
-            let connection = get_connection()?;
-            // Read the header
-            let header = connection.header_snapshot()?;
-
-            // Write output
-            let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-            writer.write(&header)?;
-            writer.finalize()
-        }
-        Command::Type => {
-            let mut writer =
-                DocumentWriter::from_parts(OutputTarget::Stdout, DocumentFormat::None)?;
-
-            for layout in [
-                VariableBuffer::type_layout(),
-                Header::type_layout(),
-                DiskSubHeader::type_layout(),
-                VariableHeader::type_layout(),
-            ] {
-                writer.write(&layout.to_string())?;
+                // Write output
+                let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+                writer.write(&header)?;
+                writer.finalize()
             }
+            #[cfg(windows)]
+            Command::Live { output, format } => {
+                use crate::utils::get_connection;
 
-            writer.finalize()
+                // Open the connection
+                let connection = get_connection()?;
+                // Read the header
+                let header = connection.header_snapshot()?;
+
+                // Write output
+                let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
+                writer.write(&header)?;
+                writer.finalize()
+            }
+            Command::Type => {
+                let mut writer =
+                    DocumentWriter::from_parts(OutputTarget::Stdout, DocumentFormat::None)?;
+
+                for layout in [
+                    VariableBuffer::type_layout(),
+                    Header::type_layout(),
+                    DiskSubHeader::type_layout(),
+                    VariableHeader::type_layout(),
+                ] {
+                    writer.write(&layout.to_string())?;
+                }
+
+                writer.finalize()
+            }
         }
     }
 }
