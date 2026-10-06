@@ -30,7 +30,8 @@ serde_json = { workspace = true }
 serde_yaml_ng = { workspace = true }
 
 [features]
-default = []
+# Default include broadcast to prevent breaking things
+default = ["broadcast"]
 serde = ["dep:serde"]
-debug = ["dep:type-layout"]
+debug = ["serde", "dep:type-layout"]
 broadcast = []

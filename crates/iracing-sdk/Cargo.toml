@@ -25,7 +25,7 @@ workspace = true
 [dependencies]
 async-trait = "0.1.85"
 futures = { workspace = true }
-iracing-irsdk = { workspace = true, features = ["broadcast"] }
+iracing-irsdk = { workspace = true }
 iracing-sdk-derive = { workspace = true, optional = true }
 memmap2 = "0.9"
 pin-project-lite = "0.2"
