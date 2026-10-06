@@ -1,11 +1,11 @@
 //! Integration between wire-contract values and telemetry schema decoding.
 
 use iracing_irsdk::{
-    BitField, BroadcastMessage, CameraState, CameraSwitchFocusMode, CarLeftRight, ChatCommandMode,
-    EngineWarnings, ForceFeedbackCommandMode, IncidentFlags, PaceFlags, PaceMode, PitCommandMode,
-    PitServiceFlags, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
-    ReplayStateMode, SessionFlags, SessionState, TelemetryCommandMode, TrackLocation, TrackSurface,
-    TrackWetness, VideoCaptureMode,
+    BitField, BroadcastMessageKind, CameraState, CameraSwitchFocusMode, CarLeftRight,
+    ChatCommandMode, EngineWarnings, ForceFeedbackCommandMode, IncidentFlags, PaceFlags, PaceMode,
+    PitCommandMode, PitServiceFlags, PitServiceStatus, ReloadTexturesMode, ReplayPositionMode,
+    ReplaySearchMode, ReplayStateMode, SessionFlags, SessionState, TelemetryCommandMode,
+    TrackLocation, TrackSurface, TrackWetness, VideoCaptureMode,
 };
 
 use crate::{IRacingSDKError, VarData, VariableInfo};
@@ -27,7 +27,7 @@ macro_rules! impl_enum_var_data {
 }
 
 impl_enum_var_data!(
-    BroadcastMessage,
+    BroadcastMessageKind,
     CameraSwitchFocusMode,
     CarLeftRight,
     ChatCommandMode,

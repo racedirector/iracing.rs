@@ -3,8 +3,8 @@
 use super::macros::sdk_enum;
 
 sdk_enum! {
-    /// `irsdk_BroadcastMsg`.
-    pub enum BroadcastMessage {
+    /// `irsdk_BroadcastMsg` discriminator.
+    pub enum BroadcastMessageKind {
         CameraSwitchPosition = 0,
         CameraSwitchNumber = 1,
         CameraSetState = 2,
@@ -20,6 +20,36 @@ sdk_enum! {
         ReplaySearchSessionTime = 12,
         VideoCapture = 13,
         Last = 14,
+    }
+}
+
+/// One complete message in the iRacing broadcast protocol.
+///
+/// The SDK defines a message kind plus three 16-bit arguments. Platform transports
+/// are responsible for packing this value into the representation required by the
+/// operating system before attempting delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BroadcastMessage {
+    /// SDK broadcast-message discriminator.
+    pub kind: BroadcastMessageKind,
+    /// First SDK-defined message argument.
+    pub var1: u16,
+    /// Second SDK-defined message argument.
+    pub var2: u16,
+    /// Third SDK-defined message argument.
+    pub var3: u16,
+}
+
+impl BroadcastMessage {
+    /// Creates a broadcast message from its SDK-defined kind and arguments.
+    pub const fn new(kind: BroadcastMessageKind, var1: u16, var2: u16, var3: u16) -> Self {
+        Self {
+            kind,
+            var1,
+            var2,
+            var3,
+        }
     }
 }
 
@@ -169,9 +199,19 @@ mod tests {
 
     #[test]
     fn sentinels_and_signed_focus_values_match_the_sdk() {
-        assert_eq!(i32::from(BroadcastMessage::Last), 14);
+        assert_eq!(i32::from(BroadcastMessageKind::Last), 14);
         assert_eq!(i32::from(ReplaySearchMode::Last), 10);
         assert_eq!(i32::from(CameraSwitchFocusMode::FocusAtIncident), -3);
         assert_eq!(CameraSwitchFocusMode::try_from(-4), Err(-4));
+    }
+
+    #[test]
+    fn broadcast_message_preserves_sdk_kind_and_arguments() {
+        let message = BroadcastMessage::new(BroadcastMessageKind::PitCommand, 1, 2, 3);
+
+        assert_eq!(message.kind, BroadcastMessageKind::PitCommand);
+        assert_eq!(message.var1, 1);
+        assert_eq!(message.var2, 2);
+        assert_eq!(message.var3, 3);
     }
 }

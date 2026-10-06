@@ -4,11 +4,11 @@ use crate::{
     pad_car_number::pad_car_number,
 };
 use iracing_irsdk::{
-    BroadcastMessage, ChatCommandMode, ForceFeedbackCommandMode, PitCommand, PitCommandMode,
+    BroadcastMessageKind, ChatCommandMode, ForceFeedbackCommandMode, PitCommand, PitCommandMode,
     ReloadTexturesMode,
 };
 
-pub type FormattedMessage = (BroadcastMessage, u16, u16, u16);
+pub type FormattedMessage = (BroadcastMessageKind, u16, u16, u16);
 
 fn split_u32_words(value: u32) -> (u16, u16) {
     ((value & 0xFFFF) as u16, ((value >> 16) & 0xFFFF) as u16)
@@ -24,25 +24,25 @@ impl TryFrom<Command> for FormattedMessage {
     fn try_from(command: Command) -> Result<Self, Self::Error> {
         let message = match command {
             Command::CameraSwitchPosition(position, group, camera) => (
-                BroadcastMessage::CameraSwitchPosition,
+                BroadcastMessageKind::CameraSwitchPosition,
                 position,
                 group,
                 camera,
             ),
             Command::CameraSwitchNumber(car_number, group, camera) => (
-                BroadcastMessage::CameraSwitchNumber,
+                BroadcastMessageKind::CameraSwitchNumber,
                 pad_car_number(&car_number),
                 group,
                 camera,
             ),
             Command::CameraSetState(camera_state) => (
-                BroadcastMessage::CameraSetState,
+                BroadcastMessageKind::CameraSetState,
                 camera_state.bits() as u16,
                 0,
                 0,
             ),
             Command::ReplaySetPlaySpeed(speed, slow_motion) => (
-                BroadcastMessage::ReplaySetPlaySpeed,
+                BroadcastMessageKind::ReplaySetPlaySpeed,
                 speed as u16,
                 slow_motion.into(),
                 0,
@@ -50,31 +50,31 @@ impl TryFrom<Command> for FormattedMessage {
             Command::ReplaySetPlayPosition(mode, frame_number) => {
                 let (low, high) = split_u32_words(frame_number);
                 (
-                    BroadcastMessage::ReplaySetPlayPosition,
+                    BroadcastMessageKind::ReplaySetPlayPosition,
                     encode_mode(mode),
                     low,
                     high,
                 )
             }
             Command::ReplaySearch(mode) => {
-                (BroadcastMessage::ReplaySearch, encode_mode(mode), 0, 0)
+                (BroadcastMessageKind::ReplaySearch, encode_mode(mode), 0, 0)
             }
             Command::ReplaySetState(mode) => {
-                (BroadcastMessage::ReplaySetState, encode_mode(mode), 0, 0)
+                (BroadcastMessageKind::ReplaySetState, encode_mode(mode), 0, 0)
             }
             Command::ReloadAllTextures => (
-                BroadcastMessage::ReloadTextures,
+                BroadcastMessageKind::ReloadTextures,
                 encode_mode(ReloadTexturesMode::All),
                 0,
                 0,
             ),
             Command::ReloadTextures(car_index) => (
-                BroadcastMessage::ReloadTextures,
+                BroadcastMessageKind::ReloadTextures,
                 encode_mode(ReloadTexturesMode::CarIndex),
                 car_index,
                 0,
             ),
-            Command::Chat(mode) => (BroadcastMessage::ChatCommand, encode_mode(mode), 0, 0),
+            Command::Chat(mode) => (BroadcastMessageKind::ChatCommand, encode_mode(mode), 0, 0),
             Command::ChatMacro(macro_number) => {
                 if !(1..=15).contains(&macro_number) {
                     return Err(BroadcastError::Validation {
@@ -83,7 +83,7 @@ impl TryFrom<Command> for FormattedMessage {
                 }
 
                 (
-                    BroadcastMessage::ChatCommand,
+                    BroadcastMessageKind::ChatCommand,
                     encode_mode(ChatCommandMode::Macro),
                     macro_number,
                     0,
@@ -117,16 +117,16 @@ impl TryFrom<Command> for FormattedMessage {
                     PitCommand::ClearFuel => (encode_mode(PitCommandMode::ClearFuel), 0),
                 };
 
-                (BroadcastMessage::PitCommand, var1, var2, 0)
+                (BroadcastMessageKind::PitCommand, var1, var2, 0)
             }
             Command::Telemetry(mode) => {
-                (BroadcastMessage::TelemetryCommand, encode_mode(mode), 0, 0)
+                (BroadcastMessageKind::TelemetryCommand, encode_mode(mode), 0, 0)
             }
             Command::ForceFeedback(value) => {
                 let bits = value.to_bits();
                 let (low, high) = split_u32_words(bits);
                 (
-                    BroadcastMessage::ForceFeedbackCommand,
+                    BroadcastMessageKind::ForceFeedbackCommand,
                     encode_mode(ForceFeedbackCommandMode::MaxForce),
                     low,
                     high,
@@ -135,14 +135,14 @@ impl TryFrom<Command> for FormattedMessage {
             Command::ReplaySearchSessionTime(session_number, session_time_ms) => {
                 let (low, high) = split_u32_words(session_time_ms);
                 (
-                    BroadcastMessage::ReplaySearchSessionTime,
+                    BroadcastMessageKind::ReplaySearchSessionTime,
                     session_number,
                     low,
                     high,
                 )
             }
             Command::VideoCapture(mode) => {
-                (BroadcastMessage::VideoCapture, encode_mode(mode), 0, 0)
+                (BroadcastMessageKind::VideoCapture, encode_mode(mode), 0, 0)
             }
         };
 
