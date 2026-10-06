@@ -122,7 +122,7 @@ impl From<CameraStateFlag> for CameraState {
 
 #[derive(Args, Debug, Clone, PartialEq)]
 pub struct CameraStateArgs {
-    #[arg(long)]
+    #[arg(long, value_parser = clap::value_parser!(u32).range(0..=u16::MAX as i64))]
     raw_bits: Option<u32>,
     #[arg(long = "flag", value_enum)]
     flags: Vec<CameraStateFlag>,
