@@ -12,13 +12,10 @@ use iracing_irsdk::{
 /// # Examples
 ///
 /// ```
-/// pub use iracing_irsdk::PitCommand;
-/// pub use client::Client;
-/// pub use command::Command;
-/// pub use error::{BroadcastError, Result};
+/// use iracing_broadcast_sdk::{Command, PitCommand};
 ///
 /// let _ = Command::CameraSwitchPosition(0, 0, 0);
-/// let _ = Command::Pit(PitCommand::Fuel(8));
+/// let _ = Command::PitCommand(PitCommand::Fuel(8));
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
