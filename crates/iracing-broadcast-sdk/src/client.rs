@@ -35,7 +35,7 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// Returns [`IRacingSDKError`] if `RegisterWindowMessageW` fails.
+    /// Returns [`Error::Connection`] if `RegisterWindowMessageW` fails.
     pub fn new() -> Result<Self> {
         let message = U16CString::from_str(IRSDK_BROADCASTMSGNAME)?;
 
@@ -59,8 +59,8 @@ impl Client {
     ///
     /// # Errors
     ///
-    /// Returns [`IRacingSDKError`] if the command cannot be encoded or if
-    /// `SendNotifyMessageW` reports a Win32 error.
+    /// Returns [`Error::Validation`] if the command cannot be encoded or
+    /// [`Error::Windows`] if `SendNotifyMessageW` reports a Win32 error.
     pub fn send_message(&self, message: Command) -> Result<()> {
         self.send_formatted_message(message.try_into()?)
     }
