@@ -350,4 +350,16 @@ mod tests {
             Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof
         ));
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialization_round_trip_without_padding() {
+        let header = valid_live_header();
+
+        let header_json = serde_json::to_value(header).unwrap();
+        assert!(header_json.get("_pad").is_none());
+        assert!(header_json["buffers"][0].get("_pad").is_none());
+        let decoded_header: Header = serde_json::from_value(header_json).unwrap();
+        assert_eq!(decoded_header.as_bytes(), header.as_bytes());
+    }
 }

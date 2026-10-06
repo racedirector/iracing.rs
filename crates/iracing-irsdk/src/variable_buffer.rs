@@ -99,4 +99,15 @@ mod tests {
             })
         ));
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialization_round_trip_without_padding() {
+        let buffer = VariableBuffer::new(10, 20, 9);
+
+        let buffer_json = serde_json::to_value(buffer).unwrap();
+        assert!(buffer_json.get("_pad").is_none());
+        let decoded_buffer: VariableBuffer = serde_json::from_value(buffer_json).unwrap();
+        assert_eq!(decoded_buffer.as_bytes(), buffer.as_bytes());
+    }
 }

@@ -414,4 +414,39 @@ mod tests {
             .is_err()
         );
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserialization_rejects_invalid_metadata() {
+        let invalid = serde_json::json!({
+            "variable_type": "Float",
+            "offset": -1,
+            "count": 1,
+            "count_as_time": false,
+            "name": "Speed",
+            "description": "Vehicle speed",
+            "unit": "m/s",
+        });
+        assert!(serde_json::from_value::<VariableHeader>(invalid).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialization_round_trip() {
+        let variable = VariableHeader::new(
+            VariableType::Float,
+            8,
+            1,
+            true,
+            "Speed",
+            "Vehicle speed",
+            "m/s",
+        )
+        .unwrap();
+
+        let variable_json = serde_json::to_value(variable).unwrap();
+        assert_eq!(variable_json["count_as_time"], true);
+        let decoded_variable: VariableHeader = serde_json::from_value(variable_json).unwrap();
+        assert_eq!(decoded_variable.as_bytes(), variable.as_bytes());
+    }
 }
