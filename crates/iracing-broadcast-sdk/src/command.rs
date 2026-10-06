@@ -222,3 +222,97 @@ impl TryFrom<Command> for BroadcastMessage {
         Ok(message)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_message(
+        command: Command,
+        kind: BroadcastMessageKind,
+        var1: u16,
+        var2: u16,
+        var3: u16,
+    ) {
+        let message = BroadcastMessage::try_from(command).expect("command should encode");
+
+        assert_eq!(message, BroadcastMessage::new(kind, var1, var2, var3));
+    }
+
+    #[test]
+    fn camera_switch_position_encodes_to_broadcast_message() {
+        assert_message(
+            Command::CameraSwitchPosition(12, 3, 4),
+            BroadcastMessageKind::CameraSwitchPosition,
+            12,
+            3,
+            4,
+        );
+    }
+
+    #[test]
+    fn replay_position_splits_frame_number_into_words() {
+        assert_message(
+            Command::ReplaySetPlayPosition(ReplayPositionMode::Current, 0x1234_5678),
+            BroadcastMessageKind::ReplaySetPlayPosition,
+            encode_mode(ReplayPositionMode::Current),
+            0x5678,
+            0x1234,
+        );
+    }
+
+    #[test]
+    fn chat_macro_encodes_macro_mode_and_number() {
+        assert_message(
+            Command::ChatMacro(15),
+            BroadcastMessageKind::ChatCommand,
+            encode_mode(ChatCommandMode::Macro),
+            15,
+            0,
+        );
+    }
+
+    #[test]
+    fn chat_macro_rejects_out_of_range_number() {
+        let error = BroadcastMessage::try_from(Command::ChatMacro(16))
+            .expect_err("macro numbers above 15 must be rejected");
+
+        assert!(matches!(error, crate::error::Error::Validation { .. }));
+    }
+
+    #[test]
+    fn pit_fuel_encodes_mode_and_value() {
+        assert_message(
+            Command::Pit(PitCommand::Fuel(8)),
+            BroadcastMessageKind::PitCommand,
+            encode_mode(PitCommandMode::Fuel),
+            8,
+            0,
+        );
+    }
+
+    #[test]
+    fn force_feedback_preserves_existing_encoding() {
+        let bits = 1.0_f32.to_bits();
+        let (low, high) = split_u32_words(bits);
+
+        assert_message(
+            Command::ForceFeedback(1.0),
+            BroadcastMessageKind::ForceFeedbackCommand,
+            encode_mode(ForceFeedbackCommandMode::MaxForce),
+            low,
+            high,
+        );
+    }
+
+    #[test]
+    fn replay_session_time_splits_time_into_words() {
+        assert_message(
+            Command::ReplaySearchSessionTime(7, 0x1234_5678),
+            BroadcastMessageKind::ReplaySearchSessionTime,
+            7,
+            0x5678,
+            0x1234,
+        );
+    }
+}
