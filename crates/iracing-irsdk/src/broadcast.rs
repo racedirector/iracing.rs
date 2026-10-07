@@ -19,7 +19,6 @@ sdk_enum! {
         ForceFeedbackCommand = 11,
         ReplaySearchSessionTime = 12,
         VideoCapture = 13,
-        Last = 14,
     }
 }
 
@@ -124,7 +123,6 @@ sdk_enum! {
     /// `irsdk_RpyStateMode`.
     pub enum ReplayStateMode {
         EraseTape = 0,
-        Last = 1,
     }
 }
 
@@ -149,7 +147,6 @@ sdk_enum! {
         NextFrame = 7,
         PreviousIncident = 8,
         NextIncident = 9,
-        Last = 10,
     }
 }
 
@@ -159,7 +156,6 @@ sdk_enum! {
         Begin = 0,
         Current = 1,
         End = 2,
-        Last = 3,
     }
 }
 
@@ -167,7 +163,6 @@ sdk_enum! {
     /// `irsdk_FFBCommandMode`.
     pub enum ForceFeedbackCommandMode {
         MaxForce = 0,
-        Last = 1,
     }
 }
 
@@ -199,8 +194,6 @@ mod tests {
 
     #[test]
     fn sentinels_and_signed_focus_values_match_the_sdk() {
-        assert_eq!(i32::from(BroadcastMessageKind::Last), 14);
-        assert_eq!(i32::from(ReplaySearchMode::Last), 10);
         assert_eq!(i32::from(CameraSwitchFocusMode::FocusAtIncident), -3);
         assert_eq!(CameraSwitchFocusMode::try_from(-4), Err(-4));
     }

@@ -1,8 +1,15 @@
+mod parser;
+
 use anyhow::Result;
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{Args, Subcommand};
 use iracing_broadcast_sdk::{
     CameraState, ChatCommandMode, Command as BroadcastCommand, PitCommand, ReplayPositionMode,
     ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
+};
+
+use crate::parser::{
+    camera_state_parser, replay_position_parser, replay_search_parser, telemetry_command_parser,
+    video_command_parser,
 };
 
 #[derive(Subcommand, Debug, Clone, PartialEq)]
@@ -34,18 +41,18 @@ pub enum Command {
     },
     /// Modify the disk-telemetry state
     Telemetry {
-        #[command(subcommand)]
-        command: TelemetryCommand,
+        #[arg(long, value_parser=telemetry_command_parser())]
+        mode: TelemetryCommandMode,
     },
     /// Modify FFB
     Ffb {
-        #[command(subcommand)]
-        command: FfbCliCommand,
+        #[arg(long)]
+        max_force_nm: f32,
     },
     /// Video and screen capture utilities
     Video {
-        #[command(subcommand)]
-        command: VideoCommand,
+        #[arg(long, value_parser=video_command_parser())]
+        mode: VideoCaptureMode,
     },
 }
 
@@ -101,38 +108,12 @@ impl TryFrom<CameraCommand> for BroadcastCommand {
     }
 }
 
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-enum CameraStateFlag {
-    CamToolActive,
-    UiHidden,
-    UseAutoShotSelection,
-    UseTemporaryEdits,
-    UseKeyAcceleration,
-    UseKey10xAcceleration,
-    UseMouseAimMode,
-}
-
-impl From<CameraStateFlag> for CameraState {
-    /// Return the camera-state bit represented by the CLI flag.
-    fn from(value: CameraStateFlag) -> Self {
-        match value {
-            CameraStateFlag::CamToolActive => CameraState::CAMERA_TOOL_ACTIVE,
-            CameraStateFlag::UiHidden => CameraState::USER_INTERFACE_HIDDEN,
-            CameraStateFlag::UseAutoShotSelection => CameraState::USE_AUTO_SHOT_SELECTION,
-            CameraStateFlag::UseTemporaryEdits => CameraState::USE_TEMPORARY_EDITS,
-            CameraStateFlag::UseKeyAcceleration => CameraState::USE_KEY_ACCELERATION,
-            CameraStateFlag::UseKey10xAcceleration => CameraState::USE_KEY_TEN_TIMES_ACCELERATION,
-            CameraStateFlag::UseMouseAimMode => CameraState::USE_MOUSE_AIM_MODE,
-        }
-    }
-}
-
 #[derive(Args, Debug, Clone, PartialEq)]
 pub struct CameraStateArgs {
     #[arg(long, value_parser = clap::value_parser!(u32).range(0..=u16::MAX as i64))]
     raw_bits: Option<u32>,
-    #[arg(long = "flag", value_enum)]
-    flags: Vec<CameraStateFlag>,
+    #[arg(long = "flag", value_parser = camera_state_parser())]
+    flags: Vec<CameraState>,
 }
 
 impl TryFrom<CameraStateArgs> for CameraState {
@@ -168,81 +149,6 @@ impl TryFrom<CameraStateArgs> for CameraState {
     }
 }
 
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReplaySearchArg {
-    /// Set replay play-head to start
-    ToStart,
-    /// Set replay play-head to end
-    ToEnd,
-    /// Set replay play-head to previous session
-    PrevSession,
-    /// Set replay play-head to next session
-    NextSession,
-    /// Set replay play-head to previous lap
-    PrevLap,
-    /// Set replay play-head to next lap
-    NextLap,
-    /// Set replay play-head to previous frame
-    PrevFrame,
-    /// Set replay play-head to next frame
-    NextFrame,
-    /// Set replay play-head to previous incident
-    PrevIncident,
-    /// Set replay play-head to next incident
-    NextIncident,
-}
-
-impl From<ReplaySearchArg> for ReplaySearchMode {
-    /// Return the SDK search mode for the selected replay destination.
-    fn from(value: ReplaySearchArg) -> Self {
-        match value {
-            ReplaySearchArg::ToStart => ReplaySearchMode::ToStart,
-            ReplaySearchArg::ToEnd => ReplaySearchMode::ToEnd,
-            ReplaySearchArg::PrevSession => ReplaySearchMode::PreviousSession,
-            ReplaySearchArg::NextSession => ReplaySearchMode::NextSession,
-            ReplaySearchArg::PrevLap => ReplaySearchMode::PreviousLap,
-            ReplaySearchArg::NextLap => ReplaySearchMode::NextLap,
-            ReplaySearchArg::PrevFrame => ReplaySearchMode::PreviousFrame,
-            ReplaySearchArg::NextFrame => ReplaySearchMode::NextFrame,
-            ReplaySearchArg::PrevIncident => ReplaySearchMode::PreviousIncident,
-            ReplaySearchArg::NextIncident => ReplaySearchMode::NextIncident,
-        }
-    }
-}
-
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReplayPositionArg {
-    Begin,
-    Current,
-    End,
-}
-
-impl From<ReplayPositionArg> for ReplayPositionMode {
-    /// Return the SDK origin relative to which the replay frame is positioned.
-    fn from(mode: ReplayPositionArg) -> Self {
-        match mode {
-            ReplayPositionArg::Begin => ReplayPositionMode::Begin,
-            ReplayPositionArg::Current => ReplayPositionMode::Current,
-            ReplayPositionArg::End => ReplayPositionMode::End,
-        }
-    }
-}
-
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReplayStateArg {
-    /// Erase the spooled replay
-    EraseTape,
-}
-
-impl From<ReplayStateArg> for ReplayStateMode {
-    /// Return the SDK operation for erasing the spooled replay.
-    fn from(mode: ReplayStateArg) -> Self {
-        match mode {
-            ReplayStateArg::EraseTape => ReplayStateMode::EraseTape,
-        }
-    }
-}
-
 #[derive(Subcommand, Debug, Clone, PartialEq)]
 pub enum ReplayCommand {
     /// Set replay play speed
@@ -254,21 +160,18 @@ pub enum ReplayCommand {
     },
     /// Search the replay for the given mode.
     Search {
-        #[arg(value_enum)]
-        mode: ReplaySearchArg,
+        #[arg(value_parser = replay_search_parser())]
+        mode: ReplaySearchMode,
     },
     /// Set the replay play head
     SetPlayPosition {
-        #[arg(value_enum)]
-        mode: ReplayPositionArg,
+        #[arg(value_parser = replay_position_parser())]
+        mode: ReplayPositionMode,
         #[arg(long)]
         frame: u32,
     },
-    /// Set replay state
-    SetState {
-        #[arg(value_enum, default_value_t = ReplayStateArg::EraseTape)]
-        mode: ReplayStateArg,
-    },
+    /// Erase replay tape
+    Erase,
     /// Search for a provided session time
     SearchSessionTime {
         #[arg(long)]
@@ -296,7 +199,7 @@ impl From<ReplayCommand> for BroadcastCommand {
             ReplayCommand::SetPlayPosition { mode, frame } => {
                 BroadcastCommand::ReplaySetPlayPosition(mode.into(), frame)
             }
-            ReplayCommand::SetState { mode } => BroadcastCommand::ReplaySetState(mode.into()),
+            ReplayCommand::Erase => BroadcastCommand::ReplaySetState(ReplayStateMode::EraseTape),
             ReplayCommand::SearchSessionTime { session, time_ms } => {
                 BroadcastCommand::ReplaySearchSessionTime(session, time_ms)
             }
@@ -391,71 +294,6 @@ impl From<TextureCommand> for BroadcastCommand {
     }
 }
 
-#[derive(Subcommand, Debug, Clone, PartialEq)]
-pub enum TelemetryCommand {
-    /// Stop disk telemetry
-    Stop,
-    /// Start disk telemetry
-    Start,
-    /// Flush and start new recording
-    Restart,
-}
-
-impl From<TelemetryCommand> for BroadcastCommand {
-    /// Build a broadcast command to control disk telemetry recording.
-    fn from(value: TelemetryCommand) -> Self {
-        match value {
-            TelemetryCommand::Stop => Self::Telemetry(TelemetryCommandMode::Stop),
-            TelemetryCommand::Start => Self::Telemetry(TelemetryCommandMode::Start),
-            TelemetryCommand::Restart => Self::Telemetry(TelemetryCommandMode::Restart),
-        }
-    }
-}
-
-#[derive(Subcommand, Debug, Clone, PartialEq)]
-pub enum FfbCliCommand {
-    MaxForce { nm: f32 },
-}
-
-impl From<FfbCliCommand> for BroadcastCommand {
-    /// Build a maximum-force command, passing the supplied newton-meter value unchanged.
-    fn from(value: FfbCliCommand) -> Self {
-        match value {
-            FfbCliCommand::MaxForce { nm } => Self::ForceFeedback(nm),
-        }
-    }
-}
-
-#[derive(Subcommand, Debug, Clone, PartialEq)]
-pub enum VideoCommand {
-    /// Capture a screenshot
-    Screenshot,
-    /// Start recording
-    Start,
-    /// Stop recording
-    Stop,
-    /// Toggle recording
-    Toggle,
-    /// Show video timer
-    ShowTimer,
-    /// Hide video timer
-    HideTimer,
-}
-
-impl From<VideoCommand> for BroadcastCommand {
-    /// Build a broadcast command for screenshot capture, video recording, or timer visibility.
-    fn from(value: VideoCommand) -> Self {
-        match value {
-            VideoCommand::Screenshot => Self::VideoCapture(VideoCaptureMode::TriggerScreenshot),
-            VideoCommand::Start => Self::VideoCapture(VideoCaptureMode::StartVideoCapture),
-            VideoCommand::Stop => Self::VideoCapture(VideoCaptureMode::EndVideoCapture),
-            VideoCommand::Toggle => Self::VideoCapture(VideoCaptureMode::ToggleVideoCapture),
-            VideoCommand::ShowTimer => Self::VideoCapture(VideoCaptureMode::ShowVideoTimer),
-            VideoCommand::HideTimer => Self::VideoCapture(VideoCaptureMode::HideVideoTimer),
-        }
-    }
-}
-
 impl Command {
     /// Send this command through the Windows broadcast client.
     ///
@@ -490,9 +328,9 @@ impl TryFrom<Command> for BroadcastCommand {
     /// or neither. Other command parameters pass through without validation here.
     fn try_from(command: Command) -> Result<Self, Self::Error> {
         match command {
-            Command::Telemetry { command } => Ok(command.into()),
-            Command::Ffb { command } => Ok(command.into()),
-            Command::Video { command } => Ok(command.into()),
+            Command::Telemetry { mode } => Ok(Self::Telemetry(mode)),
+            Command::Ffb { max_force_nm } => Ok(Self::ForceFeedback(max_force_nm)),
+            Command::Video { mode } => Ok(Self::VideoCapture(mode)),
             Command::Textures { command } => Ok(command.into()),
             Command::Chat { command } => Ok(command.into()),
             Command::Camera { command } => command.try_into(),
