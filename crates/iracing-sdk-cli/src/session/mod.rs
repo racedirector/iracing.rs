@@ -3,38 +3,28 @@ mod schema;
 mod snapshot;
 
 use anyhow::Result;
-use clap::Subcommand;
 
-use discover::Command as DiscoverCommand;
-use schema::Command as SchemaCommand;
-use snapshot::Command as SnapshotCommand;
+use discover::Args as DiscoverArgs;
+use schema::Args as SchemaArgs;
+use snapshot::Args as SnapshotArgs;
 
-#[derive(Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug)]
 pub enum Command {
     /// Captures JSON schema of a session string.
-    Schema {
-        #[command(subcommand)]
-        command: SchemaCommand,
-    },
+    Schema(SchemaArgs),
     /// Discovers schema additions of a session string.
-    Discover {
-        #[command(subcommand)]
-        command: DiscoverCommand,
-    },
+    Discover(DiscoverArgs),
     /// Captures a snapshot of the latest session string.
-    Snapshot {
-        #[command(subcommand)]
-        command: SnapshotCommand,
-    },
+    Snapshot(SnapshotArgs),
 }
 
 impl Command {
     /// Execute the selected session snapshot, discovery, or schema command and propagate its errors.
     pub(crate) fn run(self) -> Result<()> {
         match self {
-            Command::Snapshot { command } => command.run(),
-            Command::Discover { command } => command.run(),
-            Command::Schema { command } => command.run(),
+            Command::Snapshot(args) => args.run(),
+            Command::Discover(args) => args.run(),
+            Command::Schema(args) => args.run(),
         }
     }
 }

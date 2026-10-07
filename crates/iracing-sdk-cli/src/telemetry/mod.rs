@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use crate::utils::get_connection;
 mod snapshot;
 
 #[cfg(windows)]
@@ -101,9 +99,7 @@ impl Command {
             Command::Record { output, format } => {
                 use iracing_sdk::{LiveConnection, UpdateRate, providers::live::LiveProvider};
 
-                let provider = LiveProvider::builder()
-                    .with_connection(get_connection()?)
-                    .build()?;
+                let provider = LiveProvider::builder().build()?;
                 let connection = LiveConnection::builder().with_provider(provider).build()?;
                 let mut variables = connection.fields_owned();
                 if variables.is_empty() {

@@ -9,12 +9,12 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-use headers::Command as HeadersCommand;
+use headers::Args as HeadersArgs;
 #[cfg(windows)]
 use iracing_broadcast_cli::Command as BroadcastCommand;
 use session::Command as SessionCommand;
 use telemetry::Command as TelemetryCommand;
-use variables::Command as VariablesCommand;
+use variables::Args as VariablesArgs;
 
 #[derive(Parser)]
 #[command(name = "iracing-sdk", version, about = "iRacing SDK tools", long_about = None, arg_required_else_help = true)]
@@ -26,20 +26,14 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Tools for interacting with disk and live headers, as well as the type schema and layout.
-    Headers {
-        #[command(subcommand)]
-        command: HeadersCommand,
-    },
+    Headers(HeadersArgs),
     /// Tools for interacting with disk and live session strings, as well as type schemas.
     Session {
         #[command(subcommand)]
         command: SessionCommand,
     },
     /// Tools for interacting with disk and live variables.
-    Variables {
-        #[command(subcommand)]
-        command: VariablesCommand,
-    },
+    Variables(VariablesArgs),
     /// Tools for capturing telemetry from a source.
     Telemetry {
         #[command(subcommand)]
@@ -60,8 +54,8 @@ impl Command {
             Command::Session { command } => command.run(),
             #[cfg(windows)]
             Command::Broadcast { command } => command.run(),
-            Command::Headers { command } => command.run(),
-            Command::Variables { command } => command.run(),
+            Command::Headers(args) => args.run(),
+            Command::Variables(args) => args.run(),
             Command::Telemetry { command } => command.run().await,
         }
     }

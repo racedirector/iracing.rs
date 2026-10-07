@@ -1,84 +1,34 @@
 use crate::{
-    utils::get_disk_reader,
+    utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 use anyhow::{Context, Result};
-use clap::Subcommand;
-use iracing_sdk::provider::{SessionInformationBytesProvider, SessionInformationProvider};
-use std::path::PathBuf;
+use iracing_sdk::provider::SessionInformationProvider;
 
-#[derive(Subcommand, Debug)]
-pub(crate) enum Command {
-    /// Captures the latest session string from a live iRacing connection and outputs it to the destination in the requested format.
-    #[cfg(windows)]
-    Live {
-        /// Output destination. Use `-` for stdout.
-        #[arg(short, long, default_value = "-")]
-        output: OutputTarget,
+#[derive(clap::Args, Debug)]
+pub(crate) struct Args {
+    #[command(subcommand)]
+    source: SourceKind,
 
-        /// The format for the output.
-        #[arg(long, default_value = "yaml", value_enum)]
-        format: DocumentFormat,
-    },
-    /// Captures the session string from the IBT file and outputs it to the destination in the requested format.
-    Ibt {
-        /// Path to the input `.ibt` telemetry file.
-        #[arg(short, long)]
-        path: PathBuf,
-
-        /// Output destination. Use `-` for stdout.
-        #[arg(short, long, default_value = "-")]
-        output: OutputTarget,
-
-        /// The format for the output.
-        #[arg(long, default_value = "yaml", value_enum)]
-        format: DocumentFormat,
-    },
-}
-
-impl Command {
-    /// Write parsed IBT or live session information in the selected output format.
-    ///
-    /// File output creates or truncates the destination.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when session information is absent. Propagates source access,
-    /// session parsing, serialization, and output errors.
-    pub(crate) fn run(self) -> Result<()> {
-        match self {
-            Command::Ibt {
-                path,
-                output,
-                format,
-            } => {
-                let reader = get_disk_reader(&path)?;
-                write_session_info(&reader, output.clone(), format)?;
-                tracing::info!(ibt_path=%path.display(), output=%output, encoding=%format, "Wrote disk session snapshot.");
-                Ok(())
-            }
-            #[cfg(windows)]
-            Command::Live { output, format } => {
-                use crate::utils::get_connection;
-
-                let connection = get_connection()?;
-                write_session_info(&connection, output.clone(), format)?;
-                tracing::info!(output=%output, encoding=%format, "Wrote live session snapshot.");
-                Ok(())
-            }
-        }
-    }
-}
-
-fn write_session_info(
-    provider: &impl SessionInformationBytesProvider,
+    /// Output destination. Use `-` for stdout.
+    #[arg(short, long, default_value = "-", global = true)]
     output: OutputTarget,
+
+    /// The format for the output.
+    #[arg(long, default_value = "yaml", global = true, value_enum)]
     format: DocumentFormat,
-) -> Result<()> {
-    let session_info = provider
-        .session_info()?
-        .context("Session information is unavailable")?;
-    let mut writer = DocumentWriter::from_parts(output.clone(), format)?;
-    writer.write(&session_info)?;
-    writer.finalize()
+}
+
+impl Args {
+    pub(crate) fn run(self) -> Result<()> {
+        let provider = self.source.open()?;
+
+        let session_info = provider
+            .session_info()?
+            .context("Session information is unavailable")?;
+
+        let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
+        writer.write(&session_info)?;
+        writer.finalize()
+    }
 }
