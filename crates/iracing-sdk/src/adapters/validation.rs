@@ -208,25 +208,15 @@ mod tests {
 
     #[test]
     fn public_decode_revalidates_requested_type() {
-        let header = VariableHeader::new(
-            VariableType::Float,
-            0,
-            1,
-            false,
-            "Speed",
-            "",
-            "",
-        )
-        .unwrap();
+        let header =
+            VariableHeader::new(VariableType::Float, 0, 1, false, "Speed", "", "").unwrap();
         let headers = VariableHeaders::from(vec![header]);
         let layout = Arc::new(TelemetryLayout::try_from_headers(&headers, 4).unwrap());
         let id = AdapterValidation::resolve::<f32>(&layout, "Speed", true)
             .unwrap()
             .unwrap();
-        let validation = AdapterValidation::new(
-            Arc::clone(&layout),
-            vec![FieldExtraction::Required(id)],
-        );
+        let validation =
+            AdapterValidation::new(Arc::clone(&layout), vec![FieldExtraction::Required(id)]);
         let packet = FramePacket::new(1.0f32.to_le_bytes().to_vec(), 0, 0, layout).unwrap();
 
         assert_eq!(validation.decode::<f32>(&packet, 0).unwrap(), Some(1.0));
