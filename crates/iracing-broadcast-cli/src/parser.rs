@@ -1,8 +1,5 @@
 use clap::builder::{PossibleValuesParser, TypedValueParser};
-use iracing_broadcast_sdk::{
-    CameraState, CameraSwitchFocusMode, ReplayPositionMode, ReplaySearchMode, TelemetryCommandMode,
-    VideoCaptureMode,
-};
+use iracing_broadcast_sdk::{CameraState, ReplayPositionMode, ReplaySearchMode};
 
 macro_rules! possible_value_parser {
     (
@@ -49,25 +46,6 @@ possible_value_parser!(
 );
 
 possible_value_parser!(
-    telemetry_command_parser,
-    TelemetryCommandMode,
-    ("stop", ::Stop),
-    ("start", ::Start),
-    ("restart", ::Restart)
-);
-
-possible_value_parser!(
-    video_command_parser,
-    VideoCaptureMode,
-    ("screenshot", ::TriggerScreenshot),
-    ("start", ::StartVideoCapture),
-    ("stop", ::EndVideoCapture),
-    ("toggle", ::ToggleVideoCapture),
-    ("show-timer", ::ShowVideoTimer),
-    ("hide-timer", ::HideVideoTimer)
-);
-
-possible_value_parser!(
     camera_state_parser,
     CameraState,
     ("cam-tool-active", ::CAMERA_TOOL_ACTIVE),
@@ -78,12 +56,3 @@ possible_value_parser!(
     ("10x-acceleration", ::USE_KEY_TEN_TIMES_ACCELERATION),
     ("mouse-aim", ::USE_MOUSE_AIM_MODE)
 );
-
-// possible_value_parser!(
-//     camera_switch_focus_parser,
-//     CameraSwitchFocusMode,
-//     ("incident", ::FocusAtIncident),
-//     ("leader", ::FocusAtLeader),
-//     ("exiting", ::FocusAtExiting),
-//     ("driver", ::FocusAtDriver)
-// );

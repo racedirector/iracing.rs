@@ -120,10 +120,18 @@ impl TryFrom<Command> for BroadcastMessage {
                 camera
             ),
 
-            Command::CameraSetState(camera_state) => broadcast_message!(
-                BroadcastMessageKind::CameraSetState,
-                camera_state.bits() as u16
-            ),
+            Command::CameraSetState(camera_state) => {
+                let bits = u16::try_from(camera_state.bits()).map_err(|_| {
+                    crate::error::Error::Validation {
+                        reason: format!(
+                            "Camera state bits must fit in 16 bits, got {:#010x}",
+                            camera_state.bits()
+                        ),
+                    }
+                })?;
+
+                broadcast_message!(BroadcastMessageKind::CameraSetState, bits)
+            }
 
             Command::ReplaySetPlaySpeed(speed, slow_motion) => broadcast_message!(
                 BroadcastMessageKind::ReplaySetPlaySpeed,
