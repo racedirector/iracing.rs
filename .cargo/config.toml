@@ -2,6 +2,14 @@
 xtask = ["run", "-p", "xtask", "--"]
 test-fixtures = ["run", "-p", "test-fixtures", "--"]
 
+iracing-broadcast = [
+  "run",
+  "-p",
+  "iracing-broadcast-cli",
+  "--bin",
+  "iracing-broadcast",
+  "--",
+]
 iracing-sdk = ["run", "-p", "iracing-sdk-cli", "--bin", "iracing-sdk", "--"]
 
 ibt-read-frame = [

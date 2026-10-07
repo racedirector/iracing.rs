@@ -4,50 +4,50 @@ use clap::Subcommand;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{
-    // FramePacket, TelemetryLayout,
+    FramePacket, TelemetryLayout,
     ibt::IbtReader,
     provider::{SessionInformationProvider, VariableHeadersProvider},
 };
 use std::{
     path::{Path, PathBuf},
-    // sync::Arc,
-    // time::Duration,
+    sync::Arc,
+    time::Duration,
 };
 
 pub struct DiskTelemetry {
     pub reader: IbtReader,
-    // pub layout: Arc<TelemetryLayout>,
+    pub layout: Arc<TelemetryLayout>,
 }
 
 impl DiskTelemetry {
     pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let reader = IbtReader::open(path)?;
-        // let frame_size = reader.frame_size();
-        // let headers = reader.variable_headers()?;
-        // let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
+        let frame_size = reader.frame_size();
+        let headers = reader.variable_headers()?;
+        let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
 
         Ok(Self {
             reader,
-            // layout: Arc::new(layout),
+            layout: Arc::new(layout),
         })
     }
 
-    // pub(crate) fn frame_at(&self, index: usize) -> Result<FramePacket> {
-    //     let data = self.reader.frame(index)?;
+    pub(crate) fn frame_at(&self, index: usize) -> Result<FramePacket> {
+        let data = self.reader.frame(index)?;
 
-    //     Ok(FramePacket::new(
-    //         data,
-    //         u32::try_from(index)?,
-    //         u32::try_from(self.reader.header().session_info_update)?,
-    //         Arc::clone(&self.layout),
-    //     )?)
-    // }
+        Ok(FramePacket::new(
+            data,
+            u32::try_from(index)?,
+            u32::try_from(self.reader.header().session_info_update)?,
+            Arc::clone(&self.layout),
+        )?)
+    }
 }
 
 #[cfg(windows)]
 pub struct LiveTelemetry {
     pub connection: WindowsConnection,
-    // pub layout: Arc<TelemetryLayout>,
+    pub layout: Arc<TelemetryLayout>,
 }
 
 #[cfg(windows)]
@@ -63,32 +63,32 @@ impl LiveTelemetry {
             Err(e) => return Err(anyhow::anyhow!(e)),
         };
 
-        // let frame_size = usize::try_from(connection.header_snapshot()?.buffer_length)?;
-        // let headers = connection.variable_headers()?;
-        // let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
+        let frame_size = usize::try_from(connection.header_snapshot()?.buffer_length)?;
+        let headers = connection.variable_headers()?;
+        let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
 
         Ok(Self {
             connection,
-            // layout: Arc::new(layout),
+            layout: Arc::new(layout),
         })
     }
 
-    // pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
-    //     loop {
-    //         if let Some(frame) = self.connection.get_new_data()? {
-    //             return Ok(FramePacket::new(
-    //                 frame.data,
-    //                 u32::try_from(frame.tick)?,
-    //                 u32::try_from(frame.session_info_update)?,
-    //                 Arc::clone(&self.layout),
-    //             )?);
-    //         }
+    pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
+        loop {
+            if let Some(frame) = self.connection.get_new_data()? {
+                return Ok(FramePacket::new(
+                    frame.data,
+                    u32::try_from(frame.tick)?,
+                    u32::try_from(frame.session_info_update)?,
+                    Arc::clone(&self.layout),
+                )?);
+            }
 
-    //         // Wait up to 500ms for an update
-    //         self.connection
-    //             .wait_for_update(Duration::from_millis(500))?;
-    //     }
-    // }
+            // Wait up to 500ms for an update
+            self.connection
+                .wait_for_update(Duration::from_millis(500))?;
+        }
+    }
 }
 
 pub(crate) enum TelemetrySource {
