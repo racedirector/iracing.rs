@@ -135,7 +135,10 @@ mod tests {
         ]);
 
         let expected = CameraState::USER_INTERFACE_HIDDEN.union(CameraState::USE_MOUSE_AIM_MODE);
-        assert_eq!(BroadcastCommand::from(command), BroadcastCommand::CameraSetState(expected));
+        assert_eq!(
+            BroadcastCommand::from(command),
+            BroadcastCommand::CameraSetState(expected)
+        );
     }
 
     #[test]
@@ -177,13 +180,7 @@ mod tests {
 
     #[test]
     fn replay_position_parses_domain_mode() {
-        let command = parse_command([
-            "replay",
-            "set-play-position",
-            "current",
-            "--frame",
-            "123",
-        ]);
+        let command = parse_command(["replay", "set-play-position", "current", "--frame", "123"]);
 
         assert_eq!(
             BroadcastCommand::from(command),
