@@ -6,8 +6,8 @@ use clap::Subcommand;
 use iracing_broadcast_sdk::Command as BroadcastCommand;
 
 use crate::commands::{
-    CameraCommand, ChatCommand, ForceFeedbackCommand, PitCliCommand, ReplayCommand,
-    TelemetryCommand, TextureCommand, VideoCommand,
+    CameraCommand, ChatCommand, ForceFeedbackCommand, PitCommand, ReplayCommand, TelemetryCommand,
+    TextureCommand, VideoCommand,
 };
 
 #[derive(Subcommand, Debug, Clone)]
@@ -30,7 +30,7 @@ pub enum Command {
     /// Pit service commands
     Pit {
         #[command(subcommand)]
-        command: PitCliCommand,
+        command: PitCommand,
     },
     /// In-sim car textures
     Textures {

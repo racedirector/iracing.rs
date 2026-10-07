@@ -50,9 +50,9 @@ possible_value_parser!(
     CameraState,
     ("cam-tool-active", ::CAMERA_TOOL_ACTIVE),
     ("ui-hidden", ::USER_INTERFACE_HIDDEN),
-    ("auto-shot-selection", ::USE_AUTO_SHOT_SELECTION),
-    ("temporary-edits", ::USE_TEMPORARY_EDITS),
-    ("key-acceleration", ::USE_KEY_ACCELERATION),
-    ("10x-acceleration", ::USE_KEY_TEN_TIMES_ACCELERATION),
-    ("mouse-aim", ::USE_MOUSE_AIM_MODE)
+    ("use-auto-shot-selection", ::USE_AUTO_SHOT_SELECTION),
+    ("use-temporary-edits", ::USE_TEMPORARY_EDITS),
+    ("use-key-acceleration", ::USE_KEY_ACCELERATION),
+    ("use-10x-acceleration", ::USE_KEY_TEN_TIMES_ACCELERATION),
+    ("use-mouse-aim", ::USE_MOUSE_AIM_MODE)
 );

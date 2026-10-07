@@ -101,6 +101,8 @@ impl TryFrom<Command> for BroadcastMessage {
     /// Returns [`crate::error::Error::Validation`] if a chat macro number is
     /// outside `1..=15`.
     ///
+    /// Returns [`crate::error::Error::Validation`] if `CameraState` doesn't fit into the broadcast protocol's 16-bit argument
+    ///
     /// # Panics
     ///
     /// With overflow checks enabled, panics if car-number padding overflows `u16`.

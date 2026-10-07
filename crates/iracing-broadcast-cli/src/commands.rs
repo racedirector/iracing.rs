@@ -1,6 +1,6 @@
 use iracing_broadcast_sdk::{
-    CameraState, ChatCommandMode, Command as BroadcastCommand, PitCommand, ReplayPositionMode,
-    ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
+    CameraState, ChatCommandMode, Command as BroadcastCommand, PitCommand as SdkPitCommand,
+    ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
 };
 
 use crate::parser::{camera_state_parser, replay_position_parser, replay_search_parser};
@@ -137,7 +137,7 @@ impl From<ReplayCommand> for BroadcastCommand {
 }
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq)]
-pub enum PitCliCommand {
+pub enum PitCommand {
     Clear,
     Fuel { gallons: u16 },
     Lf { psi: u16 },
@@ -152,25 +152,25 @@ pub enum PitCliCommand {
     ClearFuel,
 }
 
-impl From<PitCliCommand> for BroadcastCommand {
+impl From<PitCommand> for BroadcastCommand {
     /// Build a pit-service broadcast command, passing numeric values through unchanged.
     ///
     /// `Ws` requests a windshield tearoff and `Fr` requests a fast repair;
     /// the corresponding clear commands cancel those requests.
-    fn from(value: PitCliCommand) -> Self {
+    fn from(value: PitCommand) -> Self {
         match value {
-            PitCliCommand::Clear => BroadcastCommand::Pit(PitCommand::Clear),
-            PitCliCommand::Fuel { gallons } => BroadcastCommand::Pit(PitCommand::Fuel(gallons)),
-            PitCliCommand::Lf { psi } => BroadcastCommand::Pit(PitCommand::LF(psi)),
-            PitCliCommand::Rf { psi } => BroadcastCommand::Pit(PitCommand::RF(psi)),
-            PitCliCommand::Lr { psi } => BroadcastCommand::Pit(PitCommand::LR(psi)),
-            PitCliCommand::Rr { psi } => BroadcastCommand::Pit(PitCommand::RR(psi)),
-            PitCliCommand::ClearTires => BroadcastCommand::Pit(PitCommand::ClearTires),
-            PitCliCommand::Ws => BroadcastCommand::Pit(PitCommand::Tearoff),
-            PitCliCommand::Fr => BroadcastCommand::Pit(PitCommand::FastRepair),
-            PitCliCommand::ClearWs => BroadcastCommand::Pit(PitCommand::ClearTearoff),
-            PitCliCommand::ClearFr => BroadcastCommand::Pit(PitCommand::ClearFastRepair),
-            PitCliCommand::ClearFuel => BroadcastCommand::Pit(PitCommand::ClearFuel),
+            PitCommand::Clear => BroadcastCommand::Pit(SdkPitCommand::Clear),
+            PitCommand::Fuel { gallons } => BroadcastCommand::Pit(SdkPitCommand::Fuel(gallons)),
+            PitCommand::Lf { psi } => BroadcastCommand::Pit(SdkPitCommand::LF(psi)),
+            PitCommand::Rf { psi } => BroadcastCommand::Pit(SdkPitCommand::RF(psi)),
+            PitCommand::Lr { psi } => BroadcastCommand::Pit(SdkPitCommand::LR(psi)),
+            PitCommand::Rr { psi } => BroadcastCommand::Pit(SdkPitCommand::RR(psi)),
+            PitCommand::ClearTires => BroadcastCommand::Pit(SdkPitCommand::ClearTires),
+            PitCommand::Ws => BroadcastCommand::Pit(SdkPitCommand::Tearoff),
+            PitCommand::Fr => BroadcastCommand::Pit(SdkPitCommand::FastRepair),
+            PitCommand::ClearWs => BroadcastCommand::Pit(SdkPitCommand::ClearTearoff),
+            PitCommand::ClearFr => BroadcastCommand::Pit(SdkPitCommand::ClearFastRepair),
+            PitCommand::ClearFuel => BroadcastCommand::Pit(SdkPitCommand::ClearFuel),
         }
     }
 }
