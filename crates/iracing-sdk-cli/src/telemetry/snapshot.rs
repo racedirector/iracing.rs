@@ -1,15 +1,11 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
-use clap::Subcommand;
-use iracing_sdk::provider::VariableHeadersProvider;
+use iracing_sdk::{ibt::IbtReader, provider::VariableHeadersProvider};
 
-use crate::{
-    utils::get_disk_reader,
-    writer::{DocumentFormat, DocumentWriter, OutputTarget, TelemetrySnapshot},
-};
+use crate::writer::{DocumentFormat, DocumentWriter, OutputTarget, TelemetrySnapshot};
 
-#[derive(Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug)]
 pub(crate) enum Command {
     /// Captures the next frame output from the live telemetry
     #[cfg(windows)]
@@ -96,7 +92,7 @@ impl Command {
                 format,
                 frame_index,
             } => {
-                let mut reader = get_disk_reader(&path)?;
+                let mut reader = IbtReader::open(path)?;
 
                 use iracing_sdk::{FramePacket, LayoutProvider, TelemetryLayout};
                 use std::sync::Arc;
