@@ -1,8 +1,13 @@
-mod commands;
+mod discover;
+mod schema;
+mod snapshot;
+
 use anyhow::Result;
 use clap::Subcommand;
 
-use commands::{DiscoverCommand, SchemaCommand, SnapshotCommand};
+use discover::Command as DiscoverCommand;
+use schema::Command as SchemaCommand;
+use snapshot::Command as SnapshotCommand;
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
