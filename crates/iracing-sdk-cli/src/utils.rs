@@ -46,6 +46,7 @@ impl TelemetrySource {
         Ok(TelemetrySource::Disk(IbtReader::open(path)?))
     }
 
+    #[cfg(windows)]
     pub(crate) fn try_connect() -> Result<Self> {
         let connection = match WindowsConnection::try_connect() {
             Ok(c) if c.is_connected() => c,
