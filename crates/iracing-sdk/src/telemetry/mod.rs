@@ -204,7 +204,6 @@ mod tests {
     //! behavior under test here.
 
     use std::{
-        collections::HashMap,
         sync::{
             Arc,
             atomic::{AtomicUsize, Ordering},
@@ -215,7 +214,7 @@ mod tests {
     use tokio::sync::{mpsc, oneshot, watch};
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, Result, VariableSchema, provider::Provider};
+    use crate::{FramePacket, Result, provider::Provider};
 
     use super::{
         ReplayDemand, Telemetry, TelemetryChannels, delivery_policy::LatestDelivery,
@@ -245,18 +244,19 @@ mod tests {
 
     /// Construct the smallest valid packet needed by the telemetry task.
     ///
-    /// No telemetry fields are decoded in these tests, so an empty schema and
+    /// No telemetry fields are decoded in these tests, so an empty layout and
     /// payload keep the fixture focused on tick and session-version delivery.
     fn live_frame(tick: u32, session_version: u32) -> FramePacket {
         FramePacket::new(
-            Vec::new(),
+            vec![0],
             tick,
             session_version,
             Arc::new(
-                VariableSchema::new(HashMap::new(), 0)
-                    .expect("an empty telemetry schema should be valid"),
+                crate::test_utils::layout([], 1)
+                    .expect("an empty telemetry layout should be valid"),
             ),
         )
+        .unwrap()
     }
 
     /// An eager, finite provider used to reproduce recorded-telemetry behavior.

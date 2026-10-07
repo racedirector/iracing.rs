@@ -4,10 +4,10 @@ use crate::SessionInfoRegion;
 use crate::provider::VariableHeadersProvider;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
-    VariableHeadersRegion, VariableInfo,
+    FieldLayout, VariableHeadersRegion,
     irsdk::{DiskSubHeader, Header, VariableHeader, VariableType},
 };
-use crate::{VariableSchema, ibt::IbtReader};
+use crate::{TelemetryLayout, ibt::IbtReader};
 use anyhow::{Context, Result, ensure};
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
@@ -60,7 +60,7 @@ fn indexed_and_snapshot_reads_match_source_bytes() -> Result<()> {
 
 #[test]
 fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
-    use crate::{SchemaProvider, provider::Provider};
+    use crate::{LayoutProvider, provider::Provider};
     use futures::executor::block_on;
     use zerocopy::IntoBytes;
 
@@ -118,14 +118,17 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
                 }
                 let mut provider = provider?;
                 assert_eq!(
-                    provider.schema().variable_count(),
+                    provider.layout().len(),
                     if keep_variables {
                         original.header().variable_count as usize
                     } else {
                         0
                     }
                 );
-                assert_eq!(provider.schema().frame_size, original.layout().frame_size());
+                assert_eq!(
+                    provider.layout().frame_size(),
+                    original.layout().frame_size()
+                );
                 assert_eq!(block_on(provider.session_yaml(0))?.is_some(), keep_session);
                 let mut count = 0;
                 while let Some(frame) = block_on(provider.next_frame())? {
@@ -373,12 +376,12 @@ fn variable_type(expected: &str) -> VariableType {
     }
 }
 
-fn assert_required_variable(actual: &VariableInfo, expected: &IbtVariableManifest) {
-    assert_eq!(actual.name, expected.name);
-    assert_eq!(actual.data_type, variable_type(&expected.data_type));
-    assert_eq!(actual.offset, expected.offset);
-    assert_eq!(actual.count, expected.count);
-    assert_eq!(actual.units, expected.units);
+fn assert_required_variable(actual: &FieldLayout, expected: &IbtVariableManifest) {
+    assert_eq!(actual.name(), expected.name);
+    assert_eq!(actual.data_type(), variable_type(&expected.data_type));
+    assert_eq!(actual.region().offset(), expected.offset);
+    assert_eq!(actual.count(), expected.count);
+    assert_eq!(actual.metadata().unit(), expected.units);
 }
 
 #[test]
@@ -389,18 +392,21 @@ fn test_generated_fixture_variables_match_manifest() -> Result<()> {
         let path = fixture.fixture_path()?;
         let reader = IbtReader::open(&path)?;
         let snapshot = reader.variable_headers()?;
-        let schema = VariableSchema::from_snapshot(snapshot, reader.layout().frame_size())?;
+        let layout = TelemetryLayout::try_from_headers(&snapshot, reader.layout().frame_size())?;
 
-        assert_eq!(schema.frame_size, fixture.frame_size);
-        assert_eq!(schema.variable_count(), fixture.num_vars as usize);
+        assert_eq!(layout.frame_size(), fixture.frame_size);
+        assert_eq!(layout.len(), fixture.num_vars as usize);
 
         for expected in &fixture.required_variables {
-            let actual = schema.variables.get(&expected.name).with_context(|| {
-                format!(
-                    "Fixture {} missing variable {}",
-                    fixture.name, expected.name
-                )
-            })?;
+            let actual = layout
+                .field_by_name(&expected.name)
+                .map(|(_, field)| field)
+                .with_context(|| {
+                    format!(
+                        "Fixture {} missing variable {}",
+                        fixture.name, expected.name
+                    )
+                })?;
             assert_required_variable(actual, expected);
         }
     }

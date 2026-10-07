@@ -1,4 +1,4 @@
-//! Field-based telemetry decoding, independent of the legacy runtime schema.
+//! Field-based telemetry decoding, from the canonical runtime layout.
 use crate::{BitField, FieldLayout, IRacingSDKError, Result, TelemetryValue, irsdk::VariableType};
 
 /// A scalar element stored in an SDK telemetry field.
@@ -9,40 +9,22 @@ pub trait TelemetryElement: Sized {
     /// Returns whether this Rust type accepts the advertised SDK storage type.
     fn accepts(data_type: VariableType) -> bool;
     /// Decodes one isolated element, rejecting incorrect byte lengths.
-    ///
-    /// Built-in implementations decode little-endian values. Characters remain
-    /// raw bytes, and any nonzero boolean byte becomes `true`.
-    ///
-    /// # Errors
-    ///
-    /// Built-in implementations return [`IRacingSDKError::WireSize`] unless
-    /// `bytes` contains exactly one element's SDK storage width.
     fn decode_element(bytes: &[u8]) -> Result<Self>;
 }
 
 /// Decodes a validated field from a telemetry frame.
-pub trait FieldData: Sized {
+pub trait VarData: Sized {
     /// Checks storage compatibility and scalar/array shape without reading data.
-    ///
-    /// Built-in scalars require a count of one. `Vec<T>` accepts any validated
-    /// field count, including one, if `T` accepts the storage type.
-    ///
-    /// # Errors
-    ///
-    /// Built-in implementations return [`IRacingSDKError::TypeConversion`] for
-    /// an incompatible storage type or scalar count.
     fn validate_field(field: &FieldLayout) -> Result<()>;
     /// Validates the requested type and decodes one complete bounded field slice.
     ///
-    /// The field's byte offset is relative to the start of `frame`. Built-in
-    /// implementations require only the selected field's full extent to fit;
-    /// a field ending exactly at `frame.len()` is accepted.
+    /// `frame` starts at the beginning of the telemetry frame; `field` supplies
+    /// its byte range. Bytes outside that range are ignored. Scalar SDK types
+    /// require one element; `Vec<T>` also accepts a single-element field.
     ///
     /// # Errors
-    ///
-    /// Propagates validation errors before attempting to read the frame, then
-    /// propagates errors from [`Self::decode_prevalidated`], including bounds
-    /// and element decoding errors.
+    /// Propagates type/shape validation and decoding errors, including a frame
+    /// too short to contain the field or an unrecognized domain enum value.
     fn decode_field(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         Self::validate_field(field)?;
         Self::decode_prevalidated(frame, field)
@@ -50,22 +32,13 @@ pub trait FieldData: Sized {
     /// Decodes after type/shape validation against this exact field.
     ///
     /// This remains bounds checked. Callers must first use `validate_field` and
-    /// retain the same field. Built-in implementations do not repeat storage
-    /// type or shape validation.
-    ///
-    /// # Errors
-    ///
-    /// Built-in implementations return [`IRacingSDKError::Memory`] with an
-    /// `UnexpectedEof` source if the field extends beyond `frame`, and propagate
-    /// element decoding errors.
+    /// retain the same field; adapter plans enforce that through layout identity.
     #[doc(hidden)]
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self>;
 }
 
-/// Borrows the field's complete byte range relative to the start of `frame`.
-///
-/// Returns [`IRacingSDKError::Memory`] with an `UnexpectedEof` source when the
-/// range extends beyond `frame`; ending exactly at `frame.len()` is valid.
+/// Borrows the field's frame-relative byte range, returning an unexpected-EOF
+/// memory error if the frame does not contain the entire range.
 pub(crate) fn field_bytes<'a>(frame: &'a [u8], field: &FieldLayout) -> Result<&'a [u8]> {
     let region = field.region();
     frame.get(region.as_range()).ok_or_else(|| {
@@ -77,9 +50,8 @@ pub(crate) fn field_bytes<'a>(frame: &'a [u8], field: &FieldLayout) -> Result<&'
     })
 }
 
-/// Checks storage compatibility without restricting the field's element count.
-///
-/// Returns [`IRacingSDKError::TypeConversion`] if `T` rejects the storage type.
+/// Checks the storage type accepted by `T`, returning a type-conversion error
+/// on mismatch. Does not check the field's element count.
 fn validate_element<T: TelemetryElement>(field: &FieldLayout) -> Result<()> {
     if !T::accepts(field.data_type()) {
         return Err(IRacingSDKError::type_conversion(
@@ -105,7 +77,7 @@ macro_rules! scalar {
                 Ok(($decode)(bytes))
             }
         }
-        impl FieldData for $type {
+        impl VarData for $type {
             fn validate_field(field: &FieldLayout) -> Result<()> {
                 validate_element::<Self>(field)?;
                 if field.count() != 1 {
@@ -131,16 +103,10 @@ scalar!(BitField, BitField, 4, |bytes| BitField(u32::from_le_bytes(
 scalar!(f32, Float, 4, f32::from_le_bytes);
 scalar!(f64, Double, 8, f64::from_le_bytes);
 
-impl<T: TelemetryElement> FieldData for Vec<T> {
+impl<T: TelemetryElement> VarData for Vec<T> {
     fn validate_field(field: &FieldLayout) -> Result<()> {
         validate_element::<T>(field)
     }
-    /// Decodes all field elements in storage order into a new vector, including
-    /// a single element when the field count is one.
-    ///
-    /// Requires prior validation against this field. Returns a memory error if
-    /// the field exceeds `frame`, or the first element decoding error without
-    /// returning a partial vector.
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         field_bytes(frame, field)?
             .chunks_exact(field.data_type().byte_size())
@@ -152,19 +118,15 @@ impl<T: TelemetryElement> FieldData for Vec<T> {
 impl TelemetryValue {
     /// Decodes a selected field with one bounded slice and explicit little-endian values.
     ///
-    /// The field's byte offset is relative to the start of `frame`. A count of
-    /// one returns the scalar variant matching the storage type; larger counts
-    /// return [`Self::Array`] in storage order. Characters remain raw bytes,
-    /// and any nonzero boolean byte becomes `true`.
+    /// Returns a scalar for a one-element field and an array otherwise. Character
+    /// fields retain their byte values; any nonzero boolean byte becomes `true`.
+    /// `frame` starts at the beginning of the telemetry frame.
     ///
     /// # Errors
-    ///
-    /// Returns [`IRacingSDKError::Memory`] with an `UnexpectedEof` source if the
-    /// selected field extends beyond `frame`. Ending at `frame.len()` is valid.
+    /// Returns an unexpected-EOF memory error if `frame` does not contain the
+    /// field's full byte range.
     pub fn decode_field(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         let bytes = field_bytes(frame, field)?;
-        /// Wraps an isolated field slice as a scalar for count one or an array
-        /// otherwise, propagating the first element decoding error.
         fn values<T: TelemetryElement>(
             bytes: &[u8],
             field: &FieldLayout,
@@ -238,7 +200,7 @@ mod tests {
             TelemetryValue::Float64(10.0),
         );
     }
-    fn check_scalar<T: FieldData + TelemetryElement + PartialEq + std::fmt::Debug + Clone>(
+    fn check_scalar<T: VarData + TelemetryElement + PartialEq + std::fmt::Debug + Clone>(
         storage: VariableType,
         bytes: &[u8],
         expected: T,
@@ -278,5 +240,38 @@ mod tests {
             Vec::<bool>::decode_field(&[], &field),
             Err(IRacingSDKError::TypeConversion { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn scalar_bit_patterns_round_trip(bits in any::<u32>(), offset in 0..100usize) {
+            let mut data = vec![0; offset + 4];
+            data[offset..].copy_from_slice(&bits.to_le_bytes());
+            for storage in [VariableType::Integer, VariableType::Float, VariableType::BitField] {
+                let field = crate::test_utils::field("Speed".into(), storage, offset, 1, false, String::new(), String::new());
+                let decoded = match storage {
+                    VariableType::Integer => i32::decode_field(&data, &field).unwrap() as u32,
+                    VariableType::Float => f32::decode_field(&data, &field).unwrap().to_bits(),
+                    VariableType::BitField => BitField::decode_field(&data, &field).unwrap().value(),
+                    _ => unreachable!(),
+                };
+                prop_assert_eq!(decoded, bits);
+                prop_assert!(TelemetryValue::decode_field(&data[..data.len()-1], &field).is_err());
+            }
+        }
+        #[test]
+        fn integer_arrays_round_trip(values in prop::collection::vec(any::<i32>(), 1..73), offset in 0..100usize) {
+            let mut data = vec![0; offset];
+            for value in &values { data.extend(value.to_le_bytes()); }
+            let field = crate::test_utils::field("CarIdxLap".into(), VariableType::Integer, offset, values.len(), false, String::new(), String::new());
+            prop_assert_eq!(Vec::<i32>::decode_field(&data, &field).unwrap(), values);
+            prop_assert!(Vec::<i32>::decode_field(&data[..data.len()-1], &field).is_err());
+        }
     }
 }

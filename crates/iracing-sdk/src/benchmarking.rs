@@ -22,7 +22,7 @@ use tokio_stream::wrappers::WatchStream;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    AdapterValidation, FrameAdapter, FramePacket, Result, VariableSchema,
+    AdapterValidation, FrameAdapter, FramePacket, LayoutProvider, Result, TelemetryLayout,
     connections::ibt::{
         coordinator::{self, ReplayControl},
         subscription::IbtSubscription,
@@ -61,17 +61,21 @@ impl<P: Provider> SessionPolicy<P> for NoSessions<P> {
 /// Cross-platform connection facade using production latest-value delivery.
 pub struct LatestPipeline {
     frames: watch::Receiver<Option<Arc<FramePacket>>>,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     cancel: CancellationToken,
     task: Option<JoinHandle<()>>,
 }
 
 impl LatestPipeline {
     /// Spawn the production telemetry loop with latest-value delivery.
-    pub fn spawn<P>(provider: P, schema: Arc<VariableSchema>) -> Self
+    ///
+    /// The pipeline retains the provider's exact shared layout allocation so
+    /// adapter validation and produced packets cannot disagree on layout identity.
+    pub fn spawn<P>(provider: P) -> Self
     where
-        P: Provider,
+        P: Provider + LayoutProvider,
     {
+        let layout = Arc::clone(provider.layout());
         let (sender, frames) = watch::channel(None);
         let (channels, task) = Telemetry::builder(provider)
             .with_delivery_policy(LatestDelivery::new(sender), frames)
@@ -80,7 +84,7 @@ impl LatestPipeline {
 
         Self {
             frames: channels.frames,
-            schema,
+            layout,
             cancel: channels.cancel,
             task: Some(task),
         }
@@ -91,7 +95,7 @@ impl LatestPipeline {
     where
         T: FrameAdapter + Send + 'static,
     {
-        let validation = T::validate_schema(&self.schema)?;
+        let validation = T::validate_layout(&self.layout)?;
         let frames = WatchStream::new(self.frames.clone())
             .skip_while(|packet| std::future::ready(packet.is_none()))
             .take_while(|packet| std::future::ready(packet.is_some()))
@@ -128,7 +132,7 @@ pub struct OnDemandPipeline {
     frames: watch::Receiver<Option<Arc<FramePacket>>>,
     controls: mpsc::UnboundedSender<ReplayControl>,
     next_subscriber_id: AtomicU64,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     cancel: CancellationToken,
     telemetry_task: Option<JoinHandle<()>>,
     coordinator_task: Option<JoinHandle<()>>,
@@ -136,10 +140,14 @@ pub struct OnDemandPipeline {
 
 impl OnDemandPipeline {
     /// Spawn the production telemetry loop and replay acknowledgement coordinator.
-    pub fn spawn<P>(provider: P, schema: Arc<VariableSchema>) -> Self
+    ///
+    /// The pipeline retains the provider's exact shared layout allocation so
+    /// adapter validation and produced packets cannot disagree on layout identity.
+    pub fn spawn<P>(provider: P) -> Self
     where
-        P: Provider,
+        P: Provider + LayoutProvider,
     {
+        let layout = Arc::clone(provider.layout());
         let (requests, request_receiver) = mpsc::channel(1);
         let (channels, telemetry_task) = Telemetry::builder(provider)
             .with_delivery_policy(OnDemandDelivery::new(request_receiver), requests)
@@ -152,7 +160,7 @@ impl OnDemandPipeline {
             frames,
             controls,
             next_subscriber_id: AtomicU64::new(0),
-            schema,
+            layout,
             cancel: channels.cancel,
             telemetry_task: Some(telemetry_task),
             coordinator_task: Some(coordinator_task),
@@ -164,7 +172,7 @@ impl OnDemandPipeline {
     where
         T: FrameAdapter + Send + 'static,
     {
-        let validation: AdapterValidation = T::validate_schema(&self.schema)?;
+        let validation: AdapterValidation = T::validate_layout(&self.layout)?;
         let subscriber_id = self.next_subscriber_id.fetch_add(1, Ordering::Relaxed);
         let _ = self.controls.send(ReplayControl::Join { subscriber_id });
         Ok(Box::pin(IbtSubscription::<T>::new(
@@ -213,7 +221,7 @@ impl Drop for OnDemandPipeline {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::atomic::AtomicUsize};
+    use std::sync::atomic::AtomicUsize;
 
     use futures::{StreamExt, future::join_all};
 
@@ -224,7 +232,13 @@ mod tests {
         credits: mpsc::UnboundedReceiver<()>,
         next_tick: u32,
         reads: Arc<AtomicUsize>,
-        schema: Arc<VariableSchema>,
+        layout: Arc<TelemetryLayout>,
+    }
+
+    impl LayoutProvider for ControlledProvider {
+        fn layout(&self) -> &Arc<TelemetryLayout> {
+            &self.layout
+        }
     }
 
     #[async_trait]
@@ -236,12 +250,9 @@ mod tests {
             let tick = self.next_tick;
             self.next_tick += 1;
             self.reads.fetch_add(1, Ordering::SeqCst);
-            Ok(Some(FramePacket::new(
-                Vec::new(),
-                tick,
-                0,
-                Arc::clone(&self.schema),
-            )))
+            Ok(Some(
+                FramePacket::new(vec![0], tick, 0, Arc::clone(&self.layout)).unwrap(),
+            ))
         }
 
         async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
@@ -257,29 +268,27 @@ mod tests {
         ControlledProvider,
         mpsc::UnboundedSender<()>,
         Arc<AtomicUsize>,
-        Arc<VariableSchema>,
     ) {
         let (credits, receiver) = mpsc::unbounded_channel();
         let reads = Arc::new(AtomicUsize::new(0));
-        let schema =
-            Arc::new(VariableSchema::new(HashMap::new(), 0).expect("empty schema should validate"));
+        let layout =
+            Arc::new(crate::test_utils::layout([], 1).expect("empty layout should validate"));
         (
             ControlledProvider {
                 credits: receiver,
                 next_tick: 0,
                 reads: Arc::clone(&reads),
-                schema: Arc::clone(&schema),
+                layout,
             },
             credits,
             reads,
-            schema,
         )
     }
 
     #[tokio::test]
     async fn latest_pipeline_coalesces_a_deterministic_burst() {
-        let (provider, credits, reads, schema) = source();
-        let pipeline = LatestPipeline::spawn(provider, schema);
+        let (provider, credits, reads) = source();
+        let pipeline = LatestPipeline::spawn(provider);
         let mut subscription = pipeline
             .subscribe::<DynamicFrame>()
             .expect("dynamic adapter should validate");
@@ -305,8 +314,8 @@ mod tests {
 
     #[tokio::test]
     async fn replay_waits_for_every_subscription_acknowledgement() {
-        let (provider, credits, reads, schema) = source();
-        let pipeline = OnDemandPipeline::spawn(provider, schema);
+        let (provider, credits, reads) = source();
+        let pipeline = OnDemandPipeline::spawn(provider);
         let mut subscriptions: Vec<_> = (0..4)
             .map(|_| {
                 pipeline

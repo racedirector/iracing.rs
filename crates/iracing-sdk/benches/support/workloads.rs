@@ -5,11 +5,12 @@
 //! aggregate consumer benchmark from silently evolving into different shapes.
 
 use iracing_sdk::{
-    IRacingTelemetryFrame, VariableInfo, VariableSchema,
+    FieldLayout, IRacingTelemetryFrame, TelemetryLayout,
     adapters::{AdapterValidation, FrameAdapter},
     irsdk::VariableType,
     types::{FramePacket, VarData},
 };
+use std::sync::Arc;
 
 pub const CONSUMER_FIELD_COUNT: usize = 47;
 pub const CAR_INDEX_COUNT: usize = 72;
@@ -122,8 +123,8 @@ pub struct TimedConsumerFrame47 {
 }
 
 impl FrameAdapter for TimedConsumerFrame47 {
-    fn validate_schema(schema: &VariableSchema) -> iracing_sdk::Result<AdapterValidation> {
-        ConsumerFrame47::validate_schema(schema)
+    fn validate_layout(layout: &Arc<TelemetryLayout>) -> iracing_sdk::Result<AdapterValidation> {
+        ConsumerFrame47::validate_layout(layout)
     }
 
     fn adapt(packet: &FramePacket, validation: &AdapterValidation) -> Self {
@@ -145,45 +146,45 @@ pub struct ConsumerWorkload {
     /// Precomputed mapping for all 47 typed adapter fields.
     pub validation: AdapterValidation,
     /// Metadata for the 72-element lap-distance array.
-    pub lap_dist_pct: VariableInfo,
+    pub lap_dist_pct: FieldLayout,
     /// Metadata for the 72-element track-surface array.
-    pub track_surface: VariableInfo,
+    pub track_surface: FieldLayout,
     /// Metadata for the 72-element pit-road-state array.
-    pub on_pit_road: VariableInfo,
+    pub on_pit_road: FieldLayout,
 }
 
 /// Prepare and exhaustively verify the representative consumer before timing.
 pub fn prepare_consumer_workload(
     packet: &FramePacket,
-    schema: &VariableSchema,
+    layout: &Arc<TelemetryLayout>,
 ) -> ConsumerWorkload {
-    let validation = ConsumerFrame47::validate_schema(schema)
+    let validation = ConsumerFrame47::validate_layout(layout)
         .unwrap_or_else(|error| panic!("consumer benchmark validation failed: {error}"));
     assert_eq!(validation.field_count(), CONSUMER_FIELD_COUNT);
     assert!(
         validation
-            .extraction_plan
+            .extraction_plan()
             .iter()
-            .all(|extraction| extraction.var_info().is_some()),
+            .all(|extraction| extraction.field_id().is_some()),
         "consumer benchmark would exercise a missing or defaulted adapter field"
     );
 
     let lap_dist_pct = super::require_variable(
-        schema,
+        layout,
         "CarIdxLapDistPct",
         VariableType::Float,
         CAR_INDEX_COUNT,
     )
     .clone();
     let track_surface = super::require_variable(
-        schema,
+        layout,
         "CarIdxTrackSurface",
         VariableType::Integer,
         CAR_INDEX_COUNT,
     )
     .clone();
     let on_pit_road = super::require_variable(
-        schema,
+        layout,
         "CarIdxOnPitRoad",
         VariableType::Boolean,
         CAR_INDEX_COUNT,
@@ -251,7 +252,7 @@ fn verify_consumer(packet: &FramePacket, workload: &ConsumerWorkload) {
     assert_eq!(frame.replay_frame, Some(1));
     assert_eq!(frame.is_replay, Some(true));
 
-    let lap_dist_pct = Vec::<f32>::from_bytes(packet.data.as_ref(), &workload.lap_dist_pct)
+    let lap_dist_pct = Vec::<f32>::decode_field(packet.data().as_ref(), &workload.lap_dist_pct)
         .expect("failed to verify CarIdxLapDistPct");
     assert_eq!(
         lap_dist_pct,
@@ -260,14 +261,14 @@ fn verify_consumer(packet: &FramePacket, workload: &ConsumerWorkload) {
             .collect::<Vec<_>>()
     );
 
-    let track_surface = Vec::<i32>::from_bytes(packet.data.as_ref(), &workload.track_surface)
+    let track_surface = Vec::<i32>::decode_field(packet.data().as_ref(), &workload.track_surface)
         .expect("failed to verify CarIdxTrackSurface");
     assert_eq!(
         track_surface,
         (1..=CAR_INDEX_COUNT as i32).collect::<Vec<_>>()
     );
 
-    let on_pit_road = Vec::<bool>::from_bytes(packet.data.as_ref(), &workload.on_pit_road)
+    let on_pit_road = Vec::<bool>::decode_field(packet.data().as_ref(), &workload.on_pit_road)
         .expect("failed to verify CarIdxOnPitRoad");
     assert_eq!(
         on_pit_road,

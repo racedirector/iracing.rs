@@ -419,12 +419,12 @@ mod tests {
     //! The only frame passed to `observe` is a minimal packet used to prove that
     //! normal replay traversal does not trigger another session fetch.
 
-    use std::{collections::HashMap, sync::Arc, time::Duration};
+    use std::{sync::Arc, time::Duration};
 
     use tokio::sync::watch;
     use tokio_util::sync::CancellationToken;
 
-    use crate::{FramePacket, IRacingSDKError, Result, VariableSchema, provider::Provider};
+    use crate::{FramePacket, IRacingSDKError, Result, provider::Provider};
 
     use super::{
         IbtSessionPolicy, IbtSessionState, LiveSessionPolicy, SessionParseTask, SessionPolicy,
@@ -609,14 +609,15 @@ mod tests {
     /// Construct a minimal frame for exercising the no-op `observe` path.
     fn frame() -> FramePacket {
         FramePacket::new(
-            Vec::new(),
+            vec![0],
             0,
             0,
             Arc::new(
-                VariableSchema::new(HashMap::new(), 0)
-                    .expect("an empty telemetry schema should be valid"),
+                crate::test_utils::layout([], 1)
+                    .expect("an empty telemetry layout should be valid"),
             ),
         )
+        .unwrap()
     }
 
     #[tokio::test]

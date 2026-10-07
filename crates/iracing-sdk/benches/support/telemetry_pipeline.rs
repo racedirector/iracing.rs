@@ -17,7 +17,7 @@ use std::{
 
 use futures::{FutureExt, Stream, StreamExt, future::join_all};
 use iracing_sdk::{
-    FrameAdapter, FramePacket, Result, VariableSchema,
+    FrameAdapter, FramePacket, LayoutProvider, Result, TelemetryLayout,
     benchmarking::{LatestPipeline, OnDemandPipeline},
     provider::Provider,
 };
@@ -69,11 +69,17 @@ impl SourceTimes {
 struct DeterministicProvider {
     credits: mpsc::UnboundedReceiver<()>,
     data: Arc<Vec<u8>>,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     next_tick: u32,
     reads: Arc<AtomicUsize>,
     session_fetches: Arc<AtomicUsize>,
     times: Option<Arc<SourceTimes>>,
+}
+
+impl LayoutProvider for DeterministicProvider {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
+    }
 }
 
 #[async_trait::async_trait]
@@ -95,12 +101,15 @@ impl Provider for DeterministicProvider {
         }
         self.reads.fetch_add(1, Ordering::Relaxed);
 
-        Ok(Some(FramePacket::new(
-            self.data.as_slice().to_vec(),
-            tick,
-            0,
-            Arc::clone(&self.schema),
-        )))
+        Ok(Some(
+            FramePacket::new(
+                self.data.as_slice().to_vec(),
+                tick,
+                0,
+                Arc::clone(&self.layout),
+            )
+            .unwrap(),
+        ))
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
@@ -115,7 +124,7 @@ impl Provider for DeterministicProvider {
 
 fn source(
     data: Arc<Vec<u8>>,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     timestamp_capacity: Option<usize>,
 ) -> (
     DeterministicProvider,
@@ -130,7 +139,7 @@ fn source(
         DeterministicProvider {
             credits: receiver,
             data,
-            schema,
+            layout,
             next_tick: 0,
             reads: Arc::clone(&reads),
             session_fetches: Arc::clone(&session_fetches),
@@ -160,12 +169,12 @@ where
     /// Construct the pipeline and validate every subscription before timing.
     pub fn new(
         data: Arc<Vec<u8>>,
-        schema: Arc<VariableSchema>,
+        layout: Arc<TelemetryLayout>,
         subscribers: usize,
         timestamp_capacity: Option<usize>,
     ) -> Self {
-        let (provider, source, times) = source(data, Arc::clone(&schema), timestamp_capacity);
-        let pipeline = LatestPipeline::spawn(provider, schema);
+        let (provider, source, times) = source(data, layout, timestamp_capacity);
+        let pipeline = LatestPipeline::spawn(provider);
         let subscriptions = (0..subscribers)
             .map(|_| {
                 pipeline
@@ -240,12 +249,12 @@ where
     /// Construct and start the replay-style pipeline before timing.
     pub fn new(
         data: Arc<Vec<u8>>,
-        schema: Arc<VariableSchema>,
+        layout: Arc<TelemetryLayout>,
         subscribers: usize,
         timestamp_capacity: Option<usize>,
     ) -> Self {
-        let (provider, source, times) = source(data, Arc::clone(&schema), timestamp_capacity);
-        let pipeline = OnDemandPipeline::spawn(provider, schema);
+        let (provider, source, times) = source(data, layout, timestamp_capacity);
+        let pipeline = OnDemandPipeline::spawn(provider);
         let subscriptions = (0..subscribers)
             .map(|_| {
                 pipeline

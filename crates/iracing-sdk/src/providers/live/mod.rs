@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    FramePacket, IRacingSDKError, IRacingSessionString, Result, SchemaProvider, VariableSchema,
+    FramePacket, IRacingSDKError, IRacingSessionString, LayoutProvider, Result, TelemetryLayout,
     WindowsConnection,
     provider::{Provider, SessionInformationBytesProvider, VariableHeadersProvider},
     windows::WaitResult,
@@ -22,7 +22,7 @@ const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub struct LiveProvider {
     connection: WindowsConnection,
-    schema: Arc<VariableSchema>,
+    layout: Arc<TelemetryLayout>,
     poll_interval: Duration,
     max_no_connection_attempts: Option<u32>,
 }
@@ -55,6 +55,15 @@ impl LiveProvider {
         Self::builder().build()
     }
 
+    /// Captures and validates the connection's telemetry layout.
+    ///
+    /// `poll_interval` controls waits between connection checks and update-event
+    /// timeouts. `max_no_connection_attempts` limits consecutive disconnected
+    /// observations within a frame request; `None` waits indefinitely.
+    ///
+    /// # Errors
+    /// Propagates header snapshot, variable-header read, and layout validation
+    /// errors, including an invalid advertised frame size.
     fn from_parts(
         connection: WindowsConnection,
         poll_interval: Duration,
@@ -69,21 +78,28 @@ impl LiveProvider {
             )
         })?;
 
-        let schema = VariableSchema::from_headers(&connection.variable_headers()?, frame_size)?;
+        let layout =
+            TelemetryLayout::try_from_headers(&connection.variable_headers()?, frame_size)?;
 
         Ok(Self {
             connection,
-            schema: Arc::new(schema),
+            layout: Arc::new(layout),
             poll_interval,
             max_no_connection_attempts,
         })
     }
 
-    /// Returns an ownable schema.
-    pub(crate) fn shared_schema(&self) -> Arc<VariableSchema> {
-        Arc::clone(&self.schema)
+    /// Returns an ownable layout.
+    pub(crate) fn shared_layout(&self) -> Arc<TelemetryLayout> {
+        Arc::clone(&self.layout)
     }
 
+    /// Waits for a new frame, returning `None` when disconnected observations
+    /// reach the configured attempt limit. Update-event timeouts are retried.
+    ///
+    /// # Errors
+    /// Propagates frame-read and event-wait errors. Also rejects negative ticks
+    /// and frame byte counts that differ from the retained layout's size.
     async fn next_frame_impl(&mut self) -> Result<Option<FramePacket>> {
         let mut no_connection = NoConnectionState::default();
 
@@ -139,8 +155,8 @@ impl LiveProvider {
                         )
                     })?,
                     frame.session_info_update as u32,
-                    self.shared_schema(),
-                )));
+                    self.shared_layout(),
+                )?));
             }
 
             // No data yet, wait for signal (cooperative async)
@@ -179,9 +195,9 @@ impl LiveProvider {
     }
 }
 
-impl SchemaProvider for LiveProvider {
-    fn schema(&self) -> &VariableSchema {
-        self.schema.as_ref()
+impl LayoutProvider for LiveProvider {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 

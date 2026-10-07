@@ -183,6 +183,38 @@ impl TelemetryLayout {
     }
 }
 
+/// Access to the shared runtime layout for a telemetry source or frame.
+pub trait LayoutProvider {
+    /// Returns the originating layout retained by this source.
+    fn layout(&self) -> &std::sync::Arc<TelemetryLayout>;
+    /// Resolves a published field name.
+    fn field_named(&self, name: &str) -> Option<&FieldLayout> {
+        self.layout().field_by_name(name).map(|(_, field)| field)
+    }
+    /// Checks whether the layout publishes a field.
+    fn has_field(&self, name: &str) -> bool {
+        self.field_named(name).is_some()
+    }
+    /// Returns all published names in header order.
+    fn field_names(&self) -> Vec<String> {
+        self.layout()
+            .fields()
+            .map(|(_, field)| field.name().to_owned())
+            .collect()
+    }
+    /// Returns field descriptions for inspection/export, outside typed hot paths.
+    fn fields_owned(&self) -> Vec<FieldLayout> {
+        self.layout()
+            .fields()
+            .map(|(_, field)| field.clone())
+            .collect()
+    }
+    /// Number of published fields.
+    fn field_count(&self) -> usize {
+        self.layout().len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

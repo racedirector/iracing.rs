@@ -73,14 +73,12 @@ use quote::{format_ident, quote};
 use std::collections::HashMap;
 use syn::fold::Fold;
 use syn::parse::Parser;
-use syn::{
-    Attribute, DeriveInput, Expr, Field, Lit, LitInt, LitStr, Meta, Type, parse_macro_input,
-};
+use syn::{Attribute, DeriveInput, Expr, Field, Lit, Meta, Type, parse_macro_input};
 
 /// Derive macro that implements `::iracing_sdk::adapters::FrameAdapter` for structs with named fields.
 ///
 /// Generates an implementation that performs two phases:
-/// 1. Connection-time schema validation producing an ordered extraction plan.
+/// 1. Connection-time layout validation producing an ordered extraction plan.
 /// 2. Runtime adaptation that decodes packet bytes into the struct fields using the plan.
 ///
 /// # Examples
@@ -97,7 +95,7 @@ use syn::{
 /// }
 /// ```
 ///
-/// The generated impl validates a provided `VariableSchema` and produces an `AdapterValidation`
+/// The generated impl validates a provided `TelemetryLayout` and produces an `AdapterValidation`
 /// which `adapt` uses to populate `SimpleFrame` from a `FramePacket`.
 #[proc_macro_derive(
     IRacingTelemetryFrame,
@@ -125,7 +123,7 @@ pub fn derive_from_raw_frame(input: TokenStream) -> TokenStream {
 /// Parses the given `DeriveInput` (must be a struct with named fields), computes per-field
 /// extraction strategies, builds a telemetry lookup map for calculated expressions,
 /// and emits the `impl ::iracing_sdk::adapters::FrameAdapter` token stream which contains
-/// `validate_schema` and `adapt` implementations tailored to the struct's fields and attributes.
+/// `validate_layout` and `adapt` implementations tailored to the struct's fields and attributes.
 ///
 /// The function returns a `syn::Error` on unsupported inputs (non-struct or non-named fields)
 /// or on invalid/malformed per-field attributes.
@@ -214,19 +212,17 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
     // Generate the complete implementation
     let expanded = quote! {
         impl #impl_generics ::iracing_sdk::adapters::FrameAdapter for #struct_name #ty_generics #where_clause {
-            fn validate_schema(schema: &::iracing_sdk::VariableSchema) -> ::iracing_sdk::Result<::iracing_sdk::adapters::AdapterValidation> {
+            fn validate_layout(layout: &::std::sync::Arc<::iracing_sdk::TelemetryLayout>) -> ::iracing_sdk::Result<::iracing_sdk::adapters::AdapterValidation> {
                 use ::iracing_sdk::adapters::FieldExtraction;
 
                 #(#validation_checks)*
 
                 let extraction_plan = vec![#(#extraction_plan_items),*];
-                Ok(::iracing_sdk::adapters::AdapterValidation::new(extraction_plan))
+                Ok(::iracing_sdk::adapters::AdapterValidation::new(::std::sync::Arc::clone(layout), extraction_plan))
             }
 
             fn adapt(packet: &::iracing_sdk::types::FramePacket, validation: &::iracing_sdk::adapters::AdapterValidation) -> Self {
-                use ::iracing_sdk::adapters::FieldExtraction;
-                use ::iracing_sdk::VarData;
-                let data = packet.data.as_ref();
+                validation.ensure_packet(packet).expect("adapter layout mismatch");
 
                 Self {
                     #(#extraction_assignments),*
@@ -240,7 +236,7 @@ fn generate_frame_adapter(input: &DeriveInput) -> syn::Result<TokenStream> {
 
 /// Field strategy determined from attributes and type analysis.
 enum FieldStrategy {
-    /// Critical telemetry field that must exist in the schema.
+    /// Critical telemetry field that must exist in the layout.
     Critical {
         field_name: String,
         field_ident: syn::Ident,
@@ -294,65 +290,6 @@ enum FieldStrategy {
         field_ident: syn::Ident,
         field_type: syn::Type,
     },
-}
-
-/// Generates a tokenized validation expression that checks a telemetry variable's runtime type against `target_type` and yields an optional cloned value for the field.
-///
-/// The produced code calls `::iracing_sdk::adapters::telemetry_type_mismatch_details::<T>(probe_expr)?` and:
-/// - returns `Some(clone_expr)` when the telemetry type matches `target_type`;
-/// - yields `None` when a type mismatch is detected and `treat_mismatch_as_missing` is `true`;
-/// - returns a `IRacingSDKError::Parse` error when a type mismatch is detected and `treat_mismatch_as_missing` is `false` (the error message includes `field_name_lit` and the mismatch `details`).
-///
-/// # Parameters
-///
-/// - `probe_expr`: token stream yielding an expression used to probe the telemetry variable (e.g., a lookup into the schema).
-/// - `clone_expr`: token stream yielding an expression that produces the value to return inside `Some(...)` when the types match.
-/// - `field_name_lit`: string literal of the telemetry field name used in error messages.
-/// - `target_type`: the Rust type to validate against the telemetry variable.
-/// - `treat_mismatch_as_missing`: when `true`, a type mismatch is treated as missing (returns `None`); when `false`, a type mismatch produces a `Parse` error.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// # use quote::quote;
-/// # use syn::parse_str;
-/// // produce code that probes a schema entry and clones it when compatible
-/// let probe = quote! { schema.get_variable("Speed") };
-/// let clone = quote! { var_info.clone() };
-/// let target: syn::Type = parse_str("f32").unwrap();
-/// let tokens = generate_type_validation_check(probe, clone, "Speed", &target, true);
-/// // `tokens` now contains generated code that yields `Some(var_info.clone())` or `None` depending on type compatibility
-/// ```
-fn generate_type_validation_check(
-    probe_expr: proc_macro2::TokenStream,
-    clone_expr: proc_macro2::TokenStream,
-    field_name_lit: &str,
-    target_type: &Type,
-    treat_mismatch_as_missing: bool,
-) -> proc_macro2::TokenStream {
-    let mismatch_handler = if treat_mismatch_as_missing {
-        quote! {
-            None
-        }
-    } else {
-        quote! {
-            return Err(::iracing_sdk::IRacingSDKError::Parse {
-                context: "Frame adapter validation".to_string(),
-                details: format!(
-                    "Field '{}' has incompatible telemetry type: {}",
-                    #field_name_lit,
-                    details
-                ),
-            });
-        }
-    };
-
-    quote! {
-        match ::iracing_sdk::adapters::telemetry_type_mismatch_details::<#target_type>(#probe_expr)? {
-            Some(details) => { #mismatch_handler }
-            None => Some(#clone_expr),
-        }
-    }
 }
 
 /// Determine the extraction strategy for a single struct field from its attributes and type.
@@ -826,10 +763,10 @@ fn extract_option_type(ty: &Type) -> Option<Type> {
     None
 }
 
-/// Build the code snippets for the schema validation phase and the extraction plan from field strategies.
+/// Build the code snippets for the layout validation phase and the extraction plan from field strategies.
 ///
 /// This function converts an ordered slice of `FieldStrategy` values into two vectors of token streams:
-/// - validation checks: statements that will be emitted into `validate_schema` to verify schema presence and telemetry type compatibility;
+/// - validation checks: statements that will be emitted into `validate_layout` to verify layout presence and telemetry type compatibility;
 /// - extraction plan items: `FieldExtraction` entries that encode how `adapt` should read or compute each struct field at runtime.
 ///
 /// # Returns
@@ -847,269 +784,72 @@ fn extract_option_type(ty: &Type) -> Option<Type> {
 fn generate_validation_phase(
     strategies: &[FieldStrategy],
 ) -> (Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>) {
-    let mut validation_checks = Vec::new();
-    let mut extraction_plan_items = Vec::new();
-
+    let mut checks = Vec::new();
+    let mut items = Vec::new();
     for (index, strategy) in strategies.iter().enumerate() {
-        match strategy {
-            FieldStrategy::TypeDefault {
-                field_name,
-                field_type,
-                ..
-            } => {
-                let field_name_lit = field_name;
-                let var_name = format_ident!("var_info_{}", index);
-                let validated_name = format_ident!("validated_var_info_{}", index);
-                let type_check = generate_type_validation_check(
-                    quote!(var_info),
-                    quote!((*var_info).clone()),
-                    field_name_lit,
-                    field_type,
-                    true,
-                );
-
-                validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit);
-                    let #validated_name = match #var_name {
-                        Some(var_info) => { #type_check }
-                        None => None,
-                    };
-                });
-
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::WithDefault {
-                        name: #field_name_lit.to_string(),
-                        var_info: #validated_name,
-                        default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
-                    }
-                });
-            }
-            FieldStrategy::WithDefault {
-                field_name,
-                default_expr,
-                field_type,
-                ..
-            } => {
-                let field_name_lit = field_name;
-                let var_name = format_ident!("var_info_{}", index);
-                let validated_name = format_ident!("validated_var_info_{}", index);
-                let default_repr = quote!(#default_expr).to_string();
-                let default_repr_lit = LitStr::new(&default_repr, proc_macro2::Span::call_site());
-                let type_check = generate_type_validation_check(
-                    quote!(var_info),
-                    quote!((*var_info).clone()),
-                    field_name_lit,
-                    field_type,
-                    true,
-                );
-
-                validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit);
-                    let #validated_name = match #var_name {
-                        Some(var_info) => { #type_check }
-                        None => None,
-                    };
-                });
-
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::WithDefault {
-                        name: #field_name_lit.to_string(),
-                        var_info: #validated_name,
-                        default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
-                    }
-                });
-            }
-            FieldStrategy::Optional {
-                field_name,
-                inner_type,
-                ..
-            } => {
-                let field_name_lit = field_name;
-                let var_name = format_ident!("var_info_{}", index);
-                let validated_name = format_ident!("validated_var_info_{}", index);
-                let type_check = generate_type_validation_check(
-                    quote!(var_info),
-                    quote!((*var_info).clone()),
-                    field_name_lit,
-                    inner_type,
-                    true,
-                );
-
-                validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit);
-                    let #validated_name = match #var_name {
-                        Some(var_info) => { #type_check }
-                        None => None,
-                    };
-                });
-
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::Optional {
-                        name: #field_name_lit.to_string(),
-                        var_info: #validated_name,
-                    }
-                });
-            }
+        let id = format_ident!("field_id_{}", index);
+        let (name, ty, required, kind) = match strategy {
             FieldStrategy::Critical {
                 field_name,
                 field_type,
                 ..
-            } => {
-                let field_name_lit = field_name;
-                validation_checks.push(quote! {
-                    if !schema.variables.contains_key(#field_name_lit) {
-                        let available_fields: Vec<String> = schema.variables.keys().cloned().collect();
-                        return Err(::iracing_sdk::IRacingSDKError::Parse {
-                            context: "Frame adapter validation".to_string(),
-                            details: format!("Critical field '{}' is missing from schema. Connection aborted. Available fields: {}",
-                                #field_name_lit, available_fields.join(", ")),
-                        });
-                    }
-                });
-
-                let var_name = format_ident!("var_info_{}", index);
-                let validated_name = format_ident!("validated_var_info_{}", index);
-                let type_check = generate_type_validation_check(
-                    quote!(&#var_name),
-                    quote!(#var_name.clone()),
-                    field_name_lit,
-                    field_type,
-                    false,
-                );
-                validation_checks.push(quote! {
-                    let #var_name = schema.get_variable(#field_name_lit).unwrap().clone();
-                    let #validated_name = {
-                        #type_check
-                    }.unwrap();
-                });
-
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::Required {
-                        name: #field_name_lit.to_string(),
-                        var_info: #validated_name,
-                    }
-                });
+            } => (field_name, field_type.clone(), true, 0),
+            FieldStrategy::Optional {
+                field_name,
+                inner_type,
+                ..
+            } => (field_name, inner_type.clone(), false, 1),
+            FieldStrategy::TypeDefault {
+                field_name,
+                field_type,
+                ..
             }
+            | FieldStrategy::WithDefault {
+                field_name,
+                field_type,
+                ..
+            } => (field_name, field_type.clone(), false, 2),
             FieldStrategy::BitfieldHas {
                 field_name,
                 target_is_option,
-                default_expr,
                 fail_if_missing,
                 ..
             }
             | FieldStrategy::BitfieldMap {
                 field_name,
                 target_is_option,
-                default_expr,
                 fail_if_missing,
                 ..
-            } => {
-                let field_name_lit = field_name;
-                let var_name = format_ident!("var_info_{}", index);
-                let validated_name = format_ident!("validated_var_info_{}", index);
-                let type_check = generate_type_validation_check(
-                    quote!(var_info),
-                    quote!((*var_info).clone()),
-                    field_name_lit,
-                    &syn::parse_quote!(::iracing_sdk::BitField),
-                    !*fail_if_missing,
-                );
+            } => (
+                field_name,
+                syn::parse_quote!(::iracing_sdk::BitField),
+                *fail_if_missing,
                 if *fail_if_missing {
-                    // Override to Required path (strongest semantics)
-                    validation_checks.push(quote! {
-                        if !schema.variables.contains_key(#field_name_lit) {
-                            let available_fields: Vec<String> = schema.variables.keys().cloned().collect();
-                            return Err(::iracing_sdk::IRacingSDKError::Parse {
-                                context: "Frame adapter validation".to_string(),
-                                details: format!("Critical field '{}' is missing from schema. Connection aborted. Available fields: {}",
-                                    #field_name_lit, available_fields.join(", ")),
-                            });
-                        }
-                    });
-                    validation_checks.push(quote! {
-                        let #var_name = schema.get_variable(#field_name_lit).unwrap().clone();
-                        let #validated_name = match ::iracing_sdk::adapters::telemetry_type_mismatch_details::<::iracing_sdk::BitField>(&#var_name)? {
-                            Some(details) => {
-                                return Err(::iracing_sdk::IRacingSDKError::Parse {
-                                    context: "Frame adapter validation".to_string(),
-                                    details: format!(
-                                        "Field '{}' has incompatible telemetry type: {}",
-                                        #field_name_lit,
-                                        details
-                                    ),
-                                });
-                            }
-                            None => #var_name.clone(),
-                        };
-                    });
-                    extraction_plan_items.push(quote! {
-                        FieldExtraction::Required { name: #field_name_lit.to_string(), var_info: #validated_name }
-                    });
+                    0
+                } else if *target_is_option {
+                    1
                 } else {
-                    validation_checks.push(quote! {
-                        let #var_name = schema.get_variable(#field_name_lit);
-                    });
-
-                    if *target_is_option {
-                        validation_checks.push(quote! {
-                            let #validated_name = match #var_name {
-                                Some(var_info) => { #type_check }
-                                None => None,
-                            };
-                        });
-                        extraction_plan_items.push(quote! {
-                            FieldExtraction::Optional { name: #field_name_lit.to_string(), var_info: #validated_name }
-                        });
-                    } else if default_expr.is_some() {
-                        let default_repr = quote!(#default_expr).to_string();
-                        let default_repr_lit =
-                            LitStr::new(&default_repr, proc_macro2::Span::call_site());
-                        validation_checks.push(quote! {
-                            let #validated_name = match #var_name {
-                                Some(var_info) => { #type_check }
-                                None => None,
-                            };
-                        });
-                        extraction_plan_items.push(quote! {
-                            FieldExtraction::WithDefault {
-                                name: #field_name_lit.to_string(),
-                                var_info: #validated_name,
-                                default_value: ::iracing_sdk::adapters::DefaultValue::ExplicitExpression(#default_repr_lit.to_string()),
-                            }
-                        });
-                    } else {
-                        validation_checks.push(quote! {
-                            let #validated_name = match #var_name {
-                                Some(var_info) => { #type_check }
-                                None => None,
-                            };
-                        });
-                        extraction_plan_items.push(quote! {
-                            FieldExtraction::WithDefault {
-                                name: #field_name_lit.to_string(),
-                                var_info: #validated_name,
-                                default_value: ::iracing_sdk::adapters::DefaultValue::TypeDefault,
-                            }
-                        });
-                    }
-                }
-            }
+                    2
+                },
+            ),
             FieldStrategy::Calculated { expression_str, .. } => {
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::Calculated {
-                        expression: #expression_str.to_string(),
-                    }
-                });
+                let _ = expression_str;
+                items.push(quote!(FieldExtraction::Calculated));
+                continue;
             }
             FieldStrategy::Skipped { .. } => {
-                extraction_plan_items.push(quote! {
-                    FieldExtraction::Skipped
-                });
+                items.push(quote!(FieldExtraction::Skipped));
+                continue;
             }
-        }
+        };
+        checks.push(quote! { let #id = ::iracing_sdk::AdapterValidation::resolve::<#ty>(layout, #name, #required)?; });
+        items.push(match kind {
+            0 => quote!(FieldExtraction::Required(#id.expect("required field resolution"))),
+            1 => quote!(FieldExtraction::Optional(#id)),
+            _ => quote!(FieldExtraction::WithDefault(#id)),
+        });
     }
-
-    (validation_checks, extraction_plan_items)
+    (checks, items)
 }
 
 /// Rewrites a calculated expression so bare telemetry identifiers are replaced with
@@ -1155,13 +895,13 @@ struct CalculatedExprFolder<'a> {
 
 impl<'a> Fold for CalculatedExprFolder<'a> {
     /// Rewrites simple identifier paths that match known telemetry fields into
-    /// `validation.fetch_or_default::<Type>(packet, "FieldName")` calls; all other
+    /// `validation.fetch_or_default::<Type>(packet, slot)` calls; all other
     /// expressions are folded unchanged.
     ///
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use syn::{parse_quote, Expr, LitStr};
+    /// use syn::{parse_quote, Expr};
     /// use std::collections::HashMap;
     ///
     /// // Minimal stand-in for the folder's field_map: name -> (index, type)
@@ -1173,12 +913,12 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     ///
     /// // Manually perform the transformation the folder would do:
     /// let transformed: Expr = parse_quote! {
-    ///     validation.fetch_or_default::<i32>(packet, LitStr::new("speed", proc_macro2::Span::call_site()))
+    ///     validation.fetch_or_default::<i32>(packet, 0)
     /// };
     ///
     /// let rendered = quote::quote!(#transformed).to_string();
     /// assert!(rendered.contains("fetch_or_default"));
-    /// assert!(rendered.contains("speed"));
+    /// assert!(rendered.contains("0"));
     /// ```
     fn fold_expr(&mut self, expr: Expr) -> Expr {
         match expr {
@@ -1187,11 +927,11 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
             {
                 if let Some(ident) = expr_path.path.get_ident() {
                     let ident_str = ident.to_string();
-                    if let Some((_, ty)) = self.field_map.get(&ident_str) {
-                        let name_lit = LitStr::new(&ident_str, ident.span());
+                    if let Some((index, ty)) = self.field_map.get(&ident_str) {
+                        let index = *index;
                         let ty = ty.clone();
                         return syn::parse_quote! {
-                            validation.fetch_or_default::<#ty>(packet, #name_lit)
+                            validation.fetch_or_default::<#ty>(packet, #index)
                         };
                     }
                 }
@@ -1202,110 +942,18 @@ impl<'a> Fold for CalculatedExprFolder<'a> {
     }
 }
 
-/// Generate the struct-field assignment token stream for a telemetry-backed field that falls back to the Rust type's `Default` when the variable is absent or decoding fails.
-///
-/// The produced tokens initialize the named field by indexing the adapter validation's extraction plan at `index` and:
-/// - If the plan contains a `FieldExtraction::WithDefault` with `Some(var_info)`, attempts to decode the bytes using `<FieldType as VarData>::from_bytes`. On successful decode the decoded value is used; on decode error a one-time `tracing::warn!` is emitted and `<FieldType as Default>::default()` is used.
-/// - If `var_info` is `None` or the plan entry is missing/other variant, uses `<FieldType as Default>::default()`.
-///
-/// # Parameters
-///
-/// - `index`: zero-based position of the field's extraction plan entry within `validation.extraction_plan`.
-/// - `field_ident`: identifier of the struct field to assign.
-/// - `field_type`: Rust type of the field (used both for decoding and to obtain `Default`).
-/// - `field_name`: telemetry variable name used for diagnostic messages in warnings.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use proc_macro2::Span;
-/// use syn::Ident;
-/// // Construct a token stream for a field named `speed: i32` mapped to telemetry variable "Speed"
-/// let ts = generate_type_default_assignment(
-///     0,
-///     &Ident::new("speed", Span::call_site()),
-///     &syn::parse_str::<syn::Type>("i32").unwrap(),
-///     "Speed",
-/// );
-/// // `ts` can be interpolated into an impl body generated by the derive macro.
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_type_default_assignment(
     index: usize,
     field_ident: &syn::Ident,
     field_type: &syn::Type,
     field_name: &str,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-    quote! {
-        #field_ident: {
-            match validation.extraction_plan.get(#index_lit) {
-                Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
-                    if let Some(var_info) = var_info {
-                        match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                            Ok(value) => value,
-                            Err(_e) => {
-                                static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                WARNED.call_once(|| {
-                                    ::iracing_sdk::__private::tracing::warn!(
-                                        field = #field_name_lit,
-                                        expected_type = ::std::any::type_name::<#field_type>(),
-                                        actual_type = ?var_info.data_type,
-                                        error = ?_e,
-                                        "Type mismatch: failed to convert field, using default value (warning shown once)"
-                                    );
-                                });
-                                <#field_type as ::core::default::Default>::default()
-                            }
-                        }
-                    } else {
-                        <#field_type as ::core::default::Default>::default()
-                    }
-                }
-                _ => <#field_type as ::core::default::Default>::default(),
-            }
-        }
-    }
+    let _ = field_name;
+    quote!(#field_ident: validation.fetch_or_default::<#field_type>(packet, #index))
 }
 
-/// Generates the TokenStream for a struct field initializer that implements the "WithDefault"
-/// extraction strategy.
-///
-/// The generated code will:
-/// - Look up the field's extraction plan entry at `index`.
-/// - If a `var_info` is present, attempt to decode the bytes into `field_type` via
-///   `<field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info)`.
-/// - On successful decode, return the decoded value.
-/// - On decode error, emit a one-time `tracing::warn!` annotated with `field_name` and the
-///   observed telemetry type, then evaluate and return `default_expr`.
-/// - If `var_info` is absent or the plan entry is missing/unexpected, evaluate and return
-///   `default_expr`.
-///
-/// Parameters:
-/// - `index`: index of this field's extraction plan entry in `validation.extraction_plan`.
-/// - `field_ident`: identifier of the struct field to initialize.
-/// - `field_type`: Rust type of the field; used both in the generated type casts and in the
-///   emitted warning message.
-/// - `default_expr`: expression to evaluate when the telemetry value is missing or decoding
-///   fails; inserted verbatim into the generated code.
-/// - `field_name`: telemetry variable name used in warning metadata.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use syn::{Expr, Ident, Type};
-/// use proc_macro2::TokenStream;
-///
-/// // Example usage (construction of syn values omitted for brevity)
-/// let idx = 0usize;
-/// let ident: Ident = syn::parse_str("speed").unwrap();
-/// let ty: Type = syn::parse_str("f32").unwrap();
-/// let default_expr: Expr = syn::parse_str("0.0f32").unwrap();
-/// let field_name = "Speed";
-///
-/// let ts: TokenStream = generate_with_default_assignment(idx, &ident, &ty, &default_expr, field_name);
-/// // `ts` now contains the tokens for the field initializer implementing the WithDefault strategy.
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_with_default_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1313,208 +961,32 @@ fn generate_with_default_assignment(
     default_expr: &Expr,
     field_name: &str,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-    quote! {
-        #field_ident: {
-            let fallback = || -> #field_type { #default_expr };
-            match validation.extraction_plan.get(#index_lit) {
-                Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
-                    if let Some(var_info) = var_info {
-                        match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                            Ok(value) => value,
-                            Err(_e) => {
-                                static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                WARNED.call_once(|| {
-                                    ::iracing_sdk::__private::tracing::warn!(
-                                        field = #field_name_lit,
-                                        expected_type = ::std::any::type_name::<#field_type>(),
-                                        actual_type = ?var_info.data_type,
-                                        error = ?_e,
-                                        "Type mismatch: failed to convert field, using default value (warning shown once)"
-                                    );
-                                });
-                                fallback()
-                            }
-                        }
-                    } else {
-                        fallback()
-                    }
-                }
-                _ => fallback(),
-            }
-        }
-    }
+    let _ = field_name;
+    quote!(#field_ident: validation.decode::<#field_type>(packet, #index).ok().flatten().unwrap_or_else(|| #default_expr))
 }
 
-/// Generates the struct-field initializer TokenStream for a field whose strategy is `Optional`.
-///
-/// The produced code reads the adapter's extraction plan at `index`, expects a
-/// `FieldExtraction::Optional { var_info, .. }` entry, and:
-/// - if `var_info` is `Some`, decodes bytes with `<inner_type as VarData>::from_bytes(&data, var_info)` and returns `Some(value)` on success;
-/// - on decode error, emits a one-time `tracing::warn!` (including the field name, expected Rust type, actual telemetry type, and the error) and yields `None`;
-/// - if `var_info` is `None` or the plan entry is missing/unexpected, yields `None`.
-///
-/// # Parameters
-///
-/// - `index`: zero-based index of this field in the adapter's extraction plan.
-/// - `field_ident`: identifier of the struct field being generated.
-/// - `inner_type`: the Rust type `T` inside the `Option<T>` target.
-/// - `field_name`: telemetry variable name used in diagnostics.
-///
-/// # Returns
-///
-/// A `proc_macro2::TokenStream` containing the expression that initializes the struct field to an `Option<inner_type>` according to the behavior above.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// # use syn::{Ident, Type};
-/// # use proc_macro2::TokenStream;
-/// // Construct inputs for a hypothetical field `speed: Option<f32>` mapped to telemetry "Speed"
-/// let index = 0usize;
-/// let field_ident: Ident = syn::parse_str("speed").unwrap();
-/// let inner_type: Type = syn::parse_str("f32").unwrap();
-/// let field_name = "Speed";
-///
-/// // Call the generator (assumes visibility in the same crate)
-/// let tokens: TokenStream = generate_optional_assignment(index, &field_ident, &inner_type, field_name);
-///
-/// // Generated tokens should reference the field identifier
-/// let tokens_str = tokens.to_string();
-/// assert!(tokens_str.contains("speed"));
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_optional_assignment(
     index: usize,
     field_ident: &syn::Ident,
     inner_type: &syn::Type,
     field_name: &str,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-    quote! {
-        #field_ident: {
-            match validation.extraction_plan.get(#index_lit) {
-                Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
-                    if let Some(var_info) = var_info {
-                        match <#inner_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                            Ok(value) => Some(value),
-                            Err(_e) => {
-                                static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                WARNED.call_once(|| {
-                                    ::iracing_sdk::__private::tracing::warn!(
-                                        field = #field_name_lit,
-                                        expected_type = ::std::any::type_name::<#inner_type>(),
-                                        actual_type = ?var_info.data_type,
-                                        error = ?_e,
-                                        "Type mismatch: failed to convert optional field, using None (warning shown once)"
-                                    );
-                                });
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            }
-        }
-    }
+    let _ = field_name;
+    quote!(#field_ident: validation.decode::<#inner_type>(packet, #index).ok().flatten())
 }
 
-/// Generate the struct field assignment tokens for a field classified as "Critical".
-///
-/// This produces code that reads the extraction plan at `index`, expects a
-/// `FieldExtraction::Required { name, var_info }` entry, decodes the variable
-/// with `<T as VarData>::from_bytes(&data, var_info)`, returns the decoded
-/// value on success and panics on decode errors or if the plan entry is missing
-/// or of an unexpected variant.
-///
-/// # Panics
-///
-/// Panics if the extraction plan entry at `index` is missing, is not
-/// `FieldExtraction::Required`, or if decoding the variable fails.
-///
-/// # Returns
-///
-/// A `proc_macro2::TokenStream` containing the generated assignment expression
-/// for the given field.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// // Generated snippet (conceptual):
-/// // my_field: {
-/// //     match validation.extraction_plan.get(3) {
-/// //         Some(::iracing_sdk::adapters::FieldExtraction::Required { name, var_info }) => {
-/// //             match <MyType as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-/// //                 Ok(value) => value,
-/// //                 Err(err) => panic!("Failed to decode critical field '{}' during adapt: {err:?}", name),
-/// //             }
-/// //         }
-/// //         Some(other) => panic!("Validation plan entry for 'MyField' is {:?}, expected Required", other),
-/// //         None => panic!("Validation plan missing required field 'MyField'"),
-/// //     }
-/// // }
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_critical_assignment(
     index: usize,
     field_ident: &syn::Ident,
     field_type: &syn::Type,
     field_name: &str,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-    quote! {
-        #field_ident: {
-            match validation.extraction_plan.get(#index_lit) {
-                Some(::iracing_sdk::adapters::FieldExtraction::Required { name, var_info }) => {
-                    match <#field_type as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                        Ok(value) => value,
-                        Err(err) => panic!("Failed to decode critical field '{}' during adapt: {err:?}", name),
-                    }
-                }
-                Some(other) => panic!("Validation plan entry for '{}' is {:?}, expected Required", #field_name_lit, other),
-                None => panic!("Validation plan missing required field '{}'", #field_name_lit),
-            }
-        }
-    }
+    quote!(#field_ident: validation.decode::<#field_type>(packet, #index).expect(concat!("Failed to decode critical field ", #field_name)).expect("missing required plan slot"))
 }
 
-/// Generate the struct-field assignment tokens for a `BitfieldHas` extraction strategy.
-///
-/// This produces the TokenStream used to initialize a single struct field when the field is
-/// extracted from a `::iracing_sdk::BitField` mask. For `target_is_option == true` the
-/// generated code returns `Option<bool>` (using `None` on missing/mis-parse); otherwise it
-/// returns `bool` and uses `default_expr` or `false` as the fallback when the bitfield is
-/// absent or fails to decode.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use syn::parse_str;
-/// use quote::ToTokens;
-///
-/// // Prepare inputs
-/// let ident = parse_str::<syn::Ident>("flag_field").unwrap();
-/// let mask_expr = parse_str::<syn::Expr>("0x04u32").unwrap();
-/// let default_expr = Some(parse_str::<syn::Expr>("true").unwrap());
-///
-/// // Generate tokens for a non-option bool field with explicit fallback
-/// let ts = iracing_sdk_derive::generate_bitfield_has_assignment(
-///     0,
-///     &ident,
-///     "FLAG_NAME",
-///     false,
-///     &default_expr,
-///     &mask_expr,
-/// );
-///
-/// let s = ts.to_string();
-/// // Generated code should attempt to call `has_flag` on the decoded BitField
-/// assert!(s.contains("has_flag"));
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_bitfield_has_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1522,106 +994,24 @@ fn generate_bitfield_has_assignment(
     target_is_option: bool,
     default_expr: &Option<Expr>,
     mask_expr: &Expr,
+    fail_if_missing: bool,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-
+    let _ = field_name;
+    let value = quote!(validation.decode::<::iracing_sdk::BitField>(packet, #index));
     if target_is_option {
-        quote! {
-            #field_ident: {
-                match validation.extraction_plan.get(#index_lit) {
-                    Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
-                        if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                                Ok(bits) => Some(bits.has_flag(#mask_expr)),
-                                Err(_e) => {
-                                    static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                    WARNED.call_once(|| {
-                                        ::iracing_sdk::__private::tracing::warn!(
-                                            field = #field_name_lit,
-                                            expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
-                                            error = ?_e,
-                                            "Type mismatch: failed to convert bitfield, using None (warning shown once)"
-                                        );
-                                    });
-                                    None
-                                }
-                            }
-                        } else { None }
-                    }
-                    _ => None,
-                }
-            }
-        }
+        quote!(#field_ident: #value.ok().flatten().map(|bits| bits.has_flag(#mask_expr)))
+    } else if fail_if_missing {
+        quote!(#field_ident: #value.expect("critical bitfield decode").expect("critical bitfield slot").has_flag(#mask_expr))
     } else {
-        let fallback_bool = if let Some(expr) = default_expr {
-            quote! { #expr }
-        } else {
-            quote! { false }
-        };
-        quote! {
-            #field_ident: {
-                match validation.extraction_plan.get(#index_lit) {
-                    Some(::iracing_sdk::adapters::FieldExtraction::Required { var_info, .. }) => {
-                        match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                            Ok(bits) => bits.has_flag(#mask_expr),
-                            Err(err) => panic!("Failed to decode critical bitfield during adapt: {err:?}"),
-                        }
-                    }
-                    Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
-                        if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                                Ok(bits) => bits.has_flag(#mask_expr),
-                                Err(_e) => {
-                                    static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                    WARNED.call_once(|| {
-                                        ::iracing_sdk::__private::tracing::warn!(
-                                            field = #field_name_lit,
-                                            expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
-                                            error = ?_e,
-                                            "Type mismatch: failed to convert bitfield, using default value (warning shown once)"
-                                        );
-                                    });
-                                    #fallback_bool
-                                }
-                            }
-                        } else { #fallback_bool }
-                    }
-                    _ => { #fallback_bool },
-                }
-            }
-        }
+        let fallback = default_expr
+            .as_ref()
+            .map(|expr| quote!(#expr))
+            .unwrap_or_else(|| quote!(false));
+        quote!(#field_ident: #value.ok().flatten().map(|bits| bits.has_flag(#mask_expr)).unwrap_or_else(|| #fallback))
     }
 }
 
-/// Generate the struct-field assignment tokens for a `BitfieldMap` extraction strategy.
-///
-/// The produced code reads the corresponding `validation.extraction_plan` entry at `index`,
-/// decodes a `::iracing_sdk::BitField` from `data` when present, applies `decoder_expr` to the
-/// decoded `BitField`, and returns either the decoded/mapped value, an explicit `default_expr` or
-/// `Default::default()` fallback, or `None` for `Option` targets. For critical (`Required`)
-/// plan entries a decode error will panic; for non-critical entries a one-time `tracing::warn!`
-/// is emitted on decode failures and the fallback is used.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use syn::{Ident, Expr};
-/// // Construct a simple decoder expression and an ident for demonstration purposes.
-/// let ident = Ident::new("mapped_field", proc_macro2::Span::call_site());
-/// let decoder: Expr = syn::parse_str("|bits: ::iracing_sdk::BitField| bits.some_map()").unwrap();
-/// let tokens = iracing_sdk_derive::generate_bitfield_map_assignment(
-///     0,
-///     &ident,
-///     "SomeBitfield",
-///     false,
-///     &None,
-///     &decoder,
-/// );
-/// // `tokens` contains the generated assignment for use in the derived `adapt` implementation.
-/// ```
+/// Generates a positional field assignment against the retained validated layout.
 fn generate_bitfield_map_assignment(
     index: usize,
     field_ident: &syn::Ident,
@@ -1629,77 +1019,20 @@ fn generate_bitfield_map_assignment(
     target_is_option: bool,
     default_expr: &Option<Expr>,
     decoder_expr: &Expr,
+    fail_if_missing: bool,
 ) -> proc_macro2::TokenStream {
-    let index_lit = LitInt::new(&index.to_string(), proc_macro2::Span::call_site());
-    let field_name_lit = field_name;
-
+    let _ = field_name;
+    let value = quote!(validation.decode::<::iracing_sdk::BitField>(packet, #index));
     if target_is_option {
-        quote! {
-            #field_ident: {
-                match validation.extraction_plan.get(#index_lit) {
-                    Some(::iracing_sdk::adapters::FieldExtraction::Optional { var_info, .. }) => {
-                        if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                                Ok(bits) => Some((#decoder_expr)(bits)),
-                                Err(_e) => {
-                                    static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                    WARNED.call_once(|| {
-                                        ::iracing_sdk::__private::tracing::warn!(
-                                            field = #field_name_lit,
-                                            expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
-                                            error = ?_e,
-                                            "Type mismatch: failed to convert bitfield, using None (warning shown once)"
-                                        );
-                                    });
-                                    None
-                                }
-                            }
-                        } else { None }
-                    }
-                    _ => None,
-                }
-            }
-        }
+        quote!(#field_ident: #value.ok().flatten().map(#decoder_expr))
+    } else if fail_if_missing {
+        quote!(#field_ident: (#decoder_expr)(#value.expect("critical bitfield decode").expect("critical bitfield slot")))
     } else {
-        let fallback_expr = if let Some(expr) = default_expr {
-            quote! { #expr }
-        } else {
-            quote! { ::core::default::Default::default() }
-        };
-        quote! {
-            #field_ident: {
-                match validation.extraction_plan.get(#index_lit) {
-                    Some(::iracing_sdk::adapters::FieldExtraction::Required { var_info, .. }) => {
-                        match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                            Ok(bits) => (#decoder_expr)(bits),
-                            Err(err) => panic!("Failed to decode critical bitfield during adapt: {err:?}"),
-                        }
-                    }
-                    Some(::iracing_sdk::adapters::FieldExtraction::WithDefault { var_info, .. }) => {
-                        if let Some(var_info) = var_info {
-                            match <::iracing_sdk::BitField as ::iracing_sdk::VarData>::from_bytes(&data, var_info) {
-                                Ok(bits) => (#decoder_expr)(bits),
-                                Err(_e) => {
-                                    static WARNED: ::std::sync::Once = ::std::sync::Once::new();
-                                    WARNED.call_once(|| {
-                                        ::iracing_sdk::__private::tracing::warn!(
-                                            field = #field_name_lit,
-                                            expected_type = "BitField",
-                                            actual_type = ?var_info.data_type,
-                                            error = ?_e,
-                                            "Type mismatch: failed to convert bitfield, using default value (warning shown once)"
-                                        );
-                                    });
-                                    #fallback_expr
-                                }
-                            }
-                        } else { #fallback_expr }
-                    }
-                    _ => { #fallback_expr },
-                }
-            }
-        }
+        let fallback = default_expr
+            .as_ref()
+            .map(|expr| quote!(#expr))
+            .unwrap_or_else(|| quote!(::core::default::Default::default()));
+        quote!(#field_ident: #value.ok().flatten().map(#decoder_expr).unwrap_or_else(|| #fallback))
     }
 }
 
@@ -1776,6 +1109,7 @@ fn generate_extraction_phase(
                 target_is_option,
                 default_expr,
                 mask_expr,
+                fail_if_missing,
                 ..
             } => generate_bitfield_has_assignment(
                 index,
@@ -1784,6 +1118,7 @@ fn generate_extraction_phase(
                 *target_is_option,
                 default_expr,
                 mask_expr,
+                *fail_if_missing,
             ),
             FieldStrategy::BitfieldMap {
                 field_ident,
@@ -1791,6 +1126,7 @@ fn generate_extraction_phase(
                 target_is_option,
                 default_expr,
                 decoder_expr,
+                fail_if_missing,
                 ..
             } => generate_bitfield_map_assignment(
                 index,
@@ -1799,6 +1135,7 @@ fn generate_extraction_phase(
                 *target_is_option,
                 default_expr,
                 decoder_expr,
+                *fail_if_missing,
             ),
 
             FieldStrategy::Calculated {
@@ -1972,7 +1309,7 @@ mod tests {
 
         assert_eq!(validation_checks.len(), 2);
         assert_eq!(extraction_plan_items.len(), 3);
-        assert!(checks.contains("get_variable"));
+        assert!(checks.contains("resolve"));
         assert!(checks.contains("\"Speed\""));
         assert!(checks.contains("\"Gear\""));
         assert!(plan.contains("FieldExtraction :: WithDefault"));
@@ -1991,8 +1328,8 @@ mod tests {
         let rendered = tokens.to_string();
 
         assert!(rendered.contains("fetch_or_default"));
-        assert!(rendered.contains("\"speed\""));
-        assert!(rendered.contains("\"rpm\""));
+        assert!(!rendered.contains("\"speed\""));
+        assert!(!rendered.contains("\"rpm\""));
     }
 
     #[test]
@@ -2001,10 +1338,10 @@ mod tests {
             generate_optional_assignment(0, &parse_quote!(speed), &parse_quote!(f32), "Speed");
         let rendered = tokens.to_string();
 
-        assert!(rendered.contains("FieldExtraction :: Optional"));
-        assert!(rendered.contains("Some"));
-        assert!(rendered.contains("from_bytes"));
-        assert!(rendered.contains("\"Speed\""));
+        assert!(rendered.contains("decode"));
+        assert!(rendered.contains("flatten"));
+        assert!(rendered.contains("decode"));
+        assert!(!rendered.contains("\"Speed\""));
     }
 
     #[test]
@@ -2018,12 +1355,13 @@ mod tests {
             false,
             &default_expr,
             &mask_expr,
+            false,
         );
         let rendered = tokens.to_string();
 
         assert!(rendered.contains("has_flag"));
         assert!(rendered.contains("0x4u32"));
-        assert!(rendered.contains("\"SessionFlags\""));
+        assert!(!rendered.contains("\"SessionFlags\""));
     }
 
     #[test]
@@ -2036,11 +1374,12 @@ mod tests {
             false,
             &None,
             &decoder_expr,
+            false,
         );
         let rendered = tokens.to_string();
 
         assert!(rendered.contains("(decode_flags)"));
-        assert!(rendered.contains("FieldExtraction :: WithDefault"));
-        assert!(rendered.contains("\"SessionFlags\""));
+        assert!(rendered.contains("unwrap_or_else"));
+        assert!(!rendered.contains("\"SessionFlags\""));
     }
 }

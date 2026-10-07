@@ -51,7 +51,7 @@ impl Command {
     ///
     /// Returns an error for an empty IBT, an invalid frame index, missing variables,
     /// or a live stream ending before a frame arrives. Propagates source access,
-    /// subscription, frame reading, schema validation, decoding, serialization,
+    /// subscription, frame reading, layout validation, decoding, serialization,
     /// and output errors.
     pub async fn run(self) -> Result<()> {
         match self {
@@ -59,20 +59,21 @@ impl Command {
             Command::Live { output, format } => {
                 use anyhow::anyhow;
                 use futures::StreamExt;
-                use iracing_sdk::{DynamicFrame, LiveConnection, SchemaProvider, UpdateRate};
+                use iracing_sdk::{DynamicFrame, LayoutProvider, LiveConnection, UpdateRate};
 
                 let connection = LiveConnection::builder().build()?;
 
-                let mut variables = connection.variables();
+                let mut variables = connection.fields_owned();
                 if variables.is_empty() {
                     return Err(anyhow!(
                         "No telemetry variables were available from the live connection"
                     ));
                 }
                 variables.sort_unstable_by(|left, right| {
-                    left.offset
-                        .cmp(&right.offset)
-                        .then_with(|| left.name.cmp(&right.name))
+                    left.region()
+                        .offset()
+                        .cmp(&right.region().offset())
+                        .then_with(|| left.name().cmp(right.name()))
                 });
 
                 let mut frames =
@@ -97,7 +98,7 @@ impl Command {
             } => {
                 let mut reader = get_disk_reader(&path)?;
 
-                use iracing_sdk::{FramePacket, SchemaProvider, VariableSchema};
+                use iracing_sdk::{FramePacket, LayoutProvider, TelemetryLayout};
                 use std::sync::Arc;
 
                 let frame_count = reader.layout().frame_count();
@@ -118,20 +119,22 @@ impl Command {
                 if headers.is_empty() {
                     bail!("IBT contains no telemetry variable headers");
                 }
-                let schema = VariableSchema::from_headers(&headers, reader.layout().frame_size())?;
+                let layout =
+                    TelemetryLayout::try_from_headers(&headers, reader.layout().frame_size())?;
 
                 let frame = FramePacket::new(
                     data,
                     u32::try_from(frame_index)
                         .context("Frame index exceeds the supported tick range")?,
                     reader.header().session_info_update as u32,
-                    Arc::new(schema),
-                );
-                let mut variables = frame.variables();
+                    Arc::new(layout),
+                )?;
+                let mut variables = frame.fields_owned();
                 variables.sort_unstable_by(|left, right| {
-                    left.offset
-                        .cmp(&right.offset)
-                        .then_with(|| left.name.cmp(&right.name))
+                    left.region()
+                        .offset()
+                        .cmp(&right.region().offset())
+                        .then_with(|| left.name().cmp(right.name()))
                 });
                 let snapshot = TelemetrySnapshot::from_provider(&frame, &variables)?;
                 let mut writer = DocumentWriter::from_parts(output, format)?;

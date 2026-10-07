@@ -1,113 +1,101 @@
-//! Frame packet types for stream-based architecture
-
+//! Owned telemetry frames with an exact runtime layout contract.
+use crate::{
+    FieldLayout, IRacingSDKError, LayoutProvider, Result, TelemetryLayout, TelemetryValue,
+    TelemetryValueProvider,
+};
 use std::sync::Arc;
 
-use crate::{
-    SchemaProvider, TelemetryValue, VariableInfo, VariableSchema,
-    types::telemetry_value::TelemetryValueProvider,
-};
-
-/// Raw telemetry frame packet for the stream-based architecture
-///
-/// This is the fundamental data unit that flows through the system.
-/// All other data (adaptations, sessions) is derived from this.
+/// One complete frame associated with the layout that describes its bytes.
 #[derive(Debug, Clone)]
 pub struct FramePacket {
-    /// Telemetry data buffer (zero-copy via Arc)
-    pub data: Arc<[u8]>,
-
-    /// Monotonic frame counter
+    data: Arc<[u8]>,
+    layout: Arc<TelemetryLayout>,
+    /// Source tick counter.
     pub tick: u32,
-
-    /// Session version (changes trigger session updates)
+    /// Source session-information revision.
     pub session_version: u32,
-
-    /// Variable schema for field access
-    pub schema: Arc<VariableSchema>,
 }
-
 impl FramePacket {
-    /// Create a new frame packet
+    /// Constructs exactly one frame without truncation.
+    ///
+    /// # Errors
+    /// Rejects both short and oversized buffers relative to the layout.
     pub fn new(
-        data: Vec<u8>,
+        data: impl Into<Arc<[u8]>>,
         tick: u32,
         session_version: u32,
-        schema: Arc<VariableSchema>,
-    ) -> Self {
-        Self {
-            data: data.into(),
+        layout: Arc<TelemetryLayout>,
+    ) -> Result<Self> {
+        let data = data.into();
+        if data.len() != layout.frame_size() {
+            return Err(IRacingSDKError::WireSize {
+                expected: layout.frame_size(),
+                actual: data.len(),
+            });
+        }
+        Ok(Self {
+            data,
+            layout,
             tick,
             session_version,
-            schema,
-        }
+        })
+    }
+    /// Borrows the immutable complete frame bytes.
+    pub fn data(&self) -> &Arc<[u8]> {
+        &self.data
+    }
+    /// Returns the originating shared layout.
+    pub fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
+    }
+    /// Decodes a published name, returning `None` for an absent field.
+    pub fn value(&self, name: &str) -> Result<Option<TelemetryValue>> {
+        self.layout
+            .field_by_name(name)
+            .map(|(_, field)| self.telemetry_value(field))
+            .transpose()
     }
 }
-
-impl FramePacket {
-    /// Decodes a variable from this frame by name.
-    ///
-    /// Returns `Ok(None)` when the schema has no variable with that name.
-    /// Returns an error when the matching variable cannot be decoded from the
-    /// frame data.
-    pub fn value(
-        &self,
-        name: &str,
-    ) -> crate::Result<Option<crate::types::telemetry_value::TelemetryValue>> {
-        let Some(info) = self.variable(name) else {
-            return Ok(None);
-        };
-
-        self.telemetry_value(info).map(Some)
+impl LayoutProvider for FramePacket {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
-
-impl SchemaProvider for FramePacket {
-    fn schema(&self) -> &VariableSchema {
-        &self.schema
-    }
-}
-
 impl TelemetryValueProvider for FramePacket {
-    fn telemetry_value(&self, info: &VariableInfo) -> crate::Result<TelemetryValue> {
-        TelemetryValue::decode(self.data.as_ref(), info)
+    fn telemetry_value(&self, field: &FieldLayout) -> Result<TelemetryValue> {
+        TelemetryValue::decode_field(&self.data, field)
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::irsdk::VariableType;
-    use std::collections::HashMap;
-
+    use crate::{
+        VariableHeaders,
+        irsdk::{VariableHeader, VariableType},
+    };
     #[test]
-    fn frame_packet_provides_schema_and_telemetry_values() {
-        let rpm_info = VariableInfo {
-            name: "RPM".into(),
-            data_type: VariableType::Integer,
-            offset: 0,
-            count: 1,
-            count_as_time: false,
-            units: "rev/min".into(),
-            description: "Engine RPM".into(),
-        };
-        let schema = Arc::new(VariableSchema {
-            variables: HashMap::from([("RPM".to_string(), rpm_info)]),
-            frame_size: 4,
-        });
-        let packet = FramePacket::new(1234i32.to_le_bytes().to_vec(), 10, 2, Arc::clone(&schema));
-
-        assert!(std::ptr::eq(packet.schema(), schema.as_ref()));
-        assert!(packet.has_variable("RPM"));
-        assert!(!packet.has_variable("Missing"));
-
-        let info = packet.variable("RPM").unwrap();
+    fn accepts_only_exact_frames_and_reuses_layout() {
+        let headers = VariableHeaders::new(&[VariableHeader::new(
+            VariableType::Float,
+            0,
+            1,
+            false,
+            "Speed",
+            "",
+            "m/s",
+        )
+        .unwrap()]);
+        let layout = Arc::new(TelemetryLayout::try_from_headers(&headers, 4).unwrap());
+        for actual in [3, 5] {
+            assert!(
+                matches!(FramePacket::new(vec![0;actual],0,0,layout.clone()), Err(IRacingSDKError::WireSize { expected:4, actual:n }) if n==actual)
+            );
+        }
+        let packet = FramePacket::new(42f32.to_le_bytes().to_vec(), 1, 2, layout.clone()).unwrap();
+        assert!(Arc::ptr_eq(packet.layout(), &layout));
         assert_eq!(
-            packet.telemetry_value(info).unwrap(),
-            TelemetryValue::Int32(1234)
-        );
-        assert_eq!(
-            packet.value("RPM").unwrap(),
-            Some(TelemetryValue::Int32(1234))
+            packet.value("Speed").unwrap(),
+            Some(TelemetryValue::Float32(42.0))
         );
         assert_eq!(packet.value("Missing").unwrap(), None);
     }

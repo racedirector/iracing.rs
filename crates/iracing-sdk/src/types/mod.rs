@@ -1,78 +1,28 @@
-//! Core types for telemetry data representation.
-//!
-//! This module provides the foundational data structures for handling iRacing telemetry data,
-//! including schema management, bitfield helpers, and type-safe binary parsing.
-//!
-//! ## Architecture
-//!
-//! The type system maps directly to iRacing SDK structures:
-//! - [`VariableSchema`] describes the structure of telemetry variables with O(1) lookup
-//! - [`irsdk::VariableType`](crate::irsdk::VariableType) maps to iRacing's `irsdk_VarType` enum with size information
-//! - [`VarData`] trait provides type-safe parsing from binary telemetry data
-//! - [`BitField`] handles iRacing's bitfield variables with flag operations
-//!
-//! ## Performance Characteristics
-//!
-//! - O(1) variable lookup via HashMap
-//! - Bounds checking on all memory operations
-//! - Tick count wraparound handling for proper frame ordering
-//!
-//! ## Usage Example
-//!
-//! ```rust,no_run
-//! use iracing_sdk::{VarData, VariableInfo, VariableSchema, irsdk::VariableType};
-//! use std::collections::HashMap;
-//!
-//! // Create a schema for RPM data
-//! let mut variables = HashMap::new();
-//! variables.insert("RPM".to_string(), VariableInfo {
-//!     name: "RPM".to_string(),
-//!     data_type: VariableType::Float,
-//!     offset: 0,
-//!     count: 1,
-//!     count_as_time: false,
-//!     units: "rev/min".to_string(),
-//!     description: "Engine RPM".to_string(),
-//! });
-//!
-//! let schema = VariableSchema::new(variables, 4)?;
-//! let frame = vec![0x00, 0xA0, 0x8C, 0x45]; // 4500.0 as little-endian f32
-//!
-//! // Parse RPM value
-//! let rpm_info = schema.get_variable("RPM").expect("RPM variable");
-//! let rpm: f32 = f32::from_bytes(&frame, rpm_info)?;
-//! assert!((rpm - 4500.0).abs() < 1.0); // Allow for floating point precision
-//! # Ok::<(), iracing_sdk::IRacingSDKError>(())
-//! ```
-
+//! Core runtime telemetry and session types.
 mod dynamic_frame;
-mod field_data;
+pub(crate) mod field_data;
 mod frame;
 mod ibt;
 mod iracing_session_string;
 mod regions;
-mod schema;
 mod session_info_bytes;
 mod telemetry_layout;
 mod telemetry_value;
 mod update_rate;
-mod var_data;
 mod variable_headers;
 
 // Re-export all public types
 pub use dynamic_frame::DynamicFrame;
-pub use field_data::{FieldData, TelemetryElement};
+pub use field_data::{TelemetryElement, VarData};
 pub use frame::FramePacket;
 pub use ibt::IbtLayout;
 pub use iracing_irsdk::BitField;
 pub(crate) use iracing_session_string::IRacingSessionString;
 pub use regions::*;
-pub use schema::{SchemaProvider, VariableInfo, VariableSchema};
 pub use session_info_bytes::{SessionInfoBytes, SessionInfoEncoding, SessionInfoPayload};
-pub use telemetry_layout::{FieldId, FieldLayout, FieldMetadata, TelemetryLayout};
+pub use telemetry_layout::{FieldId, FieldLayout, FieldMetadata, LayoutProvider, TelemetryLayout};
 pub use telemetry_value::{TelemetryValue, TelemetryValueProvider};
 pub use update_rate::UpdateRate;
-pub use var_data::VarData;
 pub use variable_headers::VariableHeaders;
 
 /// Deprecated name for owned session bytes.
@@ -82,229 +32,3 @@ pub type SessionInfoBuffer = SessionInfoBytes;
 /// Deprecated name for owned variable headers.
 #[deprecated(note = "use VariableHeaders")]
 pub type VariableHeadersBuffer = VariableHeaders;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::irsdk::VariableType;
-
-    use proptest::prelude::*;
-
-    // Property test strategies
-    prop_compose! {
-        fn arb_variable_info()(
-            name in "[a-zA-Z][a-zA-Z0-9_]*",
-            data_type in prop::sample::select(vec![
-                VariableType::Character, VariableType::Integer,
-                VariableType::Float, VariableType::Double,
-                VariableType::Boolean, VariableType::BitField
-            ]),
-            offset in 0..1024usize,
-            count in 1..10usize,
-            units in "[a-zA-Z/^2]*",
-            description in "[a-zA-Z ]*"
-        ) -> VariableInfo {
-            VariableInfo {
-                name,
-                data_type,
-                offset,
-                count,
-                count_as_time: false,
-                units,
-                description,
-            }
-        }
-    }
-
-    // RawFrame tests removed - RawFrame no longer exists
-
-    // Property tests for VariableSchema
-    proptest! {
-
-        #[test]
-        fn prop_variable_schema_parsing_with_fuzzed_headers(
-            variables in prop::collection::btree_map(
-                "[a-zA-Z][a-zA-Z0-9_]*",
-                arb_variable_info(),
-                0..20
-            ),
-            frame_size in 64..2048usize
-        ) {
-            // VariableSchema parsing succeeds/fails appropriately with fuzzed headers
-            use std::collections::HashMap;
-            let mut adjusted_variables = HashMap::new();
-
-            // Adjust variable offsets to ensure they fit within frame_size
-            for (name, mut var_info) in variables.into_iter() {
-                // Ensure offset is within reasonable bounds for the frame size
-                let max_size = var_info.data_type.byte_size() * var_info.count;
-                if max_size < frame_size {
-                    var_info.offset %= frame_size - max_size;
-                } else {
-                    var_info.offset = 0;
-                    var_info.count = 1;
-                }
-
-                // Ensure name consistency
-                var_info.name = name.clone();
-                adjusted_variables.insert(name, var_info);
-            }
-
-            let schema = VariableSchema {
-                variables: adjusted_variables,
-                frame_size,
-            };
-
-            // Schema should be consistent
-            prop_assert!(schema.frame_size <= 2048);
-            prop_assert!(schema.frame_size >= 64);
-
-            // All variable offsets should be reasonable
-            for var_info in schema.variables.values() {
-                let end_offset = var_info.offset + (var_info.data_type.byte_size() * var_info.count);
-                prop_assert!(end_offset <= schema.frame_size);
-                prop_assert!(var_info.count > 0);
-            }
-        }
-
-        #[test]
-        fn prop_variable_type_size_calculations_correct(var_type in prop::sample::select(vec![
-            VariableType::Character, VariableType::Integer,
-            VariableType::Float, VariableType::Double,
-            VariableType::Boolean, VariableType::BitField
-        ])) {
-            // VariableType size calculations correct for all enum variants
-            let size = var_type.byte_size();
-            prop_assert!(size > 0);
-            prop_assert!(size <= 8);
-
-            match var_type {
-                VariableType::Character | VariableType::Boolean => {
-                    prop_assert_eq!(size, 1);
-                },
-                VariableType::Integer | VariableType::Float | VariableType::BitField => {
-                    prop_assert_eq!(size, 4);
-                },
-                VariableType::Double => {
-                    prop_assert_eq!(size, 8);
-                },
-            }
-        }
-
-        #[test]
-        fn prop_vardata_roundtrip_preserves_data_f32(
-            value in any::<f32>(),
-            offset in 0..100usize
-        ) {
-            // VarData roundtrip (serialize→deserialize) preserves data
-            let mut data = vec![0u8; offset + 4 + 10];
-            let bytes = value.to_le_bytes();
-            data[offset..offset + 4].copy_from_slice(&bytes);
-
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::Float,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
-
-            let result = f32::from_bytes(&data, &var_info);
-            prop_assert!(result.is_ok());
-
-            let parsed = result.unwrap();
-            if value.is_finite() {
-                prop_assert!((parsed - value).abs() < f32::EPSILON);
-            } else if value.is_nan() {
-                prop_assert!(parsed.is_nan());
-            } else {
-                prop_assert_eq!(parsed, value);
-            }
-        }
-
-        #[test]
-        fn prop_vardata_roundtrip_preserves_data_i32(
-            value in any::<i32>(),
-            offset in 0..100usize
-        ) {
-            let mut data = vec![0u8; offset + 4 + 10];
-            let bytes = value.to_le_bytes();
-            data[offset..offset + 4].copy_from_slice(&bytes);
-
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::Integer,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
-
-            let result = i32::from_bytes(&data, &var_info);
-            prop_assert!(result.is_ok());
-            prop_assert_eq!(result.unwrap(), value);
-        }
-
-        #[test]
-        fn prop_bitfield_parsing_handles_all_32bit_patterns(
-            value in any::<u32>(),
-            offset in 0..100usize
-        ) {
-            // BitField parsing handles all 32-bit patterns correctly
-            let mut data = vec![0u8; offset + 4 + 10];
-            let bytes = value.to_le_bytes();
-            data[offset..offset + 4].copy_from_slice(&bytes);
-
-            let var_info = VariableInfo {
-                name: "test".to_string(),
-                data_type: VariableType::BitField,
-                offset,
-                count: 1,
-                count_as_time: false,
-                units: "test".to_string(),
-                description: "test".to_string(),
-            };
-
-            let result = BitField::from_bytes(&data, &var_info);
-            prop_assert!(result.is_ok());
-            prop_assert_eq!(result.unwrap().value(), value);
-        }
-
-        #[test]
-        fn prop_tick_comparison_handles_wraparound(
-            tick1 in any::<u32>(),
-            tick2 in any::<u32>()
-        ) {
-            // Tick comparison handles wraparound correctly for all u32 sequences
-            let diff = tick2.wrapping_sub(tick1);
-
-            // If the difference is small (< half range), tick2 is "after" tick1
-            // If the difference is large (> half range), it's wraparound and tick1 is "after" tick2
-            let is_tick2_newer = diff < u32::MAX / 2;
-
-            // This property should always hold for proper wraparound handling
-            if tick1 == tick2 {
-                prop_assert_eq!(diff, 0);
-            } else if diff == 1 {
-                prop_assert!(is_tick2_newer);
-            }
-        }
-
-        #[test]
-        fn prop_bitfield_flag_operations(
-            value in any::<u32>(),
-            bit_index in 0..32u32
-        ) {
-            let bitfield = BitField::new(value);
-            let expected_bit_set = (value & (1 << bit_index)) != 0;
-            prop_assert_eq!(bitfield.is_set(bit_index), expected_bit_set);
-
-            // Test flag checking with the bit as a flag
-            let flag = 1 << bit_index;
-            prop_assert_eq!(bitfield.has_flag(flag), expected_bit_set);
-        }
-    }
-}

@@ -2,7 +2,7 @@ use anyhow::{Context, Result, ensure};
 use clap::ValueEnum;
 #[cfg(test)]
 use iracing_irsdk::VariableHeader;
-use iracing_sdk::{TelemetryValue, TelemetryValueProvider, VariableInfo};
+use iracing_sdk::{FieldLayout, TelemetryValue, TelemetryValueProvider};
 use serde::{
     Serialize, Serializer,
     ser::{SerializeMap, SerializeSeq},
@@ -29,11 +29,11 @@ impl fmt::Display for RecordStreamFormat {
 enum RecordEncoder {
     Jsonl {
         writer: OutputSink,
-        variables: Vec<VariableInfo>,
+        variables: Vec<FieldLayout>,
     },
     Csv {
         writer: Box<csv::Writer<OutputSink>>,
-        variables: Vec<VariableInfo>,
+        variables: Vec<FieldLayout>,
         column_count: usize,
     },
 }
@@ -45,7 +45,7 @@ pub(crate) struct RecordStreamWriter<S> {
 pub struct NeedsPreparation {
     sink: OutputSink,
     format: RecordStreamFormat,
-    variables: Vec<VariableInfo>,
+    variables: Vec<FieldLayout>,
 }
 
 pub struct Ready {
@@ -59,17 +59,16 @@ impl RecordStreamWriter<()> {
         format: RecordStreamFormat,
         variables: &[VariableHeader],
     ) -> Result<RecordStreamWriter<NeedsPreparation>> {
-        let variables = variables
-            .iter()
-            .map(VariableInfo::try_from)
-            .collect::<iracing_sdk::Result<Vec<_>>>()?;
+        let variables = test_fields(variables)?;
         Self::from_variables(target, format, variables)
     }
 
+    /// Opens the output, creating or truncating a file target immediately.
+    /// Preserves `variables` order and propagates file-opening errors.
     pub fn from_variables(
         target: OutputTarget,
         format: RecordStreamFormat,
-        variables: Vec<VariableInfo>,
+        variables: Vec<FieldLayout>,
     ) -> Result<RecordStreamWriter<NeedsPreparation>> {
         Ok(RecordStreamWriter {
             state: NeedsPreparation {
@@ -82,6 +81,9 @@ impl RecordStreamWriter<()> {
 }
 
 impl RecordStreamWriter<NeedsPreparation> {
+    /// Prepares encoding and writes a CSV header in field order, expanding
+    /// arrays into zero-based `name[index]` columns. JSONL has no header.
+    /// Propagates errors writing the CSV header.
     pub fn prepare(self) -> Result<RecordStreamWriter<Ready>> {
         let NeedsPreparation {
             sink: writer,
@@ -96,15 +98,18 @@ impl RecordStreamWriter<NeedsPreparation> {
                     .has_headers(false)
                     .from_writer(writer);
                 let mut headers = Vec::with_capacity(
-                    variables.iter().map(|variable| variable.count.max(1)).sum(),
+                    variables
+                        .iter()
+                        .map(|variable| variable.count().max(1))
+                        .sum(),
                 );
                 for variable in &variables {
-                    if variable.count <= 1 {
-                        headers.push(variable.name.clone());
+                    if variable.count() <= 1 {
+                        headers.push(variable.name().to_owned());
                         continue;
                     }
-                    for index in 0..variable.count {
-                        headers.push(format!("{}[{}]", variable.name, index));
+                    for index in 0..variable.count() {
+                        headers.push(format!("{}[{}]", variable.name(), index));
                     }
                 }
                 writer.write_record(&headers)?;
@@ -122,6 +127,11 @@ impl RecordStreamWriter<NeedsPreparation> {
 }
 
 impl RecordStreamWriter<Ready> {
+    /// Writes one frame in the configured field order.
+    ///
+    /// Propagates field-decoding, serialization, and output errors. CSV also
+    /// rejects nested arrays and values whose element count differs from the
+    /// declared field count. An output error may leave a partial record.
     pub fn write(&mut self, telemetry: &dyn TelemetryValueProvider) -> Result<()> {
         match &mut self.state.encoder {
             RecordEncoder::Jsonl { writer, variables } => {
@@ -144,21 +154,21 @@ impl RecordStreamWriter<Ready> {
                                 ensure!(
                                     !matches!(value, TelemetryValue::Array(_)),
                                     "Nested array in `{}`",
-                                    variable.name
+                                    variable.name()
                                 );
                                 row.push(Some(SerializableValue(value)));
                             }
                             // Keep the named column for an empty variable.
-                            if values.is_empty() && variable.count == 0 {
+                            if values.is_empty() && variable.count() == 0 {
                                 row.push(None);
                             }
                         }
                         value => row.push(Some(SerializableValue(value))),
                     }
                     ensure!(
-                        row.len() - start == variable.count.max(1),
+                        row.len() - start == variable.count().max(1),
                         "CSV column count mismatch for `{}`",
-                        variable.name
+                        variable.name()
                     );
                 }
                 writer.serialize(&row)?;
@@ -176,29 +186,33 @@ impl RecordStreamWriter<Ready> {
     }
 }
 
+/// Decodes fields in the supplied order, stopping at the first error and adding
+/// the failing field's name to its context.
 fn decode_values(
     provider: &dyn TelemetryValueProvider,
-    variables: &[VariableInfo],
+    variables: &[FieldLayout],
 ) -> Result<Vec<TelemetryValue>> {
     variables
         .iter()
         .map(|variable| {
             provider
                 .telemetry_value(variable)
-                .with_context(|| format!("Failed to decode `{}`", variable.name))
+                .with_context(|| format!("Failed to decode `{}`", variable.name()))
         })
         .collect()
 }
 
 pub(crate) struct TelemetrySnapshot<'a> {
-    variables: &'a [VariableInfo],
+    variables: &'a [FieldLayout],
     values: Vec<TelemetryValue>,
 }
 
 impl<'a> TelemetrySnapshot<'a> {
+    /// Captures values for the supplied fields in order, propagating decoding
+    /// errors with the failing field's name.
     pub(crate) fn from_provider(
         provider: &dyn TelemetryValueProvider,
-        variables: &'a [VariableInfo],
+        variables: &'a [FieldLayout],
     ) -> Result<Self> {
         Ok(Self {
             variables,
@@ -207,10 +221,12 @@ impl<'a> TelemetrySnapshot<'a> {
     }
 }
 impl Serialize for TelemetrySnapshot<'_> {
+    /// Serializes field names and plain values in the supplied order, propagating
+    /// serializer errors.
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(Some(self.variables.len()))?;
         for (variable, value) in self.variables.iter().zip(&self.values) {
-            map.serialize_entry(&variable.name, &SerializableValue(value))?;
+            map.serialize_entry(&variable.name(), &SerializableValue(value))?;
         }
         map.end()
     }
@@ -237,6 +253,12 @@ impl Serialize for SerializableValue<'_> {
             }
         }
     }
+}
+
+#[cfg(test)]
+fn test_fields(headers: &[VariableHeader]) -> Result<Vec<FieldLayout>> {
+    let layout = iracing_sdk::TelemetryLayout::try_from_headers(&headers.to_vec().into(), 8587)?;
+    Ok(layout.fields().map(|(_, field)| field.clone()).collect())
 }
 
 #[cfg(test)]
@@ -275,8 +297,8 @@ mod tests {
     }
 
     impl TelemetryValueProvider for Provider {
-        fn telemetry_value(&self, info: &VariableInfo) -> iracing_sdk::Result<TelemetryValue> {
-            match info.name.as_str() {
+        fn telemetry_value(&self, info: &FieldLayout) -> iracing_sdk::Result<TelemetryValue> {
+            match info.name() {
                 "Speed" => Ok(TelemetryValue::Float32(42.5)),
                 "CarIdxLap" if !self.fail => {
                     Ok(TelemetryValue::Array(vec![
@@ -322,10 +344,7 @@ mod tests {
     fn snapshot_writes_plain_values_in_every_document_format() -> Result<()> {
         use crate::writer::{DocumentFormat, DocumentWriter};
 
-        let variables = headers()
-            .iter()
-            .map(VariableInfo::try_from)
-            .collect::<iracing_sdk::Result<Vec<_>>>()?;
+        let variables = test_fields(&headers())?;
         let snapshot = TelemetrySnapshot::from_provider(
             &Provider {
                 fail: false,
