@@ -283,6 +283,16 @@ mod tests {
     }
 
     #[test]
+    fn camera_state_rejects_bits_that_do_not_fit_broadcast_argument() {
+        let state = CameraState::from_bits_retain(0x0001_0000);
+
+        let error = BroadcastMessage::try_from(Command::CameraSetState(state))
+            .expect_err("camera state bits above 16 bits must be rejected");
+
+        assert!(matches!(error, crate::error::Error::Validation { .. }));
+    }
+
+    #[test]
     fn replay_position_splits_frame_number_into_words() {
         assert_message(
             Command::ReplaySetPlayPosition(ReplayPositionMode::Current, 0x1234_5678),
