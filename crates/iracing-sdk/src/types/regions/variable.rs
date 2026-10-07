@@ -72,11 +72,13 @@ impl VariableRegion {
     }
 
     /// Returns the underlying frame-relative byte region.
+    #[inline]
     pub fn as_region(&self) -> ByteRegion {
         self.region
     }
 
     /// Returns the region as a half-open byte range.
+    #[inline]
     pub fn as_range(&self) -> Range<usize> {
         self.region.as_range()
     }
@@ -87,6 +89,7 @@ impl VariableRegion {
     }
 
     /// Returns the frame-relative starting byte offset.
+    #[inline]
     pub fn offset(&self) -> usize {
         self.region.offset()
     }
@@ -97,6 +100,7 @@ impl VariableRegion {
     }
 
     /// Returns the number of elements in the region.
+    #[inline]
     pub fn count(&self) -> usize {
         self.count.get()
     }

@@ -25,6 +25,7 @@ pub trait VarData: Sized {
     /// # Errors
     /// Propagates type/shape validation and decoding errors, including a frame
     /// too short to contain the field or an unrecognized domain enum value.
+    #[inline]
     fn decode_field(frame: &[u8], field: &FieldLayout) -> Result<Self> {
         Self::validate_field(field)?;
         Self::decode_prevalidated(frame, field)
@@ -39,35 +40,55 @@ pub trait VarData: Sized {
 
 /// Borrows the field's frame-relative byte range, returning an unexpected-EOF
 /// memory error if the frame does not contain the entire range.
+#[inline]
 pub(crate) fn field_bytes<'a>(frame: &'a [u8], field: &FieldLayout) -> Result<&'a [u8]> {
     let region = field.region();
-    frame.get(region.as_range()).ok_or_else(|| {
-        IRacingSDKError::memory_unexpected_eof(
-            region.offset(),
-            region.as_region().end(),
-            frame.len(),
-        )
-    })
+    match frame.get(region.as_range()) {
+        Some(bytes) => Ok(bytes),
+        None => Err(field_out_of_bounds(field, frame.len())),
+    }
+}
+
+/// Builds the out-of-bounds error away from the hot decoding path.
+#[cold]
+#[inline(never)]
+fn field_out_of_bounds(field: &FieldLayout, frame_len: usize) -> IRacingSDKError {
+    let region = field.region();
+    IRacingSDKError::memory_unexpected_eof(region.offset(), region.as_region().end(), frame_len)
 }
 
 /// Checks the storage type accepted by `T`, returning a type-conversion error
 /// on mismatch. Does not check the field's element count.
+#[inline]
 fn validate_element<T: TelemetryElement>(field: &FieldLayout) -> Result<()> {
     if !T::accepts(field.data_type()) {
-        return Err(IRacingSDKError::type_conversion(
-            std::any::type_name::<T>(),
-            field.data_type(),
-        ));
+        return Err(element_type_mismatch::<T>(field));
     }
     Ok(())
+}
+
+/// Builds the storage-type mismatch error away from the hot validation path.
+#[cold]
+#[inline(never)]
+fn element_type_mismatch<T>(field: &FieldLayout) -> IRacingSDKError {
+    IRacingSDKError::type_conversion(std::any::type_name::<T>(), field.data_type())
+}
+
+/// Builds the scalar-shape mismatch error away from the hot validation path.
+#[cold]
+#[inline(never)]
+fn scalar_count_mismatch(field: &FieldLayout) -> IRacingSDKError {
+    IRacingSDKError::type_conversion("scalar count 1", field.count())
 }
 
 macro_rules! scalar {
     ($type:ty, $storage:ident, $width:literal, $decode:expr) => {
         impl TelemetryElement for $type {
+            #[inline]
             fn accepts(data_type: VariableType) -> bool {
                 data_type == VariableType::$storage
             }
+            #[inline]
             fn decode_element(bytes: &[u8]) -> Result<Self> {
                 let bytes: [u8; $width] =
                     bytes.try_into().map_err(|_| IRacingSDKError::WireSize {
@@ -78,16 +99,15 @@ macro_rules! scalar {
             }
         }
         impl VarData for $type {
+            #[inline]
             fn validate_field(field: &FieldLayout) -> Result<()> {
                 validate_element::<Self>(field)?;
                 if field.count() != 1 {
-                    return Err(IRacingSDKError::type_conversion(
-                        "scalar count 1",
-                        field.count(),
-                    ));
+                    return Err(scalar_count_mismatch(field));
                 }
                 Ok(())
             }
+            #[inline]
             fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self> {
                 Self::decode_element(field_bytes(frame, field)?)
             }
@@ -104,14 +124,19 @@ scalar!(f32, Float, 4, f32::from_le_bytes);
 scalar!(f64, Double, 8, f64::from_le_bytes);
 
 impl<T: TelemetryElement> VarData for Vec<T> {
+    #[inline]
     fn validate_field(field: &FieldLayout) -> Result<()> {
         validate_element::<T>(field)
     }
     fn decode_prevalidated(frame: &[u8], field: &FieldLayout) -> Result<Self> {
-        field_bytes(frame, field)?
-            .chunks_exact(field.data_type().byte_size())
-            .map(T::decode_element)
-            .collect()
+        let bytes = field_bytes(frame, field)?;
+        // Allocate the exact element count once; collecting into `Result<Vec<_>>`
+        // cannot use the iterator's size hint and would grow repeatedly.
+        let mut values = Vec::with_capacity(field.count());
+        for chunk in bytes.chunks_exact(field.data_type().byte_size()) {
+            values.push(T::decode_element(chunk)?);
+        }
+        Ok(values)
     }
 }
 
@@ -135,11 +160,12 @@ impl TelemetryValue {
             if field.count() == 1 {
                 return T::decode_element(bytes).map(wrap);
             }
-            bytes
-                .chunks_exact(field.data_type().byte_size())
-                .map(|chunk| T::decode_element(chunk).map(wrap))
-                .collect::<Result<Vec<_>>>()
-                .map(TelemetryValue::Array)
+            // Preallocate exactly; `collect::<Result<Vec<_>>>` would grow repeatedly.
+            let mut values = Vec::with_capacity(field.count());
+            for chunk in bytes.chunks_exact(field.data_type().byte_size()) {
+                values.push(wrap(T::decode_element(chunk)?));
+            }
+            Ok(TelemetryValue::Array(values))
         }
         match field.data_type() {
             VariableType::Character => values(bytes, field, Self::Char),
