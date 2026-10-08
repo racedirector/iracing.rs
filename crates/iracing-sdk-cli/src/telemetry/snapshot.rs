@@ -46,7 +46,6 @@ impl Args {
         let fields_owned = packet.fields_owned();
         let snapshot = TelemetrySnapshot::from_provider(&packet, &fields_owned)?;
         writer.write(&snapshot)?;
-
         writer.finalize()
     }
 }

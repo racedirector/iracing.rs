@@ -4,15 +4,17 @@ use clap::Subcommand;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{
-    FramePacket, TelemetryLayout,
+    FramePacket, LayoutProvider, TelemetryLayout,
     ibt::IbtReader,
-    provider::{SessionInformationProvider, VariableHeadersProvider},
+    provider::{SessionInformationBytesProvider, VariableHeadersProvider},
 };
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
+
+#[cfg(windows)]
+use std::time::Duration;
 
 pub struct DiskTelemetry {
     pub reader: IbtReader,
@@ -41,6 +43,24 @@ impl DiskTelemetry {
             u32::try_from(self.reader.header().session_info_update)?,
             Arc::clone(&self.layout),
         )?)
+    }
+}
+
+impl SessionInformationBytesProvider for DiskTelemetry {
+    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
+        self.reader.session_info_snapshot()
+    }
+}
+
+impl VariableHeadersProvider for DiskTelemetry {
+    fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
+        self.reader.variable_headers()
+    }
+}
+
+impl LayoutProvider for DiskTelemetry {
+    fn layout(&self) -> &std::sync::Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 
@@ -73,6 +93,27 @@ impl LiveTelemetry {
         })
     }
 
+    /// Wait cooperatively for a frame, or finish when the simulator disconnects.
+    /// Canceling this future leaves at most one bounded native wait in progress.
+    pub(crate) async fn next_frame_async(&mut self) -> Result<Option<FramePacket>> {
+        loop {
+            if !self.connection.is_connected() {
+                return Ok(None);
+            }
+            if let Some(frame) = self.connection.get_new_data()? {
+                return Ok(Some(FramePacket::new(
+                    frame.data,
+                    u32::try_from(frame.tick)?,
+                    u32::try_from(frame.session_info_update)?,
+                    Arc::clone(&self.layout),
+                )?));
+            }
+            self.connection
+                .wait_for_update_async(Duration::from_millis(500))
+                .await?;
+        }
+    }
+
     pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
         loop {
             if let Some(frame) = self.connection.get_new_data()? {
@@ -91,18 +132,39 @@ impl LiveTelemetry {
     }
 }
 
+#[cfg(windows)]
+impl SessionInformationBytesProvider for LiveTelemetry {
+    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
+        self.connection.session_info_snapshot()
+    }
+}
+
+#[cfg(windows)]
+impl VariableHeadersProvider for LiveTelemetry {
+    fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
+        self.connection.variable_headers()
+    }
+}
+
+#[cfg(windows)]
+impl LayoutProvider for LiveTelemetry {
+    fn layout(&self) -> &std::sync::Arc<TelemetryLayout> {
+        &self.layout
+    }
+}
+
 pub(crate) enum TelemetrySource {
     Disk(Box<DiskTelemetry>),
     #[cfg(windows)]
     Live(LiveTelemetry),
 }
 
-impl SessionInformationProvider for TelemetrySource {
-    fn session_info(&self) -> iracing_sdk::Result<Option<iracing_sdk::schema::SessionInfo>> {
+impl SessionInformationBytesProvider for TelemetrySource {
+    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
         match self {
-            Self::Disk(telemetry) => telemetry.reader.session_info(),
+            Self::Disk(telemetry) => telemetry.session_info_snapshot(),
             #[cfg(windows)]
-            Self::Live(telemetry) => telemetry.connection.session_info(),
+            Self::Live(telemetry) => telemetry.session_info_snapshot(),
         }
     }
 }
@@ -110,9 +172,19 @@ impl SessionInformationProvider for TelemetrySource {
 impl VariableHeadersProvider for TelemetrySource {
     fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
         match self {
-            Self::Disk(telemetry) => telemetry.reader.variable_headers(),
+            Self::Disk(telemetry) => telemetry.variable_headers(),
             #[cfg(windows)]
-            Self::Live(telemetry) => telemetry.connection.variable_headers(),
+            Self::Live(telemetry) => telemetry.variable_headers(),
+        }
+    }
+}
+
+impl LayoutProvider for TelemetrySource {
+    fn layout(&self) -> &std::sync::Arc<TelemetryLayout> {
+        match self {
+            Self::Disk(telemetry) => telemetry.layout(),
+            #[cfg(windows)]
+            Self::Live(telemetry) => telemetry.layout(),
         }
     }
 }
