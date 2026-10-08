@@ -131,7 +131,7 @@ mod tests {
             "--flag",
             "ui-hidden",
             "--flag",
-            "mouse-aim",
+            "use-mouse-aim",
         ]);
 
         let expected = CameraState::USER_INTERFACE_HIDDEN.union(CameraState::USE_MOUSE_AIM_MODE);
