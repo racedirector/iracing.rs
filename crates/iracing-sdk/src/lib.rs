@@ -61,6 +61,7 @@ pub mod adapters;
 mod error;
 pub mod irsdk;
 mod parse_utils;
+pub mod source;
 pub mod test_utils;
 pub mod types;
 

@@ -28,14 +28,12 @@
 //! - Frame reading is allocation-minimal except for the returned frame bytes
 //! - Indexed frame geometry is O(1)
 
-mod source;
-
 use crate::{
     IRacingSDKError, IbtLayout, Result, SessionInfoBytes, VariableHeaders,
     provider::{SessionInformationBytesProvider, VariableHeadersProvider},
+    source::ibt::Source,
 };
 use memmap2::Mmap;
-use source::IbtSource;
 use std::{fs::File, path::Path};
 
 use iracing_irsdk::{DiskSubHeader, Header, IbtHeader};
@@ -47,7 +45,7 @@ use iracing_irsdk::{DiskSubHeader, Header, IbtHeader};
 /// Geometry uses `usize`: sources larger than `usize::MAX` bytes are rejected
 /// (including files of 4 GiB or more on 32-bit targets).
 pub struct IbtReader {
-    source: IbtSource,
+    source: Source,
 
     header: IbtHeader,
     layout: IbtLayout,
@@ -74,15 +72,15 @@ impl IbtReader {
             path,
             source: std::io::Error::new(error.kind(), format!("Failed to map IBT source: {error}")),
         })?;
-        Self::from_source(IbtSource::Mapped(mapped))
+        Self::from_source(Source::Mapped(mapped))
     }
 
     /// Parse owned in-memory `.ibt` data.
     pub fn from_bytes<B: Into<Vec<u8>>>(data: B) -> Result<Self> {
-        Self::from_source(IbtSource::Owned(data.into()))
+        Self::from_source(Source::Owned(data.into()))
     }
 
-    fn from_source(source: IbtSource) -> Result<Self> {
+    fn from_source(source: Source) -> Result<Self> {
         let source_len = source.len();
         let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
         let Some(bytes) = source.get(0..preamble_len) else {
@@ -246,8 +244,8 @@ mod tests {
     impl IbtReader {
         pub(crate) fn owned_bytes_mut(&mut self) -> &mut Vec<u8> {
             match &mut self.source {
-                IbtSource::Owned(bytes) => bytes,
-                IbtSource::Mapped(_) => panic!("fault injection requires an owned source"),
+                Source::Owned(bytes) => bytes,
+                Source::Mapped(_) => panic!("fault injection requires an owned source"),
             }
         }
     }
@@ -481,7 +479,7 @@ mod tests {
 
         let reader = IbtReader::from_bytes(data)?;
 
-        assert!(matches!(reader.source, IbtSource::Owned(_)));
+        assert!(matches!(reader.source, Source::Owned(_)));
         assert!(reader.layout().frame_count() > 0);
         assert!(!reader.variable_headers()?.is_empty());
         Ok(())
@@ -490,7 +488,7 @@ mod tests {
     #[test]
     fn open_keeps_frames_mapped() -> Result<()> {
         let reader = IbtReader::open(fixture_path()?)?;
-        assert!(matches!(reader.source, IbtSource::Mapped(_)));
+        assert!(matches!(reader.source, Source::Mapped(_)));
         Ok(())
     }
 }

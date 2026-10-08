@@ -5,12 +5,11 @@
 
 use iracing_irsdk::{StatusField, VariableBuffer};
 
-use super::source::WaitResult;
-use crate::provider::{SessionInformationBytesProvider, VariableHeadersProvider};
-use crate::{ByteRegion, FrameRegion};
 use crate::{
-    IRacingSDKError, Result, SessionInfoBytes, SessionInfoRegion, VariableHeaders,
-    VariableHeadersRegion, windows::source::LiveSource,
+    ByteRegion, FrameRegion, IRacingSDKError, Result, SessionInfoBytes, SessionInfoRegion,
+    VariableHeaders, VariableHeadersRegion,
+    provider::{SessionInformationBytesProvider, VariableHeadersProvider},
+    source::live::{Source, WaitResult},
 };
 use std::mem::offset_of;
 use std::time::Duration;
@@ -20,7 +19,7 @@ use iracing_irsdk::Header;
 /// Direct connection to iRacing shared memory
 #[derive(Debug)]
 pub struct Connection {
-    source: LiveSource,
+    source: Source,
 
     last_tick_count: i32,
 }
@@ -44,10 +43,10 @@ impl Connection {
     /// Returns an error when opening the mapping/event fails or the mapped
     /// extent cannot hold the complete fixed SDK header.
     pub fn try_connect() -> Result<Self> {
-        Self::from_source(LiveSource::try_connect()?)
+        Self::from_source(Source::try_connect()?)
     }
 
-    fn from_source(source: LiveSource) -> Result<Self> {
+    fn from_source(source: Source) -> Result<Self> {
         if source.len() < size_of::<Header>() {
             return Err(IRacingSDKError::parse_error(
                 "Header",
@@ -150,7 +149,7 @@ impl Connection {
 
     fn acquire_frame(
         &mut self,
-        mut after_copy: impl FnMut(&LiveSource, usize),
+        mut after_copy: impl FnMut(&Source, usize),
     ) -> Result<Option<LiveFrameSnapshot>> {
         let invalid = || {
             IRacingSDKError::parse_error(
@@ -368,13 +367,13 @@ mod tests {
         let mut bytes = vec![0; len];
         bytes[..size_of::<Header>()].copy_from_slice(header.as_bytes());
         bytes[264..268].copy_from_slice(&[1, 2, 3, 4]);
-        Connection::from_source(LiveSource::test_source(&bytes)).unwrap()
+        Connection::from_source(Source::test_source(&bytes)).unwrap()
     }
 
     #[test]
     fn activation_rejects_truncated_headers() {
         for len in [1, offset_of!(Header, tick_rate), size_of::<Header>() - 1] {
-            assert!(Connection::from_source(LiveSource::test_source(&vec![0; len])).is_err());
+            assert!(Connection::from_source(Source::test_source(&vec![0; len])).is_err());
         }
     }
 

@@ -38,9 +38,7 @@
 
 mod broadcast;
 mod connection;
-mod source;
 
 pub use broadcast::Broadcast;
 pub use connection::{Connection, LiveFrameSnapshot};
 pub use iracing_broadcast_sdk::Command as BroadcastCommand;
-pub use source::WaitResult;

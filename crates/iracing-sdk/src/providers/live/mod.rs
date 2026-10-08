@@ -13,7 +13,7 @@ use crate::{
     FramePacket, IRacingSDKError, IRacingSessionString, LayoutProvider, Result, TelemetryLayout,
     WindowsConnection,
     provider::{Provider, SessionInformationBytesProvider, VariableHeadersProvider},
-    windows::WaitResult,
+    source::live::WaitResult,
 };
 
 const WAITING_LOG_INTERVAL: Duration = Duration::from_secs(10);
