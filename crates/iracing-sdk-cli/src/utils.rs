@@ -20,6 +20,14 @@ pub struct DiskTelemetry {
 }
 
 impl DiskTelemetry {
+    /// Open a completed IBT recording and validate its telemetry layout.
+    ///
+    /// The file must remain unmodified and untruncated while the reader is alive.
+    ///
+    /// # Errors
+    ///
+    /// Propagates file access, memory mapping, IBT parsing, variable header, and
+    /// telemetry layout validation errors.
     pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let reader = IbtReader::open(path)?;
         let frame_size = reader.frame_size();
@@ -32,6 +40,15 @@ impl DiskTelemetry {
         })
     }
 
+    /// Read the zero-based IBT frame without advancing a replay cursor.
+    ///
+    /// The returned packet owns its bytes and uses `index` as its tick counter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `index` is outside the recording, the frame cannot be
+    /// read, `index` or the session update counter cannot fit in `u32`, or the
+    /// frame size does not match the retained layout.
     pub(crate) fn frame_at(&self, index: usize) -> Result<FramePacket> {
         let data = self.reader.frame(index)?;
 
@@ -52,6 +69,14 @@ pub struct LiveTelemetry {
 
 #[cfg(windows)]
 impl LiveTelemetry {
+    /// Open live shared memory and validate its telemetry layout without waiting
+    /// for the simulator to become connected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if telemetry is not connected. Propagates shared-memory
+    /// setup, header access, frame-size conversion, variable header, and layout
+    /// validation errors.
     pub(crate) fn try_connect() -> Result<Self> {
         let connection = match WindowsConnection::try_connect() {
             Ok(c) if c.is_connected() => c,
@@ -73,6 +98,17 @@ impl LiveTelemetry {
         })
     }
 
+    /// Block until a new live frame can be returned with the retained layout.
+    ///
+    /// The first observed tick establishes a baseline without yielding a frame.
+    /// Waits retry after each 500 ms timeout, including while disconnected;
+    /// there is no overall timeout.
+    ///
+    /// # Errors
+    ///
+    /// Propagates acquisition and wait errors. Also returns an error if the tick
+    /// or session update counter cannot fit in `u32`, or the frame size differs
+    /// from the retained layout.
     pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
         loop {
             if let Some(frame) = self.connection.get_new_data()? {

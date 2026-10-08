@@ -27,6 +27,17 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Write and flush one IBT frame or the next live frame in the selected format.
+    ///
+    /// The IBT index is zero-based. Live capture blocks without an overall timeout
+    /// and is available only on Windows. File output is created or truncated
+    /// before opening the source, even if capture later fails.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source setup, layout validation, frame acquisition, counter
+    /// conversion, telemetry decoding, serialization, and output errors,
+    /// including an out-of-range IBT index or disconnected live source at setup.
     pub(crate) fn run(&self) -> Result<()> {
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
 
