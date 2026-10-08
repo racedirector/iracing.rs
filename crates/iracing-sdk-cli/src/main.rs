@@ -9,13 +9,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
-use headers::Args as HeadersArgs;
-#[cfg(windows)]
-use iracing_broadcast_cli::Command as BroadcastCommand;
-use session::Command as SessionCommand;
-use telemetry::Command as TelemetryCommand;
-use variables::Args as VariablesArgs;
-
 #[derive(Parser)]
 #[command(name = "iracing-sdk", version, about = "iRacing SDK tools", long_about = None, arg_required_else_help = true)]
 struct Cli {
@@ -26,24 +19,24 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Tools for interacting with disk and live headers, as well as the type schema and layout.
-    Headers(HeadersArgs),
+    Headers(headers::Args),
     /// Tools for interacting with disk and live session strings, as well as type schemas.
     Session {
         #[command(subcommand)]
-        command: SessionCommand,
+        command: session::Command,
     },
     /// Tools for interacting with disk and live variables.
-    Variables(VariablesArgs),
+    Variables(variables::Args),
     /// Tools for capturing telemetry from a source.
     Telemetry {
         #[command(subcommand)]
-        command: TelemetryCommand,
+        command: telemetry::Command,
     },
     /// Tools for sending broadcast commands to the simulator.
     #[cfg(windows)]
     Broadcast {
         #[command(subcommand)]
-        command: BroadcastCommand,
+        command: iracing_broadcast_cli::Command,
     },
 }
 

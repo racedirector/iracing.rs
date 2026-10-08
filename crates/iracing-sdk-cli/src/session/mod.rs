@@ -4,18 +4,14 @@ mod snapshot;
 
 use anyhow::Result;
 
-use discover::Args as DiscoverArgs;
-use schema::Args as SchemaArgs;
-use snapshot::Args as SnapshotArgs;
-
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     /// Captures JSON schema of a session string.
-    Schema(SchemaArgs),
+    Schema(schema::Args),
     /// Discovers schema additions of a session string.
-    Discover(DiscoverArgs),
+    Discover(discover::Args),
     /// Captures a snapshot of the latest session string.
-    Snapshot(SnapshotArgs),
+    Snapshot(snapshot::Args),
 }
 
 impl Command {

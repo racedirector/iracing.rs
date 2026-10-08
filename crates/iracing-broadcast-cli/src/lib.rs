@@ -5,52 +5,47 @@ use anyhow::Result;
 use clap::Subcommand;
 use iracing_broadcast_sdk::Command as BroadcastCommand;
 
-use crate::commands::{
-    CameraCommand, ChatCommand, ForceFeedbackCommand, PitCommand, ReplayCommand, TelemetryCommand,
-    TextureCommand, VideoCommand,
-};
-
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
     /// Manipulate the camera
     Camera {
         #[command(subcommand)]
-        command: CameraCommand,
+        command: commands::CameraCommand,
     },
     /// Modify the replay state
     Replay {
         #[command(subcommand)]
-        command: ReplayCommand,
+        command: commands::ReplayCommand,
     },
     /// Chat commands
     Chat {
         #[command(subcommand)]
-        command: ChatCommand,
+        command: commands::ChatCommand,
     },
     /// Pit service commands
     Pit {
         #[command(subcommand)]
-        command: PitCommand,
+        command: commands::PitCommand,
     },
     /// In-sim car textures
     Textures {
         #[command(subcommand)]
-        command: TextureCommand,
+        command: commands::TextureCommand,
     },
     /// Modify the disk-telemetry state
     Telemetry {
         #[command(subcommand)]
-        command: TelemetryCommand,
+        command: commands::TelemetryCommand,
     },
     /// Modify FFB
     Ffb {
         #[command(subcommand)]
-        command: ForceFeedbackCommand,
+        command: commands::ForceFeedbackCommand,
     },
     /// Video and screen capture utilities
     Video {
         #[command(subcommand)]
-        command: VideoCommand,
+        command: commands::VideoCommand,
     },
 }
 
