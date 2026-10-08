@@ -1104,18 +1104,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iracing-lifecycle-monitor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "iracing-sdk",
- "iracing-simulation",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "iracing-sdk"
 version = "0.1.0"
 dependencies = [
