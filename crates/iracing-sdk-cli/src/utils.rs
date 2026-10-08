@@ -11,8 +11,10 @@ use iracing_sdk::{
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
+
+#[cfg(windows)]
+use std::time::Duration;
 
 pub struct DiskTelemetry {
     pub reader: IbtReader,
@@ -101,16 +103,19 @@ impl LiveTelemetry {
     /// Block until a new live frame can be returned with the retained layout.
     ///
     /// The first observed tick establishes a baseline without yielding a frame.
-    /// Waits retry after each 500 ms timeout, including while disconnected;
-    /// there is no overall timeout.
+    /// Waits retry after each 500 ms timeout while connected; there is no overall
+    /// timeout. A disconnect ends capture with an error.
     ///
     /// # Errors
     ///
-    /// Propagates acquisition and wait errors. Also returns an error if the tick
-    /// or session update counter cannot fit in `u32`, or the frame size differs
-    /// from the retained layout.
+    /// Returns an error if the source disconnects. Propagates acquisition and
+    /// wait errors. Also returns an error if the tick or session update counter
+    /// cannot fit in `u32`, or the frame size differs from the retained layout.
     pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
         loop {
+            if !self.connection.is_connected() {
+                anyhow::bail!("Live telemetry disconnected before a frame was available");
+            }
             if let Some(frame) = self.connection.get_new_data()? {
                 return Ok(FramePacket::new(
                     frame.data,

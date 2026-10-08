@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use iracing_sdk::LayoutProvider;
 
 use crate::{
@@ -8,10 +8,19 @@ use crate::{
 
 #[derive(clap::Args, Debug)]
 struct IbtExtraArgs {
-    #[arg(long = "index", short = 'i', default_value = "0", global = true)]
+    /// Zero-based frame index in the IBT recording.
+    #[arg(long = "index", short = 'i', default_value = "0")]
     pub frame_index: usize,
 }
 
+/// Capture one telemetry frame; live capture is available only on Windows.
+///
+/// ```text
+/// iracing-sdk telemetry snapshot live --output telemetry.json --format json
+/// iracing-sdk telemetry snapshot live --output telemetry.yaml
+/// iracing-sdk telemetry snapshot ibt --path ./test-data/ibt/profile_small.ibt --output telemetry.yaml
+/// iracing-sdk telemetry snapshot ibt --path ./test-data/ibt/profile_small.ibt --index 11 --format json
+/// ```
 #[derive(clap::Args, Debug)]
 pub(crate) struct Args {
     #[command(subcommand)]
@@ -31,16 +40,15 @@ impl Args {
     ///
     /// The IBT index is zero-based. Live capture blocks without an overall timeout
     /// and is available only on Windows. File output is created or truncated
-    /// before opening the source, even if capture later fails.
+    /// only after the frame has been acquired and decoded.
     ///
     /// # Errors
     ///
     /// Propagates source setup, layout validation, frame acquisition, counter
     /// conversion, telemetry decoding, serialization, and output errors,
-    /// including an out-of-range IBT index or disconnected live source at setup.
+    /// including an out-of-range IBT index or a live source disconnecting before
+    /// a frame arrives.
     pub(crate) fn run(&self) -> Result<()> {
-        let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
-
         let packet = match &self.source {
             SourceKind::Ibt { extra } => {
                 let telemetry = DiskTelemetry::open(&extra.path)?;
@@ -54,8 +62,19 @@ impl Args {
             }
         }?;
 
-        let fields_owned = packet.fields_owned();
+        let mut fields_owned = packet.fields_owned();
+        ensure!(
+            !fields_owned.is_empty(),
+            "No telemetry variables were available from the source"
+        );
+        fields_owned.sort_unstable_by(|left, right| {
+            left.region()
+                .offset()
+                .cmp(&right.region().offset())
+                .then_with(|| left.name().cmp(right.name()))
+        });
         let snapshot = TelemetrySnapshot::from_provider(&packet, &fields_owned)?;
+        let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
         writer.write(&snapshot)?;
 
         writer.finalize()

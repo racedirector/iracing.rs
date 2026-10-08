@@ -12,32 +12,7 @@ use snapshot::Args as SnapshotArgs;
 
 use crate::writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter};
 
-/// ```no-run
-/// // Convert the ibt file to csv at output
-/// telemetry convert --path ./test-data/ibt/b_mustang_bristol_race.ibt --output telemetry.csv
-///
-/// // Convert the ibt file to JSONL at output
-/// telemetry convert --path ./test-data/ibt/b_mustang_bristol_race.ibt --output telemetry.jsonl --format jsonl
-///
-/// // Record live telemetry to csv at output
-/// telemetry record --output telemetry.csv
-///
-/// // Record live telemetry to JSONL at output
-/// telemetry record --output telemetry.jsonl --format jsonl
-///
-/// // Snapshot the next frame to output in JSON
-/// telemetry snapshot --output telemetry.json --format json
-///
-/// // Snapshot the next frame to output in YAML
-/// telemetry snapshot --output telemetry.yaml
-///
-/// // Snapshot the first frame from input to output
-/// telemetry snapshot --path ./test-data/ibt/b_mustang_bristol_race.ibt --output telemetry.yaml
-///
-/// // Snapshot frame 1000 from input to output
-/// telemetry snapshot --path ./test-data/ibt/b_mustang_bristol_race.ibt --output telemetry.yaml --index 1000
-/// ```
-
+/// Export recorded telemetry, record live telemetry, or capture a single frame.
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
     /// Converts an IBT to CSV or JSONL
