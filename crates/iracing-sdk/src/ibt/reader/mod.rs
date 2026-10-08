@@ -10,7 +10,7 @@
 //!
 //! fn read_frames() -> iracing_sdk::Result<()> {
 //!     // Open IBT file
-//!     let mut reader = IbtReader::open("telemetry.ibt")?;
+//!     let reader = IbtReader::open("telemetry.ibt")?;
 //!     println!("File contains {} frames", reader.layout().frame_count());
 //!
 //!     for index in 0..reader.layout().frame_count() {
@@ -34,7 +34,7 @@ use crate::{
     source::ibt::Source,
 };
 use memmap2::Mmap;
-use std::{fs::File, path::Path};
+use std::{fs::File, ops::Range, path::Path};
 
 use iracing_irsdk::{DiskSubHeader, Header, IbtHeader};
 
@@ -50,6 +50,72 @@ pub struct IbtReader {
     header: IbtHeader,
     layout: IbtLayout,
 }
+
+/// One owned recorded frame with its zero-based file coordinate.
+///
+/// The index identifies a physical record in this recording, not a live SDK
+/// tick or the compatibility synthetic tick in `FramePacket`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedFrame {
+    index: usize,
+    bytes: Vec<u8>,
+}
+
+impl RecordedFrame {
+    /// Returns the zero-based record index within the recording.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// Returns the raw telemetry bytes, without a schema or session cache.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Consumes this frame and returns its owned telemetry bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+/// Demand-driven traversal of a validated half-open recorded frame range.
+///
+/// Each call to `next` reads at most one frame through `IbtLayout`. The reader
+/// remains cursor-free; multiple ranges and direct reads are independent.
+/// A read error is yielded for its index and traversal proceeds to the next
+/// index. The iterator ends permanently at the exclusive bound.
+pub struct IbtFrames<'a> {
+    reader: &'a IbtReader,
+    remaining: Range<usize>,
+}
+
+impl std::fmt::Debug for IbtFrames<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IbtFrames")
+            .field("remaining", &self.remaining)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Iterator for IbtFrames<'_> {
+    type Item = Result<RecordedFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.remaining.next()?;
+        Some(
+            self.reader
+                .frame(index)
+                .map(|bytes| RecordedFrame { index, bytes }),
+        )
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.remaining.size_hint()
+    }
+}
+
+impl ExactSizeIterator for IbtFrames<'_> {}
+impl std::iter::FusedIterator for IbtFrames<'_> {}
 
 impl IbtReader {
     /// Open and parse an immutable `.ibt` recording using a read-only memory map.
@@ -155,6 +221,11 @@ impl IbtReader {
 
     /// Reads exactly one indexed frame, regardless of prior source reads.
     ///
+    /// `index` is a zero-based physical record coordinate within this recording,
+    /// not a byte offset or a live SDK tick. It must be less than
+    /// [`Self::frame_count`]. Addressing delegates to [`IbtLayout::frame`] and
+    /// uses O(1) addressing and never changes replay state.
+    ///
     /// # Errors
     /// Returns an error if `index` is out of range or the complete frame cannot be read.
     pub fn frame(&self, index: usize) -> Result<Vec<u8>> {
@@ -169,6 +240,46 @@ impl IbtReader {
         };
 
         Ok(bytes.into())
+    }
+
+    /// Traverses a half-open range of zero-based recorded frame indices.
+    ///
+    /// Coordinates are `usize`, matching [`Self::frame_count`] and the physical
+    /// layout; they are not byte offsets or live SDK ticks. The end is clamped to
+    /// `frame_count`; the start must not exceed the end or `frame_count`.
+    /// Empty ranges, including the range at EOF,
+    /// are allowed. Validation is O(1) and reads no source bytes. Each iterator
+    /// item allocates only its requested frame, and no replay state is changed.
+    ///
+    /// ```no_run
+    /// # use iracing_sdk::ibt::IbtReader;
+    /// # fn inspect() -> iracing_sdk::Result<()> {
+    /// let reader = IbtReader::open("telemetry.ibt")?;
+    /// for frame in reader.frames(0..reader.frame_count())? {
+    ///     let frame = frame?;
+    ///     println!("record {}: {} bytes", frame.index(), frame.bytes().len());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a parse error before source access for reversed ranges or starts
+    /// beyond the recording. Frame read failures are returned by the iterator.
+    pub fn frames(&self, range: Range<usize>) -> Result<IbtFrames<'_>> {
+        if range.start > range.end || range.start > self.frame_count() {
+            return Err(IRacingSDKError::parse_error(
+                "IbtReader::frames",
+                format!(
+                    "Invalid frame range {range:?} for {} frames",
+                    self.frame_count()
+                ),
+            ));
+        }
+        Ok(IbtFrames {
+            reader: self,
+            remaining: range.start..range.end.min(self.frame_count()),
+        })
     }
 
     /// Get disk metadata from the disk sub-header
@@ -266,6 +377,79 @@ mod tests {
             assert_eq!(reader.frame(0)?, first);
             assert_eq!(reader.frame(last_index)?, last);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn ranges_are_bounded_independent_and_preserve_record_identity() -> Result<()> {
+        for reader in [
+            IbtReader::open(fixture_path()?)?,
+            IbtReader::from_bytes(fixture_bytes()?)?,
+        ] {
+            let count = reader.frame_count();
+            assert!(count >= 3);
+            for range in [0..0, count..count, 0..1, 1..3, count - 1..count] {
+                let mut frames = reader.frames(range.clone())?;
+                assert_eq!(frames.len(), range.len());
+                for index in range {
+                    let frame = frames.next().context("expected frame")??;
+                    assert_eq!(frame.index(), index);
+                    assert_eq!(frame.bytes(), reader.frame(index)?);
+                    assert_eq!(frame.clone().into_bytes(), reader.frame(index)?);
+                }
+                assert_eq!(frames.len(), 0);
+                assert!(frames.next().is_none());
+                assert!(frames.next().is_none());
+            }
+            for end in [count + 1, usize::MAX] {
+                let frames = reader.frames(count - 1..end)?;
+                assert_eq!(frames.len(), 1);
+                let frames = frames.collect::<crate::Result<Vec<_>>>()?;
+                assert_eq!(frames[0].index(), count - 1);
+                assert_eq!(frames[0].bytes(), reader.frame(count - 1)?);
+                assert!(reader.frames(count..end)?.next().is_none());
+            }
+            let mut first = reader.frames(0..2)?;
+            let mut second = reader.frames(count - 1..count)?;
+            assert_eq!(first.next().unwrap()?.index(), 0);
+            assert_eq!(second.next().unwrap()?.index(), count - 1);
+            assert_eq!(first.next().unwrap()?.index(), 1);
+            for range in [Range { start: 2, end: 1 }, count + 1..count + 1] {
+                assert!(reader.frames(range).is_err());
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ranges_validate_before_source_access_and_read_only_on_demand() -> Result<()> {
+        let mut reader = IbtReader::from_bytes(fixture_bytes()?)?;
+        let count = reader.frame_count();
+        let first_end = reader.layout().frame(0)?.end();
+        reader.owned_bytes_mut().truncate(first_end);
+        assert_eq!(reader.frames(0..count + 1)?.len(), count);
+        assert!(reader.frames(count + 1..usize::MAX).is_err());
+        assert!(reader.frames(count..count)?.next().is_none());
+        let mut frames = reader.frames(0..count)?;
+        assert!(frames.next().unwrap().is_ok());
+        assert!(frames.next().unwrap().is_err());
+        assert_eq!(reader.frame(0)?.len(), reader.frame_size());
+        Ok(())
+    }
+
+    #[test]
+    fn empty_recording_allows_only_empty_range() -> Result<()> {
+        let original = fixture_bytes()?;
+        let end = IbtReader::from_bytes(original.clone())?
+            .layout()
+            .frame_data_start();
+        let reader = IbtReader::from_bytes(original[..end].to_vec())?;
+        assert_eq!(reader.frame_count(), 0);
+        assert!(reader.frames(0..0)?.next().is_none());
+        assert!(reader.frames(0..1)?.next().is_none());
+        assert!(reader.frames(0..usize::MAX)?.next().is_none());
+        assert!(reader.frames(1..usize::MAX).is_err());
+        assert!(reader.frame(0).is_err());
         Ok(())
     }
 

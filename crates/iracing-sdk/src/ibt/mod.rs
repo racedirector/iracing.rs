@@ -5,7 +5,7 @@
 
 pub mod reader;
 
-pub use reader::IbtReader;
+pub use reader::{IbtFrames, IbtReader, RecordedFrame};
 
 #[cfg(test)]
 mod tests;
