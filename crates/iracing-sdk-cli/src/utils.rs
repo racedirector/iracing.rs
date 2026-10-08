@@ -50,6 +50,7 @@ pub struct LiveTelemetry {
     // pub layout: Arc<TelemetryLayout>,
 }
 
+#[cfg(windows)]
 impl LiveTelemetry {
     pub(crate) fn try_connect() -> Result<Self> {
         let connection = match WindowsConnection::try_connect() {
@@ -133,11 +134,10 @@ where
 }
 
 #[derive(Subcommand, Debug)]
-pub(crate) enum SourceKind<IbtExtra = NoArgs, LiveExtra = NoArgs>
-where
-    IbtExtra: clap::Args,
-    LiveExtra: clap::Args,
-{
+pub(crate) enum SourceKind<
+    IbtExtra: clap::Args = NoArgs,
+    #[cfg(windows)] LiveExtra: clap::Args = NoArgs,
+> {
     Ibt {
         #[command(flatten)]
         extra: IbtArgs<IbtExtra>,
