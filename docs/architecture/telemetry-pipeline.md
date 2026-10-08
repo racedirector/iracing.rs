@@ -41,6 +41,17 @@ recordings: no process may modify or truncate the file until the reader (or
 owning provider/connection) is dropped. Use `from_bytes` with an owned copy when
 that lifetime requirement cannot be met.
 
+`IbtReader::frames(start..end)` rejects reversed ranges and starts beyond `frame_count`
+before source access, and clamps the exclusive end to `frame_count` and returns a bounded pull iterator. Empty ranges (including EOF)
+are valid. Each item reads one frame through `IbtLayout` and returns a
+`RecordedFrame` containing its `usize` index and owned bytes. Independent ranges
+and direct reads do not share traversal state. A failed item advances the range
+iterator by one coordinate; its bytes can be retried with `frame(index)`.
+Recorded coordinates identify physical records, not live SDK ticks; provider
+synthetic ticks remain compatibility behavior. `usize` preserves existing frame
+and layout APIs and ordinary Rust range syntax. A future replay adapter can own
+its cursor over this reader without taking ownership of frame geometry.
+
 `frame(index)`, `session_info_snapshot()`, and
 `VariableHeadersProvider::variable_headers()` access validated byte ranges directly
 through `IbtSource` and return owned data on each call. Both mapped and owned
