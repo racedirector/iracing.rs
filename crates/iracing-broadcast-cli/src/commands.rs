@@ -121,9 +121,9 @@ impl From<ReplayCommand> for BroadcastCommand {
             ReplayCommand::SetPlaySpeed { speed, slow_motion } => {
                 BroadcastCommand::ReplaySetPlaySpeed(speed, slow_motion)
             }
-            ReplayCommand::Search { mode } => BroadcastCommand::ReplaySearch(mode.into()),
+            ReplayCommand::Search { mode } => BroadcastCommand::ReplaySearch(mode),
             ReplayCommand::SetPlayPosition { mode, frame } => {
-                BroadcastCommand::ReplaySetPlayPosition(mode.into(), frame)
+                BroadcastCommand::ReplaySetPlayPosition(mode, frame)
             }
             ReplayCommand::Erase => BroadcastCommand::ReplaySetState(ReplayStateMode::EraseTape),
             ReplayCommand::SearchSessionTime { session, time_ms } => {

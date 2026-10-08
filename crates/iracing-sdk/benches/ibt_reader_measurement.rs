@@ -129,7 +129,7 @@ fn measure(
     PEAK_BYTES.store(before, Ordering::SeqCst);
     TRACK_PEAK.store(true, Ordering::SeqCst);
     let open_started = Instant::now();
-    let mut reader = open()?;
+    let reader = open()?;
     let open_time = open_started.elapsed();
     TRACK_PEAK.store(false, Ordering::SeqCst);
     let retained_heap = LIVE_BYTES.load(Ordering::SeqCst).saturating_sub(before);

@@ -2,7 +2,7 @@ use crate::{
     utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
-use anyhow::{Result, bail};
+use anyhow::{Context, Result};
 use iracing_sdk::provider::SessionInformationProvider;
 use schemars::schema_for_value;
 
@@ -22,13 +22,12 @@ pub(crate) struct Args {
 
 impl Args {
     pub(crate) fn run(self) -> Result<()> {
-        let provider = self.source.open()?;
-
-        let Some(session_info) = provider.session_info()? else {
-            bail!("Could not retrieve session info")
-        };
-
-        let schema = schema_for_value!(session_info);
+        let schema = self
+            .source
+            .open()?
+            .session_info()?
+            .map(|info| schema_for_value!(info))
+            .context("No session info found")?;
 
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
         writer.write(&schema)?;

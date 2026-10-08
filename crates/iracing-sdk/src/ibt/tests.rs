@@ -18,7 +18,7 @@ fn indexed_and_snapshot_reads_match_source_bytes() -> Result<()> {
     for fixture in load_fixture_manifest()?.fixtures {
         let path = fixture.fixture_path()?;
         let bytes = fs::read(&path)?;
-        for mut reader in [
+        for reader in [
             IbtReader::open(&path)?,
             IbtReader::from_bytes(bytes.clone())?,
         ] {
@@ -187,7 +187,7 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     file.write_all(changed_header.as_bytes())?;
     file.flush()?;
     drop(file);
-    let mut reader = IbtReader::open(&path)?;
+    let reader = IbtReader::open(&path)?;
 
     assert!(
         crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?

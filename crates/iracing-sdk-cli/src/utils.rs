@@ -4,49 +4,53 @@ use clap::Subcommand;
 #[cfg(windows)]
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{
+    // FramePacket, TelemetryLayout,
     ibt::IbtReader,
-    provider::{SessionInformationBytesProvider, VariableHeadersProvider},
+    provider::{SessionInformationProvider, VariableHeadersProvider},
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    // sync::Arc,
+    // time::Duration,
+};
 
-#[derive(Subcommand, Debug)]
-pub(crate) enum SourceKind {
-    Ibt {
-        /// The path of the IBT
-        #[arg(short, long)]
-        path: PathBuf,
-    },
-    #[cfg(windows)]
-    Live,
+pub struct DiskTelemetry {
+    pub reader: IbtReader,
+    // pub layout: Arc<TelemetryLayout>,
 }
 
-impl SourceKind {
-    pub(crate) fn open(self) -> Result<TelemetrySource> {
-        match self {
-            Self::Ibt { path } => TelemetrySource::open(path),
-            #[cfg(windows)]
-            Self::Live => TelemetrySource::try_connect(),
-        }
-    }
-}
-
-// pub(crate) enum TelemetryFrameRequest {
-//     Next,
-//     Index(usize),
-// }
-
-pub(crate) enum TelemetrySource {
-    #[cfg(windows)]
-    Live(WindowsConnection),
-    Disk(IbtReader),
-}
-
-impl TelemetrySource {
+impl DiskTelemetry {
     pub(crate) fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Ok(TelemetrySource::Disk(IbtReader::open(path)?))
+        let reader = IbtReader::open(path)?;
+        // let frame_size = reader.frame_size();
+        // let headers = reader.variable_headers()?;
+        // let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
+
+        Ok(Self {
+            reader,
+            // layout: Arc::new(layout),
+        })
     }
 
-    #[cfg(windows)]
+    // pub(crate) fn frame_at(&self, index: usize) -> Result<FramePacket> {
+    //     let data = self.reader.frame(index)?;
+
+    //     Ok(FramePacket::new(
+    //         data,
+    //         u32::try_from(index)?,
+    //         u32::try_from(self.reader.header().session_info_update)?,
+    //         Arc::clone(&self.layout),
+    //     )?)
+    // }
+}
+
+#[cfg(windows)]
+pub struct LiveTelemetry {
+    pub connection: WindowsConnection,
+    // pub layout: Arc<TelemetryLayout>,
+}
+
+impl LiveTelemetry {
     pub(crate) fn try_connect() -> Result<Self> {
         let connection = match WindowsConnection::try_connect() {
             Ok(c) if c.is_connected() => c,
@@ -58,57 +62,46 @@ impl TelemetrySource {
             Err(e) => return Err(anyhow::anyhow!(e)),
         };
 
-        Ok(TelemetrySource::Live(connection))
+        // let frame_size = usize::try_from(connection.header_snapshot()?.buffer_length)?;
+        // let headers = connection.variable_headers()?;
+        // let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
+
+        Ok(Self {
+            connection,
+            // layout: Arc::new(layout),
+        })
     }
 
-    // /// Returns an owned byte-snapshot for a frame request.
-    // pub(crate) fn frame(self, request: TelemetryFrameRequest) -> Result<Vec<u8>> {
-    //     match self {
-    //         #[cfg(windows)]
-    //         Self::Live(mut connection) => {
-    //             let Some(data) = connection.get_new_data()? else {
-    //                 return Err(anyhow::anyhow!("Could not retrieve live frame snapshot"));
-    //             };
-
-    //             Ok(data.data)
+    // pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
+    //     loop {
+    //         if let Some(frame) = self.connection.get_new_data()? {
+    //             return Ok(FramePacket::new(
+    //                 frame.data,
+    //                 u32::try_from(frame.tick)?,
+    //                 u32::try_from(frame.session_info_update)?,
+    //                 Arc::clone(&self.layout),
+    //             )?);
     //         }
-    //         Self::Disk(mut reader) => {
-    //             let data = match request {
-    //                 TelemetryFrameRequest::Index(index) => reader.frame(index)?,
-    //                 TelemetryFrameRequest::Next => reader.frame(0)?,
-    //             };
 
-    //             Ok(data)
-    //         }
-    //     }
-    // }
-
-    // pub(crate) fn to_provider(self) -> Result<TelemetryProvider> {
-    //     match self {
-    //         #[cfg(windows)]
-    //         Self::Live(connection) => {
-    //             let provider = LiveProvider::builder()
-    //                 .with_connection(connection)
-    //                 .build()
-    //                 .map_err(|e| anyhow::anyhow!(e))?;
-
-    //             Ok(TelemetryProvider::Live(provider))
-    //         }
-    //         Self::Disk(reader) => {
-    //             let provider = IbtProvider::from_reader(reader)?;
-
-    //             Ok(TelemetryProvider::Disk(provider))
-    //         }
+    //         // Wait up to 500ms for an update
+    //         self.connection
+    //             .wait_for_update(Duration::from_millis(500))?;
     //     }
     // }
 }
 
-impl SessionInformationBytesProvider for TelemetrySource {
-    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
+pub(crate) enum TelemetrySource {
+    Disk(Box<DiskTelemetry>),
+    #[cfg(windows)]
+    Live(LiveTelemetry),
+}
+
+impl SessionInformationProvider for TelemetrySource {
+    fn session_info(&self) -> iracing_sdk::Result<Option<iracing_sdk::schema::SessionInfo>> {
         match self {
-            Self::Disk(reader) => reader.session_info_snapshot(),
+            Self::Disk(telemetry) => telemetry.reader.session_info(),
             #[cfg(windows)]
-            Self::Live(connection) => connection.session_info_snapshot(),
+            Self::Live(telemetry) => telemetry.connection.session_info(),
         }
     }
 }
@@ -116,42 +109,55 @@ impl SessionInformationBytesProvider for TelemetrySource {
 impl VariableHeadersProvider for TelemetrySource {
     fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
         match self {
-            Self::Disk(reader) => reader.variable_headers(),
+            Self::Disk(telemetry) => telemetry.reader.variable_headers(),
             #[cfg(windows)]
-            Self::Live(connection) => connection.variable_headers(),
+            Self::Live(telemetry) => telemetry.connection.variable_headers(),
         }
     }
 }
 
-// pub(crate) enum TelemetryProvider {
-//     #[cfg(windows)]
-//     Live(LiveProvider),
-//     Disk(IbtProvider),
-// }
+#[derive(clap::Args, Debug, Default)]
+pub(crate) struct NoArgs {}
 
-// impl TelemetryProvider {
-//     pub(crate) async fn to_connection(self) -> Result<TelemetryConnection> {
-//         match self {
-//             Self::Disk(provider) => {
-//                 let connection = IbtConnection::builder()
-//                     .with_provider(provider)
-//                     .build()
-//                     .await?;
+#[derive(clap::Args, Debug)]
+pub(crate) struct IbtArgs<Extra = NoArgs>
+where
+    Extra: clap::Args,
+{
+    /// The path of the IBT
+    #[arg(short, long)]
+    pub path: PathBuf,
 
-//                 Ok(TelemetryConnection::Disk(connection))
-//             }
-//             #[cfg(windows)]
-//             Self::Live(provider) => {
-//                 let connection = LiveConnection::builder().with_provider(provider).build()?;
+    #[command(flatten)]
+    pub extra: Extra,
+}
 
-//                 Ok(TelemetryConnection::Live(connection))
-//             }
-//         }
-//     }
-// }
+#[derive(Subcommand, Debug)]
+pub(crate) enum SourceKind<IbtExtra = NoArgs, LiveExtra = NoArgs>
+where
+    IbtExtra: clap::Args,
+    LiveExtra: clap::Args,
+{
+    Ibt {
+        #[command(flatten)]
+        extra: IbtArgs<IbtExtra>,
+    },
 
-// pub(crate) enum TelemetryConnection {
-//     #[cfg(windows)]
-//     Live(LiveConnection),
-//     Disk(IbtConnection),
-// }
+    #[cfg(windows)]
+    Live {
+        #[command(flatten)]
+        extra: LiveExtra,
+    },
+}
+
+impl SourceKind {
+    pub(crate) fn open(&self) -> Result<TelemetrySource> {
+        match self {
+            Self::Ibt { extra } => Ok(TelemetrySource::Disk(Box::new(DiskTelemetry::open(
+                &extra.path,
+            )?))),
+            #[cfg(windows)]
+            Self::Live { .. } => Ok(TelemetrySource::Live(LiveTelemetry::try_connect()?)),
+        }
+    }
+}

@@ -16,7 +16,7 @@ fn public_layout_describes_owned_and_mapped_recordings() -> anyhow::Result<()> {
     let mapped = IbtReader::open(&path)?;
     let owned = IbtReader::from_bytes(bytes.clone())?;
 
-    for mut reader in [mapped, owned] {
+    for reader in [mapped, owned] {
         // A probe uses the reader's layout without recomputing geometry from headers.
         let layout: IbtLayout = reader.layout().clone();
         assert_eq!(layout.source_len(), bytes.len());

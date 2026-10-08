@@ -145,8 +145,8 @@ mod tests {
         for fixture in load_fixture_manifest()?.fixtures {
             let path = fixture.fixture_path()?;
             let bytes = fs::read(&path)?;
-            let mut reference = IbtReader::from_bytes(bytes.clone())?;
-            let mut moved = IbtReader::open(&path)?;
+            let reference = IbtReader::from_bytes(bytes.clone())?;
+            let moved = IbtReader::open(&path)?;
             moved.frame(fixture.num_frames - 1)?;
             crate::provider::SessionInformationBytesProvider::session_info_snapshot(&moved)?;
             moved.variable_headers()?;
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn failed_read_does_not_advance_replay() -> anyhow::Result<()> {
         let bytes = fs::read(require_smallest_ibt_fixture()?)?;
-        let mut reader = IbtReader::from_bytes(bytes.clone())?;
+        let reader = IbtReader::from_bytes(bytes.clone())?;
         let expected = reader.frame(0)?;
         let start = reader.layout().frame_data_start();
         let mut provider = IbtProvider::from_reader(reader)?;

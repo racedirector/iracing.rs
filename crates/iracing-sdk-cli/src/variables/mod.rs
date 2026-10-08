@@ -22,8 +22,7 @@ pub(crate) struct Args {
 
 impl Args {
     pub(crate) fn run(self) -> Result<()> {
-        let provider = self.source.open()?;
-        let headers = provider.variable_headers()?;
+        let headers = self.source.open()?.variable_headers()?;
 
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
         writer.write(&headers)?;

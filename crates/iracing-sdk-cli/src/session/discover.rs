@@ -22,9 +22,9 @@ pub(crate) struct Args {
 
 impl Args {
     pub(crate) fn run(self) -> Result<()> {
-        let provider = self.source.open()?;
-
-        let unknown_fields = provider
+        let unknown_fields = self
+            .source
+            .open()?
             .session_info()?
             .map(|info| info.collect_unknown_fields())
             .unwrap_or(vec![]);

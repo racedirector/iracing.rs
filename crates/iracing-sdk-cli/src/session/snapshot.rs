@@ -21,9 +21,9 @@ pub(crate) struct Args {
 
 impl Args {
     pub(crate) fn run(self) -> Result<()> {
-        let provider = self.source.open()?;
-
-        let session_info = provider
+        let session_info = self
+            .source
+            .open()?
             .session_info()?
             .context("Session information is unavailable")?;
 

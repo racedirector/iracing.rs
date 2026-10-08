@@ -91,7 +91,7 @@ fn bench_sequential_replay(c: &mut Criterion) {
             |b, path| {
                 b.iter_batched(
                     || IbtReader::open(path).expect("fixture should open"),
-                    |mut reader| {
+                    |reader| {
                         for index in 0..reader.layout().frame_count() {
                             black_box(reader.frame(index).expect("fixture frame should read"));
                         }
@@ -215,7 +215,7 @@ fn bench_random_frame_read(c: &mut Criterion) {
             |b, (path, positions)| {
                 b.iter_batched(
                     || IbtReader::open(path).expect("fixture should open"),
-                    |mut reader| {
+                    |reader| {
                         for &position in positions {
                             black_box(
                                 reader

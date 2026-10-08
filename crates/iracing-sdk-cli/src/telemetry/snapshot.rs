@@ -92,7 +92,7 @@ impl Command {
                 format,
                 frame_index,
             } => {
-                let mut reader = IbtReader::open(path)?;
+                let reader = IbtReader::open(path)?;
 
                 use iracing_sdk::{FramePacket, LayoutProvider, TelemetryLayout};
                 use std::sync::Arc;

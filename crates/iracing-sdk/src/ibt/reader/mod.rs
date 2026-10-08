@@ -159,7 +159,7 @@ impl IbtReader {
     ///
     /// # Errors
     /// Returns an error if `index` is out of range or the complete frame cannot be read.
-    pub fn frame(&mut self, index: usize) -> Result<Vec<u8>> {
+    pub fn frame(&self, index: usize) -> Result<Vec<u8>> {
         let frame = self.layout.frame(index)?;
         let frame_range = frame.as_region().as_range();
 
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn indexed_reads_are_independent_of_metadata_and_invalid_indices() -> Result<()> {
-        for mut reader in [
+        for reader in [
             IbtReader::open(fixture_path()?)?,
             IbtReader::from_bytes(fixture_bytes()?)?,
         ] {
@@ -358,7 +358,7 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("drop.ibt");
         std::fs::copy(fixture_path()?, &path)?;
-        let mut reader = IbtReader::open(&path)?;
+        let reader = IbtReader::open(&path)?;
         let frame = reader.frame(0)?;
         drop(reader);
         // Windows disallows truncating a file with a live file mapping.
@@ -463,7 +463,7 @@ mod tests {
         for record_count in [-1, 0, 1, i32::MAX] {
             let mut bytes = original.clone();
             write_i32(&mut bytes, size_of::<Header>() + 28, record_count);
-            let mut reader = IbtReader::from_bytes(bytes)?;
+            let reader = IbtReader::from_bytes(bytes)?;
             assert_eq!(reader.layout().frame_count(), expected);
             assert_eq!(
                 reader.frame(expected - 1)?.len(),

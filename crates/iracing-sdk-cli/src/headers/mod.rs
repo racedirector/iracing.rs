@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::{
-    utils::{SourceKind, TelemetrySource},
+    utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
@@ -21,17 +21,20 @@ pub(crate) struct Args {
 
 impl Args {
     pub(crate) fn run(self) -> Result<()> {
-        let source = self.source.open()?;
-
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
-        match source {
-            TelemetrySource::Disk(reader) => {
-                writer.write(&reader.header())?;
-                writer.write(&reader.disk_header())?;
+
+        match self.source {
+            SourceKind::Ibt { extra } => {
+                let telemetry = DiskTelemetry::open(&extra.path)?;
+                writer.write(&telemetry.reader.header())?;
+                writer.write(&telemetry.reader.disk_header())?;
             }
             #[cfg(windows)]
-            TelemetrySource::Live(connection) => {
-                let header = connection.header_snapshot()?;
+            SourceKind::Live { .. } => {
+                use crate::utils::LiveTelemetry;
+
+                let telemetry = LiveTelemetry::try_connect()?;
+                let header = telemetry.connection.header_snapshot()?;
                 writer.write(&header)?;
             }
         }
