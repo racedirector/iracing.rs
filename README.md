@@ -101,6 +101,7 @@ Defined in `.cargo/config.toml` for convenience:
 
 ## Additional Resources
 
+- SDK CLI users should start with [`crates/iracing-sdk-cli/README.md`](crates/iracing-sdk-cli/README.md) and `cargo iracing-sdk --help`.
 - Broadcast CLI users should start with [`crates/iracing-broadcast-cli/README.md`](crates/iracing-broadcast-cli/README.md) and `cargo iracing-broadcast --help`.
 - Per-crate guidance lives alongside each package (`crates/*/AGENTS.md`). Start there for deep-dive development tips.
 - Inspect the consolidated telemetry commands with `cargo iracing-sdk --help` and each subcommand's `--help`.
