@@ -1,8 +1,8 @@
 //! Composition for the standalone `iracing-broadcast` executable.
 //!
 //! `main` creates this CLI-specific application and injects it into commands.
-//! Commands declare `BroadcastCommands`; this module adapts the concrete SDK
-//! client. No telemetry dependency is needed by this executable.
+//! Commands declare `BroadcastCommands`; this module lazily owns the shared
+//! `BroadcastClient` adapter. No telemetry dependency is needed by this executable.
 //!
 //! Construction is inert. The first dispatch initializes the client and caches
 //! success for the application's lifetime. Initialization failures leave the slot
@@ -11,7 +11,7 @@
 //! The non-Windows adapter reports unsupported dispatch without Win32 setup.
 
 use anyhow::Result;
-use iracing_broadcast_cli::BroadcastCommands;
+use iracing_broadcast_cli::{BroadcastClient, BroadcastCommands};
 use iracing_broadcast_sdk::Command;
 
 // Private factory/resource parameters let tests count initialization without Win32.
@@ -43,40 +43,6 @@ impl<B: BroadcastCommands, F: FnMut() -> Result<B>> BroadcastCommands for Applic
             slot @ None => slot.insert((self.initialize_broadcast)()?),
         };
         client.send_broadcast(command)
-    }
-}
-
-pub(crate) struct BroadcastClient {
-    #[cfg(windows)]
-    client: iracing_broadcast_sdk::Client,
-}
-
-impl BroadcastClient {
-    fn new() -> Result<Self> {
-        #[cfg(windows)]
-        {
-            Ok(Self {
-                client: iracing_broadcast_sdk::Client::new()?,
-            })
-        }
-        #[cfg(not(windows))]
-        {
-            anyhow::bail!("Broadcast commands only run on windows")
-        }
-    }
-}
-
-impl BroadcastCommands for BroadcastClient {
-    fn send_broadcast(&mut self, command: Command) -> Result<()> {
-        #[cfg(windows)]
-        {
-            Ok(self.client.send_message(command)?)
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = command;
-            anyhow::bail!("Broadcast commands only run on windows")
-        }
     }
 }
 
@@ -166,7 +132,7 @@ mod tests {
                 .send_broadcast(Command::ReloadAllTextures)
                 .unwrap_err()
                 .to_string()
-                .contains("only run on windows")
+                .contains("only run on Windows")
         );
     }
 }

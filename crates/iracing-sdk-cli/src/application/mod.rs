@@ -23,7 +23,7 @@ mod live;
 
 use crate::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
 use anyhow::Result;
-use iracing_broadcast_cli::BroadcastCommands;
+use iracing_broadcast_cli::{BroadcastClient, BroadcastCommands};
 use iracing_broadcast_sdk::Command;
 use iracing_irsdk::Header;
 use iracing_sdk::{FieldLayout, FramePacket, VariableHeaders, schema::SessionInfo};
@@ -104,40 +104,6 @@ impl<B, L: LiveFrames, F, G: FnMut() -> Result<L>> LiveFrames for Application<B,
     }
     async fn next_live_frame_async(&mut self) -> Result<Option<FramePacket>> {
         self.live()?.next_live_frame_async().await
-    }
-}
-
-pub(crate) struct BroadcastClient {
-    #[cfg(windows)]
-    client: iracing_broadcast_sdk::Client,
-}
-
-impl BroadcastClient {
-    fn new() -> Result<Self> {
-        #[cfg(windows)]
-        {
-            Ok(Self {
-                client: iracing_broadcast_sdk::Client::new()?,
-            })
-        }
-        #[cfg(not(windows))]
-        {
-            anyhow::bail!("Broadcast commands only run on windows")
-        }
-    }
-}
-
-impl BroadcastCommands for BroadcastClient {
-    fn send_broadcast(&mut self, command: Command) -> Result<()> {
-        #[cfg(windows)]
-        {
-            Ok(self.client.send_message(command)?)
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = command;
-            anyhow::bail!("Broadcast commands only run on windows")
-        }
     }
 }
 
@@ -364,7 +330,7 @@ mod tests {
                 .send_broadcast(Command::ReloadAllTextures)
                 .unwrap_err()
                 .to_string()
-                .contains("only run on windows")
+                .contains("only run on Windows")
         );
         assert!(application.broadcast.is_none());
         assert!(application.live.is_none());

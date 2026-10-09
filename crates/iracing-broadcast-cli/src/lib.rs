@@ -62,6 +62,55 @@ pub trait BroadcastCommands {
     fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()>;
 }
 
+/// Shared transport adapter for CLI application composition.
+///
+/// Each application owns its own instance and chooses when to initialize it.
+/// Commands consume [`BroadcastCommands`] rather than constructing this adapter.
+#[derive(Debug)]
+pub struct BroadcastClient {
+    #[cfg(windows)]
+    client: iracing_broadcast_sdk::Client,
+}
+
+impl BroadcastClient {
+    /// Construct the concrete transport adapter.
+    ///
+    /// CLI applications invoke this constructor lazily and retain the adapter.
+    /// On Windows this registers the SDK broadcast message; it does not wait for
+    /// a running simulator.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-platform error outside Windows, or propagates SDK
+    /// client initialization errors on Windows.
+    pub fn new() -> Result<Self> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                client: iracing_broadcast_sdk::Client::new()?,
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            anyhow::bail!("Broadcast commands only run on Windows")
+        }
+    }
+}
+
+impl BroadcastCommands for BroadcastClient {
+    fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()> {
+        #[cfg(windows)]
+        {
+            Ok(self.client.send_message(command)?)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = command;
+            anyhow::bail!("Broadcast commands only run on Windows")
+        }
+    }
+}
+
 impl Command {
     /// Execute using only the injected broadcast capability.
     ///
