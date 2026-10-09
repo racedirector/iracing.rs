@@ -44,12 +44,14 @@ pub(crate) struct Application<
 }
 
 impl Application {
+    /// Create an application without initializing any simulator resources.
     pub(crate) fn new() -> Self {
         Self::with_initializers(BroadcastClient::new, LiveTelemetry::try_connect)
     }
 }
 
 impl<B, L, F: FnMut() -> Result<B>, G: FnMut() -> Result<L>> Application<B, L, F, G> {
+    /// Retain independent initializers, calling each only when its resource is needed.
     fn with_initializers(initialize_broadcast: F, initialize_live: G) -> Self {
         Self {
             broadcast: None,
@@ -61,6 +63,10 @@ impl<B, L, F: FnMut() -> Result<B>, G: FnMut() -> Result<L>> Application<B, L, F
 }
 
 impl<B, L, F, G: FnMut() -> Result<L>> Application<B, L, F, G> {
+    /// Return the retained live resource, initializing it on first use.
+    ///
+    /// Propagates initialization errors and leaves the resource absent so the
+    /// next call retries. Does not initialize the broadcast client.
     fn live(&mut self) -> Result<&mut L> {
         match &mut self.live {
             Some(live) => Ok(live),
@@ -72,6 +78,10 @@ impl<B, L, F, G: FnMut() -> Result<L>> Application<B, L, F, G> {
 impl<B: BroadcastCommands, L, F: FnMut() -> Result<B>, G> BroadcastCommands
     for Application<B, L, F, G>
 {
+    /// Initialize the broadcast client on first use and dispatch the command.
+    ///
+    /// Propagates initialization and dispatch errors. Failed initialization is
+    /// retried on the next call; dispatch errors retain the initialized client.
     fn send_broadcast(&mut self, command: Command) -> Result<()> {
         let client = match &mut self.broadcast {
             Some(client) => client,

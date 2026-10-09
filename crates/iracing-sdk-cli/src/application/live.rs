@@ -45,6 +45,10 @@ impl LiveTelemetry {
         Self::from_connection(connection)
     }
 
+    /// Retain the connection with a layout validated against its current metadata.
+    ///
+    /// Propagates header access, frame-size conversion, variable header, and
+    /// layout validation errors.
     fn from_connection(connection: WindowsConnection) -> Result<Self> {
         let frame_size = usize::try_from(connection.header_snapshot()?.buffer_length)?;
         let headers = connection.variable_headers()?;
@@ -58,6 +62,16 @@ impl LiveTelemetry {
 
     /// Wait cooperatively for a frame, or finish when the simulator disconnects.
     /// Canceling this future leaves at most one bounded native wait in progress.
+    ///
+    /// Returns `None` on disconnect. The first observed tick establishes a
+    /// baseline without yielding a frame. Waits retry after each 500 ms timeout
+    /// while connected; there is no overall timeout.
+    ///
+    /// # Errors
+    ///
+    /// Propagates acquisition and wait errors. Also returns an error if the tick
+    /// or session update counter cannot fit in `u32`, or the frame size differs
+    /// from the retained layout.
     async fn next_frame_async(&mut self) -> Result<Option<FramePacket>> {
         loop {
             if !self.connection.is_connected() {
@@ -135,6 +149,7 @@ pub(crate) struct LiveTelemetry;
 
 #[cfg(not(windows))]
 impl LiveTelemetry {
+    /// Return an unsupported-platform error without opening a connection.
     pub(super) fn try_connect() -> Result<Self> {
         anyhow::bail!("Live telemetry only runs on Windows")
     }

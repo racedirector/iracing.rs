@@ -48,7 +48,8 @@ impl Args {
     /// Propagates source setup, layout validation, frame acquisition, counter
     /// conversion, telemetry decoding, serialization, and output errors,
     /// including an out-of-range IBT index or a live source disconnecting before
-    /// a frame arrives.
+    /// a frame arrives. Returns an error if the frame has no telemetry fields,
+    /// before opening output.
     pub(crate) fn run(
         &self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveFrames,
