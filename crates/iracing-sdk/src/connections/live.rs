@@ -1,12 +1,9 @@
 //! Live telemetry connection for Windows
 
 #[cfg(windows)]
-use crate::LayoutProvider;
-
-#[cfg(windows)]
 use {
     crate::{
-        FrameAdapter, Result, TelemetryLayout,
+        FrameAdapter, LayoutProvider, Result, TelemetryLayout,
         provider::Provider,
         providers::live::LiveProvider,
         schema::SessionInfo,
