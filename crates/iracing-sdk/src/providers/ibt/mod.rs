@@ -40,7 +40,12 @@ impl IbtProvider {
 
     /// Adapts a replay, preserving its configured bounds and current position.
     /// Schema validation uses the complete recording metadata, as in
-    /// [`Self::from_reader`]. Returns an error for missing or invalid metadata.
+    /// [`Self::from_reader`]. A nonpositive recorded tick rate defaults to 60 Hz.
+    ///
+    /// # Errors
+    /// Propagates variable-header read and layout validation errors. Missing
+    /// variable metadata is an error only when the recording contains frames,
+    /// even if the configured replay range is empty.
     pub fn from_replay(replay: IbtReplay) -> Result<Self> {
         let reader = replay.reader();
         let frame_size = reader.frame_size();
@@ -94,7 +99,8 @@ impl LayoutProvider for IbtProvider {
 
 #[async_trait::async_trait]
 impl Provider for IbtProvider {
-    /// Emits each frame once in index order, then returns permanent EOF.
+    /// Emits the remaining frames within the replay bounds in index order,
+    /// then returns permanent EOF.
     ///
     /// The synthetic tick is the zero-based frame index (checked against `u32`), and
     /// the session version is the recording header's update counter. Failed
@@ -123,6 +129,12 @@ impl Provider for IbtProvider {
         Ok(Some(packet))
     }
 
+    /// Returns the recording's decoded, sanitized session YAML without advancing.
+    /// Ignores `_version` and returns `None` only when session metadata is absent.
+    ///
+    /// # Errors
+    /// Propagates session-byte read errors and rejects text that is empty or
+    /// whitespace-only after sanitization. YAML syntax is not validated here.
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
         let Some(snapshot) =
             crate::provider::SessionInformationBytesProvider::session_info_snapshot(

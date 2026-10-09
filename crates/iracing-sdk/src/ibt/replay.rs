@@ -19,6 +19,7 @@ pub struct IbtReplay {
 }
 
 impl std::fmt::Debug for IbtReplay {
+    /// Formats the traversal bounds and position, omitting the reader.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IbtReplay")
             .field("range", &self.range)
@@ -28,6 +29,8 @@ impl std::fmt::Debug for IbtReplay {
 }
 
 impl IbtReplay {
+    /// Owns the reader with full-recording bounds and a cursor at zero.
+    /// An empty recording starts at EOF; no frame bytes are read.
     pub(crate) fn new(reader: IbtReader) -> Self {
         let end = reader.frame_count();
         Self {
@@ -76,6 +79,7 @@ impl IbtReplay {
 
     /// Seeks within the configured bounds, including the exclusive EOF end.
     ///
+    /// `index` is an absolute zero-based record coordinate in the recording.
     /// Returns an error without changing state for positions outside the bounds.
     /// Seeking to an earlier frame permits replay after EOF.
     pub fn seek(&mut self, index: usize) -> Result<()> {
@@ -93,7 +97,7 @@ impl IbtReplay {
     }
 
     /// Reads the current record without advancing, returning `None` at EOF.
-    /// Errors from validated reader access leave the cursor unchanged.
+    /// Returns an error if the complete frame cannot be read, leaving the cursor unchanged.
     pub fn current_frame(&self) -> Result<Option<RecordedFrame>> {
         if self.is_eof() {
             return Ok(None);
@@ -116,6 +120,7 @@ impl IbtReplay {
 
     /// Reads one record and advances only after a successful read.
     /// Returns `None` repeatedly at EOF until a seek or range reset.
+    /// Propagates [`Self::current_frame`] errors without advancing the cursor.
     pub fn next_frame(&mut self) -> Result<Option<RecordedFrame>> {
         let frame = self.current_frame()?;
         if frame.is_some() {

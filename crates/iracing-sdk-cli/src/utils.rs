@@ -53,6 +53,13 @@ impl DiskTelemetry {
     /// reversed ranges and starts beyond EOF fail before iteration. Each item
     /// reads one frame on demand. Item errors consume their recorded coordinate,
     /// and independent iterators do not share cursor state.
+    /// Empty ranges are valid. Packet ticks retain the zero-based recorded indices.
+    ///
+    /// # Errors
+    ///
+    /// Invalid ranges return an error immediately. Iterator items return errors
+    /// for failed frame reads, indices or session update counters that do not fit
+    /// in `u32`, or frame sizes that differ from the retained layout.
     pub(crate) fn frames(
         &self,
         range: Range<usize>,
@@ -65,6 +72,9 @@ impl DiskTelemetry {
     }
 
     /// Iterates all recorded frames in file order, starting at zero.
+    ///
+    /// Construction reads no frame bytes and always succeeds. Each item follows
+    /// the packet and error semantics of [`Self::frames`].
     pub(crate) fn all_frames(
         &self,
     ) -> Result<impl ExactSizeIterator<Item = Result<FramePacket>> + std::iter::FusedIterator + '_>
@@ -72,11 +82,17 @@ impl DiskTelemetry {
         self.frames(0..self.reader.frame_count())
     }
 
+    /// Consumes a recorded frame, preserving its index as the packet tick.
+    /// Propagates conversion and layout errors from [`Self::packet_from_bytes`].
     fn packet_from_recorded(&self, frame: RecordedFrame) -> Result<FramePacket> {
         let index = frame.index();
         self.packet_from_bytes(index, frame.into_bytes())
     }
 
+    /// Wraps owned bytes with the retained layout and recording session version.
+    /// `index` is the zero-based recorded coordinate used as the packet tick.
+    /// Returns an error if either counter cannot fit in `u32` or the byte count
+    /// differs from the layout's frame size.
     fn packet_from_bytes(&self, index: usize, data: Vec<u8>) -> Result<FramePacket> {
         Ok(FramePacket::new(
             data,

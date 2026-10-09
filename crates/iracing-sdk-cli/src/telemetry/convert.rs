@@ -33,6 +33,18 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Exports the selected half-open range of zero-based records as CSV or JSONL.
+    /// An omitted end selects the recording's end; empty ranges are valid.
+    ///
+    /// Validates the input and range before creating or truncating a file output
+    /// or writing to stdout. Flushes the output after all selected frames.
+    ///
+    /// # Errors
+    ///
+    /// Rejects reversed ranges and bounds beyond the recording. Propagates input
+    /// and layout validation, frame reading, packet construction, field decoding,
+    /// serialization, and output errors. Failures after opening the output may
+    /// leave a truncated file or partial export.
     pub(crate) fn run(&self) -> Result<()> {
         tracing::info!(path = %self.path.display(), "Opening IBT file");
         let telemetry =

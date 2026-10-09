@@ -48,7 +48,10 @@ pub struct IbtConnection {
 
 impl IbtConnection {
     /// Builds coordinated subscriptions over the supplied replay bounds and position.
-    /// Delivery still waits for subscriptions and [`Self::start`].
+    /// Spawns background tasks; delivery still waits for subscriptions and [`Self::start`].
+    ///
+    /// # Errors
+    /// Propagates metadata and layout validation errors from [`IbtProvider::from_replay`].
     pub async fn from_replay(replay: crate::ibt::IbtReplay) -> Result<Self> {
         Self::from_provider(IbtProvider::from_replay(replay)?).await
     }
