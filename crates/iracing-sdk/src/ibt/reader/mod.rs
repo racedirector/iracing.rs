@@ -282,6 +282,11 @@ impl IbtReader {
         })
     }
 
+    /// Traverses all frames
+    pub fn all_frames(&self) -> Result<IbtFrames<'_>> {
+        self.frames(0..self.frame_count())
+    }
+
     /// Get disk metadata from the disk sub-header
     pub fn disk_header(&self) -> &DiskSubHeader {
         self.header.disk_header()
