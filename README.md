@@ -15,8 +15,6 @@ Rust workspace for working with iRacing telemetry and simulation state:
 ## Crates
 
 - [`crates/iracing-irsdk`](crates/iracing-irsdk) — dependency-light Rust representations of the native SDK wire contract: fixed-layout headers, variable metadata, constants, enums, flags, and broadcast command values.
-- [`crates/iracing-broadcast-sdk`](crates/iracing-broadcast-sdk) — typed iRacing broadcast commands plus the Windows transport used to dispatch them.
-- [`crates/iracing-broadcast-cli`](crates/iracing-broadcast-cli) — the standalone Windows-only `iracing-broadcast` CLI for camera, replay, chat, pit, telemetry, force-feedback, texture, and capture operations. Start with its [user README](crates/iracing-broadcast-cli/README.md).
 - [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing (`SessionInfo::parse`), telemetry decoding (`VarData`/`TelemetryLayout`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory telemetry tools.
 - [`crates/iracing-sdk-cli`](crates/iracing-sdk-cli) — the consolidated `iracing-sdk` CLI for telemetry export, snapshots, session schemas, and metadata.
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
