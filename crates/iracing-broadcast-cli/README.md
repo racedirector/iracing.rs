@@ -32,6 +32,13 @@ cargo build -p iracing-broadcast-cli --bin iracing-broadcast --release
 .\target\release\iracing-broadcast.exe --help
 ```
 
+To install the current checkout with Cargo on Windows:
+
+```powershell
+cargo install --path crates/iracing-broadcast-cli
+iracing-broadcast --help
+```
+
 The workspace is configured for tag-driven `cargo-dist` releases. Check the repository's GitHub Releases for packaged artifacts when available; running from the workspace checkout is the canonical path for current `main`.
 
 ## Quick start
