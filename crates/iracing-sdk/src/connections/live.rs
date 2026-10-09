@@ -166,11 +166,3 @@ impl Drop for LiveConnection {
 pub struct LiveConnection {
     _private: (),
 }
-
-#[cfg(not(windows))]
-impl LiveConnection {
-    /// Start building a live telemetry connection.
-    pub fn builder() -> LiveConnectionBuilder {
-        LiveConnectionBuilder::default()
-    }
-}
