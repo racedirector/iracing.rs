@@ -1,8 +1,8 @@
-use crate::dependencies::LiveFrames;
 use anyhow::{Result, ensure};
 use iracing_sdk::LayoutProvider;
 
 use crate::{
+    commands::dependencies::LiveFrames,
     utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget, TelemetrySnapshot},
 };
@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn live_command_uses_injected_frame_capability() {
         let crate::Command::Telemetry {
-            command: crate::telemetry::Command::Snapshot(args),
+            command: crate::commands::telemetry::Command::Snapshot(args),
         } = crate::Cli::try_parse_from(["iracing-sdk", "telemetry", "snapshot", "live"])
             .unwrap()
             .command

@@ -21,7 +21,7 @@
 
 mod live;
 
-use crate::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
+use crate::commands::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
 use anyhow::Result;
 use iracing_broadcast_cli::{BroadcastClient, BroadcastCommands};
 use iracing_broadcast_sdk::Command;

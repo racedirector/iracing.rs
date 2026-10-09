@@ -1,7 +1,7 @@
 //! Direct shared-memory adapter used by the current CLI capture commands.
 //! Retained by `Application`; no background `LiveConnection` task is introduced.
 
-use crate::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
+use crate::commands::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
 use anyhow::Result;
 use iracing_irsdk::Header;
 use iracing_sdk::{FieldLayout, FramePacket, VariableHeaders, schema::SessionInfo};

@@ -1,8 +1,8 @@
-use crate::dependencies::LiveSessions;
 use anyhow::Result;
 use iracing_sdk::provider::SessionInformationProvider;
 
 use crate::{
+    commands::dependencies::LiveSessions,
     utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };

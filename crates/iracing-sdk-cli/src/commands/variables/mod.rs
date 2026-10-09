@@ -1,8 +1,8 @@
-use crate::dependencies::LiveVariables;
 use anyhow::Result;
 use iracing_sdk::provider::VariableHeadersProvider;
 
 use crate::{
+    commands::dependencies::LiveVariables,
     utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };

@@ -18,7 +18,7 @@ impl Command {
     /// Execute the selected session snapshot, discovery, or schema command and propagate its errors.
     pub(crate) fn run(
         self,
-        dependencies: &mut impl crate::dependencies::LiveSessions,
+        dependencies: &mut impl crate::commands::dependencies::LiveSessions,
     ) -> Result<()> {
         match self {
             Command::Snapshot(args) => args.run(dependencies),

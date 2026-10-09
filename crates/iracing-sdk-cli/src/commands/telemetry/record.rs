@@ -1,7 +1,9 @@
-use crate::dependencies::LiveFrames;
 use anyhow::{Context, Result, ensure};
 
-use crate::writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter};
+use crate::{
+    commands::dependencies::LiveFrames,
+    writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter},
+};
 
 /// Records a live connection to the given format at output.
 #[derive(clap::Args, Debug)]
@@ -74,7 +76,7 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let output = directory.path().join("record.csv");
         let crate::Command::Telemetry {
-            command: crate::telemetry::Command::Record(args),
+            command: crate::commands::telemetry::Command::Record(args),
         } = crate::Cli::try_parse_from([
             "iracing-sdk",
             "telemetry",

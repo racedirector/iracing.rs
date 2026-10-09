@@ -1,7 +1,7 @@
-use crate::dependencies::LiveHeaders;
 use anyhow::Result;
 
 use crate::{
+    commands::dependencies::LiveHeaders,
     utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };

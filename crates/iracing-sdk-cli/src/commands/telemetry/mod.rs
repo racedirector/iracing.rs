@@ -20,7 +20,10 @@ pub(crate) enum Command {
 
 impl Command {
     /// Execute the selected telemetry command and propagate source and output errors.
-    pub async fn run(self, dependencies: &mut impl crate::dependencies::LiveFrames) -> Result<()> {
+    pub async fn run(
+        self,
+        dependencies: &mut impl crate::commands::dependencies::LiveFrames,
+    ) -> Result<()> {
         match self {
             Self::Convert(args) => args.run(),
             #[cfg(windows)]

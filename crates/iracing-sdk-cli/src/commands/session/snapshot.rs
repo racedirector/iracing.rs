@@ -1,5 +1,5 @@
-use crate::dependencies::LiveSessions;
 use crate::{
+    commands::dependencies::LiveSessions,
     utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
