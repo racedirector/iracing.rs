@@ -1,15 +1,15 @@
 //! IBT connection for disk telemetry.
 
-mod builder;
 pub(crate) mod coordinator;
 pub(crate) mod subscription;
 
-pub use builder::{IbtConnectionBuilder, NoSource, PathSource, ProviderSource};
-
 use futures::{Stream, StreamExt};
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
+use std::{
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::WatchStream;
@@ -47,9 +47,11 @@ pub struct IbtConnection {
 }
 
 impl IbtConnection {
-    /// Start building an IBT connection.
-    pub fn builder() -> IbtConnectionBuilder<NoSource> {
-        IbtConnectionBuilder::default()
+    /// Creates a new connection to an IBT at the provided path
+    pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let provider = IbtProvider::open(path)?;
+        let connection = Self::from_provider(provider).await?;
+        Ok(connection)
     }
 
     /// Starts the replay tasks with the provider's shared layout and tick rate.

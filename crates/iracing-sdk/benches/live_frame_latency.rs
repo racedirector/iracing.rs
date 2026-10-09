@@ -36,8 +36,7 @@ async fn main() -> Result<()> {
         TIMEOUT.as_secs(),
     );
 
-    let connection = LiveConnection::builder()
-        .build()
+    let connection = LiveConnection::new()
         .context("failed to connect; start iRacing and enter an active session")?;
     let mut stream = Box::pin(connection.subscribe::<DynamicFrame>(UpdateRate::Native)?);
     let started = Instant::now();

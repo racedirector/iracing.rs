@@ -166,11 +166,10 @@ fn bench_connection_sequential_replay(c: &mut Criterion) {
                     let mut elapsed = Duration::ZERO;
                     for _ in 0..iterations {
                         elapsed += runtime.block_on(async {
-                            let connection = IbtConnection::builder()
-                                .with_path(path.clone())
-                                .build()
+                            let connection = IbtConnection::open(path.clone())
                                 .await
                                 .expect("fixture connection should open");
+
                             let mut frames = Box::pin(
                                 connection
                                     .subscribe::<DynamicFrame>()

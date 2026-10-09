@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
             .without_no_connection_limit()
             .build()?;
 
-        let connection = LiveConnection::builder().with_provider(provider).build()?;
+        let connection = LiveConnection::from_provider(provider);
         let mut stream = Box::pin(connection.session_updates());
         let mut previous_session_info = None;
         let mut previous_setup_revision = None;
