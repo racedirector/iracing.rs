@@ -160,9 +160,6 @@ impl Drop for LiveConnection {
 // Non-Windows stub implementation
 #[cfg(not(windows))]
 /// Placeholder live connection type on unsupported platforms.
-///
-/// Calling [`Self::builder`] and building it returns
-/// [`crate::IRacingSDKError::UnsupportedPlatform`].
 pub struct LiveConnection {
     _private: (),
 }
