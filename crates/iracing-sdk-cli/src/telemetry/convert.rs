@@ -47,14 +47,20 @@ impl Args {
             frame_count
         );
 
+        let frames = if self.start_index == 0 && self.end_index.is_none() {
+            Box::new(telemetry.all_frames()?) as Box<dyn Iterator<Item = Result<_>> + '_>
+        } else {
+            Box::new(telemetry.frames(self.start_index..end_index)?)
+        };
         let variables = telemetry.fields_owned();
         let mut writer =
             RecordStreamWriter::from_variables(self.output.clone(), self.format, variables)?
                 .prepare()?;
 
         let mut exported = 0usize;
-        for index in self.start_index..end_index {
-            let packet = telemetry.frame_at(index)?;
+
+        for packet in frames {
+            let packet = packet?;
             writer.write(&packet)?;
             exported += 1;
             if exported.is_multiple_of(10_000) {

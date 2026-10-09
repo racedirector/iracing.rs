@@ -4,6 +4,9 @@
 //! through indexed frame reads and owned metadata snapshots.
 
 pub mod reader;
+pub mod replay;
+
+pub use replay::IbtReplay;
 
 pub use reader::{IbtFrames, IbtReader, RecordedFrame};
 

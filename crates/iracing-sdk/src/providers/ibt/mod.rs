@@ -4,19 +4,18 @@ use std::{path::Path, sync::Arc};
 
 use crate::{
     FramePacket, IRacingSDKError, LayoutProvider, Result, TelemetryLayout,
-    ibt::IbtReader,
+    ibt::{IbtReader, IbtReplay},
     provider::{Provider, VariableHeadersProvider},
     types::IRacingSessionString,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 ///
-/// Owns the validated variable layout and sequential replay cursor. Construction
-/// always starts at frame zero, regardless of previous indexed reader operations.
+/// Owns the validated variable layout and delegates cursor state to [`IbtReplay`].
+/// `from_reader` starts at frame zero; `from_replay` preserves replay state.
 pub struct IbtProvider {
-    reader: IbtReader,
+    replay: IbtReplay,
     layout: Arc<TelemetryLayout>,
-    current_frame: usize,
     tick_rate: f64,
 }
 
@@ -36,6 +35,14 @@ impl IbtProvider {
     /// the layout's frame size, or if telemetry frames have no variable metadata.
     /// A zero-frame recording may have an empty layout.
     pub fn from_reader(reader: IbtReader) -> Result<Self> {
+        Self::from_replay(reader.replay())
+    }
+
+    /// Adapts a replay, preserving its configured bounds and current position.
+    /// Schema validation uses the complete recording metadata, as in
+    /// [`Self::from_reader`]. Returns an error for missing or invalid metadata.
+    pub fn from_replay(replay: IbtReplay) -> Result<Self> {
+        let reader = replay.reader();
         let frame_size = reader.frame_size();
 
         let headers = reader.variable_headers()?;
@@ -53,9 +60,8 @@ impl IbtProvider {
             60.0
         };
         Ok(Self {
-            reader,
+            replay,
             layout: Arc::new(layout),
-            current_frame: 0,
             tick_rate,
         })
     }
@@ -67,7 +73,7 @@ impl IbtProvider {
 
     /// Returns the total number of telemetry frames in the recording.
     pub fn total_frames(&self) -> usize {
-        self.reader.frame_count()
+        self.replay.reader().frame_count()
     }
 
     fn tick_for_frame(index: usize) -> Result<u32> {
@@ -99,24 +105,29 @@ impl Provider for IbtProvider {
     /// returned byte count differs from the telemetry layout's frame size.
     /// These failures leave the replay cursor unchanged.
     async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
-        if self.current_frame >= self.total_frames() {
+        if self.replay.is_eof() {
             return Ok(None);
         }
-        let tick = Self::tick_for_frame(self.current_frame)?;
-        let frame_data = self.reader.frame(self.current_frame)?;
+        let tick = Self::tick_for_frame(self.replay.position())?;
+        let Some(frame) = self.replay.current_frame()? else {
+            return Ok(None);
+        };
+        let frame_data = frame.into_bytes();
         let packet = FramePacket::new(
             frame_data,
             tick,
-            self.reader.header().session_info_update as u32,
+            self.replay.reader().header().session_info_update as u32,
             self.shared_layout(),
         )?;
-        self.current_frame += 1;
+        self.replay.advance();
         Ok(Some(packet))
     }
 
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
         let Some(snapshot) =
-            crate::provider::SessionInformationBytesProvider::session_info_snapshot(&self.reader)?
+            crate::provider::SessionInformationBytesProvider::session_info_snapshot(
+                self.replay.reader(),
+            )?
         else {
             return Ok(None);
         };
@@ -190,6 +201,18 @@ mod tests {
     }
 
     #[test]
+    fn configured_replay_preserves_bounds_position_and_ticks() -> anyhow::Result<()> {
+        let mut replay = IbtReader::open(require_smallest_ibt_fixture()?)?.replay();
+        replay.set_range(1..4)?;
+        replay.seek(2)?;
+        let mut provider = IbtProvider::from_replay(replay)?;
+        assert_eq!(block_on(provider.next_frame())?.unwrap().tick, 2);
+        assert_eq!(block_on(provider.next_frame())?.unwrap().tick, 3);
+        assert!(block_on(provider.next_frame())?.is_none());
+        Ok(())
+    }
+
+    #[test]
     fn failed_read_does_not_advance_replay() -> anyhow::Result<()> {
         let bytes = fs::read(require_smallest_ibt_fixture()?)?;
         let reader = IbtReader::from_bytes(bytes.clone())?;
@@ -197,10 +220,10 @@ mod tests {
         let start = reader.layout().frame_data_start();
         let mut provider = IbtProvider::from_reader(reader)?;
         // Inject a short read without mutating a live mapped file.
-        provider.reader.owned_bytes_mut().truncate(start);
+        provider.replay.reader.owned_bytes_mut().truncate(start);
         assert!(block_on(provider.next_frame()).is_err());
-        assert_eq!(provider.current_frame, 0);
-        *provider.reader.owned_bytes_mut() = bytes;
+        assert_eq!(provider.replay.position(), 0);
+        *provider.replay.reader.owned_bytes_mut() = bytes;
         let frame = block_on(provider.next_frame())?.unwrap();
         assert_eq!(frame.tick, 0);
         assert_eq!(frame.data().as_ref(), expected);
@@ -247,13 +270,14 @@ mod tests {
         let bytes = fs::read(require_smallest_ibt_fixture()?)?;
         let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
         let offset = provider
+            .replay
             .reader
             .layout()
             .metadata()
             .session_info()
             .expect("fixture has session information")
             .offset();
-        provider.reader.owned_bytes_mut()[offset] = 0;
+        provider.replay.reader.owned_bytes_mut()[offset] = 0;
 
         let error = block_on(provider.session_yaml(0)).unwrap_err().to_string();
         assert!(
@@ -282,9 +306,10 @@ mod tests {
         bytes.truncate(metadata_end);
 
         let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
-        assert_eq!(provider.reader.frame_count(), 0);
+        assert_eq!(provider.replay.reader().frame_count(), 0);
         assert!(
             provider
+                .replay
                 .reader
                 .layout()
                 .metadata()

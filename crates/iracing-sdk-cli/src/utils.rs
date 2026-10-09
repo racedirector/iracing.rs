@@ -5,10 +5,11 @@ use clap::Subcommand;
 use iracing_sdk::WindowsConnection;
 use iracing_sdk::{
     FramePacket, LayoutProvider, TelemetryLayout,
-    ibt::IbtReader,
+    ibt::{IbtReader, RecordedFrame},
     provider::{SessionInformationBytesProvider, VariableHeadersProvider},
 };
 use std::{
+    ops::Range,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -46,6 +47,45 @@ impl DiskTelemetry {
         })
     }
 
+    /// Iterates a validated half-open range of recorded frames as schema-backed packets.
+    ///
+    /// Bounds follow `IbtReader::frames`: the end clamps to the recording length;
+    /// reversed ranges and starts beyond EOF fail before iteration. Each item
+    /// reads one frame on demand. Item errors consume their recorded coordinate,
+    /// and independent iterators do not share cursor state.
+    pub(crate) fn frames(
+        &self,
+        range: Range<usize>,
+    ) -> Result<impl ExactSizeIterator<Item = Result<FramePacket>> + std::iter::FusedIterator + '_>
+    {
+        Ok(self
+            .reader
+            .frames(range)?
+            .map(|frame| self.packet_from_recorded(frame?)))
+    }
+
+    /// Iterates all recorded frames in file order, starting at zero.
+    pub(crate) fn all_frames(
+        &self,
+    ) -> Result<impl ExactSizeIterator<Item = Result<FramePacket>> + std::iter::FusedIterator + '_>
+    {
+        self.frames(0..self.reader.frame_count())
+    }
+
+    fn packet_from_recorded(&self, frame: RecordedFrame) -> Result<FramePacket> {
+        let index = frame.index();
+        self.packet_from_bytes(index, frame.into_bytes())
+    }
+
+    fn packet_from_bytes(&self, index: usize, data: Vec<u8>) -> Result<FramePacket> {
+        Ok(FramePacket::new(
+            data,
+            u32::try_from(index)?,
+            u32::try_from(self.reader.header().session_info_update)?,
+            Arc::clone(&self.layout),
+        )?)
+    }
+
     /// Read the zero-based IBT frame without advancing a replay cursor.
     ///
     /// The returned packet owns its bytes and uses `index` as its tick counter.
@@ -56,14 +96,7 @@ impl DiskTelemetry {
     /// read, `index` or the session update counter cannot fit in `u32`, or the
     /// frame size does not match the retained layout.
     pub(crate) fn frame_at(&self, index: usize) -> Result<FramePacket> {
-        let data = self.reader.frame(index)?;
-
-        Ok(FramePacket::new(
-            data,
-            u32::try_from(index)?,
-            u32::try_from(self.reader.header().session_info_update)?,
-            Arc::clone(&self.layout),
-        )?)
+        self.packet_from_bytes(index, self.reader.frame(index)?)
     }
 }
 
@@ -278,5 +311,39 @@ impl SourceKind {
             #[cfg(windows)]
             Self::Live { .. } => Ok(TelemetrySource::Live(LiveTelemetry::try_connect()?)),
         }
+    }
+}
+
+#[cfg(test)]
+mod disk_tests {
+    use super::*;
+    use iracing_sdk::test_utils::require_named_ibt_fixture;
+
+    #[test]
+    fn packet_iterators_preserve_coordinates_layout_and_independence() -> Result<()> {
+        let telemetry = DiskTelemetry::open(require_named_ibt_fixture("profile_small.ibt")?)?;
+        let count = telemetry.reader.frame_count();
+        let mut first = telemetry.all_frames()?;
+        let mut tail = telemetry.frames(count - 1..usize::MAX)?;
+        assert_eq!(first.len(), count);
+        assert_eq!(tail.len(), 1);
+        let packet = tail.next().unwrap()?;
+        assert_eq!(packet.tick as usize, count - 1);
+        assert_eq!(packet.data(), telemetry.frame_at(count - 1)?.data());
+        assert!(Arc::ptr_eq(packet.layout(), &telemetry.layout));
+        assert_eq!(
+            packet.session_version,
+            telemetry.frame_at(0)?.session_version
+        );
+        assert!(tail.next().is_none());
+        assert!(tail.next().is_none());
+        assert_eq!(first.next().unwrap()?.tick, 0);
+        telemetry.frame_at(count - 1)?;
+        assert_eq!(first.next().unwrap()?.tick, 1);
+        assert_eq!(first.len(), count - 2);
+        assert_eq!(telemetry.frames(count..count)?.len(), 0);
+        assert!(telemetry.frames(Range { start: 2, end: 1 }).is_err());
+        assert!(telemetry.frames(count + 1..usize::MAX).is_err());
+        Ok(())
     }
 }

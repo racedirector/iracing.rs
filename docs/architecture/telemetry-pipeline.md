@@ -49,8 +49,13 @@ and direct reads do not share traversal state. A failed item advances the range
 iterator by one coordinate; its bytes can be retried with `frame(index)`.
 Recorded coordinates identify physical records, not live SDK ticks; provider
 synthetic ticks remain compatibility behavior. `usize` preserves existing frame
-and layout APIs and ordinary Rust range syntax. A future replay adapter can own
-its cursor over this reader without taking ownership of frame geometry.
+and layout APIs and ordinary Rust range syntax. `IbtReader::replay(self)` transfers ownership into `IbtReplay`, the sole owner
+of sequential record cursor state. `set_range` uses reader range validation and
+resets to the clamped range start; `seek` accepts the exclusive end as EOF.
+`current_frame` reads without advancing, `advance` moves one coordinate, and
+`next_frame` reads then advances only on success. EOF persists until a seek or
+range reset. The core has no clock, background task, or sampling policy.
+Independent reader access through `reader()` never changes replay position.
 
 `frame(index)`, `session_info_snapshot()`, and
 `VariableHeadersProvider::variable_headers()` access validated byte ranges directly
@@ -112,11 +117,14 @@ bytes and schema for exploratory name-based lookup. Hot paths should implement
 
 `IbtProvider::from_reader` validates the exact variable-header snapshot against
 the layout's frame size and owns the resulting shared schema. Construction
-starts its sequential cursor at frame zero, even after indexed reader operations.
+delegates its sequential cursor to `IbtReplay`, starting at frame zero even after
+indexed reader operations. `IbtProvider::from_replay` and
+`IbtConnection::from_replay` preserve configured replay bounds and position;
+the connection acknowledgement barrier continues to control demand.
 Frames without variable metadata are rejected; zero-frame recordings may have
 an empty schema. Successful reads advance one index, failed reads retain the
 index for retry, and the layout's frame count determines permanent EOF. Packets
-use the zero-based index cast to `u32` as their synthetic tick and retain the
+use the zero-based index checked against `u32` as their synthetic tick and retain the
 header's session update counter. Tick rate comes from the header with a 60 Hz
 fallback for nonpositive values. Session YAML is read from a fresh snapshot,
 decoded and sanitized by the provider. Reads complete as fast as the file can be

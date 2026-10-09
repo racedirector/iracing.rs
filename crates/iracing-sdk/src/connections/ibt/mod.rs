@@ -47,6 +47,12 @@ pub struct IbtConnection {
 }
 
 impl IbtConnection {
+    /// Builds coordinated subscriptions over the supplied replay bounds and position.
+    /// Delivery still waits for subscriptions and [`Self::start`].
+    pub async fn from_replay(replay: crate::ibt::IbtReplay) -> Result<Self> {
+        Self::from_provider(IbtProvider::from_replay(replay)?).await
+    }
+
     /// Creates a new connection to an IBT at the provided path
     pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let provider = IbtProvider::open(path)?;
@@ -300,6 +306,28 @@ mod tests {
         let connection = IbtConnection::from_provider_parts(provider, layout, 60.0).await?;
 
         Ok((connection, observed_reads))
+    }
+
+    #[tokio::test]
+    async fn configured_replay_delivers_only_remaining_bounded_frames() -> Result<()> {
+        let mut replay = crate::ibt::IbtReader::from_bytes(fixture_with_frame_count(4)?)?.replay();
+        replay.set_range(1..4)?;
+        replay.seek(2)?;
+        let connection = IbtConnection::from_replay(replay).await?;
+        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
+        connection.start()?;
+        let ticks = tokio::time::timeout(Duration::from_secs(1), async {
+            let mut ticks = Vec::new();
+            while let Some(frame) = frames.next().await {
+                ticks.push(frame.tick_count());
+            }
+            ticks
+        })
+        .await
+        .expect("bounded replay should reach EOF");
+        assert_eq!(ticks, vec![2, 3]);
+        assert_eq!(connection.current_frame().unwrap().tick, 3);
+        Ok(())
     }
 
     #[tokio::test]

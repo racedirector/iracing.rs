@@ -1,7 +1,7 @@
 //! Indexed IBT file reader
 //!
 //! Provides cross-platform indexed frame reads and owned metadata snapshots.
-//! Sequential replay and schema construction belong to `IbtProvider`.
+//! Sequential replay belongs to `super::IbtReplay`; providers construct schemas.
 //!
 //! ## Usage Example
 //!
@@ -126,6 +126,23 @@ impl ExactSizeIterator for IbtFrames<'_> {}
 impl std::iter::FusedIterator for IbtFrames<'_> {}
 
 impl IbtReader {
+    /// Transfers ownership into a deterministic replay starting at record zero.
+    ///
+    /// ```no_run
+    /// # use iracing_sdk::ibt::IbtReader;
+    /// # fn replay() -> iracing_sdk::Result<()> {
+    /// let mut replay = IbtReader::open("telemetry.ibt")?.replay();
+    /// replay.set_range(10..20)?;
+    /// while let Some(frame) = replay.next_frame()? {
+    ///     println!("record {}", frame.index());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn replay(self) -> super::IbtReplay {
+        super::IbtReplay::new(self)
+    }
+
     /// Open and parse an immutable `.ibt` recording using a read-only memory map.
     ///
     /// The file must not be modified or truncated by any process while this reader
