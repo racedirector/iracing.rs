@@ -90,6 +90,7 @@ pub struct IbtFrames<'a> {
 }
 
 impl std::fmt::Debug for IbtFrames<'_> {
+    /// Formats the remaining record range, propagating any formatter error.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IbtFrames")
             .field("remaining", &self.remaining)
@@ -100,6 +101,11 @@ impl std::fmt::Debug for IbtFrames<'_> {
 impl Iterator for IbtFrames<'_> {
     type Item = Result<RecordedFrame>;
 
+    /// Reads the next record, yielding its index and owned telemetry bytes.
+    ///
+    /// Errors from [`IbtReader::frame`] are yielded unchanged and still advance
+    /// the iterator to the next index. Returns `None` permanently once the
+    /// exclusive range bound is reached.
     fn next(&mut self) -> Option<Self::Item> {
         let index = self.remaining.next()?;
         Some(
@@ -109,6 +115,8 @@ impl Iterator for IbtFrames<'_> {
         )
     }
 
+    /// Returns exact bounds on the remaining items, including any read errors.
+    /// No frame bytes are read.
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.remaining.size_hint()
     }
@@ -282,7 +290,12 @@ impl IbtReader {
         })
     }
 
-    /// Traverses all frames
+    /// Traverses all recorded frames in increasing index order, starting at zero.
+    ///
+    /// Equivalent to `self.frames(0..self.frame_count())`. Construction always
+    /// succeeds without reading frame bytes; an empty recording yields no items.
+    /// Frame read errors are yielded by the iterator, which can continue with
+    /// the next record.
     pub fn all_frames(&self) -> Result<IbtFrames<'_>> {
         self.frames(0..self.frame_count())
     }
