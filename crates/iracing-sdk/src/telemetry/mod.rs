@@ -2,15 +2,17 @@
 
 pub(crate) mod builder;
 pub(crate) mod delivery_policy;
+pub(crate) mod provider;
 pub(crate) mod session_policy;
 
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 
+use super::provider::Provider;
+
 use crate::{
     FramePacket,
-    provider::Provider,
     schema::SessionInfo,
     telemetry::{
         delivery_policy::{DeliveryPolicy, OnDemandDelivery, ReplayDemand},
