@@ -1,9 +1,5 @@
 //! Live telemetry connection for Windows
 
-mod builder;
-
-pub use builder::LiveConnectionBuilder;
-
 #[cfg(windows)]
 use crate::LayoutProvider;
 
@@ -46,9 +42,10 @@ pub struct LiveConnection {
 
 #[cfg(windows)]
 impl LiveConnection {
-    /// Start building a live telemetry connection.
-    pub fn builder() -> LiveConnectionBuilder {
-        LiveConnectionBuilder::default()
+    /// Creates a new connection with a new provider.
+    pub fn new() -> Result<Self> {
+        let provider = LiveProvider::new()?;
+        Ok(Self::from_provider(provider))
     }
 
     /// Starts background telemetry and session delivery from the provider.
