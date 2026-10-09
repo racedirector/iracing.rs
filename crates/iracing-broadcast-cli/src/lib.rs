@@ -49,26 +49,28 @@ pub enum Command {
     },
 }
 
-impl Command {
-    /// Send this command through the Windows broadcast client.
+/// Broadcast dispatch required by the command layer.
+///
+/// Implementations own transport setup and lifecycle. Fakes can capture commands
+/// without simulator infrastructure, on any platform.
+pub trait BroadcastCommands {
+    /// Dispatch a typed command.
     ///
     /// # Errors
     ///
-    /// Returns an unsupported-platform error on non-Windows systems. On Windows,
-    /// propagates client initialization, camera-state conversion, command encoding,
-    /// and Win32 dispatch errors.
-    pub fn run(self) -> Result<()> {
-        #[cfg(not(windows))]
-        {
-            Err(anyhow::anyhow!("Broadcast commands only run on windows"))
-        }
+    /// Propagates implementation-specific initialization and dispatch failures.
+    fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()>;
+}
 
-        #[cfg(windows)]
-        {
-            let client = iracing_broadcast_sdk::Client::new()?;
-            client.send_message(self.into())?;
-            Ok(())
-        }
+impl Command {
+    /// Execute using only the injected broadcast capability.
+    ///
+    /// # Errors
+    ///
+    /// Propagates errors from the dependency, including unsupported-platform,
+    /// initialization, encoding, and dispatch errors in production applications.
+    pub fn run(self, dependencies: &mut (impl BroadcastCommands + ?Sized)) -> Result<()> {
+        dependencies.send_broadcast(self.into())
     }
 }
 
@@ -111,6 +113,45 @@ mod tests {
 
     fn command_parse_fails(args: impl IntoIterator<Item = &'static str>) -> bool {
         TestCli::try_parse_from(std::iter::once("iracing-broadcast").chain(args)).is_err()
+    }
+
+    #[derive(Default)]
+    struct FakeBroadcast(Vec<BroadcastCommand>);
+
+    impl BroadcastCommands for FakeBroadcast {
+        fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()> {
+            self.0.push(command);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn parsed_commands_dispatch_through_injected_dependency() -> Result<()> {
+        let mut dependency = FakeBroadcast::default();
+        parse_command(["replay", "search", "previous-session"]).run(&mut dependency)?;
+        parse_command(["camera", "set-state", "--raw-bits", "8"]).run(&mut dependency)?;
+        assert_eq!(
+            dependency.0,
+            [
+                BroadcastCommand::ReplaySearch(ReplaySearchMode::PreviousSession),
+                BroadcastCommand::CameraSetState(CameraState::from_bits_retain(8)),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn injected_dispatch_error_is_propagated() {
+        struct FailingBroadcast;
+        impl BroadcastCommands for FailingBroadcast {
+            fn send_broadcast(&mut self, _: BroadcastCommand) -> Result<()> {
+                anyhow::bail!("fake dispatch failure")
+            }
+        }
+        let error = parse_command(["replay", "search", "previous-session"])
+            .run(&mut FailingBroadcast)
+            .unwrap_err();
+        assert_eq!(error.to_string(), "fake dispatch failure");
     }
 
     #[test]

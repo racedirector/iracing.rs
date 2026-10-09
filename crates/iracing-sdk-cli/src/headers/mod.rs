@@ -1,3 +1,4 @@
+use crate::dependencies::LiveHeaders;
 use anyhow::Result;
 
 use crate::{
@@ -20,7 +21,10 @@ pub(crate) struct Args {
 }
 
 impl Args {
-    pub(crate) fn run(self) -> Result<()> {
+    pub(crate) fn run(
+        self,
+        #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveHeaders,
+    ) -> Result<()> {
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
 
         match self.source {
@@ -31,14 +35,42 @@ impl Args {
             }
             #[cfg(windows)]
             SourceKind::Live { .. } => {
-                use crate::utils::LiveTelemetry;
-
-                let telemetry = LiveTelemetry::try_connect()?;
-                let header = telemetry.connection.header_snapshot()?;
+                let header = dependencies.live_header()?;
                 writer.write(&header)?;
             }
         }
 
         writer.finalize()
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    struct FakeHeaders {
+        calls: usize,
+    }
+    impl LiveHeaders for FakeHeaders {
+        fn live_header(&mut self) -> Result<iracing_irsdk::Header> {
+            self.calls += 1;
+            anyhow::bail!("fake header acquisition")
+        }
+    }
+    #[test]
+    fn live_command_uses_injected_header_capability() {
+        let crate::Command::Headers(args) =
+            crate::Cli::try_parse_from(["iracing-sdk", "headers", "live", "--format", "json"])
+                .unwrap()
+                .command
+        else {
+            panic!("expected headers command")
+        };
+        let mut fake = FakeHeaders { calls: 0 };
+        assert_eq!(
+            args.run(&mut fake).unwrap_err().to_string(),
+            "fake header acquisition"
+        );
+        assert_eq!(fake.calls, 1);
     }
 }

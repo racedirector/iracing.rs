@@ -25,6 +25,7 @@ clap = { workspace = true }
 csv = { workspace = true }
 futures = { workspace = true }
 iracing-broadcast-cli = { workspace = true }
+iracing-broadcast-sdk = { workspace = true }
 iracing-sdk = { workspace = true, features = ["schema-discovery", "codegen"] }
 iracing-irsdk = { workspace = true, features = ["debug"] }
 schemars = { workspace = true }

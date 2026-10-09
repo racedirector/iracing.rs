@@ -1,3 +1,4 @@
+use crate::dependencies::LiveFrames;
 use anyhow::{Result, ensure};
 use iracing_sdk::LayoutProvider;
 
@@ -48,18 +49,17 @@ impl Args {
     /// conversion, telemetry decoding, serialization, and output errors,
     /// including an out-of-range IBT index or a live source disconnecting before
     /// a frame arrives.
-    pub(crate) fn run(&self) -> Result<()> {
+    pub(crate) fn run(
+        &self,
+        #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveFrames,
+    ) -> Result<()> {
         let packet = match &self.source {
             SourceKind::Ibt { extra } => {
                 let telemetry = DiskTelemetry::open(&extra.path)?;
                 telemetry.frame_at(extra.extra.frame_index)
             }
             #[cfg(windows)]
-            SourceKind::Live { .. } => {
-                use crate::utils::LiveTelemetry;
-                let mut telemetry = LiveTelemetry::try_connect()?;
-                telemetry.next_frame()
-            }
+            SourceKind::Live { .. } => dependencies.next_live_frame(),
         }?;
 
         let fields_owned = packet.fields_owned();
@@ -72,5 +72,38 @@ impl Args {
         writer.write(&snapshot)?;
 
         writer.finalize()
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    struct FakeFrames;
+    impl LiveFrames for FakeFrames {
+        fn live_fields(&mut self) -> Result<Vec<iracing_sdk::FieldLayout>> {
+            panic!("snapshot only requests a frame")
+        }
+        fn next_live_frame(&mut self) -> Result<iracing_sdk::FramePacket> {
+            anyhow::bail!("fake frame acquisition")
+        }
+        async fn next_live_frame_async(&mut self) -> Result<Option<iracing_sdk::FramePacket>> {
+            panic!("snapshot uses synchronous acquisition")
+        }
+    }
+    #[test]
+    fn live_command_uses_injected_frame_capability() {
+        let crate::Command::Telemetry {
+            command: crate::telemetry::Command::Snapshot(args),
+        } = crate::Cli::try_parse_from(["iracing-sdk", "telemetry", "snapshot", "live"])
+            .unwrap()
+            .command
+        else {
+            panic!("expected snapshot command")
+        };
+        assert_eq!(
+            args.run(&mut FakeFrames).unwrap_err().to_string(),
+            "fake frame acquisition"
+        );
     }
 }

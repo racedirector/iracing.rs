@@ -42,6 +42,13 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - Check for a nested `AGENTS.md` before editing a crate. Package guidance exists for `iracing-sdk`, `iracing-simulation`.
 
+## CLI composition
+
+- Each CLI binary constructs its own `application::Application` in `main`.
+  Inject command capability traits; keep simulator construction in that module.
+- Keep application resources lazy and independent. See the application modules
+  for retry/reuse semantics; preserve direct shared-memory CLI capture behavior.
+
 ## Patterns & Gotchas
 
 - Frame extraction is little-endian; always rely on `VarData::decode_field` rather than manual decoding to avoid drift.

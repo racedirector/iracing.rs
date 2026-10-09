@@ -89,6 +89,16 @@ workspace packages with `publish = false`. They should consume public crate APIs
 as downstream programs do; do not make library internals public only to support
 an example.
 
+### CLI composition
+
+The two CLI executables have separate composition roots and consumer-owned
+capability traits. Implementation invariants and initialization policy live in
+[`iracing-broadcast`'s application module](../../crates/iracing-broadcast-cli/src/application.rs)
+and [`iracing-sdk`'s application module](../../crates/iracing-sdk-cli/src/application/mod.rs).
+The broadcast command contract lives in `iracing-broadcast-cli`; the SDK CLI
+composes it alongside its own live command contracts without introducing an SDK
+dependency into the standalone broadcast CLI.
+
 ## Primary runtime paths
 
 Recorded telemetry:

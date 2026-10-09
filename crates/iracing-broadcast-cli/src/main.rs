@@ -1,3 +1,5 @@
+mod application;
+
 use clap::Parser;
 
 #[derive(Parser)]
@@ -20,13 +22,16 @@ fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
+    let mut application = application::Application::new();
+
     #[cfg(not(windows))]
     {
+        let _ = &mut application;
         Err(anyhow::anyhow!("Broadcast commands only run on Windows."))
     }
 
     #[cfg(windows)]
     {
-        Cli::parse().command.run()
+        Cli::parse().command.run(&mut application)
     }
 }

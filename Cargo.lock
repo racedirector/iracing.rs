@@ -1145,6 +1145,7 @@ dependencies = [
  "csv",
  "futures",
  "iracing-broadcast-cli",
+ "iracing-broadcast-sdk",
  "iracing-irsdk",
  "iracing-sdk",
  "schemars",

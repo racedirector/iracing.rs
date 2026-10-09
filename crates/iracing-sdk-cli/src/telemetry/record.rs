@@ -1,10 +1,7 @@
+use crate::dependencies::LiveFrames;
 use anyhow::{Context, Result, ensure};
-use iracing_sdk::LayoutProvider;
 
-use crate::{
-    utils::LiveTelemetry,
-    writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter},
-};
+use crate::writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter};
 
 /// Records a live connection to the given format at output.
 #[derive(clap::Args, Debug)]
@@ -19,9 +16,8 @@ pub(crate) struct Args {
 }
 
 impl Args {
-    pub(crate) async fn run(&self) -> Result<()> {
-        let mut telemetry = LiveTelemetry::try_connect()?;
-        let variables = telemetry.fields_owned();
+    pub(crate) async fn run(&self, dependencies: &mut impl LiveFrames) -> Result<()> {
+        let variables = dependencies.live_fields()?;
         ensure!(
             !variables.is_empty(),
             "No telemetry variables were available from the live connection"
@@ -41,7 +37,7 @@ impl Args {
                     result.context("Failed to listen for Ctrl+C")?;
                     break;
                 }
-                frame = telemetry.next_frame_async() => {
+                frame = dependencies.next_live_frame_async() => {
                     let Some(packet) = frame? else { break };
                     writer.write(&packet)?;
                     frame_count += 1;
@@ -53,6 +49,46 @@ impl Args {
         }
         writer.finalize()?;
         tracing::info!(frames_exported = frame_count, "Finished live export");
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+    struct EmptyFrames;
+    impl LiveFrames for EmptyFrames {
+        fn live_fields(&mut self) -> Result<Vec<iracing_sdk::FieldLayout>> {
+            Ok(vec![])
+        }
+        fn next_live_frame(&mut self) -> Result<iracing_sdk::FramePacket> {
+            panic!("record uses async capture")
+        }
+        async fn next_live_frame_async(&mut self) -> Result<Option<iracing_sdk::FramePacket>> {
+            panic!("empty layout must fail before capture")
+        }
+    }
+    #[tokio::test]
+    async fn injected_empty_layout_fails_before_creating_output() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let output = directory.path().join("record.csv");
+        let crate::Command::Telemetry {
+            command: crate::telemetry::Command::Record(args),
+        } = crate::Cli::try_parse_from([
+            "iracing-sdk",
+            "telemetry",
+            "record",
+            "--output",
+            output.to_str().unwrap(),
+        ])?
+        .command
+        else {
+            panic!("expected record command")
+        };
+        let error = args.run(&mut EmptyFrames).await.unwrap_err();
+        assert!(error.to_string().contains("No telemetry variables"));
+        assert!(!output.exists());
         Ok(())
     }
 }

@@ -16,11 +16,14 @@ pub enum Command {
 
 impl Command {
     /// Execute the selected session snapshot, discovery, or schema command and propagate its errors.
-    pub(crate) fn run(self) -> Result<()> {
+    pub(crate) fn run(
+        self,
+        dependencies: &mut impl crate::dependencies::LiveSessions,
+    ) -> Result<()> {
         match self {
-            Command::Snapshot(args) => args.run(),
-            Command::Discover(args) => args.run(),
-            Command::Schema(args) => args.run(),
+            Command::Snapshot(args) => args.run(dependencies),
+            Command::Discover(args) => args.run(dependencies),
+            Command::Schema(args) => args.run(dependencies),
         }
     }
 }

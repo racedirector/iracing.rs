@@ -1,5 +1,6 @@
+use crate::dependencies::LiveSessions;
 use crate::{
-    utils::SourceKind,
+    utils::{DiskTelemetry, SourceKind},
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 use anyhow::{Context, Result};
@@ -21,13 +22,17 @@ pub(crate) struct Args {
 }
 
 impl Args {
-    pub(crate) fn run(self) -> Result<()> {
-        let schema = self
-            .source
-            .open()?
-            .session_info()?
-            .map(|info| schema_for_value!(info))
-            .context("No session info found")?;
+    pub(crate) fn run(
+        self,
+        #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveSessions,
+    ) -> Result<()> {
+        let schema = match self.source {
+            SourceKind::Ibt { extra } => DiskTelemetry::open(&extra.path)?.session_info()?,
+            #[cfg(windows)]
+            SourceKind::Live { .. } => dependencies.live_session()?,
+        }
+        .map(|info| schema_for_value!(info))
+        .context("No session info found")?;
 
         let mut writer = DocumentWriter::from_parts(self.output.clone(), self.format)?;
         writer.write(&schema)?;

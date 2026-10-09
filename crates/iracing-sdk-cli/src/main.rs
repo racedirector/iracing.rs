@@ -1,3 +1,8 @@
+// Production simulator commands are Windows-only; retain portable adapters/contracts.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod application;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod dependencies;
 mod headers;
 mod session;
 mod telemetry;
@@ -42,14 +47,21 @@ enum Command {
 
 impl Command {
     /// Execute the selected tool command and propagate its errors.
-    pub async fn run(self) -> Result<()> {
+    pub async fn run<D>(self, dependencies: &mut D) -> Result<()>
+    where
+        D: iracing_broadcast_cli::BroadcastCommands
+            + dependencies::LiveHeaders
+            + dependencies::LiveSessions
+            + dependencies::LiveVariables
+            + dependencies::LiveFrames,
+    {
         match self {
-            Command::Session { command } => command.run(),
+            Command::Session { command } => command.run(dependencies),
             #[cfg(windows)]
-            Command::Broadcast { command } => command.run(),
-            Command::Headers(args) => args.run(),
-            Command::Variables(args) => args.run(),
-            Command::Telemetry { command } => command.run().await,
+            Command::Broadcast { command } => command.run(dependencies),
+            Command::Headers(args) => args.run(dependencies),
+            Command::Variables(args) => args.run(dependencies),
+            Command::Telemetry { command } => command.run(dependencies).await,
         }
     }
 }
@@ -63,7 +75,8 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    Cli::parse().command.run().await?;
+    let mut application = application::Application::new();
+    Cli::parse().command.run(&mut application).await?;
 
     Ok(())
 }

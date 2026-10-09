@@ -1,8 +1,6 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-#[cfg(windows)]
-use iracing_sdk::WindowsConnection;
 use iracing_sdk::{
     FramePacket, LayoutProvider, TelemetryLayout,
     ibt::{IbtReader, RecordedFrame},
@@ -13,9 +11,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-#[cfg(windows)]
-use std::time::Duration;
 
 pub struct DiskTelemetry {
     pub reader: IbtReader,
@@ -134,157 +129,6 @@ impl LayoutProvider for DiskTelemetry {
     }
 }
 
-#[cfg(windows)]
-pub struct LiveTelemetry {
-    pub connection: WindowsConnection,
-    pub layout: Arc<TelemetryLayout>,
-}
-
-#[cfg(windows)]
-impl LiveTelemetry {
-    /// Open live shared memory and validate its telemetry layout without waiting
-    /// for the simulator to become connected.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if telemetry is not connected. Propagates shared-memory
-    /// setup, header access, frame-size conversion, variable header, and layout
-    /// validation errors.
-    pub(crate) fn try_connect() -> Result<Self> {
-        let connection = match WindowsConnection::try_connect() {
-            Ok(c) if c.is_connected() => c,
-            Ok(_) => {
-                return Err(anyhow::anyhow!(
-                    "Shared memory opened but telemetry is not connected yet"
-                ));
-            }
-            Err(e) => return Err(anyhow::anyhow!(e)),
-        };
-
-        Self::from_connection(connection)
-    }
-
-    pub(crate) fn from_connection(connection: WindowsConnection) -> Result<Self> {
-        let frame_size = usize::try_from(connection.header_snapshot()?.buffer_length)?;
-        let headers = connection.variable_headers()?;
-        let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
-
-        Ok(Self {
-            connection,
-            layout: Arc::new(layout),
-        })
-    }
-
-    /// Wait cooperatively for a frame, or finish when the simulator disconnects.
-    /// Canceling this future leaves at most one bounded native wait in progress.
-    pub(crate) async fn next_frame_async(&mut self) -> Result<Option<FramePacket>> {
-        loop {
-            if !self.connection.is_connected() {
-                return Ok(None);
-            }
-            if let Some(frame) = self.connection.get_new_data()? {
-                return Ok(Some(FramePacket::new(
-                    frame.data,
-                    u32::try_from(frame.tick)?,
-                    u32::try_from(frame.session_info_update)?,
-                    Arc::clone(&self.layout),
-                )?));
-            }
-            self.connection
-                .wait_for_update_async(Duration::from_millis(500))
-                .await?;
-        }
-    }
-
-    /// Block until a new live frame can be returned with the retained layout.
-    ///
-    /// The first observed tick establishes a baseline without yielding a frame.
-    /// Waits retry after each 500 ms timeout while connected; there is no overall
-    /// timeout. A disconnect ends capture with an error.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the source disconnects. Propagates acquisition and
-    /// wait errors. Also returns an error if the tick or session update counter
-    /// cannot fit in `u32`, or the frame size differs from the retained layout.
-    pub(crate) fn next_frame(&mut self) -> Result<FramePacket> {
-        loop {
-            if !self.connection.is_connected() {
-                anyhow::bail!("Live telemetry disconnected before a frame was available");
-            }
-            if let Some(frame) = self.connection.get_new_data()? {
-                return Ok(FramePacket::new(
-                    frame.data,
-                    u32::try_from(frame.tick)?,
-                    u32::try_from(frame.session_info_update)?,
-                    Arc::clone(&self.layout),
-                )?);
-            }
-
-            // Wait up to 500ms for an update
-            self.connection
-                .wait_for_update(Duration::from_millis(500))?;
-        }
-    }
-}
-
-#[cfg(windows)]
-impl SessionInformationBytesProvider for LiveTelemetry {
-    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
-        self.connection.session_info_snapshot()
-    }
-}
-
-#[cfg(windows)]
-impl VariableHeadersProvider for LiveTelemetry {
-    fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
-        self.connection.variable_headers()
-    }
-}
-
-#[cfg(windows)]
-impl LayoutProvider for LiveTelemetry {
-    fn layout(&self) -> &std::sync::Arc<TelemetryLayout> {
-        &self.layout
-    }
-}
-
-pub(crate) enum TelemetrySource {
-    Disk(Box<DiskTelemetry>),
-    #[cfg(windows)]
-    Live(LiveTelemetry),
-}
-
-impl SessionInformationBytesProvider for TelemetrySource {
-    fn session_info_snapshot(&self) -> iracing_sdk::Result<Option<iracing_sdk::SessionInfoBytes>> {
-        match self {
-            Self::Disk(telemetry) => telemetry.session_info_snapshot(),
-            #[cfg(windows)]
-            Self::Live(telemetry) => telemetry.session_info_snapshot(),
-        }
-    }
-}
-
-impl VariableHeadersProvider for TelemetrySource {
-    fn variable_headers(&self) -> iracing_sdk::Result<iracing_sdk::VariableHeaders> {
-        match self {
-            Self::Disk(telemetry) => telemetry.variable_headers(),
-            #[cfg(windows)]
-            Self::Live(telemetry) => telemetry.variable_headers(),
-        }
-    }
-}
-
-impl LayoutProvider for TelemetrySource {
-    fn layout(&self) -> &std::sync::Arc<TelemetryLayout> {
-        match self {
-            Self::Disk(telemetry) => telemetry.layout(),
-            #[cfg(windows)]
-            Self::Live(telemetry) => telemetry.layout(),
-        }
-    }
-}
-
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct NoArgs {}
 
@@ -316,18 +160,6 @@ pub(crate) enum SourceKind<
         #[command(flatten)]
         extra: LiveExtra,
     },
-}
-
-impl SourceKind {
-    pub(crate) fn open(&self) -> Result<TelemetrySource> {
-        match self {
-            Self::Ibt { extra } => Ok(TelemetrySource::Disk(Box::new(DiskTelemetry::open(
-                &extra.path,
-            )?))),
-            #[cfg(windows)]
-            Self::Live { .. } => Ok(TelemetrySource::Live(LiveTelemetry::try_connect()?)),
-        }
-    }
 }
 
 #[cfg(test)]
