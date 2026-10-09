@@ -36,6 +36,7 @@ impl Command {
     pub async fn run<D>(self, dependencies: &mut D) -> Result<()>
     where
         D: iracing_broadcast_cli::BroadcastCommands
+            + iracing_broadcast_cli::ReplaySessions
             + dependencies::LiveHeaders
             + dependencies::LiveSessions
             + dependencies::LiveVariables

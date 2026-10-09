@@ -1,9 +1,11 @@
 mod commands;
 mod parser;
+pub mod session_select;
 
 use anyhow::Result;
 use clap::Subcommand;
 use iracing_broadcast_sdk::Command as BroadcastCommand;
+pub use session_select::{ReplaySession, SessionSelector, SessionTime};
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
@@ -62,6 +64,24 @@ pub trait BroadcastCommands {
     fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()>;
 }
 
+/// Sessions available for replay lookup.
+///
+/// Implementations own live session acquisition and readiness policy, including
+/// any bounded wait for session metadata, and map the result into the
+/// command-owned [`ReplaySession`] view. Acquisition failures return an error;
+/// an empty list means the metadata published no sessions, not that the
+/// simulator is absent. Fakes can script sessions without simulator
+/// infrastructure, on any platform.
+pub trait ReplaySessions {
+    /// Return the sessions currently available for replay lookup.
+    ///
+    /// # Errors
+    ///
+    /// Propagates implementation-specific initialization, acquisition, and
+    /// readiness failures.
+    fn replay_sessions(&mut self) -> Result<Vec<ReplaySession>>;
+}
+
 /// Shared transport adapter for CLI application composition.
 ///
 /// Each application owns its own instance and chooses when to initialize it.
@@ -118,30 +138,27 @@ impl BroadcastCommands for BroadcastClient {
 }
 
 impl Command {
-    /// Execute using only the injected broadcast capability.
+    /// Execute using the injected capabilities.
+    ///
+    /// Every command dispatches through [`BroadcastCommands`]; the replay
+    /// group additionally resolves session selectors against
+    /// [`ReplaySessions`] before its wire command is built.
     ///
     /// # Errors
     ///
-    /// Propagates errors from the dependency, including unsupported-platform,
-    /// initialization, encoding, and dispatch errors in production applications.
-    pub fn run(self, dependencies: &mut (impl BroadcastCommands + ?Sized)) -> Result<()> {
-        dependencies.send_broadcast(self.into())
-    }
-}
-
-impl From<Command> for BroadcastCommand {
-    /// Build the selected SDK command without sending it.
-    ///
-    fn from(command: Command) -> Self {
-        match command {
-            Command::Telemetry { command } => command.into(),
-            Command::Ffb { command } => command.into(),
-            Command::Video { command } => command.into(),
-            Command::Textures { command } => command.into(),
-            Command::Chat { command } => command.into(),
-            Command::Camera { command } => command.into(),
-            Command::Replay { command } => command.into(),
-            Command::Pit { command } => command.into(),
+    /// Propagates errors from the dependencies, including unsupported-platform,
+    /// initialization, session acquisition and resolution, encoding, and
+    /// dispatch errors in production applications.
+    pub fn run(self, app: &mut (impl BroadcastCommands + ReplaySessions + ?Sized)) -> Result<()> {
+        match self {
+            Command::Camera { command } => app.send_broadcast(command.into()),
+            Command::Replay { command } => command.run(app),
+            Command::Chat { command } => app.send_broadcast(command.into()),
+            Command::Pit { command } => app.send_broadcast(command.into()),
+            Command::Textures { command } => app.send_broadcast(command.into()),
+            Command::Telemetry { command } => app.send_broadcast(command.into()),
+            Command::Ffb { command } => app.send_broadcast(command.into()),
+            Command::Video { command } => app.send_broadcast(command.into()),
         }
     }
 }
@@ -170,13 +187,55 @@ mod tests {
         TestCli::try_parse_from(std::iter::once("iracing-broadcast").chain(args)).is_err()
     }
 
+    fn wire(command: Command) -> BroadcastCommand {
+        match command {
+            Command::Camera { command } => command.into(),
+            Command::Replay { .. } => {
+                unreachable!("replay dispatch is covered by the run-path tests")
+            }
+            Command::Chat { command } => command.into(),
+            Command::Pit { command } => command.into(),
+            Command::Textures { command } => command.into(),
+            Command::Telemetry { command } => command.into(),
+            Command::Ffb { command } => command.into(),
+            Command::Video { command } => command.into(),
+        }
+    }
+
+    fn session(number: u16, kind: &str, name: Option<&str>) -> ReplaySession {
+        ReplaySession {
+            number,
+            session_type: kind.to_string(),
+            name: name.map(str::to_string),
+        }
+    }
+
+    fn weekend_sessions() -> Vec<ReplaySession> {
+        vec![
+            session(0, "Practice", Some("Practice")),
+            session(1, "Qualify", Some("Qualify")),
+            session(2, "Race", Some("Race")),
+        ]
+    }
+
     #[derive(Default)]
-    struct FakeBroadcast(Vec<BroadcastCommand>);
+    struct FakeBroadcast {
+        sent: Vec<BroadcastCommand>,
+        sessions: Option<Vec<ReplaySession>>,
+    }
 
     impl BroadcastCommands for FakeBroadcast {
         fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()> {
-            self.0.push(command);
+            self.sent.push(command);
             Ok(())
+        }
+    }
+
+    impl ReplaySessions for FakeBroadcast {
+        fn replay_sessions(&mut self) -> Result<Vec<ReplaySession>> {
+            self.sessions
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("fake has no session metadata"))
         }
     }
 
@@ -186,7 +245,7 @@ mod tests {
         parse_command(["replay", "search", "previous-session"]).run(&mut dependency)?;
         parse_command(["camera", "set-state", "--raw-bits", "8"]).run(&mut dependency)?;
         assert_eq!(
-            dependency.0,
+            dependency.sent,
             [
                 BroadcastCommand::ReplaySearch(ReplaySearchMode::PreviousSession),
                 BroadcastCommand::CameraSetState(CameraState::from_bits_retain(8)),
@@ -201,6 +260,11 @@ mod tests {
         impl BroadcastCommands for FailingBroadcast {
             fn send_broadcast(&mut self, _: BroadcastCommand) -> Result<()> {
                 anyhow::bail!("fake dispatch failure")
+            }
+        }
+        impl ReplaySessions for FailingBroadcast {
+            fn replay_sessions(&mut self) -> Result<Vec<ReplaySession>> {
+                Ok(Vec::new())
             }
         }
         let error = parse_command(["replay", "search", "previous-session"])
@@ -226,10 +290,7 @@ mod tests {
         ]);
 
         let expected = CameraState::USER_INTERFACE_HIDDEN.union(CameraState::USE_MOUSE_AIM_MODE);
-        assert_eq!(
-            BroadcastCommand::from(command),
-            BroadcastCommand::CameraSetState(expected)
-        );
+        assert_eq!(wire(command), BroadcastCommand::CameraSetState(expected));
     }
 
     #[test]
@@ -237,7 +298,7 @@ mod tests {
         let command = parse_command(["camera", "set-state", "--raw-bits", "8"]);
 
         assert_eq!(
-            BroadcastCommand::from(command),
+            wire(command),
             BroadcastCommand::CameraSetState(CameraState::from_bits_retain(8))
         );
     }
@@ -261,21 +322,161 @@ mod tests {
 
     #[test]
     fn replay_search_parses_domain_mode() {
-        let command = parse_command(["replay", "search", "previous-session"]);
+        let Command::Replay {
+            command: commands::ReplayCommand::Direct(direct),
+        } = parse_command(["replay", "search", "previous-session"])
+        else {
+            panic!("expected a direct replay search");
+        };
 
         assert_eq!(
-            BroadcastCommand::from(command),
+            BroadcastCommand::from(direct),
             BroadcastCommand::ReplaySearch(ReplaySearchMode::PreviousSession)
         );
     }
 
     #[test]
     fn replay_position_parses_domain_mode() {
-        let command = parse_command(["replay", "set-play-position", "current", "--frame", "123"]);
+        let Command::Replay {
+            command: commands::ReplayCommand::Direct(direct),
+        } = parse_command(["replay", "set-play-position", "current", "--frame", "123"])
+        else {
+            panic!("expected a direct replay position command");
+        };
 
         assert_eq!(
-            BroadcastCommand::from(command),
+            BroadcastCommand::from(direct),
             BroadcastCommand::ReplaySetPlayPosition(ReplayPositionMode::Current, 123)
         );
+    }
+
+    #[test]
+    fn replay_group_keeps_direct_subcommands_alongside_resolved_search() {
+        assert!(matches!(
+            parse_command(["replay", "pause"]),
+            Command::Replay {
+                command: commands::ReplayCommand::Direct(commands::DirectReplayCommand::Pause),
+            }
+        ));
+        assert!(matches!(
+            parse_command(["replay", "erase"]),
+            Command::Replay {
+                command: commands::ReplayCommand::Direct(commands::DirectReplayCommand::Erase),
+            }
+        ));
+    }
+
+    #[test]
+    fn search_session_time_parses_typed_selectors() {
+        let Command::Replay {
+            command: commands::ReplayCommand::SearchSessionTime { session, time },
+        } = parse_command([
+            "replay",
+            "search-session-time",
+            "--session",
+            "race",
+            "--time",
+            "7:50",
+        ])
+        else {
+            panic!("expected a resolved session-time search");
+        };
+        assert_eq!(session.key(), Some("race"));
+        assert!(!session.is_number());
+        assert_eq!(time.millis(), 470_000);
+    }
+
+    #[test]
+    fn search_session_time_rejects_bad_selector_syntax_at_parse_time() {
+        assert!(command_parse_fails([
+            "replay",
+            "search-session-time",
+            "--session",
+            "race",
+            "--time",
+            "5:70"
+        ]));
+        assert!(command_parse_fails([
+            "replay",
+            "search-session-time",
+            "--session",
+            "race"
+        ]));
+        assert!(command_parse_fails([
+            "replay",
+            "search-session-time",
+            "--time",
+            "20"
+        ]));
+        assert!(command_parse_fails([
+            "replay",
+            "search-session-time",
+            "--session",
+            "99999",
+            "--time",
+            "20"
+        ]));
+        assert!(command_parse_fails([
+            "replay",
+            "search-session-time",
+            "--session",
+            "race",
+            "--time-ms",
+            "1000"
+        ]));
+    }
+
+    #[test]
+    fn search_session_time_dispatches_resolved_selector() -> Result<()> {
+        let mut dependency = FakeBroadcast {
+            sent: Vec::new(),
+            sessions: Some(weekend_sessions()),
+        };
+        parse_command([
+            "replay",
+            "search-session-time",
+            "--session",
+            "race",
+            "--time",
+            "7:50",
+        ])
+        .run(&mut dependency)?;
+        parse_command([
+            "replay",
+            "search-session-time",
+            "--session",
+            "0",
+            "--time",
+            "0",
+        ])
+        .run(&mut dependency)?;
+        assert_eq!(
+            dependency.sent,
+            [
+                BroadcastCommand::ReplaySearchSessionTime(2, 470_000),
+                BroadcastCommand::ReplaySearchSessionTime(0, 0),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn search_session_time_resolution_failure_prevents_dispatch() {
+        let mut dependency = FakeBroadcast {
+            sent: Vec::new(),
+            sessions: Some(weekend_sessions()),
+        };
+        let error = parse_command([
+            "replay",
+            "search-session-time",
+            "--session",
+            "bogus",
+            "--time",
+            "1",
+        ])
+        .run(&mut dependency)
+        .unwrap_err();
+        assert!(error.to_string().contains("available sessions"));
+        assert!(dependency.sent.is_empty());
     }
 }

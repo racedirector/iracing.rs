@@ -23,7 +23,7 @@ mod live;
 
 use crate::commands::dependencies::{LiveFrames, LiveHeaders, LiveSessions, LiveVariables};
 use anyhow::Result;
-use iracing_broadcast_cli::{BroadcastClient, BroadcastCommands};
+use iracing_broadcast_cli::{BroadcastClient, BroadcastCommands, ReplaySession, ReplaySessions};
 use iracing_broadcast_sdk::Command;
 use iracing_irsdk::Header;
 use iracing_sdk::{FieldLayout, FramePacket, VariableHeaders, schema::SessionInfo};
@@ -98,6 +98,21 @@ impl<B, L: LiveHeaders, F, G: FnMut() -> Result<L>> LiveHeaders for Application<
 impl<B, L: LiveSessions, F, G: FnMut() -> Result<L>> LiveSessions for Application<B, L, F, G> {
     fn live_session(&mut self) -> Result<Option<SessionInfo>> {
         self.live()?.live_session()
+    }
+}
+impl<B, L: LiveSessions, F, G: FnMut() -> Result<L>> ReplaySessions for Application<B, L, F, G> {
+    /// Snapshot the published session list for replay lookup; an absent
+    /// session is reported as an empty list for the command layer to reject.
+    fn replay_sessions(&mut self) -> Result<Vec<ReplaySession>> {
+        let Some(session_info) = self.live()?.live_session()? else {
+            return Ok(Vec::new());
+        };
+        session_info
+            .session_info
+            .sessions
+            .iter()
+            .map(ReplaySession::from_live_session)
+            .collect()
     }
 }
 impl<B, L: LiveVariables, F, G: FnMut() -> Result<L>> LiveVariables for Application<B, L, F, G> {

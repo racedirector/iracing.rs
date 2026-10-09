@@ -1,3 +1,6 @@
+use crate::session_select::{SessionSelector, SessionTime, resolve_session};
+use crate::{BroadcastCommands, ReplaySessions};
+use anyhow::Result;
 use iracing_broadcast_sdk::{
     CameraState, ChatCommandMode, Command as BroadcastCommand, PitCommand as SdkPitCommand,
     ReplayPositionMode, ReplaySearchMode, ReplayStateMode, TelemetryCommandMode, VideoCaptureMode,
@@ -46,7 +49,7 @@ pub enum CameraCommand {
     SwitchNumber {
         #[arg(long)]
         car_number: String,
-        #[arg(long)]
+        #[arg(long, default_value_t = 0)]
         group: u16,
         #[arg(long, default_value_t = 0)]
         camera: u16,
@@ -76,7 +79,8 @@ impl From<CameraCommand> for BroadcastCommand {
 }
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq)]
-pub enum ReplayCommand {
+/// Direct replay wire operations, converted without live state.
+pub enum DirectReplayCommand {
     /// Set replay play speed
     SetPlaySpeed {
         #[arg(long)]
@@ -98,40 +102,84 @@ pub enum ReplayCommand {
     },
     /// Erase replay tape
     Erase,
-    /// Search for a provided session time
-    SearchSessionTime {
-        #[arg(long)]
-        session: u16,
-        #[arg(long)]
-        time_ms: u32,
-    },
     Normal,
     Slow16,
     /// Pause the replay
     Pause,
 }
 
-impl From<ReplayCommand> for BroadcastCommand {
+/// Replay commands: the direct wire operations plus the live-resolved
+/// session-time search.
+#[derive(clap::Subcommand, Debug, Clone)]
+pub enum ReplayCommand {
+    /// Jump the replay playhead to a session and time resolved against the
+    /// live session metadata. `--session` accepts a numeric session number or
+    /// a human selector (`race`, `practice`, `qualify`, `heat`, or a published
+    /// session name); `--time` is `SS`, `MM:SS`, or `HH:MM:SS`. Missing or
+    /// ambiguous selectors are rejected with the available sessions listed;
+    /// nothing is guessed.
+    SearchSessionTime {
+        /// Session number or name, resolved against live session metadata
+        #[arg(long)]
+        session: SessionSelector,
+        /// Session time as `SS`, `MM:SS`, or `HH:MM:SS` (e.g. `5:31:20`)
+        #[arg(long)]
+        time: SessionTime,
+    },
+    /// Direct replay wire commands
+    #[command(flatten)]
+    Direct(DirectReplayCommand),
+}
+
+impl ReplayCommand {
+    /// Execute the replay command through the injected capabilities.
+    ///
+    /// `SearchSessionTime` resolves its typed selectors against
+    /// [`ReplaySessions`] and dispatches the resolved low-level
+    /// `ReplaySearchSessionTime` wire command; the direct commands convert and
+    /// dispatch unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Propagates session acquisition, resolution, initialization, and
+    /// dispatch failures.
+    pub(crate) fn run(
+        self,
+        app: &mut (impl BroadcastCommands + ReplaySessions + ?Sized),
+    ) -> Result<()> {
+        match self {
+            Self::SearchSessionTime { session, time } => {
+                let resolved = resolve_session(&session, &app.replay_sessions()?)?;
+                app.send_broadcast(BroadcastCommand::ReplaySearchSessionTime(
+                    resolved.number,
+                    time.millis(),
+                ))
+            }
+            Self::Direct(direct) => app.send_broadcast(direct.into()),
+        }
+    }
+}
+
+impl From<DirectReplayCommand> for BroadcastCommand {
     /// Build a replay broadcast command, expanding playback shortcuts.
     ///
     /// `Normal`, `Slow16`, and `Pause` select speed/slow-motion pairs `(1, false)`,
-    /// `(16, true)`, and `(0, false)`, respectively. Session times remain in milliseconds.
-    fn from(value: ReplayCommand) -> Self {
+    /// `(16, true)`, and `(0, false)`, respectively.
+    fn from(value: DirectReplayCommand) -> Self {
         match value {
-            ReplayCommand::SetPlaySpeed { speed, slow_motion } => {
+            DirectReplayCommand::SetPlaySpeed { speed, slow_motion } => {
                 BroadcastCommand::ReplaySetPlaySpeed(speed, slow_motion)
             }
-            ReplayCommand::Search { mode } => BroadcastCommand::ReplaySearch(mode),
-            ReplayCommand::SetPlayPosition { mode, frame } => {
+            DirectReplayCommand::Search { mode } => BroadcastCommand::ReplaySearch(mode),
+            DirectReplayCommand::SetPlayPosition { mode, frame } => {
                 BroadcastCommand::ReplaySetPlayPosition(mode, frame)
             }
-            ReplayCommand::Erase => BroadcastCommand::ReplaySetState(ReplayStateMode::EraseTape),
-            ReplayCommand::SearchSessionTime { session, time_ms } => {
-                BroadcastCommand::ReplaySearchSessionTime(session, time_ms)
+            DirectReplayCommand::Erase => {
+                BroadcastCommand::ReplaySetState(ReplayStateMode::EraseTape)
             }
-            ReplayCommand::Normal => BroadcastCommand::ReplaySetPlaySpeed(1, false),
-            ReplayCommand::Slow16 => BroadcastCommand::ReplaySetPlaySpeed(16, true),
-            ReplayCommand::Pause => BroadcastCommand::ReplaySetPlaySpeed(0, false),
+            DirectReplayCommand::Normal => BroadcastCommand::ReplaySetPlaySpeed(1, false),
+            DirectReplayCommand::Slow16 => BroadcastCommand::ReplaySetPlaySpeed(16, true),
+            DirectReplayCommand::Pause => BroadcastCommand::ReplaySetPlaySpeed(0, false),
         }
     }
 }
