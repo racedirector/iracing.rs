@@ -15,8 +15,10 @@ Rust workspace for working with iRacing telemetry and simulation state:
 ## Crates
 
 - [`crates/iracing-irsdk`](crates/iracing-irsdk) — dependency-light Rust representations of the native SDK wire contract: fixed-layout headers, variable metadata, constants, enums, flags, and broadcast command values.
-- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing (`SessionInfo::parse`), telemetry decoding (`VarData`/`TelemetryLayout`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory + broadcast tools.
-- [`crates/iracing-sdk-cli`](crates/iracing-sdk-cli) — the consolidated `iracing-sdk` CLI for telemetry export, snapshots, session schemas, metadata, and broadcast commands.
+- [`crates/iracing-broadcast-sdk`](crates/iracing-broadcast-sdk) — typed iRacing broadcast commands plus the Windows transport used to dispatch them.
+- [`crates/iracing-broadcast-cli`](crates/iracing-broadcast-cli) — the standalone Windows-only `iracing-broadcast` CLI for camera, replay, chat, pit, telemetry, force-feedback, texture, and capture operations. Start with its [user README](crates/iracing-broadcast-cli/README.md).
+- [`crates/iracing-sdk`](crates/iracing-sdk) — low-level telemetry plus the streaming adapter APIs: `.ibt` reader (`IbtReader`), session YAML parsing (`SessionInfo::parse`), telemetry decoding (`VarData`/`TelemetryLayout`), `Provider`, `FramePacket`, `FrameAdapter`, `DynamicFrame`, `IbtProvider`, the Windows-only `LiveProvider`, and Windows-only shared-memory telemetry tools.
+- [`crates/iracing-sdk-cli`](crates/iracing-sdk-cli) — the consolidated `iracing-sdk` CLI for telemetry export, snapshots, session schemas, and metadata.
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-fixtures`](crates/test-fixtures) — unpublished Rust tooling for deterministic `.ibt` fixture generation, verification, and drift checks.
 
@@ -76,7 +78,7 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo iracing-sdk session schema ibt --path <FILE.ibt>` | Generate session schema from a recording. |
 | `cargo iracing-sdk session schema live` | Generate live session schema (Windows). |
 | `cargo iracing-sdk variables ibt --path <FILE.ibt>` | Export variable metadata. |
-| `cargo iracing-sdk broadcast --help` | Inspect simulator broadcast commands (Windows). |
+| `cargo iracing-broadcast --help` | Inspect standalone simulator broadcast commands (Windows). |
 
 ## Development Notes
 
@@ -101,7 +103,8 @@ Defined in `.cargo/config.toml` for convenience:
 
 ## Additional Resources
 
+- Broadcast CLI users should start with [`crates/iracing-broadcast-cli/README.md`](crates/iracing-broadcast-cli/README.md) and `cargo iracing-broadcast --help`.
 - Per-crate guidance lives alongside each package (`crates/*/AGENTS.md`). Start there for deep-dive development tips.
-- Inspect the consolidated commands with `cargo iracing-sdk --help` and each subcommand's `--help`.
+- Inspect the consolidated telemetry commands with `cargo iracing-sdk --help` and each subcommand's `--help`.
 - Telemetry consumer examples reside under `examples/` in the respective crates; run them with `cargo run -p <crate> --example <name> -- --help` to inspect options.
 - Release notes and packaging pointers live in `docs/releasing.md`.
