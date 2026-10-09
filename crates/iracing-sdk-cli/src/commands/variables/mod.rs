@@ -22,6 +22,15 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Write and flush variable descriptions from the IBT or injected live source.
+    ///
+    /// File output is created or truncated only after headers are acquired.
+    /// An empty header snapshot is written as an empty collection.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source initialization, acquisition, metadata decoding,
+    /// serialization, and output errors.
     pub(crate) fn run(
         self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveVariables,

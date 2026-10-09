@@ -22,6 +22,15 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Write and flush unknown session fields from the IBT or injected live source.
+    ///
+    /// An absent session produces an empty list. File output is created or
+    /// truncated only after session acquisition and parsing succeed.
+    ///
+    /// # Errors
+    ///
+    /// Propagates source initialization, acquisition, session parsing,
+    /// serialization, and output errors; these do not produce an empty list.
     pub(crate) fn run(
         self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveSessions,

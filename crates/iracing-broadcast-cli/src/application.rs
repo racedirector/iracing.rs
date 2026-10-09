@@ -22,12 +22,14 @@ pub(crate) struct Application<B = BroadcastClient, F = fn() -> Result<B>> {
 }
 
 impl Application {
+    /// Create an application without initializing any simulator resources.
     pub(crate) fn new() -> Self {
         Self::with_initializer(BroadcastClient::new)
     }
 }
 
 impl<B, F: FnMut() -> Result<B>> Application<B, F> {
+    /// Retain a broadcast initializer without calling it until first dispatch.
     fn with_initializer(initialize_broadcast: F) -> Self {
         Self {
             broadcast: None,
@@ -37,6 +39,10 @@ impl<B, F: FnMut() -> Result<B>> Application<B, F> {
 }
 
 impl<B: BroadcastCommands, F: FnMut() -> Result<B>> BroadcastCommands for Application<B, F> {
+    /// Initialize the broadcast client on first use and dispatch the command.
+    ///
+    /// Propagates initialization and dispatch errors. Failed initialization is
+    /// retried on the next call; dispatch errors retain the initialized client.
     fn send_broadcast(&mut self, command: Command) -> Result<()> {
         let client = match &mut self.broadcast {
             Some(client) => client,

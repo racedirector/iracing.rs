@@ -21,6 +21,15 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Write and flush the IBT header followed by its disk header, or one live header.
+    ///
+    /// Uses the injected capability for live input. File output is created or
+    /// truncated before source acquisition, even if acquisition fails.
+    ///
+    /// # Errors
+    ///
+    /// Propagates output creation, source initialization and acquisition,
+    /// serialization, and flush errors.
     pub(crate) fn run(
         self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveHeaders,

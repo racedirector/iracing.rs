@@ -18,6 +18,17 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Record injected live frames as CSV or JSONL until Ctrl+C or disconnection.
+    ///
+    /// Rejects an empty field list before opening output. Otherwise, file output
+    /// is created or truncated before waiting for frames. Flushes output after
+    /// Ctrl+C or when the source returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates field and frame acquisition, telemetry decoding, serialization,
+    /// output, and Ctrl+C listener errors, including dependency initialization
+    /// failures. An error after opening output may leave a partial recording.
     pub(crate) async fn run(&self, dependencies: &mut impl LiveFrames) -> Result<()> {
         let variables = dependencies.live_fields()?;
         ensure!(

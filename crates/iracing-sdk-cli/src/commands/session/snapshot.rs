@@ -21,6 +21,15 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Write and flush the decoded session from the IBT or injected live source.
+    ///
+    /// File output is created or truncated only after a session has been acquired
+    /// and parsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no session is available. Propagates source
+    /// initialization, acquisition, session parsing, serialization, and output errors.
     pub(crate) fn run(
         self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveSessions,

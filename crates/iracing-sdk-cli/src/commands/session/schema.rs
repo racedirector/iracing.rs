@@ -22,6 +22,15 @@ pub(crate) struct Args {
 }
 
 impl Args {
+    /// Generate and write a schema from the IBT or injected live session value.
+    ///
+    /// File output is created or truncated only after a session is available
+    /// and its schema has been generated. Flushes output on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no session is available. Propagates source
+    /// initialization, acquisition, session parsing, serialization, and output errors.
     pub(crate) fn run(
         self,
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveSessions,

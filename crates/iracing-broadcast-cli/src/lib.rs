@@ -98,6 +98,12 @@ impl BroadcastClient {
 }
 
 impl BroadcastCommands for BroadcastClient {
+    /// Send the command through the retained Windows broadcast client.
+    ///
+    /// # Errors
+    ///
+    /// Propagates command encoding and Win32 dispatch errors on Windows.
+    /// Returns an unsupported-platform error elsewhere.
     fn send_broadcast(&mut self, command: BroadcastCommand) -> Result<()> {
         #[cfg(windows)]
         {
