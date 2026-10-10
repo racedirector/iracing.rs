@@ -1,8 +1,9 @@
 use anyhow::Result;
+use iracing_sdk::IbtFile;
 
 use crate::{
     commands::dependencies::LiveHeaders,
-    utils::{DiskTelemetry, SourceKind},
+    utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
@@ -38,9 +39,9 @@ impl Args {
 
         match self.source {
             SourceKind::Ibt { extra } => {
-                let telemetry = DiskTelemetry::open(&extra.path)?;
-                writer.write(&telemetry.reader.header())?;
-                writer.write(&telemetry.reader.disk_header())?;
+                let telemetry = IbtFile::open(&extra.path)?;
+                writer.write(&telemetry.header())?;
+                writer.write(&telemetry.disk_header())?;
             }
             #[cfg(windows)]
             SourceKind::Live { .. } => {

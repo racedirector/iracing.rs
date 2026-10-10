@@ -1,9 +1,9 @@
 use anyhow::{Result, ensure};
-use iracing_sdk::LayoutProvider;
+use iracing_sdk::{IRacingSDKError, IbtFile, LayoutProvider};
 
 use crate::{
     commands::dependencies::LiveFrames,
-    utils::{DiskTelemetry, SourceKind},
+    utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget, TelemetrySnapshot},
 };
 
@@ -56,8 +56,11 @@ impl Args {
     ) -> Result<()> {
         let packet = match &self.source {
             SourceKind::Ibt { extra } => {
-                let telemetry = DiskTelemetry::open(&extra.path)?;
-                telemetry.frame_at(extra.extra.frame_index)
+                let telemetry = IbtFile::open(&extra.path).map_err(snapshot_input_error)?;
+                telemetry
+                    .frame(extra.extra.frame_index)?
+                    .into_packet()
+                    .map_err(anyhow::Error::from)
             }
             #[cfg(windows)]
             SourceKind::Live { .. } => dependencies.next_live_frame(),
@@ -73,6 +76,53 @@ impl Args {
         writer.write(&snapshot)?;
 
         writer.finalize()
+    }
+}
+
+/// Preserve snapshot's existing missing-variable message for this one canonical
+/// construction failure; unrelated parsing and I/O failures retain their cause.
+fn snapshot_input_error(error: IRacingSDKError) -> anyhow::Error {
+    if matches!(
+        &error,
+        IRacingSDKError::Parse { context, details }
+            if context == "IbtFile::from_source"
+                && details == "Telemetry frames require variable-header metadata"
+    ) {
+        anyhow::Error::new(error).context("No telemetry variables were available from the source")
+    } else {
+        error.into()
+    }
+}
+
+#[cfg(test)]
+mod input_error_tests {
+    use super::*;
+
+    #[test]
+    fn only_missing_variable_metadata_gets_snapshot_context() {
+        let missing = IRacingSDKError::parse_error(
+            "IbtFile::from_source",
+            "Telemetry frames require variable-header metadata",
+        );
+        assert!(
+            snapshot_input_error(missing)
+                .to_string()
+                .contains("No telemetry variables")
+        );
+        for (context, details) in [
+            (
+                "IbtFile::from_source",
+                "Source is shorter than the IBT preamble",
+            ),
+            (
+                "another parser",
+                "Telemetry frames require variable-header metadata",
+            ),
+        ] {
+            let error = IRacingSDKError::parse_error(context, details);
+            let message = error.to_string();
+            assert_eq!(snapshot_input_error(error).to_string(), message);
+        }
     }
 }
 

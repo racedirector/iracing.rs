@@ -1,10 +1,10 @@
 use crate::{
     commands::dependencies::LiveSessions,
-    utils::{DiskTelemetry, SourceKind},
+    utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 use anyhow::{Context, Result};
-use iracing_sdk::provider::SessionInformationProvider;
+use iracing_sdk::IbtFile;
 use schemars::schema_for_value;
 
 #[derive(clap::Args, Debug)]
@@ -36,7 +36,7 @@ impl Args {
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveSessions,
     ) -> Result<()> {
         let schema = match self.source {
-            SourceKind::Ibt { extra } => DiskTelemetry::open(&extra.path)?.session_info()?,
+            SourceKind::Ibt { extra } => super::parse_ibt_session(&IbtFile::open(&extra.path)?)?,
             #[cfg(windows)]
             SourceKind::Live { .. } => dependencies.live_session()?,
         }

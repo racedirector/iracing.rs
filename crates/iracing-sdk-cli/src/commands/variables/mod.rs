@@ -1,9 +1,9 @@
 use anyhow::Result;
-use iracing_sdk::provider::VariableHeadersProvider;
+use iracing_sdk::IbtFile;
 
 use crate::{
     commands::dependencies::LiveVariables,
-    utils::{DiskTelemetry, SourceKind},
+    utils::SourceKind,
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
@@ -36,7 +36,7 @@ impl Args {
         #[cfg_attr(not(windows), allow(unused_variables))] dependencies: &mut impl LiveVariables,
     ) -> Result<()> {
         let headers = match self.source {
-            SourceKind::Ibt { extra } => DiskTelemetry::open(&extra.path)?.variable_headers()?,
+            SourceKind::Ibt { extra } => IbtFile::open(&extra.path)?.variable_headers().clone(),
             #[cfg(windows)]
             SourceKind::Live { .. } => dependencies.live_variable_headers()?,
         };

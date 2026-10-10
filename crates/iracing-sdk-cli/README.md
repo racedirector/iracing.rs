@@ -6,6 +6,7 @@
 
 - A Rust toolchain compatible with this workspace (`rust-version = 1.88`) when building from source.
 - `.ibt` file workflows are portable across the platforms supported by the workspace.
+- Use completed recordings with valid frame and variable metadata. A recording containing frames without variable headers is rejected during input validation.
 - Live shared-memory telemetry is **Windows-only** and requires a running iRacing simulator with an active telemetry connection.
 - Live recording and the composed `broadcast` command are only present on Windows builds.
 
