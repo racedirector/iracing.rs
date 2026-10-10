@@ -62,7 +62,7 @@ fn defaults_write_first_frame_as_yaml_to_stdout() -> Result<()> {
 #[test]
 fn snapshot_preserves_published_header_order() -> Result<()> {
     let path = require_named_ibt_fixture("profile_small.ibt")?;
-    let header = *iracing_sdk::ibt::IbtReader::open(&path)?.header();
+    let header = *iracing_sdk::IbtFile::open(&path)?.header();
     let start = usize::try_from(header.variable_header_offset)?;
     let width = std::mem::size_of::<iracing_irsdk::VariableHeader>();
     let end = start + usize::try_from(header.variable_count)? * width;
