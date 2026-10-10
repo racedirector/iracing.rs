@@ -51,12 +51,30 @@ and `into_file()` accessors borrow or recover that same file. Replay yields
 bound `IbtFrame` values and owns only traversal bounds, position, seek/advance,
 and EOF state; immutable metadata and layout stay on the file.
 
-This remains an incomplete #299 migration: CLI and compatibility constructors
-still use `IbtReader` below. The provider's `from_reader` temporarily transfers
+This remains an incomplete #299 migration: compatibility constructors
+still accept `IbtReader` below. The provider's `from_reader` temporarily transfers
 the existing mapped/owned source into `IbtFile` without copying frame storage.
 The provider now retains only replay, borrows the file's shared metadata/layout,
-and delegates packet conversion to `IbtFrame::into_packet()`. #303 migrates CLI
-consumers, and #305 removes the superseded recorded compatibility topology.
+and delegates packet conversion to `IbtFrame::into_packet()`. CLI consumers use
+the file directly; #305 removes the superseded recorded compatibility topology.
+
+### Recorded CLI access
+
+All recorded CLI commands open `IbtFile` directly. Headers and variables use
+its immutable metadata, and session snapshot/schema/discovery parse its retained
+session bytes through `SessionInfo::try_from`. There is no CLI-owned disk reader,
+telemetry layout, metadata provider, or packet assembly. Telemetry snapshot and
+conversion use the SDK's `IbtFrame::into_packet()` bridge for their existing
+source-independent writers. Conversion validates its selected range before
+opening output, then pulls and writes one frame at a time without collecting
+the recording. Windows live capabilities keep their existing acquisition path.
+
+Canonical file construction rejects frames without variable metadata before any
+recorded command can consume them. Telemetry snapshot adds its existing
+missing-variable diagnostic only to that exact construction error; other source
+failures retain their original causes.
+
+### Transitional reader consumers
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
