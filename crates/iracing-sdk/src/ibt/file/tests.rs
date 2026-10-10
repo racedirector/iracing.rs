@@ -272,3 +272,146 @@ fn dropping_file_releases_mapping_resources() -> Result<()> {
     assert!(!layout.is_empty());
     Ok(())
 }
+
+#[test]
+fn direct_frames_match_mapped_owned_and_legacy_reads_with_exact_layout() -> Result<()> {
+    for fixture in crate::test_utils::load_fixture_manifest()?.fixtures {
+        let path = fixture.fixture_path()?;
+        let mapped = IbtFile::open(&path)?;
+        let owned = IbtFile::from_bytes(std::fs::read(&path)?)?;
+        let reference = crate::ibt::IbtReader::open(path)?;
+        for index in [0, mapped.frame_count() / 2, mapped.frame_count() - 1] {
+            let mapped_frame = mapped.frame(index)?;
+            let owned_frame = owned.frame(index)?;
+            assert_eq!(mapped_frame.index(), index);
+            assert_eq!(owned_frame.index(), index);
+            assert_eq!(mapped_frame.bytes(), owned_frame.bytes());
+            assert_eq!(mapped_frame.bytes(), reference.frame(index)?);
+            assert!(Arc::ptr_eq(
+                mapped_frame.layout(),
+                mapped.telemetry_layout()
+            ));
+            assert!(Arc::ptr_eq(owned_frame.layout(), owned.telemetry_layout()));
+            assert!(!Arc::ptr_eq(mapped_frame.layout(), owned_frame.layout()));
+            assert!(mapped_frame.value("Speed")?.is_some());
+            assert!(mapped_frame.value("missing variable")?.is_none());
+            assert_eq!(mapped_frame.value("Speed")?, owned_frame.value("Speed")?);
+        }
+        assert!(mapped.frame(mapped.frame_count()).is_err());
+        assert!(owned.frame(usize::MAX).is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn ranges_validate_clamp_and_keep_independent_coordinates() -> Result<()> {
+    let path = require_smallest_ibt_fixture()?;
+    for file in [
+        IbtFile::open(&path)?,
+        IbtFile::from_bytes(std::fs::read(path)?)?,
+    ] {
+        let count = file.frame_count();
+        for range in [0..0, count..count, 0..1, 1..3, count - 1..count] {
+            let mut frames = file.frames(range.clone())?;
+            assert_eq!(frames.len(), range.len());
+            assert_eq!(frames.size_hint(), (range.len(), Some(range.len())));
+            for index in range {
+                let frame = frames.next().context("expected a recorded frame")??;
+                assert_eq!(frame.index(), index);
+                assert_eq!(frame.bytes(), file.frame(index)?.bytes());
+                assert!(Arc::ptr_eq(frame.layout(), file.telemetry_layout()));
+            }
+            assert_eq!(frames.len(), 0);
+            assert!(frames.next().is_none());
+            assert!(frames.next().is_none());
+        }
+        for end in [count + 1, usize::MAX] {
+            let frames = file
+                .frames(count - 1..end)?
+                .collect::<crate::Result<Vec<_>>>()?;
+            assert_eq!(frames.len(), 1);
+            assert_eq!(frames[0].index(), count - 1);
+            assert!(file.frames(count..end)?.next().is_none());
+        }
+        let mut first = file.frames(0..2)?;
+        let mut second = file.frames(count - 1..count)?;
+        assert_eq!(first.next().unwrap()?.index(), 0);
+        file.frame(count / 2)?;
+        assert_eq!(second.next().unwrap()?.index(), count - 1);
+        assert_eq!(first.next().unwrap()?.index(), 1);
+        assert!(file.frames(Range { start: 2, end: 1 }).is_err());
+        assert!(file.frames(count + 1..usize::MAX).is_err());
+        assert_eq!(file.all_frames()?.len(), count);
+    }
+    Ok(())
+}
+
+#[test]
+fn range_creation_is_lazy_and_read_errors_advance_only_its_iterator() -> Result<()> {
+    let mut file = IbtFile::from_bytes(fixture_bytes()?)?;
+    let count = file.frame_count();
+    let first_end = file.physical_layout().frame(0)?.end();
+    let Source::Owned(bytes) = &mut file.source else {
+        unreachable!();
+    };
+    bytes.truncate(first_end);
+    assert!(file.frames(count + 1..usize::MAX).is_err());
+    assert_eq!(file.all_frames()?.len(), count);
+    assert!(file.frames(count..count)?.next().is_none());
+    let mut frames = file.all_frames()?;
+    assert_eq!(frames.next().unwrap()?.index(), 0);
+    assert!(frames.next().unwrap().is_err());
+    assert_eq!(frames.len(), count - 2);
+    assert!(frames.next().unwrap().is_err());
+    assert_eq!(frames.len(), count - 3);
+    assert_eq!(file.frame(0)?.bytes().len(), file.frame_size());
+    assert!(file.frame(1).is_err());
+    Ok(())
+}
+
+#[test]
+fn empty_recording_has_only_empty_direct_traversal() -> Result<()> {
+    let bytes = fixture_bytes()?;
+    let original = IbtFile::from_bytes(bytes.clone())?;
+    let file =
+        IbtFile::from_bytes(bytes[..original.physical_layout().frame_data_start()].to_vec())?;
+    assert!(file.frame(0).is_err());
+    for range in [0..0, 0..1, 0..usize::MAX] {
+        let mut frames = file.frames(range)?;
+        assert_eq!(frames.len(), 0);
+        assert!(frames.next().is_none());
+    }
+    assert!(file.frames(1..usize::MAX).is_err());
+    Ok(())
+}
+
+#[test]
+fn packet_bridge_transfers_exact_bytes_and_layout_without_reconstruction() -> Result<()> {
+    let file = IbtFile::open(require_smallest_ibt_fixture()?)?;
+    let frame = file.frame(2)?;
+    let bytes = frame.clone().into_bytes();
+    let packet = frame.into_packet()?;
+    assert_eq!(packet.tick, 2);
+    assert_eq!(
+        packet.session_version,
+        file.header().session_info_update as u32
+    );
+    assert!(Arc::ptr_eq(packet.data(), &bytes));
+    assert!(Arc::ptr_eq(packet.layout(), file.telemetry_layout()));
+    assert_eq!(packet.value("Speed")?, file.frame(2)?.value("Speed")?);
+    Ok(())
+}
+
+#[test]
+fn recorded_frame_owns_bytes_and_layout_after_file_drop() -> Result<()> {
+    let file = IbtFile::open(require_smallest_ibt_fixture()?)?;
+    let frame = file.frame(0)?;
+    let value = frame.value("Speed")?;
+    let layout = Arc::clone(file.telemetry_layout());
+    drop(file);
+    assert!(Arc::ptr_eq(frame.layout(), &layout));
+    assert_eq!(frame.bytes().len(), layout.frame_size());
+    assert_eq!(frame.value("Speed")?, value);
+    assert!(frame.into_packet()?.value("Speed")?.is_some());
+    Ok(())
+}
