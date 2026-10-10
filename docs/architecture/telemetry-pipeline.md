@@ -54,8 +54,9 @@ and EOF state; immutable metadata and layout stay on the file.
 This remains an incomplete #299 migration: CLI and compatibility constructors
 still use `IbtReader` below. The provider's `from_reader` temporarily transfers
 the existing mapped/owned source into `IbtFile` without copying frame storage.
-#303 migrates CLI consumers, #304 consolidates the provider's remaining layout
-and packet construction, and #305 removes the superseded recorded topology.
+The provider now retains only replay, borrows the file's shared metadata/layout,
+and delegates packet conversion to `IbtFrame::into_packet()`. #303 migrates CLI
+consumers, and #305 removes the superseded recorded compatibility topology.
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
@@ -150,20 +151,26 @@ bytes and schema for exploratory name-based lookup. Hot paths should implement
 - return session YAML when available;
 - report the source tick rate.
 
-`IbtProvider::from_reader` validates the exact variable-header snapshot against
-the layout's frame size and owns the resulting shared schema. Construction
-delegates its sequential cursor to `IbtReplay`, starting at frame zero even after
-indexed reader operations. `IbtProvider::from_replay` and
-`IbtConnection::from_replay` preserve configured replay bounds and position;
-the connection acknowledgement barrier continues to control demand.
-Frames without variable metadata are rejected; zero-frame recordings may have
-an empty schema. Successful reads advance one index, failed reads retain the
-index for retry, and the layout's frame count determines permanent EOF. Packets
-use the zero-based index checked against `u32` as their synthetic tick and retain the
-header's session update counter. Tick rate comes from the header with a 60 Hz
-fallback for nonpositive values. Session YAML is read from a fresh snapshot,
-decoded and sanitized by the provider. Reads complete as fast as the file can be
-decoded; the provider has no seek/time helper API.
+`IbtProvider` is temporary compatibility over `IbtFile` and `IbtReplay`.
+It owns only replay: layout access borrows the file's exact shared allocation,
+session YAML decodes the retained snapshot, and packets use the SDK-owned
+`IbtFrame::into_packet()` bridge. `open` constructs a file directly;
+`from_reader` transfers legacy storage into a file until #305 removes that
+constructor. `from_replay` preserves configured bounds and position.
+
+`IbtConnection::from_replay` uses the same layout allocation and preserves its
+subscription acknowledgement barrier. Valid recordings retain existing
+bounds, ordering, tick-rate fallback, session decoding, and EOF behavior.
+Packet conversion checks both record-index and session-revision representability;
+negative revisions produce an error instead of wrapping. Neither failed reads
+nor failed packet conversion advance replay.
+
+The recorded provider/connection/coordinator/subscription path is removed in
+#305 after real recorded consumers migrate to file/replay. Existing delivery
+benchmarks also exercise synthetic source-independent acknowledgement policy:
+their workload and timed boundaries remain separate from recorded-file
+ownership. Any retained delivery machinery belongs to benchmark infrastructure,
+not a public IBT facade.
 
 `LiveProvider` is Windows-only. It builds a schema from shared-memory metadata,
 waits cooperatively for updates, returns the newest owned frame snapshot, and
