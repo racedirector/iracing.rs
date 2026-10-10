@@ -313,7 +313,7 @@ mod tests {
 
     #[tokio::test]
     async fn configured_replay_delivers_only_remaining_bounded_frames() -> Result<()> {
-        let mut replay = crate::ibt::IbtReader::from_bytes(fixture_with_frame_count(4)?)?.replay();
+        let mut replay = crate::ibt::IbtFile::from_bytes(fixture_with_frame_count(4)?)?.replay();
         replay.set_range(1..4)?;
         replay.seek(2)?;
         let connection = IbtConnection::from_replay(replay).await?;
