@@ -126,21 +126,12 @@ impl ExactSizeIterator for IbtFrames<'_> {}
 impl std::iter::FusedIterator for IbtFrames<'_> {}
 
 impl IbtReader {
-    /// Transfers ownership into a deterministic replay starting at record zero.
+    /// Transfers existing mapped or owned storage into the completed file model.
     ///
-    /// ```no_run
-    /// # use iracing_sdk::ibt::IbtReader;
-    /// # fn replay() -> iracing_sdk::Result<()> {
-    /// let mut replay = IbtReader::open("telemetry.ibt")?.replay();
-    /// replay.set_range(10..20)?;
-    /// while let Some(frame) = replay.next_frame()? {
-    ///     println!("record {}", frame.index());
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn replay(self) -> super::IbtReplay {
-        super::IbtReplay::new(self)
+    /// Temporary compatibility for IbtProvider::from_reader; removed by #305.
+    /// Establishes immutable metadata without copying the complete recording.
+    pub(crate) fn into_file(self) -> Result<super::IbtFile> {
+        super::IbtFile::from_source(self.source)
     }
 
     /// Open and parse an immutable `.ibt` recording using a read-only memory map.
