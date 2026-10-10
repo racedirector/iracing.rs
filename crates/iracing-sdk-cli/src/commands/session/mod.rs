@@ -4,6 +4,17 @@ mod snapshot;
 
 use anyhow::Result;
 
+/// Parse the file's retained snapshot through the SDK's decoding/sanitization path.
+fn parse_ibt_session(
+    file: &iracing_sdk::IbtFile,
+) -> Result<Option<iracing_sdk::schema::SessionInfo>> {
+    file.session_info_bytes()
+        .cloned()
+        .map(iracing_sdk::schema::SessionInfo::try_from)
+        .transpose()
+        .map_err(Into::into)
+}
+
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     /// Captures JSON schema of a session string.

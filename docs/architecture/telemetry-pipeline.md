@@ -46,9 +46,27 @@ It transfers shared bytes and layout, converts the physical index to a synthetic
 `u32` packet tick, and checks the signed recording revision against `u32` instead
 of wrapping negatives. Native recorded access is independent of packet limits.
 
-This is an incomplete #299 migration: replay, providers, connections, and CLI
-consumers still use `IbtReader` below. #302–#305 migrate those consumers onto
+This is an incomplete #299 migration: replay, providers, and connections
+still use `IbtReader` below. #302, #304, and #305 migrate those consumers onto
 `IbtFile` and the shared packet bridge and remove the superseded topology.
+
+### Recorded CLI access
+
+All recorded CLI commands open `IbtFile` directly. Headers and variables use
+its immutable metadata, and session snapshot/schema/discovery parse its retained
+session bytes through `SessionInfo::try_from`. There is no CLI-owned disk reader,
+telemetry layout, metadata provider, or packet assembly. Telemetry snapshot and
+conversion use the SDK's `IbtFrame::into_packet()` bridge for their existing
+source-independent writers. Conversion validates its selected range before
+opening output, then pulls and writes one frame at a time without collecting
+the recording. Windows live capabilities keep their existing acquisition path.
+
+Canonical file construction rejects frames without variable metadata before any
+recorded command can consume them. Telemetry snapshot adds its existing
+missing-variable diagnostic only to that exact construction error; other source
+failures retain their original causes.
+
+### Transitional reader consumers
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a

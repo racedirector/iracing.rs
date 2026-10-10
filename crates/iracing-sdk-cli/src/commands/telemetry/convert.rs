@@ -1,12 +1,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, ensure};
-use iracing_sdk::LayoutProvider;
+use iracing_sdk::IbtFile;
 
-use crate::{
-    utils::DiskTelemetry,
-    writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter},
-};
+use crate::writer::{OutputTarget, RecordStreamFormat, RecordStreamWriter};
 
 /// Converts an IBT to the given format at output.
 #[derive(clap::Args, Debug)]
@@ -47,9 +44,8 @@ impl Args {
     /// leave a truncated file or partial export.
     pub(crate) fn run(&self) -> Result<()> {
         tracing::info!(path = %self.path.display(), "Opening IBT file");
-        let telemetry =
-            DiskTelemetry::open(&self.path).context("Failed to open IBT telemetry file")?;
-        let frame_count = telemetry.reader.frame_count();
+        let telemetry = IbtFile::open(&self.path).context("Failed to open IBT telemetry file")?;
+        let frame_count = telemetry.frame_count();
         let end_index = self.end_index.unwrap_or(frame_count);
         ensure!(
             self.start_index <= end_index && end_index <= frame_count,
@@ -59,20 +55,20 @@ impl Args {
             frame_count
         );
 
-        let frames = if self.start_index == 0 && self.end_index.is_none() {
-            Box::new(telemetry.all_frames()?) as Box<dyn Iterator<Item = Result<_>> + '_>
-        } else {
-            Box::new(telemetry.frames(self.start_index..end_index)?)
-        };
-        let variables = telemetry.fields_owned();
+        let frames = telemetry.frames(self.start_index..end_index)?;
+        let variables = telemetry
+            .telemetry_layout()
+            .fields()
+            .map(|(_, field)| field.clone())
+            .collect();
         let mut writer =
             RecordStreamWriter::from_variables(self.output.clone(), self.format, variables)?
                 .prepare()?;
 
         let mut exported = 0usize;
 
-        for packet in frames {
-            let packet = packet?;
+        for frame in frames {
+            let packet = frame?.into_packet()?;
             writer.write(&packet)?;
             exported += 1;
             if exported.is_multiple_of(10_000) {
@@ -90,6 +86,39 @@ impl Args {
 mod tests {
     use super::*;
     use iracing_sdk::test_utils::require_named_ibt_fixture;
+
+    #[test]
+    fn canonical_packet_iterators_preserve_coordinates_layout_and_independence() -> Result<()> {
+        let file = IbtFile::open(require_named_ibt_fixture("profile_small.ibt")?)?;
+        let count = file.frame_count();
+        let mut first = file.all_frames()?.map(|frame| frame?.into_packet());
+        let mut tail = file
+            .frames(count - 1..usize::MAX)?
+            .map(|frame| frame?.into_packet());
+        assert_eq!(first.len(), count);
+        assert_eq!(tail.len(), 1);
+        let packet = tail.next().unwrap()?;
+        assert_eq!(packet.tick as usize, count - 1);
+        assert_eq!(packet.data(), file.frame(count - 1)?.into_packet()?.data());
+        assert!(std::sync::Arc::ptr_eq(
+            packet.layout(),
+            file.telemetry_layout()
+        ));
+        assert_eq!(
+            packet.session_version,
+            file.frame(0)?.into_packet()?.session_version
+        );
+        assert!(tail.next().is_none());
+        assert!(tail.next().is_none());
+        assert_eq!(first.next().unwrap()?.tick, 0);
+        file.frame(count - 1)?;
+        assert_eq!(first.next().unwrap()?.tick, 1);
+        assert_eq!(first.len(), count - 2);
+        assert_eq!(file.frames(count..count)?.len(), 0);
+        assert!(file.frames(std::ops::Range { start: 2, end: 1 }).is_err());
+        assert!(file.frames(count + 1..usize::MAX).is_err());
+        Ok(())
+    }
 
     #[test]
     fn convert_exports_every_frame_in_order() -> Result<()> {
