@@ -11,6 +11,7 @@
 //!
 //! - Replay/offline path (cross-platform):
 //!   - [`ibt::IbtFile`] owns one complete recording and its immutable metadata/layouts
+//!   - [`ibt::IbtReplay`] owns pull-driven traversal over the file
 //!   - [`ibt::IbtReader`]
 //!   - [`types::TelemetryLayout`], [`types::VarData`]
 //! - Streaming adapter path:

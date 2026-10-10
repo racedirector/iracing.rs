@@ -78,6 +78,33 @@ impl fmt::Debug for IbtFile {
 }
 
 impl IbtFile {
+    /// Transfers this file into deterministic replay starting at record zero.
+    ///
+    /// No frame bytes are read. Empty recordings start at EOF.
+    ///
+    /// ```no_run
+    /// # use iracing_sdk::IbtFile;
+    /// # fn replay() -> iracing_sdk::Result<()> {
+    /// let mut replay = IbtFile::open("telemetry.ibt")?.replay();
+    /// replay.set_range(10..20)?;
+    /// while let Some(frame) = replay.next_frame()? {
+    ///     println!("record {}", frame.index());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn replay(self) -> super::IbtReplay {
+        super::IbtReplay::new(self)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn owned_bytes_mut(&mut self) -> &mut Vec<u8> {
+        match &mut self.source {
+            Source::Owned(bytes) => bytes,
+            Source::Mapped(_) => panic!("fault injection requires an owned source"),
+        }
+    }
+
     /// Opens a completed recording through a read-only memory map.
     ///
     /// The backing file must remain unchanged and untruncated by every process
@@ -115,7 +142,7 @@ impl IbtFile {
         Self::from_source(Source::Owned(bytes.into()))
     }
 
-    fn from_source(source: Source) -> Result<Self> {
+    pub(crate) fn from_source(source: Source) -> Result<Self> {
         let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
         let bytes = source.get(0..preamble_len).ok_or_else(|| {
             IRacingSDKError::parse_error(

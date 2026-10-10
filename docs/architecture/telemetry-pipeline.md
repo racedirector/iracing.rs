@@ -46,9 +46,16 @@ It transfers shared bytes and layout, converts the physical index to a synthetic
 `u32` packet tick, and checks the signed recording revision against `u32` instead
 of wrapping negatives. Native recorded access is independent of packet limits.
 
-This is an incomplete #299 migration: replay, providers, connections, and CLI
-consumers still use `IbtReader` below. #302–#305 migrate those consumers onto
-`IbtFile` and the shared packet bridge and remove the superseded topology.
+`IbtFile::replay(self)` transfers the file into `IbtReplay`, whose `file()`
+and `into_file()` accessors borrow or recover that same file. Replay yields
+bound `IbtFrame` values and owns only traversal bounds, position, seek/advance,
+and EOF state; immutable metadata and layout stay on the file.
+
+This remains an incomplete #299 migration: CLI and compatibility constructors
+still use `IbtReader` below. The provider's `from_reader` temporarily transfers
+the existing mapped/owned source into `IbtFile` without copying frame storage.
+#303 migrates CLI consumers, #304 consolidates the provider's remaining layout
+and packet construction, and #305 removes the superseded recorded topology.
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
@@ -77,13 +84,13 @@ and direct reads do not share traversal state. A failed item advances the range
 iterator by one coordinate; its bytes can be retried with `frame(index)`.
 Recorded coordinates identify physical records, not live SDK ticks; provider
 synthetic ticks remain compatibility behavior. `usize` preserves existing frame
-and layout APIs and ordinary Rust range syntax. `IbtReader::replay(self)` transfers ownership into `IbtReplay`, the sole owner
-of sequential record cursor state. `set_range` uses reader range validation and
+and layout APIs and ordinary Rust range syntax. `IbtFile::replay(self)` transfers ownership into `IbtReplay`, the sole owner
+of sequential record cursor state. `set_range` uses file range validation and
 resets to the clamped range start; `seek` accepts the exclusive end as EOF.
 `current_frame` reads without advancing, `advance` moves one coordinate, and
 `next_frame` reads then advances only on success. EOF persists until a seek or
 range reset. The core has no clock, background task, or sampling policy.
-Independent reader access through `reader()` never changes replay position.
+Independent file access through `file()` never changes replay position.
 
 `frame(index)`, `session_info_snapshot()`, and
 `VariableHeadersProvider::variable_headers()` access validated byte ranges directly
