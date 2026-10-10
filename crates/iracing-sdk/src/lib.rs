@@ -10,6 +10,7 @@
 //! # API map
 //!
 //! - Replay/offline path (cross-platform):
+//!   - [`ibt::IbtFile`] owns one complete recording and its immutable metadata/layouts
 //!   - [`ibt::IbtReader`]
 //!   - [`types::TelemetryLayout`], [`types::VarData`]
 //! - Streaming adapter path:
@@ -109,4 +110,5 @@ pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection};
 // Main API exports
 pub use connections::ibt::IbtConnection;
 pub use connections::live::LiveConnection;
+pub use ibt::IbtFile;
 pub use types::UpdateRate;
