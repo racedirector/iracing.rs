@@ -34,6 +34,11 @@ event, so cancellation cannot close the handle while the worker waits.
 
 ## Disk mappings
 
+[`IbtFile::open`](../../crates/iracing-sdk/src/ibt/file.rs) uses the same completed,
+immutable storage contract described below. It owns its mapping directly and
+establishes owned metadata snapshots and a validated telemetry layout once;
+metadata references do not point into mapped storage.
+
 [`IbtReader::open`](../../crates/iracing-sdk/src/ibt/reader/mod.rs) maps completed
 recordings read-only. The backing file must remain unchanged/untruncated by any
 process until the reader is dropped. The mapping owns its view independently of

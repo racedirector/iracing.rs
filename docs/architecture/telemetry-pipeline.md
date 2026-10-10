@@ -22,6 +22,21 @@ same.
 
 ## Wire and schema layer
 
+`IbtFile` owns one complete immutable recording. `open` retains a read-only
+mapping and `from_bytes` takes ownership of recording bytes. Construction parses
+the fixed headers, validates physical geometry with `IbtLayout`, snapshots exact
+variable-header and session-information regions once, and creates one shared
+`Arc<TelemetryLayout>` against the physical frame size. Frames without variable
+metadata are rejected; zero-frame recordings may have absent metadata and an
+empty telemetry layout. Metadata access borrows these retained snapshots and
+never reads the source again. Session decoding, sanitization, and parsing remain
+separate from byte ownership. Mapped construction does not copy the recording's
+frame region, and the backing file must remain immutable until `IbtFile` drops.
+
+This is the foundation slice of #299: indexed traversal, replay, providers,
+connections, and CLI consumers still use `IbtReader` below. #301–#305 migrate
+those consumers onto `IbtFile` and remove the superseded recorded topology.
+
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
 private read-only memory map plus decoded headers and layout, and reads one owned
