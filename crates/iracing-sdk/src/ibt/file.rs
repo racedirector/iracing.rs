@@ -1,6 +1,6 @@
 //! Complete immutable IBT recording ownership.
 
-use std::{fmt, fs::File, path::Path, sync::Arc};
+use std::{fmt, fs::File, ops::Range, path::Path, sync::Arc};
 
 use iracing_irsdk::{DiskSubHeader, Header, IbtHeader};
 use memmap2::Mmap;
@@ -9,6 +9,9 @@ use crate::{
     IRacingSDKError, IbtLayout, Result, SessionInfoBytes, TelemetryLayout, VariableHeaders,
     source::ibt::Source,
 };
+
+mod frame;
+pub use frame::IbtFrame;
 
 /// One complete immutable `.ibt` recording and its validated metadata.
 ///
@@ -27,6 +30,40 @@ pub struct IbtFile {
     session_info: Option<SessionInfoBytes>,
     telemetry_layout: Arc<TelemetryLayout>,
 }
+
+/// Lazy traversal of validated half-open recorded frame bounds.
+///
+/// Each iterator owns its coordinates and shares only immutable file state.
+/// Each step reads at most one frame; read errors are yielded for that record
+/// and advance to the next coordinate. EOF is permanent for this iterator.
+pub struct IbtFileFrames<'a> {
+    file: &'a IbtFile,
+    remaining: Range<usize>,
+}
+
+impl fmt::Debug for IbtFileFrames<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("IbtFileFrames")
+            .field("remaining", &self.remaining)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Iterator for IbtFileFrames<'_> {
+    type Item = Result<IbtFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.remaining.next().map(|index| self.file.frame(index))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.remaining.size_hint()
+    }
+}
+
+impl ExactSizeIterator for IbtFileFrames<'_> {}
+impl std::iter::FusedIterator for IbtFileFrames<'_> {}
 
 impl fmt::Debug for IbtFile {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -194,6 +231,75 @@ impl IbtFile {
     /// Returns the recorded tick rate unchanged, without a playback policy.
     pub fn tick_rate(&self) -> i32 {
         self.header().tick_rate
+    }
+
+    /// Reads one physical record using O(1) addressing through [`IbtLayout`].
+    ///
+    /// `index` is a zero-based `usize` record coordinate. The returned frame
+    /// owns only this record's bytes and shares this file's exact telemetry
+    /// layout. Reads do not change any other reader or iterator's position.
+    ///
+    /// # Errors
+    /// Rejects indices at or beyond EOF and incomplete source reads.
+    pub fn frame(&self, index: usize) -> Result<IbtFrame> {
+        let region = self.physical_layout.frame(index)?;
+        let bytes = self
+            .source
+            .get(region.as_region().as_range())
+            .ok_or_else(|| {
+                IRacingSDKError::parse_error(
+                    "IbtFile::frame",
+                    format!("Could not get frame {index} bytes from source"),
+                )
+            })?;
+        Ok(IbtFrame::new(
+            index,
+            Arc::from(bytes),
+            Arc::clone(&self.telemetry_layout),
+            self.header().session_info_update,
+        ))
+    }
+
+    /// Traverses a half-open range of zero-based physical record indices.
+    ///
+    /// Validation reads no source bytes. The end clamps to the recording's
+    /// frame count; empty ranges at EOF are valid. Each iterator is independent
+    /// and allocates only one requested frame per step.
+    ///
+    /// ```no_run
+    /// # use iracing_sdk::IbtFile;
+    /// # fn inspect() -> iracing_sdk::Result<()> {
+    /// let file = IbtFile::open("telemetry.ibt")?;
+    /// for frame in file.frames(0..file.frame_count())? {
+    ///     let frame = frame?;
+    ///     println!("record {}: {:?}", frame.index(), frame.value("Speed")?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Rejects reversed bounds or starts beyond EOF before source access.
+    /// Individual frame errors are returned lazily by the iterator.
+    pub fn frames(&self, range: Range<usize>) -> Result<IbtFileFrames<'_>> {
+        if range.start > range.end || range.start > self.frame_count() {
+            return Err(IRacingSDKError::parse_error(
+                "IbtFile::frames",
+                format!(
+                    "Invalid frame range {range:?} for {} frames",
+                    self.frame_count()
+                ),
+            ));
+        }
+        Ok(IbtFileFrames {
+            file: self,
+            remaining: range.start..range.end.min(self.frame_count()),
+        })
+    }
+
+    /// Lazily traverses the entire recording from physical record zero.
+    pub fn all_frames(&self) -> Result<IbtFileFrames<'_>> {
+        self.frames(0..self.frame_count())
     }
 }
 

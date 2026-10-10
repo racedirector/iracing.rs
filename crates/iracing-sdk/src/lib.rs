@@ -110,5 +110,5 @@ pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection};
 // Main API exports
 pub use connections::ibt::IbtConnection;
 pub use connections::live::LiveConnection;
-pub use ibt::IbtFile;
+pub use ibt::{IbtFile, IbtFileFrames, IbtFrame};
 pub use types::UpdateRate;
