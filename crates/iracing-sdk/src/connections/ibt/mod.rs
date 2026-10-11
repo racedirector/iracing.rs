@@ -50,8 +50,8 @@ impl IbtConnection {
     /// Builds coordinated subscriptions over the supplied replay bounds and position.
     /// Spawns background tasks; delivery still waits for subscriptions and [`Self::start`].
     ///
-    /// # Errors
-    /// Propagates metadata and layout validation errors from [`IbtProvider::from_replay`].
+    /// The file already owns validated metadata; its shared layout is reused.
+    /// The result signature is retained for existing compatibility callers.
     pub async fn from_replay(replay: crate::ibt::IbtReplay) -> Result<Self> {
         Self::from_provider(IbtProvider::from_replay(replay)?).await
     }
@@ -313,10 +313,13 @@ mod tests {
 
     #[tokio::test]
     async fn configured_replay_delivers_only_remaining_bounded_frames() -> Result<()> {
-        let mut replay = crate::ibt::IbtFile::from_bytes(fixture_with_frame_count(4)?)?.replay();
+        let file = crate::ibt::IbtFile::from_bytes(fixture_with_frame_count(4)?)?;
+        let layout = Arc::clone(file.telemetry_layout());
+        let mut replay = file.replay();
         replay.set_range(1..4)?;
         replay.seek(2)?;
         let connection = IbtConnection::from_replay(replay).await?;
+        assert!(Arc::ptr_eq(connection.layout(), &layout));
         let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
         connection.start()?;
         let ticks = tokio::time::timeout(Duration::from_secs(1), async {
@@ -329,7 +332,30 @@ mod tests {
         .await
         .expect("bounded replay should reach EOF");
         assert_eq!(ticks, vec![2, 3]);
-        assert_eq!(connection.current_frame().unwrap().tick, 3);
+        let final_packet = connection.current_frame().unwrap();
+        assert_eq!(final_packet.tick, 3);
+        assert!(Arc::ptr_eq(final_packet.layout(), &layout));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn file_provider_connection_and_packet_share_one_layout() -> Result<()> {
+        let file = crate::ibt::IbtFile::from_bytes(fixture_with_frame_count(1)?)?;
+        let layout = Arc::clone(file.telemetry_layout());
+        let provider = IbtProvider::from_replay(file.replay())?;
+        assert!(Arc::ptr_eq(provider.layout(), &layout));
+        let connection = IbtConnection::from_provider(provider).await?;
+        assert!(Arc::ptr_eq(connection.layout(), &layout));
+        let mut frames = Box::pin(connection.subscribe::<DynamicFrame>()?);
+        connection.start()?;
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), frames.next())
+                .await
+                .expect("file frame should be delivered")
+                .is_some()
+        );
+        let packet = connection.current_frame().unwrap();
+        assert!(Arc::ptr_eq(packet.layout(), &layout));
         Ok(())
     }
 

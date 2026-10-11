@@ -3,34 +3,35 @@
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    FramePacket, IRacingSDKError, LayoutProvider, Result, TelemetryLayout,
-    ibt::{IbtReader, IbtReplay},
+    FramePacket, LayoutProvider, Result, TelemetryLayout,
+    ibt::{IbtFile, IbtReader, IbtReplay},
     provider::Provider,
     types::IRacingSessionString,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 ///
-/// Retains its compatibility layout and delegates cursor state to [`IbtReplay`].
-/// Replay owns an [`IbtFile`](crate::ibt::IbtFile); the duplicated provider
-/// layout and packet bridge are consolidated by #304.
+/// Owns only [`IbtReplay`]. Immutable metadata and the shared layout belong to
+/// its [`IbtFile`]; packet conversion uses [`crate::ibt::IbtFrame::into_packet`].
+/// This compatibility adapter is retired with the recorded connection in #305.
 /// `from_reader` starts at frame zero; `from_replay` preserves replay state.
 pub struct IbtProvider {
     replay: IbtReplay,
-    layout: Arc<TelemetryLayout>,
-    tick_rate: f64,
 }
 
 impl IbtProvider {
     /// Open an `.ibt` file and validate its replay layout.
     ///
     /// The recording must remain unchanged while the provider is alive, as
-    /// required by [`IbtReader::open`].
+    /// required by [`IbtFile::open`].
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::from_reader(IbtReader::open(path)?)
+        Self::from_replay(IbtFile::open(path)?.replay())
     }
 
-    /// Create a replay provider starting at frame zero.
+    /// Temporarily adapt an existing reader, starting replay at frame zero.
+    ///
+    /// Its mapped or owned storage transfers into IbtFile without a full-file
+    /// copy. This constructor and the private storage bridge are removed in #305.
     ///
     /// # Errors
     /// Returns an error if variable headers cannot be read or validated against
@@ -40,61 +41,28 @@ impl IbtProvider {
         Self::from_replay(reader.into_file()?.replay())
     }
 
-    /// Adapts a replay, preserving its configured bounds and current position.
-    /// Schema validation uses the complete recording metadata, as in
-    /// [`Self::from_reader`]. A nonpositive recorded tick rate defaults to 60 Hz.
+    /// Adapts a validated file replay, preserving its bounds and current position.
     ///
-    /// # Errors
-    /// Propagates compatibility-layout validation errors. The replay's file
-    /// already validated immutable metadata during construction.
+    /// No metadata is read, copied, or reconstructed. The result signature is
+    /// retained for existing compatibility callers; this operation cannot fail.
     pub fn from_replay(replay: IbtReplay) -> Result<Self> {
-        let file = replay.file();
-        let frame_size = file.frame_size();
-
-        let headers = file.variable_headers();
-        if headers.is_empty() && file.frame_count() > 0 {
-            return Err(IRacingSDKError::parse_error(
-                "IBT replay layout",
-                "Telemetry frames require variable-header metadata",
-            ));
-        }
-        let layout = TelemetryLayout::try_from_headers(headers, frame_size)?;
-
-        let tick_rate = if file.header().tick_rate > 0 {
-            f64::from(file.header().tick_rate)
-        } else {
-            60.0
-        };
-        Ok(Self {
-            replay,
-            layout: Arc::new(layout),
-            tick_rate,
-        })
+        Ok(Self { replay })
     }
 
     /// Returns an ownable layout.
     pub(crate) fn shared_layout(&self) -> Arc<TelemetryLayout> {
-        Arc::clone(&self.layout)
+        Arc::clone(self.layout())
     }
 
     /// Returns the total number of telemetry frames in the recording.
     pub fn total_frames(&self) -> usize {
         self.replay.file().frame_count()
     }
-
-    fn tick_for_frame(index: usize) -> Result<u32> {
-        u32::try_from(index).map_err(|_| {
-            IRacingSDKError::parse_error(
-                "IbtProvider::next_frame",
-                format!("Frame index {index} exceeds the u32 tick range"),
-            )
-        })
-    }
 }
 
 impl LayoutProvider for IbtProvider {
     fn layout(&self) -> &Arc<TelemetryLayout> {
-        &self.layout
+        self.replay.file().telemetry_layout()
     }
 }
 
@@ -108,24 +76,14 @@ impl Provider for IbtProvider {
     /// reads leave the replay cursor unchanged so the same frame can be retried.
     ///
     /// # Errors
-    /// Returns an error if the frame index exceeds `u32`, reading fails, or the
-    /// returned byte count differs from the telemetry layout's frame size.
+    /// Returns an error if the frame index exceeds `u32`, the session revision
+    /// is negative, reading fails, or the frame size differs from the layout.
     /// These failures leave the replay cursor unchanged.
     async fn next_frame(&mut self) -> Result<Option<FramePacket>> {
-        if self.replay.is_eof() {
-            return Ok(None);
-        }
-        let tick = Self::tick_for_frame(self.replay.position())?;
         let Some(frame) = self.replay.current_frame()? else {
             return Ok(None);
         };
-        let frame_data = frame.into_bytes();
-        let packet = FramePacket::new(
-            frame_data,
-            tick,
-            self.replay.file().header().session_info_update as u32,
-            self.shared_layout(),
-        )?;
+        let packet = frame.into_packet()?;
         self.replay.advance();
         Ok(Some(packet))
     }
@@ -147,7 +105,8 @@ impl Provider for IbtProvider {
     }
 
     fn tick_rate(&self) -> f64 {
-        self.tick_rate
+        let rate = self.replay.file().tick_rate();
+        if rate > 0 { f64::from(rate) } else { 60.0 }
     }
 }
 
@@ -155,7 +114,6 @@ impl Provider for IbtProvider {
 mod tests {
     use super::*;
     use crate::{
-        ibt::IbtFile,
         irsdk::{DiskSubHeader, Header},
         provider::VariableHeadersProvider,
         test_utils::{load_fixture_manifest, require_smallest_ibt_fixture},
@@ -204,11 +162,55 @@ mod tests {
                     assert_eq!(packet.tick as usize, index);
                     assert_eq!(packet.session_version, fixture.session_info_update as u32);
                     assert_eq!(packet.data().as_ref(), reference.frame(index)?);
-                    assert!(Arc::ptr_eq(packet.layout(), &provider.layout));
+                    assert!(Arc::ptr_eq(packet.layout(), provider.layout()));
+                    assert!(Arc::ptr_eq(
+                        packet.layout(),
+                        provider.replay.file().telemetry_layout()
+                    ));
                 }
                 assert!(block_on(provider.next_frame())?.is_none());
                 assert!(block_on(provider.next_frame())?.is_none());
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn negative_packet_revision_preserves_replay_bounds_and_position() -> anyhow::Result<()> {
+        let mut bytes = fs::read(require_smallest_ibt_fixture()?)?;
+        let offset = offset_of!(Header, session_info_update);
+        bytes[offset..offset + size_of::<i32>()].copy_from_slice(&(-1_i32).to_le_bytes());
+        let file = IbtFile::from_bytes(bytes)?;
+        assert!(file.frame(2)?.value("Speed")?.is_some());
+        let layout = Arc::clone(file.telemetry_layout());
+        let mut replay = file.replay();
+        replay.set_range(1..4)?;
+        replay.seek(2)?;
+        let mut provider = IbtProvider::from_replay(replay)?;
+        for _ in 0..2 {
+            let error = block_on(provider.next_frame()).unwrap_err().to_string();
+            assert!(error.contains("session revision"), "{error}");
+            assert_eq!(provider.replay.position(), 2);
+            assert_eq!(provider.replay.range(), 1..4);
+            assert!(Arc::ptr_eq(provider.layout(), &layout));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_borrows_file_layout_and_reports_recorded_tick_rate() -> anyhow::Result<()> {
+        for rate in [60_i32, 120] {
+            let mut bytes = fs::read(require_smallest_ibt_fixture()?)?;
+            let offset = offset_of!(Header, tick_rate);
+            bytes[offset..offset + size_of::<i32>()].copy_from_slice(&rate.to_le_bytes());
+            let file = IbtFile::from_bytes(bytes)?;
+            let layout = Arc::clone(file.telemetry_layout());
+            let mut provider = IbtProvider::from_replay(file.replay())?;
+            assert!(Arc::ptr_eq(provider.layout(), &layout));
+            assert!(Arc::ptr_eq(&provider.shared_layout(), &layout));
+            assert_eq!(provider.tick_rate(), f64::from(rate));
+            let packet = block_on(provider.next_frame())?.unwrap();
+            assert!(Arc::ptr_eq(packet.layout(), &layout));
         }
         Ok(())
     }
@@ -263,19 +265,6 @@ mod tests {
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
         assert!(error.contains("past frame size"), "{error}");
         Ok(())
-    }
-
-    #[cfg(target_pointer_width = "64")]
-    #[test]
-    fn frame_index_beyond_tick_range_is_rejected() {
-        assert_eq!(
-            IbtProvider::tick_for_frame(u32::MAX as usize).unwrap(),
-            u32::MAX
-        );
-        let error = IbtProvider::tick_for_frame(u32::MAX as usize + 1)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("exceeds the u32 tick range"), "{error}");
     }
 
     #[test]
