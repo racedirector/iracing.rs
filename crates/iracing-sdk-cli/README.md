@@ -1,5 +1,8 @@
 # iracing-sdk
 
+For command development, consult and update the authored
+[command contracts](docs/commands/README.md) alongside the owning implementation.
+
 `iracing-sdk` is a command-line interface for inspecting iRacing telemetry recordings and, on Windows, working with live simulator telemetry. It provides user-facing workflows for headers, session data, variable metadata, telemetry snapshots, telemetry export, and live capture.
 
 ## Requirements

@@ -17,6 +17,10 @@ where
     pub extra: Extra,
 }
 
+#[cfg_attr(
+    doc,
+    doc = "Per-command source development contracts are indexed in the [command guide](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/README.md); clap owns source vocabulary and platform gates."
+)]
 #[derive(Subcommand, Debug)]
 pub(crate) enum SourceKind<
     IbtExtra: clap::Args = NoArgs,

@@ -7,6 +7,10 @@ use crate::{
     writer::{DocumentFormat, DocumentWriter, OutputTarget},
 };
 
+#[cfg_attr(
+    doc,
+    doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/headers-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/headers-live.md)."
+)]
 #[derive(clap::Args, Debug)]
 pub(crate) struct Args {
     #[command(subcommand)]
