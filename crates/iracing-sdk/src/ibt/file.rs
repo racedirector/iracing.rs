@@ -53,10 +53,13 @@ impl fmt::Debug for IbtFileFrames<'_> {
 impl Iterator for IbtFileFrames<'_> {
     type Item = Result<IbtFrame>;
 
+    /// Reads the next record, advancing past it even if the read fails.
+    /// Returns `None` permanently once the range is exhausted.
     fn next(&mut self) -> Option<Self::Item> {
         self.remaining.next().map(|index| self.file.frame(index))
     }
 
+    /// Returns the exact number of remaining records, including any that fail to read.
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.remaining.size_hint()
     }
@@ -298,6 +301,10 @@ impl IbtFile {
     }
 
     /// Lazily traverses the entire recording from physical record zero.
+    ///
+    /// Returns an empty iterator for an empty recording. No frame bytes are
+    /// read until iteration; read errors are yielded per record, as with
+    /// [`Self::frames`].
     pub fn all_frames(&self) -> Result<IbtFileFrames<'_>> {
         self.frames(0..self.frame_count())
     }

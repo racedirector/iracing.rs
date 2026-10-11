@@ -21,6 +21,10 @@ pub struct IbtFrame {
 }
 
 impl IbtFrame {
+    /// Retains one record's bytes and layout without validating their agreement.
+    ///
+    /// `index` is the zero-based physical record coordinate; `session_info_update`
+    /// is the recording header's signed revision, checked by [`Self::into_packet`].
     pub(super) fn new(
         index: usize,
         bytes: Arc<[u8]>,
@@ -56,6 +60,12 @@ impl IbtFrame {
     }
 
     /// Decodes a published field, returning `None` for an absent name.
+    ///
+    /// Names match exactly. A one-element field yields a scalar; other fields
+    /// yield an array.
+    ///
+    /// # Errors
+    /// Propagates field decoding errors from [`TelemetryValue::decode_field`].
     pub fn value(&self, name: &str) -> Result<Option<TelemetryValue>> {
         self.layout
             .field_by_name(name)
@@ -101,6 +111,15 @@ impl LayoutProvider for IbtFrame {
 }
 
 impl TelemetryValueProvider for IbtFrame {
+    /// Decodes this frame's bytes using the supplied field's type and byte range.
+    ///
+    /// The caller should obtain `field` from this frame's layout; membership in
+    /// that layout is not checked. Returns a scalar for one element and an array
+    /// otherwise.
+    ///
+    /// # Errors
+    /// Returns an unexpected-EOF memory error if the field's full byte range
+    /// is not present in this frame.
     fn telemetry_value(&self, field: &FieldLayout) -> Result<TelemetryValue> {
         TelemetryValue::decode_field(&self.bytes, field)
     }
