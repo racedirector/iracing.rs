@@ -143,7 +143,7 @@ The CLI and telemetry stack are split by responsibility:
 - [`src/main.rs`](src/main.rs) is the executable entry point and composes the application dependencies.
 - [`src/commands`](src/commands) owns the clap command composition and command-specific behavior.
 - [`src/utils.rs`](src/utils.rs) contains the CLI's source-selection helpers for disk and live telemetry.
-- [`src/writer`](src/writer) owns CLI output formatting and destinations.
+- [Generic document serialization](src/writer/document.rs) and [output destinations](src/writer/output_sink.rs) own formatting and sink side effects; other writers live in [`src/writer`](src/writer).
 - [`iracing-sdk`](../iracing-sdk) owns telemetry/session reading, layouts, decoding, live integration, and the reusable SDK contracts used by this CLI.
 - [`iracing-irsdk`](../iracing-irsdk) owns the dependency-light native iRacing wire definitions.
 - [`iracing-broadcast-cli`](../iracing-broadcast-cli/README.md) documents the standalone Windows broadcast CLI; the Windows `iracing-sdk broadcast` branch delegates to that command implementation.
