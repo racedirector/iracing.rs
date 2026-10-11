@@ -74,17 +74,21 @@ async fn replay() -> iracing_sdk::Result<()> {
 
 ### Session YAML Parsing
 
-```rust,no_run
-use iracing_sdk::{ibt::IbtReader, provider::SessionInformationProvider};
+Convert an acquired byte snapshot through the typed session boundary:
 
-fn main() -> iracing_sdk::Result<()> {
-    let reader = IbtReader::open("telemetry.ibt")?;
-    if let Some(session) = reader.session_info()? {
-        println!("Track: {}", session.weekend_info.track_display_name);
-    }
+```rust,no_run
+use iracing_sdk::{SessionInfoBytes, schema::SessionInfo};
+
+fn inspect(bytes: SessionInfoBytes) -> iracing_sdk::Result<()> {
+    let session = SessionInfo::try_from(bytes)?;
+    println!("Track: {}", session.weekend_info.track_display_name);
     Ok(())
 }
 ```
+
+See [session Rustdoc](src/schema/session/mod.rs) for decoding, sanitization,
+parser errors, and optional discovery. Source acquisition and runtime session
+publication have separate owners.
 
 ### Live Telemetry (Windows Only)
 
