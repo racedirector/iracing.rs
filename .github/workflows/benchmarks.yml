@@ -44,6 +44,7 @@ jobs:
         benchmark:
           - telemetry-diagnostics
           - ibt-reader-memory
+          - ibt-frame-ownership-diagnostic
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -52,6 +53,8 @@ jobs:
           lfs: true
       - name: Install Rust
         uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: ${{ matrix.benchmark == 'ibt-frame-ownership-diagnostic' && '1.88.0' || 'stable' }}
       - name: Cache Cargo artifacts
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run diagnostic
