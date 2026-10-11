@@ -1,8 +1,9 @@
-# IBT reader performance methodology
+# Historical IBT reader performance snapshot
 
-This document defines the IBT reader timing experiment and preserves the
-pre-refactor snapshot from issue #84 as historical context. Current performance
-evidence comes from same-runner PR comparisons.
+This document preserves the pre-refactor snapshot from issue #84. Current
+methodology belongs to the [benchmark source](../../crates/iracing-sdk/benches/ibt_reader_performance.rs)
+and [storage-neutral workload helper](../../crates/iracing-sdk/benches/support/ibt.rs).
+Current performance evidence comes from revision-specific same-runner comparisons.
 
 ## Reproduce
 
@@ -53,19 +54,7 @@ groups was outside the timed routines. Replay allocated and copied each owned
 frame; the seek case did not read a frame after positioning. Retained heap and
 page cache behavior were outside that timing target.
 
-## Current experiment
+## Current methodology
 
-`ibt_reader_open` includes reader construction and metadata parsing.
-`ibt_reader_sequential_replay`, `ibt_provider_sequential_replay`, and
-`ibt_connection_sequential_replay` preserve their original timed boundaries.
-`ibt_reader_random_frame_read` reads 1,024 deterministic indexed frames through
-the public reader API. The former `ibt_reader_random_seek` result is a different
-experiment; it originally measured cursor movement alone, and the reader no
-longer exposes a cursor-only seek API.
-
-Fixture size and frame count are derived from the wire preamble and file length
-without using the reader implementation. The benchmark reads each fixture
-sequentially with a plain file before timing every case. This establishes an
-explicit warm-cache local storage contract for both revisions; no cold-open
-disk latency or retained heap is measured. Timing evidence belongs in PR
-comparisons and their Criterion artifacts, not a mutable number in this file.
+Follow the benchmark and workload source linked above. Cargo owns target names,
+and the same-runner workflow owns base/head execution and report publication.

@@ -1,4 +1,11 @@
-# IBT reader storage measurement
+# Historical IBT reader storage measurement — 2026-09-19
+
+This report records issue #84's seekable-file experiment on Apple Silicon macOS.
+An exact measured revision and compiler version were not retained in this
+document. The implementation description and reproduction command below belong
+to that historical experiment, not current architecture or target vocabulary.
+Current methodology is owned by the [memory diagnostic source](../../crates/iracing-sdk/benches/ibt_reader_measurement.rs);
+use the [operator guide](../../crates/iracing-sdk/benches/README.md) for current invocation.
 
 Issue #84 replaces complete-file retention in `IbtReader::open` with a private
 seekable `File` source. The public `from_bytes` path remains intentionally
@@ -30,8 +37,8 @@ warmth, storage, build profile, and machine load.
 ## Recorded comparison
 
 Results below were captured after the file-backed stack on 2026-09-19 using an
-Apple Silicon macOS development machine. Run the command above for current
-numbers on the review machine.
+Apple Silicon macOS development machine. These observations do not establish
+current measurements on another revision or machine.
 
 | Mode | File size | Frame size | Frames | Open | Retained heap | Peak open heap | Replay | Throughput |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -48,7 +55,7 @@ above 840 MiB/s in both runs. The expected in-memory replay advantage does not
 justify restoring recording-sized ownership; buffering and mmap remain separate
 evidence-driven follow-ups if a real workload needs them.
 
-The acceptance signal is structural rather than a fixed timing threshold:
+The acceptance signal used for that experiment was structural rather than a fixed timing threshold:
 file-backed retained heap remains metadata-sized as recordings grow, whereas
 the memory baseline grows by at least the complete recording size. Filesystem
 cache may still grow with bytes read and is explicitly outside reader-owned
