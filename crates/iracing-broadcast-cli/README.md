@@ -116,6 +116,8 @@ The broadcast stack is split by responsibility:
 
 For the broader workspace map, development commands, and architecture links, start at the [workspace README](../../README.md) and [`docs/architecture`](../../docs/architecture/README.md).
 
+Before changing command behavior, consult its [development document](docs/commands/README.md) and update it alongside the implementation. New or moved executable leaves must keep their document and declaration Rustdoc link together. To render declaration links in the private command module, add `--document-private-items` to the documentation command.
+
 Local Rust documentation can be generated with:
 
 ```powershell
