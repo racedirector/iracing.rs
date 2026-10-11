@@ -46,7 +46,7 @@
 ## Testing & Fixtures
 
 - Integration tests rely on `.ibt` fixtures from `test-data/ibt/`; use helpers in `test_utils` (`require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hard-coded paths.
-- For hand-built schemas, session data, frames, and benchmark inputs, start with the generated catalog in `../../docs/reference/README.md` instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult `primitives-schema.yml` for enum/bitflag domains.
+- For hand-built schemas, session data, frames, and benchmark inputs, start with the [reference provenance guide](../../docs/reference/README.md) instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult the owning [iracing-irsdk types](../iracing-irsdk/src/lib.rs) for enum/bitflag domains.
 - Benchmarks require `cargo bench -p iracing-sdk --features benchmark`.
 
 - Downstream fixture tests can enable the SDK's `test-utils` feature without enabling benchmark targets.
