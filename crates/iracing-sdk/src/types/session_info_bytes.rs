@@ -89,6 +89,19 @@ impl SessionInfoBytes {
         }
     }
 
+    /// Decodes the NUL-bounded payload and removes SDK control characters.
+    ///
+    /// Uses the declared encoding through [`SessionInfoPayload::decode`], then
+    /// preserves all remaining text, including whitespace and line endings.
+    /// This cleanup does not validate YAML syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup leaves empty or whitespace-only text.
+    pub fn sanitized_yaml(&self) -> crate::Result<String> {
+        crate::types::IRacingSessionString::try_from(self.payload().decode()).map(Into::into)
+    }
+
     pub(crate) fn from_checked_region(bytes: &[u8]) -> Self {
         Self {
             bytes: bytes.to_vec(),
@@ -164,6 +177,47 @@ mod tests {
             };
             assert_eq!(String::from(buffer), expected);
         }
+    }
+
+    #[test]
+    fn sanitized_yaml_decodes_encoding_and_preserves_remaining_text() {
+        for (bytes, expected) in [
+            (
+                b"WeekendInfo:\r\n Encoding: ISO_8859_1\r\n Name: Jos\xe9\x01\t\r\n\0padding"
+                    .as_slice(),
+                "WeekendInfo:\r\n Encoding: ISO_8859_1\r\n Name: Jos\u{e9}\t\r\n",
+            ),
+            (
+                b"WeekendInfo:\n Encoding: UTF8\n Name: \xc3\xa9\xff\x01".as_slice(),
+                "WeekendInfo:\n Encoding: UTF8\n Name: \u{e9}\u{fffd}",
+            ),
+        ] {
+            let snapshot = SessionInfoBytes::from_checked_region(bytes);
+            assert!(snapshot.payload().decode().contains('\u{1}'));
+            assert_eq!(snapshot.sanitized_yaml().unwrap(), expected);
+            assert_eq!(snapshot.as_bytes(), bytes);
+        }
+    }
+
+    #[test]
+    fn sanitized_yaml_rejects_empty_cleanup_without_changing_raw_decode() {
+        for bytes in [b"".as_slice(), b"\0padding", b"\x01 \n\t"] {
+            let snapshot = SessionInfoBytes::from_checked_region(bytes);
+            let raw = snapshot.payload().decode();
+            let error = snapshot.sanitized_yaml().unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("YAML is empty after preprocessing")
+            );
+            assert_eq!(snapshot.payload().decode(), raw);
+        }
+    }
+
+    #[test]
+    fn sanitized_yaml_does_not_validate_yaml_syntax() {
+        let snapshot = SessionInfoBytes::from_checked_region(b"[");
+        assert_eq!(snapshot.sanitized_yaml().unwrap(), "[");
     }
 
     #[test]

@@ -16,6 +16,5 @@ csv = { workspace = true }
 iracing-sdk = { workspace = true }
 iracing-sdk-derive = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true, features = ["rt", "macros"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

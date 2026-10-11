@@ -137,8 +137,8 @@ name = "manual-frame-adapter"
 path = "examples/adapter_disk_position.rs"
 
 [[example]]
-name = "ibt-subscribe"
-path = "examples/disk_position_derive_connection.rs"
+name = "ibt-derive"
+path = "examples/disk_position_derive.rs"
 required-features = ["derive"]
 
 [[example]]

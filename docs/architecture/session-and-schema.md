@@ -15,11 +15,11 @@ decoded `Header` and the complete source length. Its private `ParsedIbtHeader`
 validates signed fields before geometry is constructed. `MetadataRegions` lives
 alongside the other region value objects in `types/regions`; frame counts derive
 from physical bytes, not the disk sub-header record count. The layout performs
-no I/O, schema decoding, or playback management. `IbtReader` uses it as the sole
-authority for source geometry. Fresh snapshot methods read the advertised regions
-on each call and return `None` for absent regions. The reader retains no schema
-or session cache. `IbtProvider` builds its schema once with
-`TelemetryLayout::try_from_headers(&headers, frame_size)`. Missing variable metadata
+no I/O, schema decoding, or playback management. `IbtFile` uses it as the sole
+authority for source geometry, snapshots variable/session regions once, and
+builds one shared semantic layout with
+`TelemetryLayout::try_from_headers(&headers, frame_size)`. Metadata access borrows
+those retained immutable snapshots. Missing variable metadata
 is accepted only when there are no telemetry frames. Shared validation lives in
 `parse_utils` and uses ordinary functions.
 
@@ -62,10 +62,11 @@ resolves through a name index. IDs must not be transferred between different
 layouts. Construction rejects empty/duplicate names, nonpositive frame size or
 element count, negative offsets, arithmetic overflow, and out-of-frame extents.
 It does not sort fields, reject in-frame overlaps, or normalize names. An empty
-header snapshot is valid with a positive frame size; providers decide whether
-their source requires metadata.
+header snapshot is valid with a positive frame size; the source owner decides
+whether its source requires metadata. `IbtFile` rejects empty metadata when
+physical frames are present.
 
-Providers, connections, `FramePacket`, and `DynamicFrame` retain one shared
+`IbtFile`, `IbtFrame`, live providers/connections, `FramePacket`, and `DynamicFrame` retain shared
 `Arc<TelemetryLayout>`. `LayoutProvider` exposes it and supports field inspection.
 The legacy `VariableInfo`, `VariableSchema`, and `SchemaProvider` are removed.
 `FramePacket::new` returns an error for short or oversized buffers; its bytes and
@@ -105,20 +106,25 @@ encoding is cached; control-character cleanup and parsing remain subsequent oper
 iRacing session data can contain control characters and non-UTF-8 bytes.
 `SessionInfoBytes` bounds and decodes the captured bytes; the internal
 `IRacingSessionString` removes invalid control characters and rejects empty
-text. `IbtProvider::session_yaml` and live acquisition supply this sanitized
-text. `SessionInfo::parse` then deserializes it into the typed session model.
+text. Recorded consumers parse a retained snapshot with `SessionInfo::try_from`,
+or call `sanitized_yaml()` for decoded, cleaned text without parsing or
+reserializing it. The helper preserves remaining text and line endings but does
+not validate YAML syntax. Live acquisition
+continues to supply sanitized text. `SessionInfo::parse` deserializes that text
+into the typed session model.
 Keep decoding and sanitization in the source path.
 
 ## Caching and publication
 
-The telemetry task has source-specific session policies:
+The live telemetry task detects version transitions, immediately owns the
+current YAML, and parses queued snapshots sequentially on a background FIFO
+worker before publication. Version tracking and publication belong to that
+policy, not to `SessionInfo::parse`.
 
-- live: detect version transitions, immediately own the current YAML, and parse
-  queued snapshots sequentially on a background FIFO worker before publishing;
-- IBT: fetch and parse immutable session YAML once before frames.
-
-Session version tracking and publication belong to these policies, not to
-`SessionInfo::parse`.
+`IbtFile` retains immutable session bytes independently of frame access or replay.
+Recorded consumers choose when to decode/parse them. The feature-gated recorded
+benchmark harness retains its historical one-time session parse before frames;
+it does not add a production session task to the file model.
 
 ## Typed session model
 

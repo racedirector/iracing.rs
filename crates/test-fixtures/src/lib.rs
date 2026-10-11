@@ -115,13 +115,14 @@ pub fn generate(repo_root: &Path) -> Result<GenerationReport> {
 ///
 /// This operation is read-only. In addition to checking manifest values and
 /// SHA-256 hashes, it decodes SDK wire headers, compares embedded YAML, builds an
-/// [`iracing_sdk::ibt::IbtReader`], checks its schema, and consumes every frame.
+/// [`iracing_sdk::IbtFile`], checks its layout, and consumes every frame directly
+/// and through replay.
 ///
 /// # Errors
 ///
 /// Returns an error when the manifest or an artifact is missing, malformed,
 /// unsafe to resolve below `repo_root`, inconsistent with the layout contract,
-/// hash-mismatched, or unreadable through `IbtReader`.
+/// hash-mismatched, or unreadable through the canonical file/frame/replay APIs.
 pub fn verify(repo_root: &Path) -> Result<VerificationReport> {
     verify::verify(repo_root)
 }

@@ -10,6 +10,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - `cargo build --workspace` for workspace sanity; release builds defer to cargo-dist.
 - `cargo test --workspace --all-targets` hits every crate; scope with `cargo test -p <crate>` or `cargo test -p iracing-sdk -- types::tests::bitfield_constructor_works` when debugging.
+- `cargo test -p iracing-sdk --features benchmark --lib benchmarking::` runs the feature-gated delivery/coordinator/subscription/session experiment tests. The broad gate and quality CI run these explicitly after default workspace tests; benchmark compilation alone does not run them.
 - `cargo test-fixtures` regenerates deterministic fixtures, verifies their manifest/bytes, and fails on git drift. For intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings` are the formatting/lint gates.
 - For docs-touching crate changes, run the matching docs CI commands: `cargo test -p <crate> --doc`, `RUSTDOCFLAGS="-D warnings" cargo doc -p <crate> --no-deps`, and `cargo check -p iracing-sdk --examples` and `cargo check -p iracing-sdk-cli --bins --all-features`.
@@ -17,7 +18,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 ## Quality Gates
 
-- Before committing or pushing, run and pass the checks that match `.github/workflows/quality.yml`: fixture verification, formatting, clippy, and workspace tests.
+- Before committing or pushing, run and pass the checks that match `.github/workflows/quality.yml`: fixture verification, formatting, clippy, workspace tests, and explicit benchmark-feature tests.
 - The quality workflow also compile-checks every `iracing-sdk` benchmark on Ubuntu and Windows. `benchmarks-codspeed.yml` runs the deterministic CPU targets; path-filtered IBT and delivery workflows compare PR base/head on one runner. `benchmarks.yml` runs diagnostics only, and live simulator measurement remains compile-only in hosted CI.
 - When changes touch docs or public APIs for `iracing-sdk`, `iracing-sdk-derive`, or `iracing-simulation`, also run the crate-specific doctest, docs-as-warnings, and examples/bins checks from `.github/workflows/docs.yml`.
 - CI runs the main quality gate on both Ubuntu and Windows. Local runs on one OS are useful, but do not ignore platform-specific failures surfaced by the other CI runner.
@@ -31,7 +32,7 @@ on commands, boundaries, and easy-to-miss constraints.
 ## Workspace Map
 
 - `crates/iracing-irsdk`: dependency-light native SDK wire contract: fixed-layout headers, intrinsic byte decoding, constants, enums, flags, packed fields, and portable broadcast command values. Do not add IBT navigation, shared-memory access, schemas, session parsing, or runtime orchestration here.
-- `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
+- `crates/iracing-sdk`: immutable `.ibt` ownership through `IbtFile`, direct recorded frame/replay access, schema/session parsing, source-independent providers/adapters, live connection and delivery/session policies, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-cli`: binary-only CLI and schema generator tools; its features forward to `iracing-sdk`.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
@@ -52,13 +53,13 @@ on commands, boundaries, and easy-to-miss constraints.
 ## Patterns & Gotchas
 
 - Frame extraction is little-endian; always rely on `VarData::decode_field` rather than manual decoding to avoid drift.
-- Session parsing uses `SessionInfo::parse` after source decoding and sanitization. The telemetry task has separate live and IBT session policies; preserve their documented retry, ordering, and EOF semantics instead of adding a second per-frame parser.
+- Session parsing uses `SessionInfo::parse` after source decoding and sanitization. Preserve the live telemetry task's session retry and ordering policy. Recorded consumers explicitly parse the file's immutable snapshot when needed; the historical benchmark pipeline alone retains its once-before-frames session policy.
 - Live providers and Win32 transports compile only on Windows, while `LiveConnection` retains a portable stub and broadcast command types remain portable. Gate at the narrowest OS-dependent boundary.
-- Do not generalize recorded replay semantics to live telemetry. `Telemetry::spawn_ibt` uses `OnDemandDelivery`, and `IbtConnection` advances its shared cursor only after every active subscription acknowledges the retained frame; live delivery remains latest-wins.
+- Recorded consumers use `IbtFile`/`IbtReplay` directly, with `usize` physical identity and the file's exact shared telemetry layout. Do not generalize recorded replay semantics to live telemetry: replay is pull-driven while live delivery remains latest-wins. Acknowledgement/backpressure machinery exists only under the `benchmark` feature for retained experiment workloads.
 
 ## CI & Release
 
-- `quality.yml` runs fixture verification, formatting, clippy, workspace tests, and benchmark compilation on pull requests and pushes to `main`.
+- `quality.yml` runs fixture verification, formatting, clippy, workspace tests, explicit benchmark-feature tests, and benchmark compilation on pull requests and pushes to `main`.
 - `benchmarks-codspeed.yml` runs CPU benchmarks on affected PRs and `main`. `benchmark-ibt.yml` and `benchmark-delivery.yml` call the shared same-runner Criterion comparison; `benchmarks.yml` runs diagnostics only.
 - `docs.yml` runs doctests, docs with warnings as errors, and `cargo check` for examples/bins for touched documentation crates; run those targets locally before opening PRs.
 - Releases are tag-driven (`v*`) via `cargo dist`; keep version bumps and dist metadata coordinated when preparing a release.

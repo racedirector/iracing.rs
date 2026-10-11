@@ -34,18 +34,17 @@ event, so cancellation cannot close the handle while the worker waits.
 
 ## Disk mappings
 
-[`IbtFile::open`](../../crates/iracing-sdk/src/ibt/file.rs) uses the same completed,
-immutable storage contract described below. It owns its mapping directly and
-establishes owned metadata snapshots and a validated telemetry layout once;
-metadata references do not point into mapped storage.
-
-[`IbtReader::open`](../../crates/iracing-sdk/src/ibt/reader/mod.rs) maps completed
+[`IbtFile::open`](../../crates/iracing-sdk/src/ibt/file.rs) maps completed
 recordings read-only. The backing file must remain unchanged/untruncated by any
-process until the reader is dropped. The mapping owns its view independently of
+process until the file or owning replay is dropped. The mapping owns its view independently of
 the File handle. This is an external storage assumption, not a fact proved by
 opening a file read-only or by validating IBT headers. `from_bytes` owns its
 storage when that assumption cannot be guaranteed. Layout validation cannot
 repair mmap lifetime/storage violations.
+
+The file establishes owned variable/session snapshots and a validated shared
+telemetry layout once. Metadata references do not point into mapped storage;
+recorded frames copy only their requested bytes and retain that exact layout.
 
 ## Wire contracts
 
@@ -65,5 +64,6 @@ end and reject reversed ranges. They do not bind the region to any source.
 Specialized regions validate additional geometry; inspect each constructor.
 [`IbtLayout`](../../crates/iracing-sdk/src/types/ibt/layout.rs) validates physical
 geometry against a particular source length. It does not validate variable
-semantics or the lifetime of externally mutated storage. Readers must enforce
-exact-read destinations and source bounds; providers own schema/session meaning.
+semantics or the lifetime of externally mutated storage. `IbtFile` enforces source
+bounds, complete reads, immutable snapshots, and telemetry layout construction;
+session decoding/parsing remains separate from physical geometry.

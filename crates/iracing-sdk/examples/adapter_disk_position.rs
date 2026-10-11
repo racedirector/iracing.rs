@@ -1,10 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use iracing_sdk::{
-    AdapterValidation, FieldExtraction, FrameAdapter, LayoutProvider, provider::Provider,
-    providers::ibt::IbtProvider,
-};
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter, IbtFile};
 use std::{fs, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -99,8 +96,7 @@ impl FrameAdapter for Row {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -116,14 +112,15 @@ async fn main() -> Result<()> {
 
     tracing::info!(path = %ibt_path.display(), "Opening IBT file");
 
-    let mut ibt_provider = IbtProvider::open(&ibt_path)?;
+    let file = IbtFile::open(&ibt_path)?;
 
     // ------------------------------------------------------------
     // Write session string to output path.
     // ------------------------------------------------------------
     if let Some(yml_output) = yml_output_path {
         tracing::info!("Parsing session information...");
-        if let Some(session) = ibt_provider.session_yaml(0).await? {
+        if let Some(snapshot) = file.session_info_bytes() {
+            let session = snapshot.sanitized_yaml()?;
             fs::write(&yml_output, session)?;
             tracing::info!(session_output_path = %yml_output.display(), "Session information written.")
         }
@@ -131,11 +128,12 @@ async fn main() -> Result<()> {
 
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
-    tracing::info!("Parsing frames from IBT provider");
+    tracing::info!("Parsing frames from IBT file");
 
-    let layout = ibt_provider.layout();
+    let layout = file.telemetry_layout();
     let shared_validation = Row::validate_layout(layout)?;
-    while let Some(packet) = ibt_provider.next_frame().await? {
+    for frame in file.all_frames()? {
+        let packet = frame?.into_packet()?;
         let frame = Row::adapt(&packet, &shared_validation);
         // Serialize row to CSV.
         writer.serialize(frame)?;

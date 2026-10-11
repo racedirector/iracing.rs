@@ -79,6 +79,15 @@ fn main() -> Result<()> {
                 ],
                 vec!["test", "--workspace", "--all-targets"],
                 vec![
+                    "test",
+                    "-p",
+                    "iracing-sdk",
+                    "--features",
+                    "benchmark",
+                    "--lib",
+                    "benchmarking::",
+                ],
+                vec![
                     "bench",
                     "-p",
                     "iracing-sdk",

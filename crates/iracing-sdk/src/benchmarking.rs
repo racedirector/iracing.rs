@@ -1,7 +1,11 @@
-//! Internal, feature-gated access to the production telemetry pipeline.
+//! Internal, feature-gated delivery experiments and their behavioral harnesses.
 //!
 //! This module is public only so external Criterion targets can drive private
 //! delivery policies without widening the normal SDK API.
+//! Historical recorded coordinator, acknowledgement, and session policies live
+//! only here; completed recordings use IbtFile and IbtReplay.
+
+#![doc(hidden)]
 
 use std::{
     marker::PhantomData,
@@ -23,17 +27,44 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     AdapterValidation, FrameAdapter, FramePacket, LayoutProvider, Result, TelemetryLayout,
-    connections::ibt::{
-        coordinator::{self, ReplayControl},
-        subscription::IbtSubscription,
-    },
     provider::Provider,
-    telemetry::{
-        Telemetry,
-        delivery_policy::{LatestDelivery, OnDemandDelivery},
-        session_policy::SessionPolicy,
-    },
+    telemetry::{Telemetry, delivery_policy::LatestDelivery, session_policy::SessionPolicy},
 };
+
+#[cfg(test)]
+mod connection_tests;
+mod coordinator;
+mod delivery;
+mod provider;
+#[cfg(test)]
+mod scheduling_tests;
+mod session;
+mod subscription;
+
+use crate::{schema::SessionInfo, telemetry::TelemetryChannels};
+use coordinator::ReplayControl;
+use delivery::{OnDemandDelivery, ReplayDemand};
+pub use provider::RecordedProvider;
+use session::RecordedSessionPolicy;
+use subscription::AcknowledgedSubscription;
+
+type RecordedChannels =
+    TelemetryChannels<mpsc::Sender<ReplayDemand>, watch::Receiver<Option<Arc<SessionInfo>>>>;
+
+// Keep historical session fetch and parse on the telemetry task before its first frame.
+#[cfg(test)]
+fn spawn_recorded_channels<P: Provider>(provider: P) -> RecordedChannels {
+    recorded_channels_with_task(provider).0
+}
+
+fn recorded_channels_with_task<P: Provider>(provider: P) -> (RecordedChannels, JoinHandle<()>) {
+    let (requests, receiver) = mpsc::channel(1);
+    let (sessions, receiver_sessions) = watch::channel(None);
+    Telemetry::builder(provider)
+        .with_delivery_policy(OnDemandDelivery::new(receiver), requests)
+        .with_session_policy(RecordedSessionPolicy::new(sessions), receiver_sessions)
+        .build_with_task()
+}
 
 /// A session policy that keeps session parsing out of delivery benchmarks.
 struct NoSessions<P>(PhantomData<fn() -> P>);
@@ -130,6 +161,7 @@ impl Drop for LatestPipeline {
 /// Cross-platform connection facade using acknowledged replay delivery.
 pub struct OnDemandPipeline {
     frames: watch::Receiver<Option<Arc<FramePacket>>>,
+    sessions: Option<watch::Receiver<Option<Arc<SessionInfo>>>>,
     controls: mpsc::UnboundedSender<ReplayControl>,
     next_subscriber_id: AtomicU64,
     layout: Arc<TelemetryLayout>,
@@ -139,7 +171,7 @@ pub struct OnDemandPipeline {
 }
 
 impl OnDemandPipeline {
-    /// Spawn the production telemetry loop and replay acknowledgement coordinator.
+    /// Spawn the shared telemetry loop with the experiment-owned acknowledgement coordinator.
     ///
     /// The pipeline retains the provider's exact shared layout allocation so
     /// adapter validation and produced packets cannot disagree on layout identity.
@@ -153,11 +185,33 @@ impl OnDemandPipeline {
             .with_delivery_policy(OnDemandDelivery::new(request_receiver), requests)
             .with_session_policy(NoSessions::<P>::default(), ())
             .build_with_task();
+        Self::from_channels(layout, channels, telemetry_task, None)
+    }
+
+    /// Preserve the recorded pipeline experiment, including immutable session parsing.
+    /// Session initialization runs on the spawned task and stays inside timed draining.
+    pub fn recorded<P: Provider + LayoutProvider>(provider: P) -> Self {
+        let layout = Arc::clone(provider.layout());
+        Self::recorded_with_layout(provider, layout)
+    }
+
+    fn recorded_with_layout<P: Provider>(provider: P, layout: Arc<TelemetryLayout>) -> Self {
+        let (channels, telemetry_task) = recorded_channels_with_task(provider);
+        let sessions = Some(channels.sessions.clone());
+        Self::from_channels(layout, channels, telemetry_task, sessions)
+    }
+
+    fn from_channels<S>(
+        layout: Arc<TelemetryLayout>,
+        channels: TelemetryChannels<mpsc::Sender<ReplayDemand>, S>,
+        telemetry_task: JoinHandle<()>,
+        sessions: Option<watch::Receiver<Option<Arc<SessionInfo>>>>,
+    ) -> Self {
         let (frames, controls, coordinator_task) =
             coordinator::spawn(channels.frames, channels.cancel.clone());
-
         Self {
             frames,
+            sessions,
             controls,
             next_subscriber_id: AtomicU64::new(0),
             layout,
@@ -167,20 +221,40 @@ impl OnDemandPipeline {
         }
     }
 
-    /// Create a coordinated subscription whose next poll acknowledges its prior frame.
+    /// Return the retained session for the historical recorded workload.
+    pub fn current_session(&self) -> Option<Arc<SessionInfo>> {
+        self.sessions
+            .as_ref()
+            .and_then(|sessions| sessions.borrow().clone())
+    }
+
+    #[cfg(test)]
+    fn current_frame(&self) -> Option<Arc<FramePacket>> {
+        self.frames.borrow().clone()
+    }
+
+    /// Create the boxed subscription used by the generic delivery experiment.
     pub fn subscribe<T>(&self) -> Result<Pin<Box<dyn Stream<Item = T> + Send + 'static>>>
+    where
+        T: FrameAdapter + Send + 'static,
+    {
+        Ok(Box::pin(self.recorded_subscription::<T>()?))
+    }
+
+    /// Preserve the historical recorded experiment's single caller-owned stream box.
+    pub fn recorded_subscription<T>(&self) -> Result<impl Stream<Item = T> + Send + 'static>
     where
         T: FrameAdapter + Send + 'static,
     {
         let validation: AdapterValidation = T::validate_layout(&self.layout)?;
         let subscriber_id = self.next_subscriber_id.fetch_add(1, Ordering::Relaxed);
         let _ = self.controls.send(ReplayControl::Join { subscriber_id });
-        Ok(Box::pin(IbtSubscription::<T>::new(
+        Ok(AcknowledgedSubscription::<T>::new(
             subscriber_id,
             self.frames.clone(),
             self.controls.clone(),
             validation,
-        )))
+        ))
     }
 
     /// Start coordinated replay after initial subscriptions have joined.
@@ -204,6 +278,12 @@ impl OnDemandPipeline {
         if let Some(task) = self.telemetry_task.take() {
             let _ = task.await;
         }
+    }
+}
+
+impl LayoutProvider for OnDemandPipeline {
+    fn layout(&self) -> &Arc<TelemetryLayout> {
+        &self.layout
     }
 }
 

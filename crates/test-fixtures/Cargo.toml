@@ -19,7 +19,6 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-futures = { workspace = true }
 iracing-irsdk = { workspace = true }
 iracing-sdk = { version = "0.1.0", path = "../iracing-sdk", default-features = false }
 rand = "0.9"

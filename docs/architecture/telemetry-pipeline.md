@@ -2,12 +2,24 @@
 
 ## Layers
 
-The SDK separates acquisition, transport-neutral frames, delivery/session
-policy, and consumer adaptation.
+Completed recordings use one immutable file model and pull-driven traversal:
 
 ```text
-source bytes
-  -> reader or Windows connection
+.ibt path / bytes
+  -> IbtFile
+       ├─ immutable headers / metadata
+       ├─ IbtLayout
+       ├─ shared TelemetryLayout
+       ├─ frame(index) / frames(range)
+       └─ replay() -> IbtReplay (cursor / bounds / seek / EOF)
+  -> decoding or FrameAdapter via IbtFrame::into_packet()
+```
+
+Live telemetry keeps its source-specific acquisition and delivery pipeline:
+
+```text
+shared memory
+  -> Windows connection
   -> Provider
   -> Telemetry::read_task
        ├─ DeliveryPolicy
@@ -16,9 +28,8 @@ source bytes
   -> FrameAdapter
 ```
 
-This separation lets recorded files and live shared memory share frame and
-adapter types without pretending that their timing and loss semantics are the
-same.
+Recorded and live consumers share semantic layouts and adapter types while
+their acquisition, timing, and loss behavior remain source-specific.
 
 ## Wire and schema layer
 
@@ -51,12 +62,12 @@ and `into_file()` accessors borrow or recover that same file. Replay yields
 bound `IbtFrame` values and owns only traversal bounds, position, seek/advance,
 and EOF state; immutable metadata and layout stay on the file.
 
-This remains an incomplete #299 migration: compatibility constructors
-still accept `IbtReader` below. The provider's `from_reader` temporarily transfers
-the existing mapped/owned source into `IbtFile` without copying frame storage.
-The provider now retains only replay, borrows the file's shared metadata/layout,
-and delegates packet conversion to `IbtFrame::into_packet()`. CLI consumers use
-the file directly; #305 removes the superseded recorded compatibility topology.
+Replay is deterministic and pull-driven. `set_range` validates half-open bounds
+and resets to the clamped start; `seek` accepts the exclusive end as EOF.
+`current_frame` reads without advancing, `advance` moves one physical coordinate,
+and `next_frame` advances only after a successful read. EOF persists until a seek
+or range reset. Independent file access never changes replay position. No clock,
+background task, acknowledgement, or subscriber policy belongs to file/replay.
 
 ### Recorded CLI access
 
@@ -74,50 +85,22 @@ recorded command can consume them. Telemetry snapshot adds its existing
 missing-variable diagnostic only to that exact construction error; other source
 failures retain their original causes.
 
-### Transitional reader consumers
+### Physical and semantic layout boundaries
 
-`IbtReader` parses the fixed header, disk sub-header, variable headers, session
-YAML region, and fixed-size frame records from `.ibt` data. `open` retains a
-private read-only memory map plus decoded headers and layout, and reads one owned
-frame on demand; `from_bytes` uses the same parser over an owned byte vector.
 `IbtLayout` is the canonical physical source description, exposing total
 source length, main-header/disk-header/preamble regions, optional metadata bounds,
-frame start/size/count, and O(1) indexed frame geometry. `IbtReader::layout()`
+frame start/size/count, and O(1) indexed frame geometry. `IbtFile::physical_layout()`
 exposes the same validated description for inspection without additional reads
 or changes to source state. Fixed regions are derived from the wire types;
 source length comes from the EOF-delimited frame region. No duplicate coordinates are stored.
 The layout describes byte geometry, not telemetry fields, replay state, or CLI
-formatting. `IbtSource` provides direct byte-range access using `usize` layout
+formatting. The private IBT source provides checked byte-range access using `usize` layout
 coordinates. Sources larger than `usize::MAX` bytes are rejected: files of 4 GiB
 or more cannot be opened on 32-bit targets. Supporting those files would require a separately
-scoped wider layout API. File-backed readers require completed, immutable
-recordings: no process may modify or truncate the file until the reader (or
-owning provider/connection) is dropped. Use `from_bytes` with an owned copy when
+scoped wider layout API. Mapped files require completed, immutable
+recordings: no process may modify or truncate the file until `IbtFile` (including
+a replay that owns it) is dropped. Use `from_bytes` with an owned copy when
 that lifetime requirement cannot be met.
-
-`IbtReader::frames(start..end)` rejects reversed ranges and starts beyond `frame_count`
-before source access, and clamps the exclusive end to `frame_count` and returns a bounded pull iterator. Empty ranges (including EOF)
-are valid. Each item reads one frame through `IbtLayout` and returns a
-`RecordedFrame` containing its `usize` index and owned bytes. Independent ranges
-and direct reads do not share traversal state. A failed item advances the range
-iterator by one coordinate; its bytes can be retried with `frame(index)`.
-Recorded coordinates identify physical records, not live SDK ticks; provider
-synthetic ticks remain compatibility behavior. `usize` preserves existing frame
-and layout APIs and ordinary Rust range syntax. `IbtFile::replay(self)` transfers ownership into `IbtReplay`, the sole owner
-of sequential record cursor state. `set_range` uses file range validation and
-resets to the clamped range start; `seek` accepts the exclusive end as EOF.
-`current_frame` reads without advancing, `advance` moves one coordinate, and
-`next_frame` reads then advances only on success. EOF persists until a seek or
-range reset. The core has no clock, background task, or sampling policy.
-Independent file access through `file()` never changes replay position.
-
-`frame(index)`, `session_info_snapshot()`, and
-`VariableHeadersProvider::variable_headers()` access validated byte ranges directly
-through `IbtSource` and return owned data on each call. Both mapped and owned
-sources use bounds-checked slice access without seeking or moving a physical
-cursor. There is no reader-owned logical cursor, schema, or session cache. Live
-`WindowsConnection` interprets the related shared-memory header and rotating
-buffers.
 
 `TelemetryLayout` retains header publication order, a name-to-`FieldId` index,
 and the authoritative frame size. Each `FieldLayout` owns type and descriptive
@@ -168,27 +151,6 @@ bytes and schema for exploratory name-based lookup. Hot paths should implement
 - return the next frame or permanent EOF;
 - return session YAML when available;
 - report the source tick rate.
-
-`IbtProvider` is temporary compatibility over `IbtFile` and `IbtReplay`.
-It owns only replay: layout access borrows the file's exact shared allocation,
-session YAML decodes the retained snapshot, and packets use the SDK-owned
-`IbtFrame::into_packet()` bridge. `open` constructs a file directly;
-`from_reader` transfers legacy storage into a file until #305 removes that
-constructor. `from_replay` preserves configured bounds and position.
-
-`IbtConnection::from_replay` uses the same layout allocation and preserves its
-subscription acknowledgement barrier. Valid recordings retain existing
-bounds, ordering, tick-rate fallback, session decoding, and EOF behavior.
-Packet conversion checks both record-index and session-revision representability;
-negative revisions produce an error instead of wrapping. Neither failed reads
-nor failed packet conversion advance replay.
-
-The recorded provider/connection/coordinator/subscription path is removed in
-#305 after real recorded consumers migrate to file/replay. Existing delivery
-benchmarks also exercise synthetic source-independent acknowledgement policy:
-their workload and timed boundaries remain separate from recorded-file
-ownership. Any retained delivery machinery belongs to benchmark infrastructure,
-not a public IBT facade.
 
 `LiveProvider` is Windows-only. It builds a schema from shared-memory metadata,
 waits cooperatively for updates, returns the newest owned frame snapshot, and
@@ -294,17 +256,15 @@ Each frame replaces the previous snapshot. This is correct for live state:
 consumers care about the newest value and may intentionally miss intermediate
 ticks.
 
-`OnDemandDelivery` uses an mpsc request queue and one-shot responses. One demand
-authorizes exactly one provider read. `Telemetry::spawn_ibt` selects this policy
-and returns its request handle to `IbtConnection`.
-
-`IbtConnection` places a coordinated watch bridge above that request handle.
-The connection starts explicitly, maintains one shared IBT cursor, and publishes
-one retained frame to every active subscription. A subscription acknowledges its
-current frame when it is polled for the next item. The bridge sends another
-demand only after every active subscription has acknowledged the retained frame.
-Dropping the final subscription parks the cursor without closing the connection;
-a later subscriber receives the retained frame and can resume replay.
+The `benchmark` feature retains a private acknowledgement experiment behind
+`benchmarking::OnDemandPipeline`. One mpsc demand authorizes one provider read;
+a coordinator publishes one retained packet to all active subscriptions and
+waits for every acknowledgement before the next demand. Dropping the last
+subscription parks the experiment until a later subscriber resumes it. This
+infrastructure supports delivery and historical recorded benchmark workloads;
+production recorded APIs use `IbtFile` and `IbtReplay` directly. Feature-gated
+unit tests preserve the acknowledgement, backpressure, and session-boundary
+coverage without retaining a public recorded connection.
 
 ## Session policies
 
@@ -326,33 +286,30 @@ send order, but the channel retains only the latest value and can coalesce
 updates that an observer does not receive promptly. Lossless observer delivery
 is a separate policy concern.
 
-`IbtSessionPolicy` fetches the file's single immutable YAML document once during
-initialization, parses inline, and publishes before frames. It does not retry a
-missing, failed, or malformed session, and it retains successful metadata after
-EOF.
-
-These behaviors are explicit policies because live-changing state and immutable
-recording metadata have different lifecycle requirements.
+Recorded consumers decode or parse the file's immutable session snapshot when
+they need it; file traversal itself has no session task. The recorded benchmark
+harness preserves its historical fetch/parse-once-before-frames boundary,
+including no retry of missing or malformed sessions and metadata retention after
+EOF. Its synthetic delivery mode remains session-free.
 
 ## Connections
 
-`IbtConnection` and `LiveConnection` are convenience facades that:
+`LiveConnection` is the higher-level live facade. It:
 
-- build or accept a provider;
-- spawn the telemetry task;
-- expose typed frame subscriptions and session update streams;
-- retain current frame/session snapshots;
-- cancel background work on drop.
+- builds or accepts a provider;
+- spawns the telemetry task;
+- exposes typed frame subscriptions and session update streams;
+- retains current frame/session snapshots;
+- cancels background work on drop.
 
 `LiveConnection` normalizes `UpdateRate` against source frequency and applies
-latest-wins throttling. `IbtConnection` does not accept an update rate: recorded
-delivery is paced by its coordinated subscriber acknowledgement barrier.
+latest-wins throttling.
 
 `LiveConnection` has a portable non-Windows stub whose builder returns an
 unsupported-platform error. The actual fields and subscription methods exist
 only on Windows.
 
-Both connection subscription methods currently panic if adapter schema
+Live connection subscription currently panics if adapter schema
 validation fails. Treat this as an existing public-API limitation, not a pattern
 to copy into new fallible boundaries.
 
@@ -382,4 +339,4 @@ For live telemetry, `UpdateRate::Native` forwards source cadence and
 `UpdateRate::Max(hz)` applies the custom `ThrottleExt` stream after frame
 delivery. Throttling and delivery loss are separate concerns: a live source can
 already have dropped frames before a subscriber-level throttle runs.
-Coordinated IBT subscriptions do not use this throttle.
+Recorded replay remains pull-driven and does not use this throttle.

@@ -49,7 +49,7 @@ contract:
 - `.ibt` parsing, navigation, and random/sequential file access.
 - Telemetry variable schemas, frame packets, dynamic values, typed decoding,
   and integration of SDK enums/flags with `VarData`.
-- Provider and connection abstractions for recorded and live telemetry.
+- Source-independent provider/adapter primitives and Windows live connections.
 - Background telemetry task orchestration and source-specific policies.
 - Session YAML cleanup, typed deserialization, caching, and schema discovery.
 - Windows shared-memory mapping, update waiting, and broadcast message packing.
@@ -104,12 +104,11 @@ dependency into the standalone broadcast CLI.
 Recorded telemetry:
 
 ```text
-.ibt bytes
-  -> IbtReader
-  -> IbtProvider
-  -> Telemetry task
-  -> IbtConnection / consumer
-  -> FrameAdapter or DynamicFrame
+.ibt path / bytes
+  -> IbtFile (immutable metadata, physical layout, shared telemetry layout)
+       ├─ frame(index) / frames(range)
+       └─ replay() -> IbtReplay (bounds / cursor / seek / EOF)
+  -> direct decoding, or FrameAdapter / DynamicFrame via IbtFrame::into_packet()
 ```
 
 Live telemetry:
@@ -158,6 +157,6 @@ Simulation
 - Put optional HTTP clients in simulation examples/dev-dependencies; preserve
   the raw standard-library default path.
 - Put test-only fixture discovery in `iracing-sdk::test_utils` and fixture
-  generation/verification in `scripts`.
+  generation/verification in `crates/test-fixtures`.
 - Gate the smallest OS-dependent implementation unit. Do not hide portable data
   models just because one transport is Windows-only.

@@ -6,9 +6,9 @@
 //! cargo bench -p iracing-sdk --features benchmark --bench ibt-reader-memory
 //! ```
 //!
-//! The `file` mode uses [`IbtReader::open`]. The `memory_baseline` mode models
+//! The `file` mode uses [`IbtFile::open`]. The `memory_baseline` mode models
 //! the pre-refactor ownership behavior with `std::fs::read` followed by
-//! [`IbtReader::from_bytes`]. It is benchmark-only comparison code, not a
+//! [`IbtFile::from_bytes`]. It is benchmark-only comparison code, not a
 //! second production reader.
 //!
 //! Retained and peak bytes are application-heap allocations observed through
@@ -18,7 +18,7 @@
 //! machine load; compare results only on the same machine and revision.
 
 use anyhow::{Context, Result, ensure};
-use iracing_sdk::ibt::IbtReader;
+use iracing_sdk::ibt::IbtFile;
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     fs,
@@ -122,7 +122,7 @@ impl Measurement {
 fn measure(
     mode: &'static str,
     path: &Path,
-    open: impl FnOnce() -> Result<IbtReader>,
+    open: impl FnOnce() -> Result<IbtFile>,
 ) -> Result<Measurement> {
     let file_size = fs::metadata(path)?.len();
     let before = LIVE_BYTES.load(Ordering::SeqCst);
@@ -134,15 +134,15 @@ fn measure(
     TRACK_PEAK.store(false, Ordering::SeqCst);
     let retained_heap = LIVE_BYTES.load(Ordering::SeqCst).saturating_sub(before);
     let peak_open_heap = PEAK_BYTES.load(Ordering::SeqCst).saturating_sub(before);
-    let frame_size = reader.layout().frame_size();
-    let frame_count = reader.layout().frame_count();
+    let frame_size = reader.physical_layout().frame_size();
+    let frame_count = reader.physical_layout().frame_count();
 
     let replay_started = Instant::now();
     let mut replay_bytes = 0u64;
     for index in 0..frame_count {
         let frame = reader.frame(index)?;
         replay_bytes = replay_bytes
-            .checked_add(u64::try_from(frame.len())?)
+            .checked_add(u64::try_from(frame.bytes().len())?)
             .context("replay byte count overflowed")?;
         black_box(frame);
     }
@@ -191,7 +191,7 @@ fn representative_recordings() -> Result<[PathBuf; 2]> {
 
 fn main() -> Result<()> {
     for path in representative_recordings()? {
-        let file = measure("file", &path, || Ok(IbtReader::open(&path)?))?;
+        let file = measure("file", &path, || Ok(IbtFile::open(&path)?))?;
         file.report();
         ensure!(
             file.retained_heap < file.file_size / 2,
@@ -199,7 +199,7 @@ fn main() -> Result<()> {
         );
 
         let memory = measure("memory_baseline", &path, || {
-            Ok(IbtReader::from_bytes(fs::read(&path)?)?)
+            Ok(IbtFile::from_bytes(fs::read(&path)?)?)
         })?;
         memory.report();
         ensure!(

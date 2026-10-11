@@ -1,13 +1,13 @@
 //! Cross-module compatibility checks against the generated IBT fixture manifest.
 
 use crate::SessionInfoRegion;
-use crate::provider::VariableHeadersProvider;
+
+use crate::ibt::IbtFile;
 use crate::test_utils::{IbtVariableManifest, load_fixture_manifest};
 use crate::{
     FieldLayout, VariableHeadersRegion,
     irsdk::{DiskSubHeader, Header, VariableHeader, VariableType},
 };
-use crate::{TelemetryLayout, ibt::IbtReader};
 use anyhow::{Context, Result, ensure};
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
@@ -18,36 +18,36 @@ fn indexed_and_snapshot_reads_match_source_bytes() -> Result<()> {
     for fixture in load_fixture_manifest()?.fixtures {
         let path = fixture.fixture_path()?;
         let bytes = fs::read(&path)?;
-        for reader in [
-            IbtReader::open(&path)?,
-            IbtReader::from_bytes(bytes.clone())?,
-        ] {
+        for reader in [IbtFile::open(&path)?, IbtFile::from_bytes(bytes.clone())?] {
             assert_eq!(reader.frame_count(), fixture.num_frames);
             assert_eq!(reader.frame_size(), fixture.frame_size);
 
             let selected = reader.frame_count() / 2;
             for index in [reader.frame_count() - 1, 0, selected, 1] {
-                let start = reader.layout().frame_data_start() + index * fixture.frame_size;
+                let start =
+                    reader.physical_layout().frame_data_start() + index * fixture.frame_size;
                 assert_eq!(
-                    reader.frame(index)?,
-                    bytes[start..start + fixture.frame_size]
+                    reader.frame(index)?.bytes(),
+                    &bytes[start..start + fixture.frame_size]
                 );
             }
             assert!(reader.frame(reader.frame_count()).is_err());
             assert!(reader.frame(usize::MAX).is_err());
 
             let session_region = reader
-                .layout()
+                .physical_layout()
                 .metadata()
                 .session_info()
                 .unwrap()
                 .as_region();
-            let session =
-                crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
-                    .unwrap();
+            let session = reader.session_info_bytes().unwrap();
             assert_eq!(session.as_bytes(), &bytes[session_region.as_range()]);
-            let variable_region = *reader.layout().metadata().variable_headers().unwrap();
-            let headers = reader.variable_headers()?;
+            let variable_region = *reader
+                .physical_layout()
+                .metadata()
+                .variable_headers()
+                .unwrap();
+            let headers = reader.variable_headers();
             assert_eq!(headers.len(), variable_region.count());
             assert_eq!(
                 headers.as_slice().as_bytes(),
@@ -59,14 +59,14 @@ fn indexed_and_snapshot_reads_match_source_bytes() -> Result<()> {
 }
 
 #[test]
-fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
-    use crate::{LayoutProvider, provider::Provider};
-    use futures::executor::block_on;
+fn optional_metadata_and_frames_follow_file_and_replay_contract() -> Result<()> {
     use zerocopy::IntoBytes;
 
     let bytes = fs::read(crate::test_utils::require_smallest_ibt_fixture()?)?;
-    let original = IbtReader::from_bytes(bytes.clone())?;
+    let original = IbtFile::from_bytes(bytes.clone())?;
     let preamble = size_of::<Header>() + size_of::<DiskSubHeader>();
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("metadata-combinations.ibt");
     for keep_variables in [false, true] {
         for keep_session in [false, true] {
             for keep_frames in [false, true] {
@@ -77,66 +77,73 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
                 header.session_info_offset = 0;
                 header.session_info_length = 0;
                 if keep_variables {
-                    let region = original.layout().metadata().variable_headers().unwrap();
+                    let region = original
+                        .physical_layout()
+                        .metadata()
+                        .variable_headers()
+                        .unwrap();
                     header.variable_header_offset = i32::try_from(data.len())?;
                     header.variable_count = i32::try_from(region.count())?;
                     data.extend_from_slice(&bytes[region.as_region().as_range()]);
                 }
                 if keep_session {
-                    let region = original.layout().metadata().session_info().unwrap();
+                    let region = original
+                        .physical_layout()
+                        .metadata()
+                        .session_info()
+                        .unwrap();
                     header.session_info_offset = i32::try_from(data.len())?;
                     header.session_info_length = i32::try_from(region.as_region().len())?;
                     data.extend_from_slice(&bytes[region.as_region().as_range()]);
                 }
                 if keep_frames {
                     data.extend_from_slice(
-                        &bytes[original.layout().frames().as_region().as_range()],
+                        &bytes[original.physical_layout().frames().as_region().as_range()],
                     );
                 }
                 data[..size_of::<Header>()].copy_from_slice(header.as_bytes());
-                let reader = IbtReader::from_bytes(data)?;
-                assert_eq!(!reader.variable_headers()?.is_empty(), keep_variables);
-                assert_eq!(reader.layout().frame_size(), original.layout().frame_size());
-                assert_eq!(
-                    crate::provider::SessionInformationBytesProvider::session_info_snapshot(
-                        &reader
-                    )?
-                    .is_some(),
-                    keep_session
-                );
-                let expected_frames = if keep_frames {
-                    original.layout().frame_count()
-                } else {
-                    0
-                };
-                assert_eq!(reader.layout().frame_count(), expected_frames);
-                let provider = crate::providers::ibt::IbtProvider::from_reader(reader);
-                if keep_frames && !keep_variables {
-                    let error = provider.err().unwrap().to_string();
-                    assert!(error.contains("variable-header metadata"), "{error}");
-                    continue;
-                }
-                let mut provider = provider?;
-                assert_eq!(
-                    provider.layout().len(),
-                    if keep_variables {
-                        original.header().variable_count as usize
+                fs::write(&path, &data)?;
+                for result in [IbtFile::from_bytes(data), IbtFile::open(&path)] {
+                    if keep_frames && !keep_variables {
+                        let error = result.unwrap_err().to_string();
+                        assert!(error.contains("variable-header metadata"), "{error}");
+                        continue;
+                    }
+                    let file = result?;
+                    assert_eq!(!file.variable_headers().is_empty(), keep_variables);
+                    assert_eq!(file.session_info_bytes().is_some(), keep_session);
+                    if let Some(snapshot) = file.session_info_bytes() {
+                        crate::schema::SessionInfo::try_from(snapshot.clone())?;
+                    }
+                    let expected_frames = if keep_frames {
+                        original.frame_count()
                     } else {
                         0
+                    };
+                    assert_eq!(file.frame_count(), expected_frames);
+                    assert_eq!(file.frame_size(), original.frame_size());
+                    assert_eq!(file.telemetry_layout().frame_size(), original.frame_size());
+                    assert_eq!(
+                        file.telemetry_layout().len(),
+                        if keep_variables {
+                            original.variable_headers().len()
+                        } else {
+                            0
+                        }
+                    );
+                    let layout = std::sync::Arc::clone(file.telemetry_layout());
+                    let mut replay = file.replay();
+                    let mut count = 0;
+                    while let Some(frame) = replay.next_frame()? {
+                        assert_eq!(frame.index(), count);
+                        assert!(std::sync::Arc::ptr_eq(frame.layout(), &layout));
+                        assert_eq!(frame.into_packet()?.tick as usize, count);
+                        count += 1;
                     }
-                );
-                assert_eq!(
-                    provider.layout().frame_size(),
-                    original.layout().frame_size()
-                );
-                assert_eq!(block_on(provider.session_yaml(0))?.is_some(), keep_session);
-                let mut count = 0;
-                while let Some(frame) = block_on(provider.next_frame())? {
-                    assert_eq!(frame.tick as usize, count);
-                    count += 1;
+                    assert_eq!(count, expected_frames);
+                    assert!(replay.is_eof());
+                    assert!(replay.next_frame()?.is_none());
                 }
-                assert_eq!(count, expected_frames);
-                assert!(block_on(provider.next_frame())?.is_none());
             }
         }
     }
@@ -144,25 +151,24 @@ fn optional_metadata_and_empty_replay_follow_provider_contract() -> Result<()> {
 }
 
 #[test]
-fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
+fn snapshots_remain_owned_after_file_drop_and_file_changes() -> Result<()> {
     use std::io::{Seek, SeekFrom, Write};
     use zerocopy::IntoBytes;
 
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("snapshots.ibt");
     fs::copy(crate::test_utils::require_smallest_ibt_fixture()?, &path)?;
-    let reader = IbtReader::open(&path)?;
-    let session =
-        crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?.unwrap();
-    let headers = reader.variable_headers()?;
+    let reader = IbtFile::open(&path)?;
+    let session = reader.session_info_bytes().unwrap().clone();
+    let headers = reader.variable_headers().clone();
     let session_region = reader
-        .layout()
+        .physical_layout()
         .metadata()
         .session_info()
         .unwrap()
         .as_region();
     let variable_region = reader
-        .layout()
+        .physical_layout()
         .metadata()
         .variable_headers()
         .unwrap()
@@ -187,30 +193,31 @@ fn snapshots_remain_owned_after_reader_drop_and_file_changes() -> Result<()> {
     file.write_all(changed_header.as_bytes())?;
     file.flush()?;
     drop(file);
-    let reader = IbtReader::open(&path)?;
+    let reader = IbtFile::open(&path)?;
 
     assert!(
-        crate::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
+        reader
+            .session_info_bytes()
             .unwrap()
             .as_bytes()
             .iter()
             .all(|&byte| byte == 0)
     );
     assert_eq!(
-        reader.variable_headers()?.as_slice()[0].description(),
+        reader.variable_headers().as_slice()[0].description(),
         changed_description
     );
     assert!(session.as_bytes().iter().any(|&byte| byte != 0));
     assert_eq!(headers.as_slice()[0].description(), original_description);
     assert_ne!(headers.as_slice()[0].description(), changed_description);
-    assert!(!reader.frame(0)?.is_empty());
+    assert!(!reader.frame(0)?.bytes().is_empty());
 
     drop(reader);
     fs::OpenOptions::new()
         .write(true)
         .open(&path)?
         .set_len(u64::try_from(variable_region.offset())?)?;
-    assert!(IbtReader::open(&path).is_err());
+    assert!(IbtFile::open(&path).is_err());
     Ok(())
 }
 
@@ -390,9 +397,8 @@ fn test_generated_fixture_variables_match_manifest() -> Result<()> {
 
     for fixture in &manifest.fixtures {
         let path = fixture.fixture_path()?;
-        let reader = IbtReader::open(&path)?;
-        let snapshot = reader.variable_headers()?;
-        let layout = TelemetryLayout::try_from_headers(&snapshot, reader.layout().frame_size())?;
+        let reader = IbtFile::open(&path)?;
+        let layout = reader.telemetry_layout();
 
         assert_eq!(layout.frame_size(), fixture.frame_size);
         assert_eq!(layout.len(), fixture.num_vars as usize);

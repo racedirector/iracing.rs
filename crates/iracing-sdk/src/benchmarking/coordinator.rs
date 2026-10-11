@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{FramePacket, Result, telemetry::delivery_policy::ReplayDemand};
+use crate::{FramePacket, Result, benchmarking::delivery::ReplayDemand};
 
 /// Commands sent by subscriptions and the connection to the replay coordinator.
 #[derive(Debug)]

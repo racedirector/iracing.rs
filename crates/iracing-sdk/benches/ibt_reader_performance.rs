@@ -1,4 +1,4 @@
-//! Performance baseline for the public [`IbtReader`] storage API.
+//! Performance baseline for the public [`IbtFile`] storage API and historical async workloads.
 //!
 //! Sequential case names are retained across the reader/provider API migration.
 //! The random-frame case uses direct indexed reads because the reader no longer
@@ -18,9 +18,10 @@
 //!   routine, then reads every owned frame through `frame(index)`.
 //! - `ibt_provider_sequential_replay` constructs the replay provider outside
 //!   the timed routine, then requests frames through `Provider::next_frame()`.
-//! - `ibt_connection_sequential_replay` constructs the public disk connection
+//! - `ibt_connection_sequential_replay` constructs the benchmark-only acknowledged pipeline
 //!   and one dynamic-frame subscription outside the timed routine, then starts
-//!   and drains the coordinated replay stream.
+//!   and drains the coordinated replay stream. Session YAML is fetched and parsed
+//!   on the spawned telemetry task before frames, within the timed drain.
 //! - `ibt_reader_random_frame_read` constructs the reader outside the timed routine,
 //!   then performs 1,024 deterministic `frame(index)` calls, including frame I/O.
 //!
@@ -33,7 +34,10 @@
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::StreamExt;
 use iracing_sdk::{
-    DynamicFrame, IbtConnection, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
+    DynamicFrame,
+    benchmarking::{OnDemandPipeline, RecordedProvider},
+    ibt::IbtFile,
+    provider::Provider,
 };
 use std::{hint::black_box, time::Duration, time::Instant};
 
@@ -66,7 +70,7 @@ fn bench_open(c: &mut Criterion) {
             &recording.path,
             |b, path| {
                 b.iter(|| {
-                    let reader = IbtReader::open(black_box(path)).expect("fixture should open");
+                    let reader = IbtFile::open(black_box(path)).expect("fixture should open");
                     black_box(reader)
                 });
             },
@@ -90,9 +94,9 @@ fn bench_sequential_replay(c: &mut Criterion) {
             &recording.path,
             |b, path| {
                 b.iter_batched(
-                    || IbtReader::open(path).expect("fixture should open"),
+                    || IbtFile::open(path).expect("fixture should open"),
                     |reader| {
-                        for index in 0..reader.layout().frame_count() {
+                        for index in 0..reader.physical_layout().frame_count() {
                             black_box(reader.frame(index).expect("fixture frame should read"));
                         }
                     },
@@ -127,7 +131,7 @@ fn bench_provider_sequential_replay(c: &mut Criterion) {
             &recording.path,
             |b, path| {
                 b.iter_batched(
-                    || IbtProvider::open(path).expect("fixture provider should open"),
+                    || RecordedProvider::open(path).expect("fixture provider should open"),
                     |mut provider| {
                         runtime.block_on(async {
                             while let Some(frame) = provider
@@ -166,13 +170,14 @@ fn bench_connection_sequential_replay(c: &mut Criterion) {
                     let mut elapsed = Duration::ZERO;
                     for _ in 0..iterations {
                         elapsed += runtime.block_on(async {
-                            let connection = IbtConnection::open(path.clone())
-                                .await
-                                .expect("fixture connection should open");
+                            let connection = OnDemandPipeline::recorded(
+                                RecordedProvider::open(path.clone())
+                                    .expect("fixture connection should open"),
+                            );
 
                             let mut frames = Box::pin(
                                 connection
-                                    .subscribe::<DynamicFrame>()
+                                    .recorded_subscription::<DynamicFrame>()
                                     .expect("fixture subscription should validate"),
                             );
 
@@ -213,7 +218,7 @@ fn bench_random_frame_read(c: &mut Criterion) {
             &(recording.path, positions),
             |b, (path, positions)| {
                 b.iter_batched(
-                    || IbtReader::open(path).expect("fixture should open"),
+                    || IbtFile::open(path).expect("fixture should open"),
                     |reader| {
                         for &position in positions {
                             black_box(

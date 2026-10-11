@@ -6,7 +6,7 @@ pub(crate) mod provider;
 pub(crate) mod session_policy;
 
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
 use super::provider::Provider;
@@ -14,10 +14,7 @@ use super::provider::Provider;
 use crate::{
     FramePacket,
     schema::SessionInfo,
-    telemetry::{
-        delivery_policy::{DeliveryPolicy, OnDemandDelivery, ReplayDemand},
-        session_policy::{IbtSessionPolicy, SessionPolicy},
-    },
+    telemetry::{delivery_policy::DeliveryPolicy, session_policy::SessionPolicy},
 };
 
 pub(crate) use self::builder::TelemetryBuilder;
@@ -35,10 +32,6 @@ pub struct TelemetryChannels<
     /// Cancellation token for shutdown.
     pub cancel: CancellationToken,
 }
-
-/// Communication channels for an on-demand IBT telemetry task.
-pub(crate) type IbtTelemetryChannels =
-    TelemetryChannels<mpsc::Sender<ReplayDemand>, watch::Receiver<Option<Arc<SessionInfo>>>>;
 
 /// `Telemetry` spawns and manages telemetry processing tasks.
 ///
@@ -64,24 +57,6 @@ impl Telemetry {
         P: Provider,
     {
         Self::builder(provider).build()
-    }
-
-    /// Spawn telemetry tasks for an IBT provider.
-    ///
-    /// The file's immutable session information is fetched and parsed once
-    /// before frame processing begins. The returned frame handle accepts
-    /// [`ReplayDemand`] values; each demand authorizes exactly one provider read.
-    pub(crate) fn spawn_ibt<P>(provider: P) -> IbtTelemetryChannels
-    where
-        P: Provider,
-    {
-        let (frame_tx, frame_rx) = mpsc::channel(1);
-        let (session_tx, session_rx) = watch::channel(None);
-
-        Self::builder(provider)
-            .with_delivery_policy(OnDemandDelivery::new(frame_rx), frame_tx)
-            .with_session_policy(IbtSessionPolicy::new(session_tx), session_rx)
-            .build()
     }
 
     // Reads frames and detects session changes.
@@ -188,22 +163,7 @@ impl Telemetry {
 
 #[cfg(test)]
 mod tests {
-    //! Characterization tests for the telemetry reader task.
-    //!
-    //! These tests use two deliberately different provider mocks:
-    //!
-    //! - [`FiniteProvider`] behaves like the current IBT provider. Every call to
-    //!   `next_frame` completes immediately, so the on-demand delivery policy
-    //!   must prevent the task from advancing without a matching replay demand.
-    //! - [`LiveLikeProvider`] behaves like the live provider. Its
-    //!   `next_frame` call waits for the test to supply another frame through a
-    //!   channel, just as `LiveProvider` normally waits for another
-    //!   shared-memory update. These tests protect the existing latest-wins
-    //!   live behavior while delivery policies are introduced.
-    //!
-    //! Neither mock reads an IBT file or Windows shared memory. They isolate the
-    //! scheduling and delivery behavior of `Telemetry::read_task`, which is the
-    //! behavior under test here.
+    //! Generic task finalization and live delivery characterization.
 
     use std::{
         sync::{
@@ -213,15 +173,12 @@ mod tests {
         time::Duration,
     };
 
-    use tokio::sync::{mpsc, oneshot, watch};
+    use tokio::sync::{mpsc, watch};
     use tokio_util::sync::CancellationToken;
 
     use crate::{FramePacket, Result, provider::Provider};
 
-    use super::{
-        ReplayDemand, Telemetry, TelemetryChannels, delivery_policy::LatestDelivery,
-        session_policy::SessionPolicy,
-    };
+    use super::{Telemetry, delivery_policy::LatestDelivery, session_policy::SessionPolicy};
 
     /// A session policy that records how many times the telemetry task finalizes it.
     struct CountingSessionPolicy {
@@ -261,10 +218,7 @@ mod tests {
         .unwrap()
     }
 
-    /// An eager, finite provider used to reproduce recorded-telemetry behavior.
-    ///
-    /// There are intentionally no waits or yields in `next_frame`. The delivery
-    /// policy, rather than the provider, must therefore enforce replay pacing.
+    /// A finite provider used to check generic task finalization at EOF.
     struct FiniteProvider {
         next_tick: u32,
         frame_count: u32,
@@ -315,70 +269,6 @@ mod tests {
         }
     }
 
-    /// Ask the IBT frame channel to perform one provider read.
-    ///
-    /// Unlike the live watch channel, the IBT frame handle is a request sender.
-    /// The one-shot response pairs this demand with exactly one frame, EOF, or
-    /// provider error.
-    async fn request_ibt_frame(frames: &mpsc::Sender<ReplayDemand>) -> Result<Option<FramePacket>> {
-        let (response_tx, response_rx) = oneshot::channel();
-
-        frames
-            .send(ReplayDemand {
-                response: response_tx,
-            })
-            .await
-            .expect("telemetry should accept one replay demand");
-
-        tokio::time::timeout(Duration::from_secs(1), response_rx)
-            .await
-            .expect("subscriber should not time out waiting for the replay response")
-            .expect("telemetry should answer the replay demand")
-    }
-
-    #[tokio::test]
-    async fn ibt_frame_channel_reads_one_ordered_frame_per_demand() {
-        // Arrange: an IBT provider is finite and eager, but the telemetry task
-        // must not touch it until the consumer requests a frame.
-        let (provider, mut reads) = FiniteProvider::new(3, None);
-        let channels = Telemetry::spawn_ibt(provider);
-
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), reads.recv())
-                .await
-                .is_err(),
-            "the IBT cursor should remain parked while there is no demand"
-        );
-
-        // Act and assert: every request receives the next recorded frame. The
-        // task parks again after each response instead of reading ahead.
-        for expected_tick in 0..3 {
-            let frame = request_ibt_frame(&channels.frames)
-                .await
-                .expect("the IBT provider read should succeed")
-                .expect("a frame should remain in the recording");
-
-            assert_eq!(frame.tick, expected_tick);
-            assert_eq!(reads.recv().await, Some(Some(expected_tick)));
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), reads.recv())
-                    .await
-                    .is_err(),
-                "one demand should authorize only one provider read"
-            );
-        }
-
-        // EOF is also delivered in response to a demand; it never replaces a
-        // frame that was already returned to the consumer.
-        assert!(
-            request_ibt_frame(&channels.frames)
-                .await
-                .expect("the EOF read should succeed")
-                .is_none()
-        );
-        assert_eq!(reads.recv().await, Some(None));
-    }
-
     #[tokio::test]
     async fn telemetry_finalizes_its_session_policy_once_at_eof() {
         let (provider, _reads) = FiniteProvider::new(0, None);
@@ -400,72 +290,6 @@ mod tests {
             1,
             "the telemetry task should finalize a session policy exactly once"
         );
-    }
-
-    #[tokio::test]
-    async fn ibt_session_channel_is_ready_before_frames_and_retained_after_eof() {
-        // IBT session YAML describes the whole recording. It is published once
-        // during startup, without requiring a frame demand.
-        let (provider, _reads) = FiniteProvider::new(
-            1,
-            Some(include_str!(
-                "../../../../test-data/session-yaml/profile_small.yaml"
-            )),
-        );
-        let channels = Telemetry::spawn_ibt(provider);
-        let mut sessions = channels.sessions.clone();
-
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while sessions.borrow_and_update().is_none() {
-                sessions
-                    .changed()
-                    .await
-                    .expect("IBT session channel should remain connected");
-            }
-        })
-        .await
-        .expect("IBT session metadata should be published during startup");
-
-        let session = sessions
-            .borrow()
-            .clone()
-            .expect("the parsed IBT session should be available");
-
-        assert!(
-            request_ibt_frame(&channels.frames)
-                .await
-                .expect("the frame read should succeed")
-                .is_some()
-        );
-        assert!(
-            request_ibt_frame(&channels.frames)
-                .await
-                .expect("the EOF read should succeed")
-                .is_none()
-        );
-        assert!(
-            Arc::ptr_eq(
-                &session,
-                sessions
-                    .borrow()
-                    .as_ref()
-                    .expect("EOF should retain the immutable IBT session")
-            ),
-            "IBT session metadata should remain the same snapshot after EOF"
-        );
-    }
-
-    #[tokio::test]
-    async fn ibt_cancellation_closes_the_pending_frame_channel() {
-        // With no demand outstanding, cancellation wakes the parked telemetry
-        // task and drops the receiving side of the request channel.
-        let (provider, _reads) = FiniteProvider::new(1, None);
-        let TelemetryChannels { frames, cancel, .. } = Telemetry::spawn_ibt(provider);
-
-        cancel.cancel();
-        tokio::time::timeout(Duration::from_secs(1), frames.closed())
-            .await
-            .expect("cancellation should close the IBT frame request channel");
     }
 
     /// A controllable approximation of `LiveProvider`.
