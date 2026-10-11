@@ -18,10 +18,22 @@ fn parse_ibt_session(
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     /// Captures JSON schema of a session string.
+    #[cfg_attr(
+        doc,
+        doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-schema-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-schema-live.md)."
+    )]
     Schema(schema::Args),
     /// Discovers schema additions of a session string.
+    #[cfg_attr(
+        doc,
+        doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-discover-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-discover-live.md)."
+    )]
     Discover(discover::Args),
     /// Captures a snapshot of the latest session string.
+    #[cfg_attr(
+        doc,
+        doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-snapshot-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-snapshot-live.md)."
+    )]
     Snapshot(snapshot::Args),
 }
 

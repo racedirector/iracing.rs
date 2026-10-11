@@ -6,6 +6,10 @@ use crate::{
 use anyhow::{Context, Result};
 use iracing_sdk::IbtFile;
 
+#[cfg_attr(
+    doc,
+    doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-snapshot-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-snapshot-live.md)."
+)]
 #[derive(clap::Args, Debug)]
 pub(crate) struct Args {
     #[command(subcommand)]
