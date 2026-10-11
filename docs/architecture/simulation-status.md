@@ -9,8 +9,7 @@ owns the boundary between status probes and caller lifecycle policy.
   process matching, platform assumptions, and handle ownership.
 - Tests beside those implementations own the executable status and matching
   checks.
-- [Crate examples](../../crates/iracing-simulation/examples/) and the workspace
-  [lifecycle monitor](../../examples/iracing-lifecycle-monitor/) demonstrate
+- [Crate examples](../../crates/iracing-simulation/examples/) demonstrate
   consumer composition.
 
 See the [crate README](../../crates/iracing-simulation/README.md) for usage and

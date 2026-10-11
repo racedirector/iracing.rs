@@ -25,8 +25,7 @@ clients. From the workspace root, inspect a representative example's options:
 cargo run -p iracing-simulation --example check-connection -- --help
 ```
 
-Applications compose these probes with their own lifecycle policy. The workspace
-[lifecycle monitor](../../examples/iracing-lifecycle-monitor/) shows one consumer.
+Applications compose these probes with their own lifecycle policy.
 
 ## Development
 
