@@ -77,6 +77,20 @@ use syn::{Attribute, DeriveInput, Expr, Field, Lit, Meta, Type, parse_macro_inpu
 
 /// Derive macro that implements `::iracing_sdk::adapters::FrameAdapter` for structs with named fields.
 ///
+/// Input shape and field attributes are checked during macro expansion. The
+/// parser turns unsupported shapes or malformed attributes into compiler
+/// errors; generation and the emitted adapter own separate layout/runtime
+/// decisions. A syntactically accepted input is not a guarantee that every
+/// generated Rust expression or trait bound will type-check.
+///
+/// Exact accepted/rejected cases and diagnostic expectations live in the
+/// [pass fixtures](https://github.com/racedirector/iracing.rs/tree/main/crates/iracing-sdk-derive/tests/pass)
+/// and [UI fixtures](https://github.com/racedirector/iracing.rs/tree/main/crates/iracing-sdk-derive/tests/ui),
+/// selected by the
+/// [test runner](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-derive/tests/ui.rs).
+/// Parser-local tests cover decisions before expansion. Keep the exact syntax
+/// matrix and compiler diagnostics with those executable owners.
+///
 /// Generates an implementation that performs two phases:
 /// 1. Connection-time layout validation producing an ordered extraction plan.
 /// 2. Runtime adaptation that decodes packet bytes into the struct fields using the plan.
@@ -646,13 +660,11 @@ fn is_regular_field_attribute(attr: &Attribute) -> bool {
 ///
 /// Accepts a `syn::Attribute` that uses one of the supported forms and returns
 /// a structured `AttributeValue` or a `syn::Error` if the attribute is unknown
-/// or has an invalid literal form. Supported attribute shapes:
-/// - `#[field_name = "…"]`
-/// - `#[missing = "…"]`
-/// - `#[calculated = "…"]`
-/// - `#[fail_if_missing]`
-/// - `#[skip]`
-/// - The `#[default = ...]` form is rejected with a specific error message.
+/// or has an invalid literal form. This function owns regular attribute literal
+/// parsing; callers select relevant attributes and interpret the returned values
+/// as field strategies. Expression strings are parsed separately by those
+/// callers. Parser-local tests and pass/UI cases own exact syntax and diagnostics,
+/// including rejection of the `default` spelling.
 ///
 /// # Examples
 ///
