@@ -5,13 +5,15 @@ use std::{path::Path, sync::Arc};
 use crate::{
     FramePacket, IRacingSDKError, LayoutProvider, Result, TelemetryLayout,
     ibt::{IbtReader, IbtReplay},
-    provider::{Provider, VariableHeadersProvider},
+    provider::Provider,
     types::IRacingSessionString,
 };
 
 /// A [`Provider`] that streams telemetry frames from an iRacing `.ibt` replay file.
 ///
-/// Owns the validated variable layout and delegates cursor state to [`IbtReplay`].
+/// Retains its compatibility layout and delegates cursor state to [`IbtReplay`].
+/// Replay owns an [`IbtFile`](crate::ibt::IbtFile); the duplicated provider
+/// layout and packet bridge are consolidated by #304.
 /// `from_reader` starts at frame zero; `from_replay` preserves replay state.
 pub struct IbtProvider {
     replay: IbtReplay,
@@ -35,7 +37,7 @@ impl IbtProvider {
     /// the layout's frame size, or if telemetry frames have no variable metadata.
     /// A zero-frame recording may have an empty layout.
     pub fn from_reader(reader: IbtReader) -> Result<Self> {
-        Self::from_replay(reader.replay())
+        Self::from_replay(reader.into_file()?.replay())
     }
 
     /// Adapts a replay, preserving its configured bounds and current position.
@@ -43,24 +45,23 @@ impl IbtProvider {
     /// [`Self::from_reader`]. A nonpositive recorded tick rate defaults to 60 Hz.
     ///
     /// # Errors
-    /// Propagates variable-header read and layout validation errors. Missing
-    /// variable metadata is an error only when the recording contains frames,
-    /// even if the configured replay range is empty.
+    /// Propagates compatibility-layout validation errors. The replay's file
+    /// already validated immutable metadata during construction.
     pub fn from_replay(replay: IbtReplay) -> Result<Self> {
-        let reader = replay.reader();
-        let frame_size = reader.frame_size();
+        let file = replay.file();
+        let frame_size = file.frame_size();
 
-        let headers = reader.variable_headers()?;
-        if headers.is_empty() && reader.frame_count() > 0 {
+        let headers = file.variable_headers();
+        if headers.is_empty() && file.frame_count() > 0 {
             return Err(IRacingSDKError::parse_error(
                 "IBT replay layout",
                 "Telemetry frames require variable-header metadata",
             ));
         }
-        let layout = TelemetryLayout::try_from_headers(&headers, frame_size)?;
+        let layout = TelemetryLayout::try_from_headers(headers, frame_size)?;
 
-        let tick_rate = if reader.header().tick_rate > 0 {
-            f64::from(reader.header().tick_rate)
+        let tick_rate = if file.header().tick_rate > 0 {
+            f64::from(file.header().tick_rate)
         } else {
             60.0
         };
@@ -78,7 +79,7 @@ impl IbtProvider {
 
     /// Returns the total number of telemetry frames in the recording.
     pub fn total_frames(&self) -> usize {
-        self.replay.reader().frame_count()
+        self.replay.file().frame_count()
     }
 
     fn tick_for_frame(index: usize) -> Result<u32> {
@@ -122,7 +123,7 @@ impl Provider for IbtProvider {
         let packet = FramePacket::new(
             frame_data,
             tick,
-            self.replay.reader().header().session_info_update as u32,
+            self.replay.file().header().session_info_update as u32,
             self.shared_layout(),
         )?;
         self.replay.advance();
@@ -133,18 +134,16 @@ impl Provider for IbtProvider {
     /// Ignores `_version` and returns `None` only when session metadata is absent.
     ///
     /// # Errors
-    /// Propagates session-byte read errors and rejects text that is empty or
-    /// whitespace-only after sanitization. YAML syntax is not validated here.
+    /// Rejects text that is empty or whitespace-only after sanitization.
+    /// YAML syntax is not validated here.
     async fn session_yaml(&mut self, _version: u32) -> Result<Option<String>> {
-        let Some(snapshot) =
-            crate::provider::SessionInformationBytesProvider::session_info_snapshot(
-                self.replay.reader(),
-            )?
-        else {
+        let Some(snapshot) = self.replay.file().session_info_bytes() else {
             return Ok(None);
         };
 
-        Ok(Some(IRacingSessionString::try_from(snapshot)?.into()))
+        Ok(Some(
+            IRacingSessionString::try_from(snapshot.payload().decode())?.into(),
+        ))
     }
 
     fn tick_rate(&self) -> f64 {
@@ -156,7 +155,9 @@ impl Provider for IbtProvider {
 mod tests {
     use super::*;
     use crate::{
+        ibt::IbtFile,
         irsdk::{DiskSubHeader, Header},
+        provider::VariableHeadersProvider,
         test_utils::{load_fixture_manifest, require_smallest_ibt_fixture},
     };
     use futures::executor::block_on;
@@ -214,7 +215,7 @@ mod tests {
 
     #[test]
     fn configured_replay_preserves_bounds_position_and_ticks() -> anyhow::Result<()> {
-        let mut replay = IbtReader::open(require_smallest_ibt_fixture()?)?.replay();
+        let mut replay = IbtFile::open(require_smallest_ibt_fixture()?)?.replay();
         replay.set_range(1..4)?;
         replay.seek(2)?;
         let mut provider = IbtProvider::from_replay(replay)?;
@@ -232,10 +233,10 @@ mod tests {
         let start = reader.layout().frame_data_start();
         let mut provider = IbtProvider::from_reader(reader)?;
         // Inject a short read without mutating a live mapped file.
-        provider.replay.reader.owned_bytes_mut().truncate(start);
+        provider.replay.file.owned_bytes_mut().truncate(start);
         assert!(block_on(provider.next_frame()).is_err());
         assert_eq!(provider.replay.position(), 0);
-        *provider.replay.reader.owned_bytes_mut() = bytes;
+        *provider.replay.file.owned_bytes_mut() = bytes;
         let frame = block_on(provider.next_frame())?.unwrap();
         assert_eq!(frame.tick, 0);
         assert_eq!(frame.data().as_ref(), expected);
@@ -257,7 +258,7 @@ mod tests {
             + std::mem::offset_of!(VariableHeader, offset);
         bytes[offset..offset + 4]
             .copy_from_slice(&(reader.layout().frame_size() as i32).to_le_bytes());
-        // Byte geometry remains valid; the provider owns semantic validation.
+        // Byte geometry remains valid; conversion to IbtFile validates semantics.
         let reader = IbtReader::from_bytes(bytes)?;
         let error = IbtProvider::from_reader(reader).err().unwrap().to_string();
         assert!(error.contains("past frame size"), "{error}");
@@ -279,17 +280,17 @@ mod tests {
 
     #[test]
     fn invalid_session_snapshot_returns_an_error() -> anyhow::Result<()> {
-        let bytes = fs::read(require_smallest_ibt_fixture()?)?;
-        let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
-        let offset = provider
-            .replay
-            .reader
-            .layout()
+        let mut bytes = fs::read(require_smallest_ibt_fixture()?)?;
+        let file = IbtFile::from_bytes(bytes.clone())?;
+        let offset = file
+            .physical_layout()
             .metadata()
             .session_info()
             .expect("fixture has session information")
             .offset();
-        provider.replay.reader.owned_bytes_mut()[offset] = 0;
+        // Immutable metadata is captured during construction, before replay.
+        bytes[offset] = 0;
+        let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
 
         let error = block_on(provider.session_yaml(0)).unwrap_err().to_string();
         assert!(
@@ -318,12 +319,12 @@ mod tests {
         bytes.truncate(metadata_end);
 
         let mut provider = IbtProvider::from_reader(IbtReader::from_bytes(bytes)?)?;
-        assert_eq!(provider.replay.reader().frame_count(), 0);
+        assert_eq!(provider.replay.file().frame_count(), 0);
         assert!(
             provider
                 .replay
-                .reader
-                .layout()
+                .file
+                .physical_layout()
                 .metadata()
                 .variable_headers()
                 .is_none()
