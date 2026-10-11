@@ -3,6 +3,12 @@
 //! This is not a statistical library benchmark: simulator pacing, Windows
 //! scheduling, and machine load dominate the observations. It samples one live
 //! subscription and reports inter-arrival jitter plus skipped/coalesced ticks.
+//! Connection and subscription construction precede the observation window.
+//! The window includes waiting for frames and collecting interval/tick samples;
+//! percentile sorting and printing follow it. Inter-arrival samples exclude the
+//! initial wait, while total elapsed time includes that wait. These are consumer
+//! cadence observations, not isolated acquisition cost or producer-to-consumer
+//! latency. The executable prints observations without persisting a baseline.
 //!
 //! Run on Windows with an active iRacing session:
 //!

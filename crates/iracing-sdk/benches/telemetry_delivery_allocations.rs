@@ -5,6 +5,12 @@
 //! not publish Criterion timing estimates because allocator instrumentation and
 //! timestamp sampling perturb the measured path.
 //!
+//! Fixture/layout and runtime construction precede observations. Allocation
+//! counting brackets consumption on an already constructed pipeline; shutdown
+//! follows counting. Latency samples use per-source timestamps supplied by the
+//! instrumented provider and observed by the timed consumer. Counts and latency
+//! distributions answer diagnostic questions, not uninstrumented throughput.
+//!
 //! ```text
 //! cargo bench -p iracing-sdk --features benchmark --bench telemetry-diagnostics
 //! ```
