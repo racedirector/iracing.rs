@@ -1,3 +1,11 @@
+//! Clap declarations and conversion from operator input to typed SDK operations.
+//!
+//! Exact syntax, defaults, and input constraints live on these declarations and
+//! in parser tests. Direct operations map into SDK commands without acquiring
+//! simulator resources. Session-time search resolves a session view before
+//! dispatch; the injected application owns acquisition and readiness policy.
+//! Wire encoding and SDK validation remain in `iracing-broadcast-sdk`.
+
 use crate::session_select::{SessionSelector, SessionTime, resolve_session};
 use crate::{BroadcastCommands, ReplaySessions};
 use anyhow::Result;

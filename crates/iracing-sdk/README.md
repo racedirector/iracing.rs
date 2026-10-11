@@ -185,8 +185,10 @@ impl FrameAdapter for Row {
 
 ### Binaries
 
-- `broadcast` sends iRacing broadcast commands (Windows only):
-  - `cargo broadcast --help`
+Broadcast commands are owned by [iracing-broadcast-cli](../iracing-broadcast-cli/src/lib.rs),
+with typed encoding and native dispatch in [iracing-broadcast-sdk](../iracing-broadcast-sdk/src/lib.rs).
+Use `cargo iracing-broadcast --help` for clap-derived syntax (Windows).
+
 - `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
   - Type schema: `cargo session schema type`
   - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`

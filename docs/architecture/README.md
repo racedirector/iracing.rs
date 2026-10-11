@@ -18,8 +18,8 @@ disagree, verify the implementation and update both in the same change.
   cleanup/parsing, session caching, schema discovery, and generated references.
 - [Platform and feature boundaries](platform-and-features.md): Windows and
   portable surfaces plus Cargo feature intent.
-- [Broadcast service](broadcast-service.md): the gRPC service's layered
-  command-and-observation architecture and operational boundary.
+- Broadcast ownership: [typed SDK and Windows transport](../../crates/iracing-broadcast-sdk/src/lib.rs)
+  and [CLI composition](../../crates/iracing-broadcast-cli/src/lib.rs).
 - [Simulation status](simulation-status.md): the small HTTP facade, injection
   seam, and Windows process detection.
 - [Testing and fixtures](testing-and-fixtures.md): deterministic data,

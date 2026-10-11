@@ -1,3 +1,10 @@
+//! Portable operation inputs and their encoding into the raw broadcast contract.
+//!
+//! [`Command`] expresses operations; [`BroadcastMessage`] and the domain enums
+//! come from `iracing-irsdk`. Conversion performs only the checks and encoding
+//! documented on the owning operation and conversion implementation. It neither
+//! discovers simulator state nor confirms that an operation can currently run.
+
 use iracing_irsdk::{
     BroadcastMessage, BroadcastMessageKind, CameraState, ChatCommandMode, ForceFeedbackCommandMode,
     PitCommand, PitCommandMode, ReloadTexturesMode, ReplayPositionMode, ReplaySearchMode,
@@ -8,9 +15,9 @@ use crate::pad_car_number::pad_car_number;
 
 /// Messages that can be sent to the iRacing simulation.
 ///
-/// Each variant maps to the documented window message contract in the iRacing
-/// SDK. Primitive parameters are passed through as-is and packed into the
-/// `WPARAM`/`LPARAM` pairs expected by the simulator.
+/// Conversion into [`BroadcastMessage`] performs operation-specific encoding
+/// and validation without dispatching. Raw protocol identifiers and domain
+/// values are owned by `iracing-irsdk`.
 ///
 /// # Examples
 ///
@@ -25,8 +32,13 @@ pub enum Command {
     /// Switch to a specific camera group and camera index for a position.
     CameraSwitchPosition(u16, u16, u16),
     /// Switch to a specific camera group and camera index for a car number.
+    ///
+    /// Encoding preserves leading-zero padding. See the conversion's fallback
+    /// and overflow behavior before accepting untrusted car-number strings.
     CameraSwitchNumber(String, u16, u16),
     /// Apply a new [`CameraState`] bitfield.
+    ///
+    /// Encoding rejects bits outside the protocol's 16-bit argument.
     CameraSetState(CameraState),
     /// Set the replay play speed, with an optional slow-motion toggle.
     ReplaySetPlaySpeed(i16, bool),
@@ -42,15 +54,17 @@ pub enum Command {
     ReloadTextures(u16),
     /// Send a chat command.
     Chat(ChatCommandMode),
-    /// Send a chat macro by number.
+    /// Send a chat macro by number; encoding accepts only `1..=15`.
     ChatMacro(u16),
     /// Issue a pit command.
     Pit(PitCommand),
     /// Control telemetry recording.
     Telemetry(TelemetryCommandMode),
-    /// Send a force-feedback command.
+    /// Send a force-feedback maximum-force command, preserving the `f32` bits.
     ForceFeedback(f32),
-    /// Search a replay to a specific session time.
+    /// Search a replay by session number and time in milliseconds.
+    ///
+    /// Callers resolve any operator-facing session selector before construction.
     ReplaySearchSessionTime(u16, u32),
     /// Control video capture.
     VideoCapture(VideoCaptureMode),

@@ -33,6 +33,7 @@ on commands, boundaries, and easy-to-miss constraints.
 - `crates/iracing-irsdk`: dependency-light native SDK wire contract: fixed-layout headers, intrinsic byte decoding, constants, enums, flags, packed fields, and portable broadcast command values. Do not add IBT navigation, shared-memory access, schemas, session parsing, or runtime orchestration here.
 - `crates/iracing-sdk`: low-level `.ibt` reader, schema/session parsing, provider and connection layers, telemetry delivery/session policies, typed adapters, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-cli`: binary-only CLI and schema generator tools; its features forward to `iracing-sdk`.
+- Broadcast ownership: [SDK](crates/iracing-broadcast-sdk/src/lib.rs), [CLI](crates/iracing-broadcast-cli/src/lib.rs), and raw values in `iracing-irsdk`. Preserve these boundaries; clap owns syntax.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
 - `crates/test-fixtures`: unpublished Rust generator, verifier, and drift checker for deterministic `.ibt` fixtures.

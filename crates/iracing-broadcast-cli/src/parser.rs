@@ -1,3 +1,9 @@
+//! CLI spellings for SDK domain values.
+//!
+//! These clap parsers own accepted operator vocabulary; the SDK and raw wire
+//! crate own the resulting values. Keep spelling changes with parser tests
+//! rather than maintaining a second command inventory in architecture prose.
+
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 use iracing_broadcast_sdk::{CameraState, ReplayPositionMode, ReplaySearchMode};
 

@@ -1,3 +1,21 @@
+//! Operator-facing broadcast parsing and capability-based command execution.
+//!
+//! Clap declarations and parser tests own command vocabulary and accepted input.
+//! Commands convert validated inputs into [`iracing_broadcast_sdk::Command`]
+//! and dispatch through [`BroadcastCommands`]. Replay session-time lookup first
+//! obtains command-owned session views through [`ReplaySessions`] and resolves
+//! selectors in [`session_select`]; failed resolution prevents dispatch.
+//!
+//! Each executable constructs its own application and injects these capabilities.
+//! The standalone executable's `application` module owns lazy transport and live
+//! session resources; callers embedding this command tree choose their own
+//! resource and readiness policies. [`BroadcastClient`] is the shared transport
+//! adapter, not a simulator readiness probe.
+//!
+//! Typed operation encoding belongs to `iracing-broadcast-sdk`; raw wire/domain
+//! values belong to `iracing-irsdk`. Execution returns errors to the executable
+//! and does not provide simulator acknowledgment or a command-result data stream.
+
 mod commands;
 mod parser;
 pub mod session_select;
@@ -8,6 +26,7 @@ use iracing_broadcast_sdk::Command as BroadcastCommand;
 pub use session_select::{ReplaySession, SessionSelector, SessionTime};
 
 #[derive(Subcommand, Debug, Clone)]
+/// Composable clap command tree, executed using caller-provided capabilities.
 pub enum Command {
     /// Manipulate the camera
     Camera {
