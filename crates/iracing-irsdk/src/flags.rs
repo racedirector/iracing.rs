@@ -4,6 +4,11 @@
 //! sufficient. Predicates without `any` require the complete state described
 //! by their name. Use `intersects` for any matching bit and `contains` for
 //! every bit in a mask.
+//!
+//! Raw `u32` conversions for named flag families retain unknown bits; adjacent
+//! round-trip tests check preservation. [`IncidentFlags`] packs report and
+//! penalty fields rather than independent flags. Telemetry storage-kind
+//! acceptance belongs to the higher-level decoder.
 
 use bitflags::bitflags;
 

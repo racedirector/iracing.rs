@@ -1,3 +1,10 @@
+//! Intrinsic owned wire copies and fixed-text conversion.
+//!
+//! Wire helpers check exact size and, for checked types, Rust bit-pattern
+//! validity, without validating SDK semantics or source geometry. Reader copies
+//! consume one value; an I/O failure may consume partial input. Text decoding is
+//! lossy and bounded by its field; encoding checks ASCII and NUL capacity.
+
 use std::io::Read;
 use zerocopy::{FromBytes, TryFromBytes};
 
