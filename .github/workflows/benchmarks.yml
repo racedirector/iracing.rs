@@ -59,3 +59,62 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run diagnostic
         run: cargo bench -p iracing-sdk --features benchmark --bench ${{ matrix.benchmark }}
+
+  read-teardown-attribution:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout supporting diagnostic
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+      - name: Checkout frozen main with both recorded APIs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 943f06d983ee2f1861997815967f9a8b8ba67aad
+          path: source
+          lfs: true
+          persist-credentials: false
+      - name: Install matching hosted compiler
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: 1.99.0
+      - name: Inject only the temporary diagnostic target
+        shell: bash
+        run: |
+          cp diagnostic/.github/diagnostics/ibt_frame_path_diagnostic.rs source/crates/iracing-sdk/benches/ibt_frame_path_diagnostic.rs
+          cat >> source/crates/iracing-sdk/Cargo.toml <<'EOF'
+
+          [[bench]]
+          name = "ibt-frame-path-diagnostic"
+          path = "benches/ibt_frame_path_diagnostic.rs"
+          harness = false
+          required-features = ["benchmark"]
+          EOF
+          mkdir -p results
+          git -C source rev-parse HEAD > results/provenance.txt
+          git -C diagnostic rev-parse HEAD >> results/provenance.txt
+          rustc -Vv >> results/provenance.txt
+          uname -a >> results/provenance.txt
+          cp source/crates/iracing-sdk/benches/ibt_frame_path_diagnostic.rs results/
+          git -C source diff >> results/provenance.txt
+      - name: Compile controls before timing
+        working-directory: source
+        run: cargo bench -p iracing-sdk --features benchmark --bench ibt-frame-path-diagnostic --locked --no-run
+      - name: Run balanced first pass
+        working-directory: source
+        shell: bash
+        run: cargo bench -p iracing-sdk --features benchmark --bench ibt-frame-path-diagnostic --locked 2>&1 | tee ../results/first-pass.txt
+      - name: Run reversed second pass
+        working-directory: source
+        shell: bash
+        run: cargo bench -p iracing-sdk --features benchmark --bench ibt-frame-path-diagnostic --locked -- --reverse 2>&1 | tee ../results/reversed-pass.txt
+      - name: Preserve raw observations and provenance
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ibt-read-teardown-attribution
+          path: results/
