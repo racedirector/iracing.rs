@@ -1,57 +1,30 @@
-//! # Session Information Parsing
+//! Typed session YAML deserialization and optional unknown-field discovery.
 //!
-//! This module handles parsing of iRacing's session information from shared memory YAML data.
-//! The session info contains metadata about the current racing session including track details,
-//! weather conditions, participant information, and session timing.
+//! [`SessionInfo::parse`] accepts already decoded text and deserializes it with
+//! serde. It performs no source acquisition, byte decoding, control-character
+//! cleanup, YAML quoting repair, version caching, or publication. Each call
+//! creates a new typed value; source and runtime policies decide when to call it.
 //!
-//! ## Key Features
+//! The byte conversion into [`SessionInfo`] composes separate owners:
+//! [`crate::SessionInfoBytes`] retains the advertised region;
+//! [`crate::SessionInfoPayload`] bounds the NUL-terminated text and decodes its
+//! declared encoding; the internal `IRacingSessionString` removes selected
+//! control characters and rejects empty cleaned text before deserialization.
+//! That cleanup does not rewrite quotes, escape paths, or repair arbitrary YAML.
 //!
-//! - **YAML Compatibility**: Handles iRacing's invalid YAML with unescaped characters
-//! - **Performance Caching**: Version-based caching prevents unnecessary re-parsing
-//! - **Memory Safety**: Safe extraction from Windows shared memory with bounds checking
-//! - **Type Safety**: Full serde integration with comprehensive Rust type mapping
-//! - **Error Resilience**: Graceful handling of malformed YAML and missing session data
+//! Fields and serde attributes on the domain types own required/defaulted
+//! sections and PascalCase names. With `schema-discovery`, participating types
+//! retain unmodeled keys in flattened maps; the discovery module owns reporting helpers.
+//! Without that feature, unmodeled keys are not retained in those maps.
+//! Generated schemas describe model output; captured examples are evidence,
+//! not a second parser specification. See the
+//! [reference provenance guide](https://github.com/racedirector/iracing.rs/blob/main/docs/reference/README.md).
 //!
-//! ## iRacing YAML Compatibility
-//!
-//! iRacing outputs invalid YAML containing unescaped characters in driver names and file paths
-//! that break standard YAML parsers. This module includes preprocessing to fix these issues:
-//!
-//! ```text
-//! // Problematic iRacing YAML:
-//! UserName: O'Connor, Mike
-//! TeamName: "Fast & Furious" Racing
-//!
-//! // After preprocessing:
-//! UserName: 'O''Connor, Mike'
-//! TeamName: '"Fast & Furious" Racing'
-//! ```
-//!
-//! See: [iRacing Forum Discussion](https://forums.iracing.com/discussion/comment/374646#Comment_374646)
-//!
-//! ## Performance Characteristics
-//!
-//! - **YAML Preprocessing**: ~30μs (well under 1ms target)
-//! - **Complete Parsing**: ~56μs (well under 10ms target)
-//! - **Caching**: Version-based caching eliminates parsing when session unchanged
-//! - **Memory Usage**: Single-pass preprocessing with minimal allocations
-//!
-//! ## Architecture
-//!
-//! ```text
-//! ┌─────────────────────────────────────────────┐
-//! │           Session Info Pipeline             │
-//! │                                             │
-//! │  Shared Memory  ──► YAML Extract ──► Cache. │
-//! │       │                   │            │    │
-//! │       │                   ▼            ▼    │
-//! │       │            Preprocess ──► Parse     │
-//! │       │                   │            │    │
-//! │       │                   ▼            ▼    │
-//! │       └────────── Validate ──► SessionInfo  │
-//! │                                             │
-//! └─────────────────────────────────────────────┘
-//! ```
+//! [Parsing tests](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk/src/schema/session/tests.rs)
+//! exercise typed fields, required sections, byte-conversion order, error
+//! contexts, and feature-gated unknown fields. Byte decoding and sanitization
+//! have their own tests beside those implementations. Performance observations
+//! require revision/workload provenance; this module makes no timing guarantee.
 
 use serde::{Deserialize, Serialize};
 
@@ -127,10 +100,19 @@ pub struct SessionInfo {
 }
 
 impl SessionInfo {
-    /// Parse cleaned YAML into SessionInfo
+    /// Deserialize decoded YAML into a fresh typed session value.
     ///
-    /// The YAML should already be preprocessed to fix iRacing's non-standard format.
-    /// This is a simple deserialization - preprocessing happens at lower levels.
+    /// The caller supplies valid YAML text compatible with the serde model. This
+    /// method does not decode bytes, remove control characters, repair YAML, or
+    /// cache a previous result. Convert a [`SessionInfoBytes`] snapshot with
+    /// [`Self::try_from`] to use the SDK's decoding and sanitization path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IRacingSDKError::Parse`] with the context
+    /// `SessionInfo deserialization` when YAML syntax or typed model
+    /// deserialization fails. Required and defaulted fields are defined on the
+    /// domain types; unknown-field retention depends on `schema-discovery`.
     pub fn parse(yaml: &str) -> crate::Result<Self> {
         serde_yaml_ng::from_str(yaml).map_err(|e| crate::IRacingSDKError::Parse {
             context: "SessionInfo deserialization".to_string(),
@@ -311,6 +293,12 @@ impl SessionInfo {
 impl TryFrom<SessionInfoBytes> for SessionInfo {
     type Error = IRacingSDKError;
 
+    /// Decode the bounded payload, sanitize its text, then deserialize once.
+    ///
+    /// Consumes the owned snapshot without acquiring a source or caching the
+    /// parsed value. Propagates empty-cleaned-text and deserialization errors;
+    /// the decoding boundary itself replaces or falls back for malformed text
+    /// according to [`crate::SessionInfoPayload::decode`].
     fn try_from(value: SessionInfoBytes) -> Result<Self, Self::Error> {
         let session_info = IRacingSessionString::try_from(value)?;
         SessionInfo::try_from(session_info)
@@ -320,6 +308,7 @@ impl TryFrom<SessionInfoBytes> for SessionInfo {
 impl TryFrom<IRacingSessionString> for SessionInfo {
     type Error = IRacingSDKError;
 
+    /// Deserialize sanitized text without repeating byte decoding or cleanup.
     fn try_from(value: IRacingSessionString) -> Result<Self> {
         let session_info = String::from(value);
         SessionInfo::parse(&session_info)

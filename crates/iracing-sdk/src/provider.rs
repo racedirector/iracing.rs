@@ -9,7 +9,12 @@ pub trait SessionInformationBytesProvider {
     fn session_info_snapshot(&self) -> Result<Option<SessionInfoBytes>>;
 }
 
-/// Trait indicating that an implementor can provide SessionInfo
+/// Parsed session metadata acquired through the source's snapshot boundary.
+///
+/// The blanket implementation for [`SessionInformationBytesProvider`] composes
+/// acquisition with [`SessionInfo::try_from`]. It retains no parsed cache or
+/// version state; each call acquires and converts the current snapshot. The
+/// tests below distinguish absent metadata from invalid acquired YAML.
 pub trait SessionInformationProvider {
     /// Decodes, sanitizes, and parses the session snapshot.
     /// Returns `Ok(None)` on absence and an error on acquisition or parsing failure.

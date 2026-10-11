@@ -223,7 +223,7 @@ The current live read path is:
    this calls `SessionInformationBytesProvider::session_info_snapshot`, which reads the offset and
    length from the current header and copies/extracts the one current YAML
    region into an owned `String`.
-5. `LiveProvider` performs iRacing YAML preprocessing on that owned string.
+5. `LiveProvider` applies [text cleanup](../../crates/iracing-sdk/src/types/iracing_session_string.rs) to that owned string; this is control-character sanitization, not general YAML repair.
    Typed `SessionInfo` deserialization is then dispatched away from the frame
    task.
 

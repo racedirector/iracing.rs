@@ -1,20 +1,10 @@
-//! Schema Discovery & Buffer Management
+//! Typed session metadata and optional discovery of unmodeled session fields.
 //!
-//! This module provides comprehensive schema discovery for iRacing telemetry data,
-//! including header parsing, variable schema building, and buffer management.
-//!
-//! # Architecture
-//!
-//! The schema system follows a layered approach:
-//! - Header parsing extracts iRacing's `irsdk_header` structure from shared memory
-//! - Variable schema building parses the variable definitions into structured metadata
-//! - Buffer management handles iRacing's 4-buffer rotation system
-//! - Caching optimizes performance by avoiding redundant parsing operations
-//!
-//! # Feature-Specific Implementation
-//!
-//! Live header and variable discovery are compiled only for Windows targets;
-//! session schema parsing remains available on every supported platform.
+//! [`session`] owns YAML deserialization into [`SessionInfo`] and its domain
+//! types. Source acquisition, physical frame geometry, telemetry layout,
+//! buffering, and runtime caching are owned by their respective modules.
+//! Session parsing is portable; optional features add schema generation and
+//! unknown-field retention without moving source acquisition into this module.
 
 pub mod session;
 
