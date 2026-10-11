@@ -33,9 +33,22 @@ never reads the source again. Session decoding, sanitization, and parsing remain
 separate from byte ownership. Mapped construction does not copy the recording's
 frame region, and the backing file must remain immutable until `IbtFile` drops.
 
-This is the foundation slice of #299: indexed traversal, replay, providers,
-connections, and CLI consumers still use `IbtReader` below. #301–#305 migrate
-those consumers onto `IbtFile` and remove the superseded recorded topology.
+`IbtFile::frame(index)` uses O(1) physical layout addressing and copies only
+the requested frame into shared owned storage. `IbtFrame` retains the physical
+`usize` record index and the file's exact shared telemetry layout, so it supports
+direct field decoding and remains usable after the file drops. `frames(start..end)`
+validates half-open bounds before reads, clamps ends to EOF, accepts empty ranges,
+and returns independent lazy iterators. Reversed ranges and starts beyond EOF
+fail; a yielded read error consumes that iterator's coordinate only.
+
+`IbtFrame::into_packet()` is the SDK-owned recorded packet compatibility bridge.
+It transfers shared bytes and layout, converts the physical index to a synthetic
+`u32` packet tick, and checks the signed recording revision against `u32` instead
+of wrapping negatives. Native recorded access is independent of packet limits.
+
+This is an incomplete #299 migration: replay, providers, connections, and CLI
+consumers still use `IbtReader` below. #302–#305 migrate those consumers onto
+`IbtFile` and the shared packet bridge and remove the superseded topology.
 
 `IbtReader` parses the fixed header, disk sub-header, variable headers, session
 YAML region, and fixed-size frame records from `.ibt` data. `open` retains a

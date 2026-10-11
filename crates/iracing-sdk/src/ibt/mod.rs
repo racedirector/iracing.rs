@@ -9,7 +9,7 @@ pub mod replay;
 
 pub use replay::IbtReplay;
 
-pub use file::IbtFile;
+pub use file::{IbtFile, IbtFileFrames, IbtFrame};
 
 pub use reader::{IbtFrames, IbtReader, RecordedFrame};
 
