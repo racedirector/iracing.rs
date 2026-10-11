@@ -26,7 +26,7 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; for intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - Use helpers from `iracing_sdk::test_utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
-- Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` and the generated schemas it indexes. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use the session and primitive schemas for object shapes and legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
+- Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` for generated/captured provenance and usage guidance. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use session schemas for model shapes and iracing-irsdk source for legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
 
 ## Workspace Map
 

@@ -1,64 +1,54 @@
-# Schema reference
+# Reference data
 
-JSON schema snapshots retained as reference data. Session schema generation is available through the [`iracing-sdk` CLI](../../crates/iracing-sdk-cli/src/main.rs); static session reference generation is maintained by `cargo xtask generate-reference`. Car-setup/live-variable CLI generators remain deferred.
+This directory retains type-derived schemas and historical simulator captures.
+The [YAML provenance manifest](generation.toml) records their source, production
+command, and known capture context. It owns the YAML inventory; use it rather
+than a separate list of outputs.
 
-Do not hand-edit.
+Do not hand-edit generated or captured contents to match documentation.
 
-## Using these artifacts
+## Production and verification
 
-Use this directory as the source of truth before creating telemetry schemas,
-session YAML, or binary frames for tests, fixtures, benchmarks, and simulated
-providers:
+The [reference tooling](../../xtask/src/generated.rs) owns deterministic schema
+generation and verification. Run `cargo xtask generate-reference` from the
+workspace root when updating type-derived output, review the diff, then run
+`cargo xtask check-generated`. The [repository task](../../xtask/src/main.rs)
+composes this check into `check-repo`; the [quality workflow](../../.github/workflows/quality.yml)
+owns automated execution.
 
-- `variable-schema.yml` defines the shape of one `VariableInfo`, including the
-  supported data types and the meaning of `offset`, `count`, and
-  `count_as_time`.
-- `disk-variable-schema.yml` and `live-variable-schema.yml` contain generated
-  examples with real iRacing variable names, types, array counts, units,
-  descriptions, offsets, and frame sizes. Disk recordings and live shared
-  memory expose different sets and layouts.
-- `primitives-schema.yml` defines the available iRacing enum and bitflag value
-  domains referenced by variable units such as `irsdk_Flags` and
-  `irsdk_TrkSurf`.
-- `session-schema.yml` describes the typed `SessionInfo` contract;
-  `live-session-schema.yml` records a concrete discovered session shape and
-  example, including concrete nested keys and representative values.
+The typed [session model](../../crates/iracing-sdk/src/schema/session/mod.rs)
+owns session fields. The CLI's [session schema command](../../crates/iracing-sdk-cli/src/commands/session/schema.rs)
+produces schemas from acquired session values; it does not reproduce a historical
+capture without the original source and capture context.
 
-Treat generated disk/live layouts as coherent snapshots, not mix-and-match
-field catalogs: if a synthetic frame reuses offsets, its buffer must use the
-same snapshot's `frame_size`, types, and counts. The observed snapshots are
-representative rather than a guarantee that every car, track, session type, or
-iRacing build exposes exactly the same fields. Prefer deriving a smaller test
-schema from a snapshot when a full captured layout is unnecessary, while
-retaining the selected fields' real names and metadata.
+The manifest distinguishes reproducible workspace output from captures whose
+raw inputs or generator/build revisions are unavailable. Captured YAML receives
+structural verification, not a reproducibility guarantee. The disk capture's
+filename supplies a historical date, while live capture dates remain unknown.
+Consult the manifest for those limits before drawing conclusions from a sample.
 
-| Artifact | Purpose | Regenerate from workspace root |
-| --- | --- | --- |
-| [`session-schema.yml`](session-schema.yml) | Baseline schema for `iracing_sdk::schema::SessionInfo`. | `cargo iracing-sdk session schema type --output ./docs/reference/session-schema.yml` |
-| [`variable-schema.yml`](variable-schema.yml) | Baseline schema for `iracing_sdk::VariableInfo`. | `cargo xtask generate-reference` (static schemas only). |
-| [`primitives-schema.yml`](primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | `cargo xtask generate-reference` (static schemas only). |
-| [`disk-variable-schema.yml`](disk-variable-schema.yml) | Retained representative disk telemetry schema, captured from `fordmustanggt4_interlagos gp 2026-08-01 11-24-51.ibt`. | Original capture input is absent; see provenance below. |
-| [`live-session-schema.yml`](live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo iracing-sdk session schema live --output ./docs/reference/live-session-schema.yml` |
-| [`live-variable-schema.yml`](live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | Live variable generator remains deferred. |
+The retained [`formula_ford.json`](formula_ford.json) is a telemetry-value sample,
+not a schema or an output of the YAML reference checker. It was added in
+[commit 2693a1e](https://github.com/racedirector/iracing.rs/commit/2693a1e309cbe8a561e440c15b1171e614e20558)
+on August 6, 2026. Its capture date, simulator build, source recording, and export
+command are unknown; the addition date does not establish the capture date.
+Preserve it as historical evidence rather than a current runtime contract.
 
-## Generation contract and provenance
+Deterministic IBT fixtures have a separate owner in the
+[test-fixtures crate](../../crates/test-fixtures); reference generation does not
+regenerate those recordings.
 
-`generation.toml` inventories every YAML artifact. `cargo xtask check-generated`
-(and `check-repo` / quality CI) generates the three static schemas in a temporary
-directory and compares exact bytes without modifying committed outputs. Run
-`cargo xtask generate-reference`, review the diff, and rerun the check to update.
-Generation serializes through sorted JSON values before YAML, so map order is
-stable. Generator/catalog code lives in `xtask/src/generated.rs`; Cargo.lock fixes
-the schema library version. Add new native primitive wrappers to the catalog when
-extending the documented primitive bank.
+## Using reference data in development
 
-The disk-variable Interlagos input is **not committed**; hydrated Donington and
-deterministic fixture recordings are different layouts and cannot reproduce it.
-It is classified as a capture, not a deterministic artifact. Live captures also
-lack committed raw input and known capture/build/generator revisions. The manifest
-records these unknowns explicitly. Captures get static schema-envelope/example
-validation, not a claim of reproducibility. Preserve their offsets/frame size
-coherently. None is exhaustive across cars, tracks, sessions or simulator versions.
+Use captured variable metadata and session examples as evidence when choosing
+real names, types, counts, units, and representative values for tests or
+benchmarks. Captures do not establish an exhaustive field set across cars,
+tracks, sessions, or simulator versions. Current telemetry contracts belong to
+[TelemetryLayout](../../crates/iracing-sdk/src/types/telemetry_layout.rs), and wire
+storage kinds and enum/flag values belong to [iracing-irsdk](../../crates/iracing-irsdk/src/lib.rs).
 
-The existing `cargo test-fixtures` remains the sole owner of deterministic IBT
-fixture regeneration and drift; this checker does not generate another IBT set.
+Keep each captured layout coherent: offsets, frame size, types, and counts belong
+to the same snapshot. When deriving a smaller synthetic input, preserve its
+selected fields' real metadata and validate its geometry through the owning
+layout implementation. A schema generated from Rust types describes the typed
+model; it does not prove that every simulator session has that shape.
