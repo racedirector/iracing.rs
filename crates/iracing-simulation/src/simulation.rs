@@ -1,3 +1,10 @@
+//! Synchronous status probing, with transport separated from the running predicate.
+//!
+//! [`Simulation`] owns endpoint configuration and delegates each request to its
+//! client. [`SimStatusClient`] owns transport errors; the facade reduces them to
+//! a boolean. Tests inject responses so this policy does not depend on a live
+//! endpoint. Client adapters own any additional caching or retry behavior.
+
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration, Instant};
@@ -95,8 +102,12 @@ pub enum SimStatusError {
     },
 }
 
-/// Consumer-injectable HTTP logic.
-/// Keep this synchronous + dependency-free from this crate's perspective.
+/// Synchronous HTTP transport seam for [`Simulation`].
+///
+/// Implementations return the status and body without deciding whether the
+/// simulator is running. The facade owns that predicate. Implementations may
+/// supply caching, retries, or another HTTP stack; the facade invokes this method
+/// once per check.
 pub trait SimStatusClient {
     /// Send a GET request to the iRacing sim-status endpoint and return the response.
     ///
@@ -110,7 +121,17 @@ pub trait SimStatusClient {
     ) -> Result<SimStatusResponse, SimStatusError>;
 }
 
-/// Dependency-free default client: raw HTTP/1.1 over TcpStream.
+/// Built-in HTTP/1.1 client using [`TcpStream`] without an HTTP-library dependency.
+///
+/// The host and port must parse as a numeric [`SocketAddr`]; this client does not
+/// resolve DNS names. It sends a GET with `Connection: close`, reads until EOF,
+/// and requires UTF-8 response bytes with a header terminator and numeric status
+/// code. It does not follow redirects, use TLS, or decode chunked bodies.
+///
+/// The requested timeout is applied separately to connection, socket reads, and
+/// socket writes. An elapsed-time guard also bounds the read loop between reads;
+/// this is not a single deadline covering all request phases. Transport and
+/// parsing failures are reported as [`SimStatusError`].
 #[derive(Debug, Default, Clone, Copy)]
 pub struct StdSimStatusClient;
 
@@ -191,9 +212,11 @@ impl SimStatusClient for StdSimStatusClient {
     }
 }
 
-/// High-level façade.
-/// Default construction uses the dependency-free client, but callers can inject
-/// any `SimStatusClient` for caching, retries, alternate HTTP stacks, etc.
+/// Configured HTTP status probe.
+///
+/// Construction stores host, port, timeout, and client without connecting.
+/// [`Self::check_sim_status`] requests status on demand; this type owns no polling
+/// task or reconnect state. The default client is [`StdSimStatusClient`].
 pub struct Simulation<C: SimStatusClient = StdSimStatusClient> {
     host: String,
     port: u16,
@@ -202,7 +225,7 @@ pub struct Simulation<C: SimStatusClient = StdSimStatusClient> {
 }
 
 impl Simulation<StdSimStatusClient> {
-    /// Connect to the local iRacing instance using the dependency-free default client.
+    /// Configure a probe for the local iRacing instance using the default client.
     ///
     /// This is the right choice for the common case: iRacing running on the
     /// same machine. Uses [`DEFAULT_HOST`] and [`DEFAULT_PORT`].
@@ -210,8 +233,7 @@ impl Simulation<StdSimStatusClient> {
         Self::new(DEFAULT_HOST, DEFAULT_PORT)
     }
 
-    /// Connect to an iRacing instance at `host:port` using the dependency-free
-    /// default client.
+    /// Configure a probe at `host:port` using the default client.
     ///
     /// Use this when the sim is running on a remote machine or a non-standard
     /// port. For the local case, prefer [`Simulation::local`].
@@ -225,6 +247,7 @@ impl<C: SimStatusClient> Simulation<C> {
     ///
     /// Use this when you need to inject a caching layer, retry logic, or an
     /// alternate HTTP stack. For the common case, prefer [`Simulation::new`].
+    /// The initial request timeout is five seconds.
     pub fn new_with_client(host: impl Into<String>, port: u16, client: C) -> Self {
         Self {
             host: host.into(),
@@ -234,16 +257,25 @@ impl<C: SimStatusClient> Simulation<C> {
         }
     }
 
-    /// Optional: allow consumers to tune timeout even with injected clients.
+    /// Set the timeout passed to the client on subsequent checks.
+    ///
+    /// The client determines how to enforce it; see [`StdSimStatusClient`] for
+    /// the built-in transport's timeout behavior.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
-    /// Equivalent semantics to the original JS:
-    /// - `false` on any error
-    /// - `false` on non-2xx
-    /// - `true` only if body contains `running:1`
+    /// Request status once and return whether the endpoint reports running.
+    ///
+    /// Returns `true` exactly when the response status is in `200..=299` and the
+    /// body contains the literal substring `running:1`. This is a substring
+    /// predicate, not structured response parsing. Any client error or other
+    /// response returns `false`; callers needing error details can use the
+    /// [`SimStatusClient`] directly.
+    ///
+    /// This check does not fall back to Windows process detection or establish
+    /// telemetry connectivity.
     pub fn check_sim_status(&self) -> bool {
         let resp = match self
             .client
@@ -262,7 +294,7 @@ impl<C: SimStatusClient> Simulation<C> {
 /// - treats everything after the first `\r\n\r\n` as body
 ///
 /// Notes:
-/// - This is sufficient for the local endpoint you showed.
+/// - This parser serves the built-in status transport, not general HTTP clients.
 /// - It does not implement chunked decoding; if the server uses chunked encoding,
 ///   the body will include the chunk framing.
 fn parse_http_response(bytes: &[u8]) -> Option<SimStatusResponse> {

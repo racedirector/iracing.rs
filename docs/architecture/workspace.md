@@ -73,14 +73,9 @@ so consumers do not need tracing solely because of generated warning paths.
 
 ### `iracing-simulation`
 
-Owns simulation lifecycle checks that do not require telemetry:
-
-- a portable HTTP probe for the local `get_sim_status` endpoint;
-- a `SimStatusClient` injection seam;
-- a raw-`TcpStream` default client with a deliberately small parser;
-- Windows-only process enumeration for `iRacingSim64DX11.exe`.
-
-It does not own shared-memory telemetry or broadcast commands.
+Provides independent simulation-status probes. The
+[crate Rustdoc](../../crates/iracing-simulation/src/lib.rs) owns its boundary and
+links to HTTP and Windows process contracts.
 
 ### Workspace applications
 
@@ -128,15 +123,7 @@ Broadcast command ownership is documented by the
 [CLI](../../crates/iracing-broadcast-cli/src/lib.rs). Raw wire values live in
 [`iracing-irsdk`](../../crates/iracing-irsdk/src/broadcast.rs).
 
-Simulation status:
-
-```text
-Simulation
-  -> SimStatusClient
-  -> GET /get_sim_status?object=simStatus
-  -> 2xx + body contains running:1
-  -> bool
-```
+Simulation status: see the [source-owned probe contracts](../../crates/iracing-simulation/src/lib.rs).
 
 ## Placement rules
 
@@ -144,8 +131,6 @@ Simulation
   `iracing-irsdk`.
 - Put source framing, file navigation, shared-memory transport, schema
   construction, session parsing, and runtime behavior in `iracing-sdk`.
-- Put optional HTTP clients in simulation examples/dev-dependencies; preserve
-  the raw standard-library default path.
 - Put test-only fixture discovery in `iracing-sdk::test_utils` and fixture
   generation/verification in `scripts`.
 - Gate the smallest OS-dependent implementation unit. Do not hide portable data

@@ -1,3 +1,9 @@
+//! Windows process-presence probe, independent of HTTP status and telemetry.
+//!
+//! Each check enumerates a Tool Help snapshot. [`Snapshot`] owns and closes the
+//! handle; matching and UTF-16 decoding are covered by pure unit tests. Process
+//! presence is an observation, not a guarantee that the simulator is ready.
+
 use thiserror::Error;
 use windows::Win32::{
     Foundation::{CloseHandle, HANDLE},
@@ -46,6 +52,8 @@ struct Snapshot(HANDLE);
 
 impl Snapshot {
     fn create() -> Result<Self, ProcessDetectionError> {
+        // SAFETY: This process-only snapshot call takes no borrowed pointers.
+        // A successful handle is immediately owned by Snapshot and closed on drop.
         unsafe {
             CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
                 .map(Self)
@@ -58,6 +66,7 @@ impl Snapshot {
 
 impl Drop for Snapshot {
     fn drop(&mut self) {
+        // SAFETY: Snapshot owns the successful handle, which is closed once here.
         unsafe {
             let _ = CloseHandle(self.0);
         }
@@ -73,6 +82,8 @@ fn list_running_processes() -> Result<Vec<RunningProcess>, ProcessDetectionError
     };
     let mut processes = Vec::new();
 
+    // SAFETY: snapshot owns a live process snapshot throughout iteration. entry
+    // is initialized with the required size and remains writable for each call.
     unsafe {
         match Process32FirstW(snapshot.0, &mut entry) {
             Ok(()) => loop {
@@ -115,6 +126,12 @@ fn is_process_running(exe_name: &str) -> Result<bool, ProcessDetectionError> {
 }
 
 /// Return `true` when the default iRacing simulation executable is running.
+///
+/// This Windows-only check uses case-insensitive exact executable-name matching
+/// against [`DEFAULT_IRACING_PROCESS_NAME`] in a fresh process snapshot. Snapshot
+/// and enumeration failures return [`ProcessDetectionError`]. A match does not
+/// establish HTTP endpoint readiness or telemetry connectivity, and this probe
+/// does not start or stop a process.
 pub fn is_iracing_process_running() -> Result<bool, ProcessDetectionError> {
     is_process_running(DEFAULT_IRACING_PROCESS_NAME)
 }
