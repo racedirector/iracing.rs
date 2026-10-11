@@ -12,6 +12,10 @@ use crate::{
 ///
 /// Empty session-information and variable-header regions are represented by
 /// `None`. The computed end always includes at least the fixed IBT preamble.
+/// Validation uses the supplied source length; the value does not retain source
+/// storage or protect it from later mutation/truncation. It checks metadata
+/// geometry, not variable semantics or session text. Adjacent tests own bounds,
+/// overlap, and absent-region behavior.
 #[derive(Debug, Clone)]
 pub struct MetadataRegions {
     variable_headers: Option<VariableHeadersRegion>,

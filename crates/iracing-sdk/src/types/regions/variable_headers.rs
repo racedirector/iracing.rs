@@ -10,6 +10,9 @@ use crate::{IRacingSDKError, Result, types::ibt::ParsedIbtHeader};
 /// region fits in a source. Compare [`Self::end`] with the source length before
 /// accessing the region.
 /// Individual variable headers are not semantically validated by this type.
+/// Optional constructors return `None` for zero-count advertisements;
+/// `TryFrom<&Header>` instead accepts an empty region. No source bytes are read.
+/// Adjacent tests own count/offset and arithmetic boundary behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct VariableHeadersRegion {
     /// Byte span containing the contiguous variable-header records.

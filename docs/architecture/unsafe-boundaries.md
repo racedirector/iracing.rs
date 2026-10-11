@@ -6,16 +6,13 @@ paths.
 
 ## Live shared memory
 
-[`LiveSource`](../../crates/iracing-sdk/src/windows/source.rs) owns the mapping,
-view and event through RAII wrappers. It retains a mapped extent from
-`VirtualQuery`; activation requires the complete fixed header. Scalar reads use
-bounded volatile loads, and native `RtlMoveMemory` copies into disjoint owned
-storage without constructing Rust references into simulator memory. Header,
-session-info and exact typed variable-header snapshots remain stable after
-copying; a header copy alone is not an atomic multi-field observation.
+The [primitive live source](../../crates/iracing-sdk/src/source/live.rs) owns
+mapping/view/event lifetime, scalar access, native copying, unchecked caller
+obligations, and cancellation-safe event retention. Follow its module/type docs,
+local SAFETY comments, and private Windows mapping/event tests.
 
 [`Connection`](../../crates/iracing-sdk/src/windows/connection.rs) validates
-positive live frame length and signed slot offsets through `FrameRegion`, then
+positive live frame length and signed slot offsets before constructing a `FrameRegion`, then
 independently proves containment in the retained mapping before copying. It
 retains native current-buffer selection and two attempts. Tick, session version
 and selected-slot geometry checks bracket the copy; acceptance returns owned
@@ -23,14 +20,10 @@ bytes and matching metadata together as `LiveFrameSnapshot`. `LiveProvider`
 consumes it into `FramePacket` without a second copy or shared-header read.
 No safe borrowed live header or mapped byte slice escapes this boundary.
 
-The simulator is a separate writer. FILE_MAP_READ describes this process's
-permissions, not immutability. Volatile reads make scalar observations visible;
-they do not make the whole header atomic. Snapshot acceptance depends on the
-native producer's tick publication protocol and version counters, including
-that a transition is not hidden by counter reuse during an attempt. An update
-event alone is not a snapshot lock. Manual Send/Sync depends on retaining the
-mapping throughout reads and copies. Async blocking waits own an Arc to the
-event, so cancellation cannot close the handle while the worker waits.
+Snapshot acceptance depends on the native producer publication protocol and
+version counters, including that a transition is not hidden by counter reuse
+during an attempt. The connection owns that acceptance policy; primitive-source
+contracts do not certify it.
 
 ## Disk mappings
 
@@ -58,10 +51,11 @@ obligations remain at their consuming boundaries below.
 
 ## Range and layout contracts
 
-Current main uses [`ByteRegion`](../../crates/iracing-sdk/src/types/regions/bytes.rs),
-not ByteRange. Its constructors prove a representable non-overflowing exclusive
-end and reject reversed ranges. They do not bind the region to any source.
-Specialized regions validate additional geometry; inspect each constructor.
+The [region module](../../crates/iracing-sdk/src/types/regions/mod.rs) and its
+constructor docs own geometric postconditions and their limits. Start with
+[ByteRegion](../../crates/iracing-sdk/src/types/regions/bytes.rs), then follow
+the specialized constructor and adjacent tests for the property being audited.
+
 [`IbtLayout`](../../crates/iracing-sdk/src/types/ibt/layout.rs) validates physical
 geometry against a particular source length. It does not validate variable
 semantics or the lifetime of externally mutated storage. Readers must enforce

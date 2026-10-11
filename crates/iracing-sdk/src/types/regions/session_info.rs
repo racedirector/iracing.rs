@@ -2,6 +2,11 @@ use super::ByteRegion;
 use crate::{IRacingSDKError, Result, irsdk::Header, types::ibt::ParsedIbtHeader};
 
 /// Location and size of the session-information bytes advertised by an SDK header.
+///
+/// Constructor checks concern signed dimensions and arithmetic, not source
+/// containment, text encoding, or YAML validity. Optional constructors return
+/// `None` for zero-length advertisements; `TryFrom<&Header>` instead rejects
+/// them. Adjacent tests own rejection and absence behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SessionInfoRegion {
     region: ByteRegion,
