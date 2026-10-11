@@ -14,6 +14,11 @@ use super::{
 ///
 /// Serde exposes metadata as named fields, decodes the fixed-width text fields,
 /// and omits ABI padding. Deserialization validates fields through [`Self::new`].
+/// Wire decoding instead checks Rust representation, including the storage-type
+/// discriminant, without applying the constructor's semantic restrictions.
+/// Adjacent ABI assertions/layout tests own field geometry; round-trip tests
+/// cover raw text and padding preservation. Consumers validate frame bounds,
+/// duplicate names, and relationships between metadata records.
 #[repr(C)]
 #[derive(
     Debug,
@@ -98,6 +103,8 @@ impl<'de> serde::Deserialize<'de> for VariableHeader {
 impl VariableHeader {
     /// Returns the byte range occupied by this variable, relative to the telemetry buffer start.
     /// Returns `None` if the range endpoint overflows.
+    /// Negative offsets or counts are not rejected here, and a returned range
+    /// is not proof that the variable fits a frame.
     pub fn range(&self) -> Option<Range<i32>> {
         let length = self
             .count

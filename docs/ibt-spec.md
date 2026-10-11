@@ -18,59 +18,32 @@ The variable and session regions MUST be located independently using their adver
 
 The SDK header defines region offsets and the disk writer emits the regions contiguously, then records the first frame in `varBuf[0].bufOffset`; it does not define a separate telemetry-region offset/length pair. Using the latest metadata end as `frameStart` is therefore the repository's compatibility rule for offset-based files, corroborated by the writer and captures rather than by an explicit SDK formula. Readers MAY compare a nonzero `varBuf[0].bufOffset` with the derived start, but it is live-style metadata and is not authoritative for bounds.
 
-## Main header: `irsdk_header` (112 bytes)
+## Main header: `irsdk_header`
 
 Except where specified, fields are signed 32-bit integers. A parser MUST reject an unsupported `ver`; this specification describes SDK version 2. Counts, lengths, and offsets used for file geometry MUST be nonnegative. `bufLen` and `tickRate` MUST be positive for a conforming telemetry recording.
 
-| Offset | Field | Meaning |
-| ---: | --- | --- |
-| 0 | `ver` | SDK header version. |
-| 4 | `status` | 32-bit status bitfield. |
-| 8 | `tickRate` | Nominal samples per second. |
-| 12 | `sessionInfoUpdate` | Session-information revision. |
-| 16, 20 | `sessionInfoLen`, `sessionInfoOffset` | Byte length and absolute offset of YAML region. |
-| 24, 28 | `numVars`, `varHeaderOffset` | Count and absolute offset of variable-header array. |
-| 32, 36 | `numBuf`, `bufLen` | Buffer count and bytes per telemetry frame. |
-| 40 | `curBufTickCount` | Cached live-style tick counter. |
-| 44 | `curBuf` | One-byte current-buffer index; bytes 45–47 are padding. |
-| 48–111 | `varBuf[4]` | Four 16-byte buffer descriptors. |
+Raw header field geometry is owned by [Header](../crates/iracing-irsdk/src/header.rs)
+and its ABI assertions/tests, with descriptors owned by
+[VariableBuffer](../crates/iracing-irsdk/src/variable_buffer.rs).
 
-Each `varBuf` descriptor holds `tickCount` at relative offset 0, `bufOffset` at 4, `tickCountBegin` at 8, and four padding bytes at 12. These descriptors are live-style metadata. A parser MUST NOT infer the stored frame count from their tick counters. The disk writer sets `varBuf[0].bufOffset` to the first frame; a parser MAY check it for consistency, but MUST derive frame geometry from the bounded metadata regions, `bufLen`, and file length.
+These descriptors are live-style metadata. A parser MUST NOT infer the stored frame count from their tick counters. The disk writer sets `varBuf[0].bufOffset` to the first frame; a parser MAY check it for consistency, but MUST derive frame geometry from the bounded metadata regions, `bufLen`, and file length.
 
-## Disk sub-header: `irsdk_diskSubHeader` (32 bytes)
+## Disk sub-header: `irsdk_diskSubHeader`
 
-| Relative offset | Field | Type | Meaning |
-| ---: | --- | --- | --- |
-| 0 | `sessionStartDate` | signed 64-bit integer | Unix timestamp. |
-| 8 | `sessionStartTime` | IEEE-754 `f64` | Session time in seconds at recording start. |
-| 16 | `sessionEndTime` | IEEE-754 `f64` | Session time in seconds at recording end. |
-| 24 | `sessionLapCount` | `i32` | Writer's lap count. |
-| 28 | `sessionRecordCount` | `i32` | Writer's record count. |
+[DiskSubHeader](../crates/iracing-irsdk/src/disk_sub_header.rs) and
+[IbtHeader](../crates/iracing-irsdk/src/ibt_header.rs) own raw representation
+and component ordering; adjacent source assertions/tests own ABI geometry.
 
 The sub-header MUST be read at byte 112, not located relative to `varHeaderOffset`. The disk writer increments `sessionRecordCount` as it writes records, so for a finalized file it SHOULD agree with the complete-frame count derived from file length. It is advisory to readers: a mismatch is a consistency signal and MUST NOT change frame boundaries or authorize reading beyond the EOF-derived complete-frame region.
 
-## Variable headers: `irsdk_varHeader` (144 bytes each)
+## Variable headers: `irsdk_varHeader`
 
 There are exactly `numVars` consecutive records. Each variable's `offset` is relative to the beginning of **each frame**, not the file.
 
-| Relative offset | Field | Type / extent |
-| ---: | --- | --- |
-| 0 | `type` | `i32` storage-type enum |
-| 4 | `offset` | `i32` frame-relative byte offset |
-| 8 | `count` | `i32` element count |
-| 12 | `countAsTime` | one-byte boolean; bytes 13–15 are padding |
-| 16 | `name` | 32-byte NUL-terminated text field |
-| 48 | `desc` | 64-byte NUL-terminated text field |
-| 112 | `unit` | 32-byte NUL-terminated text field |
-
-| Type value | SDK type | Bytes per element |
-| ---: | --- | ---: |
-| 0 | `char` | 1 |
-| 1 | `bool` | 1 |
-| 2 | `int` | 4 |
-| 3 | `bitField` | 4 |
-| 4 | `float` | 4 |
-| 5 | `double` | 8 |
+[VariableHeader](../crates/iracing-irsdk/src/variable_header.rs) owns metadata
+representation and intrinsic decoding; [VariableType](../crates/iracing-irsdk/src/variable_type.rs)
+owns discriminants and element widths. Frame/source checks below belong to
+the consuming parser/layout rather than raw byte validity.
 
 Value 6 (`ETCount`) is an enum bound, not a storage type. A parser MUST reject an unknown or sentinel type, negative offset, nonpositive count, or empty name. For each variable, `offset + count × elementWidth` MUST be checked for overflow and MUST NOT exceed `bufLen`. Arrays contain consecutive elements of the declared type. A name-keyed schema MUST reject duplicate names. Text ends at the first NUL within its fixed-width field; later bytes are not part of the value. `countAsTime` affects interpretation, not storage size.
 

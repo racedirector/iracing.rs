@@ -7,9 +7,12 @@ use crate::{
 
 /// IBT disk sub-header (IBT-specific structure, `irsdk_diskSubHeader`).
 ///
-/// Stored just before the variable header array (at
-/// `header.var_header_offset - IRSDK_DISK_SUBHEADER_SIZE`) and provides timing and record-count
-/// metadata specific to `.ibt` replay files.
+/// This is the second component of [`crate::IbtHeader`], immediately after the
+/// main header, independently of the variable-header array's advertised offset.
+/// It supplies timing and advisory record-count metadata, not file navigation.
+/// Decoding and construction do not validate timestamps, counts, or file bounds.
+/// Adjacent ABI assertions and `disk_sub_header_layout_matches_iracing_abi`
+/// enforce representation; round-trip tests check byte preservation.
 #[repr(C)]
 #[derive(
     Debug,

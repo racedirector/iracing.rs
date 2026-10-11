@@ -49,13 +49,12 @@ repair mmap lifetime/storage violations.
 
 ## Wire contracts
 
-[`iracing-irsdk`](../../crates/iracing-irsdk/src/lib.rs) owns fixed ABI types.
-repr(C)/transparent plus size/alignment/offset checks establish geometry.
-zerocopy FromBytes admits all bit patterns for that type; constrained enums use
-checked decoding. Exact byte-size validation does not imply meaningful lengths,
-counts, enum sentinel acceptability, cross-field layout, source bounds or a
-stable live snapshot. Wire-to-domain conversion owns semantic checks; the source
-and layout layer own actual extent and geometry. Preserve runtime round trips.
+The [raw crate contract](../../crates/iracing-irsdk/src/lib.rs) owns representation
+and intrinsic decoding limitations. Follow [Header](../../crates/iracing-irsdk/src/header.rs),
+[VariableHeader](../../crates/iracing-irsdk/src/variable_header.rs), and
+[VariableType](../../crates/iracing-irsdk/src/variable_type.rs) to definitions,
+validation, and adjacent ABI/round-trip tests. Source geometry and live snapshot
+obligations remain at their consuming boundaries below.
 
 ## Range and layout contracts
 
