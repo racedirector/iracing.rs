@@ -15,6 +15,9 @@
 //! Typed operation encoding belongs to `iracing-broadcast-sdk`; raw wire/domain
 //! values belong to `iracing-irsdk`. Execution returns errors to the executable
 //! and does not provide simulator acknowledgment or a command-result data stream.
+//!
+//! [Command development documents](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/README.md)
+//! explain executable leaves and their implementation/test boundaries.
 
 mod commands;
 mod parser;

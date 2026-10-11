@@ -25,6 +25,10 @@ pub enum Command {
     },
     /// Tools for sending broadcast commands to the simulator.
     #[cfg(windows)]
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [broadcast delegation](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/broadcast.md)."
+    )]
     Broadcast {
         #[command(subcommand)]
         command: iracing_broadcast_cli::Command,
