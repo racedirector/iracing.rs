@@ -52,7 +52,7 @@ the affected crate's `AGENTS.md`. Keep the levels distinct:
   interact.
 - Rustdoc explains public API behavior and invariants.
 - README files teach consumers how to start using a crate or example.
-- `docs/reference/*.yml` is generated schema output and must not be hand-edited.
+- `docs/reference` retains generated output and historical captures; its provenance guide links to the owning tooling and configuration. Do not hand-edit artifact contents.
 
 Prefer implementation links and stable type/module names over line numbers.
 Record observable semantics—ownership, ordering, loss, retries, cancellation,

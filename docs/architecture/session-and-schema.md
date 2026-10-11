@@ -144,17 +144,14 @@ the captured example for empty containers and full values.
 The repo skill `.agents/skills/update-session-schema/SKILL.md` guides capture
 selection, domain model updates, and verification.
 
-## Generated reference artifacts
+## Reference provenance
 
-`docs/reference/*.yml` contains checked-in output from schema binaries:
-
-- baseline session, variable, and primitive schemas;
-- disk-derived variable schema;
-- live-derived variable and session schemas.
-
-These files are generated artifacts. Session schemas can be regenerated with `cargo iracing-sdk session schema`. Variable, primitive, and car-setup schema generators are deferred after removal of the standalone binaries; retain their existing reference artifacts. Live discovery requires Windows and an appropriate simulator state.
-
-`docs/reference/README.md` is the usage index for those artifacts.
+The [reference guide](../reference/README.md) explains how to use type-derived
+schemas and retained simulator captures. Its [manifest](../reference/generation.toml)
+owns YAML provenance and inventory; the [reference tooling](../../xtask/src/generated.rs)
+owns generation and verification. These artifacts provide model output or
+historical evidence, rather than an authored runtime architecture specification.
+Session contracts belong to the typed source model and its parsing tests.
 
 ## Change rules
 

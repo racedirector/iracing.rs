@@ -63,10 +63,11 @@ skip a required integration test because data is absent. The best-effort
 
 ## Test layering
 
-- Before designing synthetic telemetry or session inputs, use the generated
-  schema catalog in [`docs/reference/README.md`](../reference/README.md) to find
-  real variable names and metadata, session shapes, and primitive value
-  domains. A disk/live snapshot's offsets and `frame_size` form one captured
+- Before designing synthetic telemetry or session inputs, use the reference
+  provenance guide in [`docs/reference/README.md`](../reference/README.md) to find
+  real variable names and metadata and representative session shapes. Use
+  iracing-irsdk source for enum/flag value domains. A disk/live snapshot's offsets
+  and `frame_size` form one captured
   layout and must not be combined with offsets from another snapshot.
 - Unit tests should construct minimal frames/schemas and use fake providers or
   ports.
