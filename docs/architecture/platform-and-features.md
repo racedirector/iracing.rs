@@ -12,8 +12,6 @@
 | `LiveConnection` symbol | Stub/builder only | Full implementation |
 | Typed broadcast commands | Yes | Yes |
 | Win32 broadcast transport | No | Yes |
-| Generated gRPC bindings/client | Yes | Yes |
-| Real broadcast gRPC service/server | No | Yes |
 | Simulation HTTP probe | Yes | Yes |
 | Simulation process enumeration | No | Yes |
 
@@ -26,8 +24,9 @@ the smallest implementation layer that imports Windows APIs.
 Portable public models should not disappear merely because a transport is
 Windows-only. Existing examples:
 
-- `BroadcastCommand` and related enums are portable typed data;
-- generated protobuf messages and `RawBroadcastClient` are portable;
+- [`iracing-broadcast-sdk`](../../crates/iracing-broadcast-sdk/src/lib.rs)
+  owns portable typed commands and Windows-only native dispatch; its raw domain
+  values come from `iracing-irsdk`;
 - `LiveConnection` preserves a non-Windows builder stub that fails clearly.
 
 Windows-only binaries must retain explicit non-Windows behavior when Cargo/CI

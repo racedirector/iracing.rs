@@ -1,3 +1,9 @@
+//! Windows transport for already-typed broadcast operations.
+//!
+//! Encoding belongs to [`Command`]'s conversion into [`BroadcastMessage`]. This
+//! module owns message registration, Win32 parameter packing, and dispatch;
+//! simulator state and command acknowledgment are outside this boundary.
+
 use crate::{
     command::Command,
     error::{Error, Result},
@@ -104,6 +110,8 @@ impl Client {
     ///
     /// The command is packed into the `WPARAM`/`LPARAM` format expected by the
     /// official iRacing SDK and dispatched via `HWND_BROADCAST`.
+    /// Successful return means Win32 accepted dispatch, not that iRacing applied
+    /// the requested operation. No telemetry readiness check is performed.
     ///
     /// # Errors
     ///

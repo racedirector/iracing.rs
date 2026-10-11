@@ -13,7 +13,7 @@
 - Mapped IBT recordings must remain unchanged until the reader/provider/connection is dropped. Never mutate or truncate a live mapped test fixture; inject short reads through owned test sources instead.
 - `ibt/`: `IbtReader` provides indexed raw frame reads, validated half-open `frames(start..end)` pull traversal with explicit recorded indices, and fresh metadata snapshots. Coordinates are `usize` record indices, not live ticks; empty ranges at EOF are valid. Range ends clamp to frame count; reversed ranges and starts beyond EOF are errors. `IbtReplay` owns sequential cursor/bounds/seek/EOF over `IbtFile` and returns bound `IbtFrame` values. `IbtProvider::from_reader` temporarily transfers mapped/owned storage through crate-private `IbtReader::into_file` (removed in #305); the provider owns only replay and borrows the file layout/session snapshots, using `IbtFrame::into_packet` before successful cursor advancement. `from_replay` preserves bounds/position; rely on `TelemetryLayout` and `FieldLayout` instead of re-parsing frame bytes.
 - `types/ibt/`: `IbtLayout` is the canonical physical IBT description, validated from `Header` and source length without I/O. Use its source-length, fixed-region, metadata, and frame accessors for runtime access and inspection; do not recalculate geometry in tooling. `MetadataRegions` lives in `types/regions/`; `IbtReader` delegates all geometry to the layout. The reader has no schema, session cache, or logical replay cursor. Provider construction rejects frames without variable headers but accepts empty recordings without metadata. Source lengths must fit `usize` (4 GiB files are rejected on 32-bit targets).
-- `types/`: `TelemetryLayout`, `FieldLayout`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::decode_field` (little-endian) rather than manual slicing.
+- `types/`: `TelemetryLayout`, `FieldLayout`, `VarData`, `FramePacket`, `DynamicFrame`, incident helpers, and bitfield enums. Always decode telemetry via `VarData::decode_field` (little-endian) rather than manual slicing.
 - `schema/session/`: `SessionInfo::parse` deserializes decoded session YAML; the live telemetry session policy tracks `session_version`, while IBT parses its session once.
 - Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `TelemetryLayout` for variable metadata.
 - `providers/`: `Provider`, `IbtProvider`, and `LiveProvider` stream `FramePacket` values plus session YAML. `IbtProvider` is temporary compatibility over `IbtFile`/`IbtReplay` and retains no independent metadata/layout/packet construction; #305 removes it after consumers migrate.
@@ -21,7 +21,7 @@
 - `telemetry/`: shared frame-read loop plus explicit delivery and session policies. `LatestDelivery` is the live default, while `Telemetry::spawn_ibt` selects `OnDemandDelivery`.
 - `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `LayoutProvider` support typed per-frame extraction.
 - Live activation must validate the full fixed header before unchecked scalar reads. Preserve event ownership in blocking workers after async cancellation; private mapping/event tests run on Windows without the simulator.
-- `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code, and broadcast helpers. Keep everything behind `#[cfg(windows)]`.
+- `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code. Keep everything behind `#[cfg(windows)]`.
 - `../iracing-sdk-cli/src/`: consolidated CLI; session schemas and discovery enable the SDK features through its dependency. Standalone variable, primitive, and car-setup generators are deferred.
 - `examples/`: cross-platform disk examples plus Windows live/broadcast examples.
 - `tests/`: integration and derive macro regression tests.
@@ -57,3 +57,5 @@ For proof-oriented unsafe/invariant audits, compose `rust-soundness-review` and
 `rust-unsafe-ffi`. Read `docs/architecture/unsafe-boundaries.md` from the workspace
 root; trace current producers and consumers and keep unimplemented proposals
 separate from current-source conclusions.
+
+Broadcast contracts live in [iracing-broadcast-sdk](../iracing-broadcast-sdk/src/lib.rs) and [iracing-broadcast-cli](../iracing-broadcast-cli/src/lib.rs); raw values live in iracing-irsdk.
