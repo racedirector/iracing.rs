@@ -19,12 +19,14 @@ pub(crate) struct DefaultDelivery;
 pub(crate) struct DefaultSessions;
 
 /// A concrete delivery policy paired with the handle returned to its consumer.
+#[cfg(feature = "benchmark")]
 pub(crate) struct CustomDelivery<D, F> {
     pub(crate) policy: D,
     pub(crate) frames: F,
 }
 
 /// A concrete session policy paired with the receiver returned to its consumer.
+#[cfg(feature = "benchmark")]
 pub(crate) struct CustomSessions<S, R> {
     pub(crate) policy: S,
     pub(crate) sessions: R,
@@ -47,6 +49,7 @@ impl BuildDelivery for DefaultDelivery {
     }
 }
 
+#[cfg(feature = "benchmark")]
 impl<D, F> BuildDelivery for CustomDelivery<D, F>
 where
     D: DeliveryPolicy,
@@ -82,6 +85,7 @@ where
     }
 }
 
+#[cfg(feature = "benchmark")]
 impl<P, S, R> BuildSessions<P> for CustomSessions<S, R>
 where
     P: Provider,
@@ -98,8 +102,7 @@ where
 /// Builds a telemetry task from independently configurable delivery and session policies.
 ///
 /// A newly-created builder uses [`LatestDelivery`] and [`LiveSessionPolicy`].
-/// Calling [`Self::with_delivery_policy`] or [`Self::with_session_policy`]
-/// replaces only that part of the task while preserving the other default.
+/// Benchmark configuration can replace either policy independently.
 pub(crate) struct TelemetryBuilder<P, D = DefaultDelivery, S = DefaultSessions> {
     pub(crate) provider: P,
     pub(crate) delivery: D,
@@ -116,6 +119,7 @@ impl<P> TelemetryBuilder<P> {
     }
 }
 
+#[cfg(feature = "benchmark")]
 impl<P, D, S> TelemetryBuilder<P, D, S> {
     /// Replace the frame delivery policy and its consumer-facing handle.
     ///

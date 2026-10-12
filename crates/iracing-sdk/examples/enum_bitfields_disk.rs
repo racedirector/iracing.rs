@@ -1,14 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use futures::executor::block_on;
-use iracing_sdk::provider::Provider;
 use iracing_sdk::{
-    BitField, LayoutProvider, VarData,
+    BitField, IbtFile, VarData,
     irsdk::{
         CarLeftRight, EngineWarnings, PaceMode, PitServiceFlags, SessionFlags, SessionState,
         TrackLocation, TrackSurface, TrackWetness,
     },
-    providers::ibt::IbtProvider,
 };
 use std::path::PathBuf;
 
@@ -33,8 +30,8 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let mut reader = IbtProvider::open(&args.ibt_path)?;
-    let layout = reader.layout().clone();
+    let file = IbtFile::open(&args.ibt_path)?;
+    let layout = file.telemetry_layout();
 
     let session_state = layout
         .field_by_name("SessionState")
@@ -73,9 +70,10 @@ fn main() -> Result<()> {
         .map(|(_, field)| field)
         .cloned();
 
-    while let Some(packet) = block_on(reader.next_frame())? {
-        let frame = packet.data();
-        let tick = packet.tick;
+    for record in file.all_frames()? {
+        let record = record?;
+        let frame = record.bytes();
+        let tick = record.index();
         let session_state_value = session_state
             .as_ref()
             .and_then(|info| i32::decode_field(frame, info).ok())

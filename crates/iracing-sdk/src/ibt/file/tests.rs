@@ -190,12 +190,23 @@ fn mapped_and_owned_reject_malformed_sources_equivalently() -> Result<()> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("malformed.ibt");
     let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
-    let mut cases = vec![original[..original.len() - 1].to_vec()];
+    let mut partial_tail = original.clone();
+    partial_tail.push(0);
+    let mut cases = vec![original[..original.len() - 1].to_vec(), partial_tail];
     for len in 1..preamble_len {
         cases.push(original[..len].to_vec());
     }
     for (offset, value) in [
         (offset_of!(Header, variable_header_offset), i32::MAX),
+        (offset_of!(Header, variable_header_offset), 0),
+        (
+            offset_of!(Header, variable_header_offset),
+            i32::try_from(original.len() - 10)?,
+        ),
+        (
+            offset_of!(Header, session_info_offset),
+            i32::try_from(original.len() - 10)?,
+        ),
         (offset_of!(Header, session_info_offset), i32::MAX),
         (offset_of!(Header, buffer_length), 0),
         (offset_of!(Header, variable_count), 0),
@@ -212,6 +223,13 @@ fn mapped_and_owned_reject_malformed_sources_equivalently() -> Result<()> {
         .unwrap()
         .as_region()
         .offset();
+    let mut overlap = original.clone();
+    write_i32(
+        &mut overlap,
+        offset_of!(Header, session_info_offset),
+        i32::try_from(variable_start)?,
+    );
+    cases.push(overlap);
     for (offset, value) in [
         (offset_of!(VariableHeader, offset), file.frame_size() as i32),
         (offset_of!(VariableHeader, variable_type), i32::MAX),
@@ -274,19 +292,24 @@ fn dropping_file_releases_mapping_resources() -> Result<()> {
 }
 
 #[test]
-fn direct_frames_match_mapped_owned_and_legacy_reads_with_exact_layout() -> Result<()> {
+fn direct_frames_match_mapped_owned_and_source_bytes_with_exact_layout() -> Result<()> {
     for fixture in crate::test_utils::load_fixture_manifest()?.fixtures {
         let path = fixture.fixture_path()?;
         let mapped = IbtFile::open(&path)?;
         let owned = IbtFile::from_bytes(std::fs::read(&path)?)?;
-        let reference = crate::ibt::IbtReader::open(path)?;
+        let reference = std::fs::read(path)?;
         for index in [0, mapped.frame_count() / 2, mapped.frame_count() - 1] {
             let mapped_frame = mapped.frame(index)?;
             let owned_frame = owned.frame(index)?;
             assert_eq!(mapped_frame.index(), index);
             assert_eq!(owned_frame.index(), index);
             assert_eq!(mapped_frame.bytes(), owned_frame.bytes());
-            assert_eq!(mapped_frame.bytes(), reference.frame(index)?);
+            let region = mapped
+                .physical_layout()
+                .frame(index)?
+                .as_region()
+                .as_range();
+            assert_eq!(mapped_frame.bytes(), &reference[region]);
             assert!(Arc::ptr_eq(
                 mapped_frame.layout(),
                 mapped.telemetry_layout()
@@ -413,5 +436,71 @@ fn recorded_frame_owns_bytes_and_layout_after_file_drop() -> Result<()> {
     assert_eq!(frame.bytes().len(), layout.frame_size());
     assert_eq!(frame.value("Speed")?, value);
     assert!(frame.into_packet()?.value("Speed")?.is_some());
+    Ok(())
+}
+
+#[test]
+fn every_truncated_preamble_length_preserves_parse_error_contract() {
+    let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
+    for len in 0..preamble_len {
+        let error = IbtFile::from_bytes(vec![0; len]).unwrap_err();
+        assert!(matches!(error, IRacingSDKError::Parse { .. }), "{error}");
+        assert!(
+            error
+                .to_string()
+                .contains("Source is shorter than the IBT preamble")
+        );
+    }
+}
+
+#[test]
+fn session_bytes_remain_inspectable_when_explicit_parsing_fails() -> Result<()> {
+    let original = fixture_bytes()?;
+    let file = IbtFile::from_bytes(original.clone())?;
+    let region = file
+        .physical_layout()
+        .metadata()
+        .session_info()
+        .unwrap()
+        .as_region()
+        .as_range();
+    for payload in [
+        b"\0padding".as_slice(),
+        b"WeekendInfo: [invalid YAML\0padding",
+    ] {
+        let mut bytes = original.clone();
+        bytes[region.clone()].fill(0);
+        bytes[region.start..region.start + payload.len()].copy_from_slice(payload);
+        let file = IbtFile::from_bytes(bytes)?;
+        let snapshot = file.session_info_bytes().unwrap();
+        assert_eq!(&snapshot.as_bytes()[..payload.len()], payload);
+        assert!(crate::schema::SessionInfo::try_from(snapshot.clone()).is_err());
+        assert!(file.frame(0)?.value("Speed")?.is_some());
+    }
+    Ok(())
+}
+
+#[test]
+fn negative_session_revision_only_fails_at_the_packet_boundary() -> Result<()> {
+    let mut bytes = fixture_bytes()?;
+    write_i32(&mut bytes, offset_of!(Header, session_info_update), -1);
+    let file = IbtFile::from_bytes(bytes)?;
+    assert_eq!(file.header().session_info_update, -1);
+    assert!(file.frame(1)?.value("Speed")?.is_some());
+    let mut replay = file.replay();
+    replay.set_range(1..3)?;
+    let frame = replay.current_frame()?.unwrap();
+    assert_eq!(frame.index(), 1);
+    assert!(
+        frame
+            .into_packet()
+            .unwrap_err()
+            .to_string()
+            .contains("session revision")
+    );
+    assert_eq!(replay.position(), 1);
+    assert_eq!(replay.range(), 1..3);
+    assert_eq!(replay.next_frame()?.unwrap().index(), 1);
+    assert_eq!(replay.position(), 2);
     Ok(())
 }

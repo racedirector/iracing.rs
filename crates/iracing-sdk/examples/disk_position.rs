@@ -29,7 +29,7 @@
 //! ```bash
 //! cargo run --example ibt-read-frame -- \
 //!   --ibt-path ./session.ibt \
-//!   --output-path ./positions.csv
+//!   --csv-output-path ./positions.csv
 //! ```
 //!
 //! ## Logging
@@ -43,9 +43,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use futures::executor::block_on;
-use iracing_sdk::provider::Provider;
-use iracing_sdk::{LayoutProvider, providers::ibt::IbtProvider, types::VarData};
+use iracing_sdk::{IbtFile, types::VarData};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -122,13 +120,13 @@ fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let mut reader = IbtProvider::open(&ibt_path).expect("Failed to open IBT file");
+    let file = IbtFile::open(&ibt_path).expect("Failed to open IBT file");
     let mut writer = Writer::from_path(&csv_output_path).expect("Could not create CSV output");
 
     tracing::info!("Resolving telemetry layout");
 
     // Clone the layout once to avoid repeated lookups.
-    let layout = reader.layout().clone();
+    let layout = file.telemetry_layout();
 
     // ------------------------------------------------------------
     // Resolve required variable metadata
@@ -174,15 +172,9 @@ fn main() -> Result<()> {
     // Frame iteration
     // ------------------------------------------------------------
     //
-    // `next_frame()` returns:
-    //   Result<Option<FramePacket>>
-    //
-    // - Err(_)       => read failure
-    // - Ok(None)     => end-of-stream
-    // - Ok(Some(...))=> next frame
-    //
-    while let Some(packet) = block_on(reader.next_frame())? {
-        let data = packet.data();
+    for frame in file.all_frames()? {
+        let frame = frame?;
+        let data = frame.bytes();
         // Extract strongly-typed values from raw frame bytes.
         let lap_distance_meters = f32::decode_field(data, lap_distance_meters_info).unwrap();
 

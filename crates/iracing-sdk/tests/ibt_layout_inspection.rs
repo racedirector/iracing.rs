@@ -1,9 +1,7 @@
 //! Downstream tooling can inspect complete geometry using only the public layout.
 
-use iracing_sdk::provider::VariableHeadersProvider;
 use iracing_sdk::{
-    IbtLayout,
-    ibt::IbtReader,
+    IbtFile, IbtLayout,
     irsdk::{DiskSubHeader, Header},
     test_utils::require_smallest_ibt_fixture,
 };
@@ -13,20 +11,20 @@ use zerocopy::IntoBytes;
 fn public_layout_describes_owned_and_mapped_recordings() -> anyhow::Result<()> {
     let path = require_smallest_ibt_fixture()?;
     let bytes = std::fs::read(&path)?;
-    let mapped = IbtReader::open(&path)?;
-    let owned = IbtReader::from_bytes(bytes.clone())?;
+    let mapped = IbtFile::open(&path)?;
+    let owned = IbtFile::from_bytes(bytes.clone())?;
 
-    for reader in [mapped, owned] {
-        // A probe uses the reader's layout without recomputing geometry from headers.
-        let layout: IbtLayout = reader.layout().clone();
+    for file in [mapped, owned] {
+        // A probe uses the file's layout without recomputing geometry from headers.
+        let layout: IbtLayout = file.physical_layout().clone();
         assert_eq!(layout.source_len(), bytes.len());
         assert_eq!(
             &bytes[layout.header_region().as_range()],
-            reader.header().as_bytes()
+            file.header().as_bytes()
         );
         assert_eq!(
             &bytes[layout.disk_header_region().as_range()],
-            reader.disk_header().as_bytes()
+            file.disk_header().as_bytes()
         );
         assert_eq!(
             layout.preamble_region().len(),
@@ -50,21 +48,21 @@ fn public_layout_describes_owned_and_mapped_recordings() -> anyhow::Result<()> {
         );
         assert_eq!(layout.frames().end(), layout.source_len());
 
-        // Metadata reads may move the source cursor; indexed frame reads still use the layout.
-        assert!(
-            iracing_sdk::provider::SessionInformationBytesProvider::session_info_snapshot(&reader)?
-                .is_some()
-        );
-        assert!(!reader.variable_headers()?.is_empty());
+        // Immutable metadata inspection and frame access share the validated file layout.
+        assert!(file.session_info_bytes().is_some());
+        assert!(!file.variable_headers().is_empty());
         for index in [layout.frame_count() - 1, 0] {
             let region = layout.frame(index)?;
             assert_eq!(region.len(), layout.frame_size());
-            assert_eq!(reader.frame(index)?, bytes[region.as_region().as_range()]);
+            assert_eq!(
+                file.frame(index)?.bytes(),
+                &bytes[region.as_region().as_range()]
+            );
         }
         assert!(layout.frame(layout.frame_count()).is_err());
-        assert!(reader.frame(layout.frame_count()).is_err());
-        drop(reader);
-        // The physical description is reusable independently of the reader/source lifetime.
+        assert!(file.frame(layout.frame_count()).is_err());
+        drop(file);
+        // The physical description is reusable independently of the file/source lifetime.
         assert_eq!(layout.source_len(), bytes.len());
     }
     Ok(())

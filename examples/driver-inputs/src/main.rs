@@ -3,10 +3,7 @@ mod driver_input;
 use clap::Parser;
 use csv::Writer;
 use driver_input::DriverInput;
-use iracing_sdk::{
-    FrameAdapter, LayoutProvider, irsdk::SessionFlags, provider::Provider,
-    providers::ibt::IbtProvider,
-};
+use iracing_sdk::{FrameAdapter, IbtFile, irsdk::SessionFlags};
 use std::{fs::File, path::PathBuf};
 use tracing_subscriber::EnvFilter;
 
@@ -84,8 +81,7 @@ impl Drop for FlagObserver {
 /// // From code/tests you can invoke the entrypoint directly (no runtime side-effects in this doctest).
 /// let _ = crate::main();
 /// ```
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -111,13 +107,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     flag_csv_output_path.push("flags.csv");
     let mut flag_observer = FlagObserver::new(flag_csv_output_path);
 
-    let mut ibt_provider = IbtProvider::open(&ibt_path).expect("Failed to initialize IBT provider");
-    let layout = ibt_provider.layout();
+    let file = IbtFile::open(&ibt_path).expect("Failed to open IBT file");
+    let layout = file.telemetry_layout();
 
-    tracing::info!("Parsing frames from IBT provider");
+    tracing::info!("Parsing frames from IBT file");
 
     let shared_validation = DriverInput::validate_layout(layout)?;
-    while let Some(packet) = ibt_provider.next_frame().await? {
+    for frame in file.all_frames()? {
+        let packet = frame?.into_packet()?;
         let frame = DriverInput::adapt(&packet, &shared_validation);
         flag_observer.observe(frame.flags)?;
 

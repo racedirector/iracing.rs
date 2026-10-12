@@ -53,5 +53,8 @@ jobs:
       - name: Test workspace
         run: cargo test --workspace --all-targets
 
+      - name: Test benchmark delivery and recorded harnesses
+        run: "cargo test -p iracing-sdk --features benchmark --lib benchmarking::"
+
       - name: Compile all benchmarks
         run: cargo bench -p iracing-sdk --features benchmark --no-run

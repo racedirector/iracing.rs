@@ -2,17 +2,14 @@
 //!
 //! Verification is deliberately layered. It checks manifest geometry and hashes,
 //! decodes foundational wire structures, compares the embedded and companion
-//! YAML bytes, then consumes the same data through [`IbtReader`] and [`IbtProvider`]. This reduces
+//! YAML bytes, then consumes every frame through [`IbtFile`] and its replay. This reduces
 //! the chance that matching generator and verifier mistakes accept invalid data.
 
-use std::{fs, io::Cursor, path::Path};
+use std::{fs, io::Cursor, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, bail, ensure};
-use futures::executor::block_on;
 use iracing_irsdk::{DiskSubHeader, Header, VariableHeader, VariableType, decode};
-use iracing_sdk::{
-    LayoutProvider, ibt::IbtReader, provider::Provider, providers::ibt::IbtProvider,
-};
+use iracing_sdk::IbtFile;
 
 use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 
@@ -26,7 +23,7 @@ use crate::{VerificationReport, generate::hex_digest, model::FixtureManifest};
 ///
 /// Returns an error when required files cannot be read, manifest paths escape
 /// `repo_root`, layout/hash/header/YAML invariants disagree, SDK validation
-/// fails, or `IbtProvider` cannot expose the declared layout and frame count.
+/// fails, or file/frame/replay access disagrees with the declared layout and bytes.
 pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
     let manifest_path = repo_root.join("test-data/ibt/manifest.json");
     let manifest_bytes = fs::read(&manifest_path)
@@ -210,19 +207,17 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             yaml_path.display()
         );
 
-        let reader = IbtReader::from_bytes(data)
-            .with_context(|| format!("opening {} through IbtReader", path.display()))?;
+        let file = IbtFile::open(&path)
+            .with_context(|| format!("opening {} through IbtFile", path.display()))?;
         ensure!(
-            reader.layout().frame_count() == fixture.num_frames,
-            "{} reader frame count mismatch",
+            file.frame_count() == fixture.num_frames,
+            "{} file frame count mismatch",
             path.display()
         );
-        let mut provider = IbtProvider::from_reader(reader)
-            .with_context(|| format!("validating {} through IbtProvider", path.display()))?;
-        let layout = provider.layout();
+        let layout = Arc::clone(file.telemetry_layout());
         ensure!(
             layout.len() == fixture.num_vars as usize,
-            "{} provider variable count mismatch",
+            "{} file variable count mismatch",
             path.display()
         );
         for expected in &fixture.required_variables {
@@ -231,13 +226,46 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
                     .field_by_name(&expected.name)
                     .map(|(_, field)| field)
                     .is_some(),
-                "{} provider layout is missing {}",
+                "{} file layout is missing {}",
                 path.display(),
                 expected.name
             );
         }
+        // Compare canonical direct access with the independently checked wire extent.
+        for (index, frame) in file.all_frames()?.enumerate() {
+            let frame =
+                frame.with_context(|| format!("reading frame {index} in {}", path.display()))?;
+            let start = session_end + index * fixture.frame_size;
+            ensure!(
+                frame.index() == index && frame.bytes() == &data[start..start + fixture.frame_size],
+                "{} direct frame {index} disagrees with source bytes",
+                path.display()
+            );
+            ensure!(
+                Arc::ptr_eq(frame.layout(), &layout),
+                "{} direct frame {index} lost its originating layout",
+                path.display()
+            );
+            let packet = frame.into_packet()?;
+            ensure!(
+                packet.tick as usize == index
+                    && packet.session_version == fixture.session_info_update as u32,
+                "{} packet metadata mismatch for frame {index}",
+                path.display()
+            );
+        }
+
+        let mut replay = file.replay();
         let mut read_frames = 0usize;
-        while block_on(provider.next_frame())?.is_some() {
+        while let Some(frame) = replay.next_frame()? {
+            let start = session_end + read_frames * fixture.frame_size;
+            ensure!(
+                frame.index() == read_frames
+                    && frame.bytes() == &data[start..start + fixture.frame_size]
+                    && Arc::ptr_eq(frame.layout(), &layout),
+                "{} replay frame {read_frames} disagrees with source bytes/layout",
+                path.display()
+            );
             read_frames += 1;
         }
         ensure!(
@@ -245,6 +273,11 @@ pub(crate) fn verify(repo_root: &Path) -> Result<VerificationReport> {
             "{} yielded {read_frames} frames, expected {}",
             path.display(),
             fixture.num_frames
+        );
+        ensure!(
+            replay.is_eof() && replay.next_frame()?.is_none(),
+            "{} replay EOF was not persistent",
+            path.display()
         );
         frame_count += read_frames;
     }

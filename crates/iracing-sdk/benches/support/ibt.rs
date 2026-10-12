@@ -6,7 +6,8 @@
 //! access, not cold-storage latency; the helper does not establish production
 //! parser acceptance or certify an arbitrary recording.
 
-use iracing_sdk::irsdk::{DiskSubHeader, Header, VariableHeader};
+use iracing_sdk::IbtLayout;
+use iracing_sdk::irsdk::{DiskSubHeader, Header};
 use std::{
     fs::{self, File},
     io::{BufReader, Read},
@@ -43,45 +44,23 @@ impl Recording {
         let disk_header = DiskSubHeader::try_from_bytes(&preamble[size_of::<Header>()..])
             .expect("fixture disk header must decode");
 
-        let positive = |value: i32, field: &str| -> usize {
-            usize::try_from(value)
-                .unwrap_or_else(|_| panic!("invalid {field} in {}", path.display()))
-        };
-        let frame_size = positive(header.buffer_length, "frame size");
-        assert!(frame_size > 0, "zero frame size in {}", path.display());
-        let variable_end = positive(header.variable_header_offset, "variable offset")
-            .checked_add(
-                positive(header.variable_count, "variable count")
-                    .checked_mul(size_of::<VariableHeader>())
-                    .expect("fixture variable region length overflow"),
-            )
-            .expect("fixture variable region end overflow");
-        let session_end = positive(header.session_info_offset, "session offset")
-            .checked_add(positive(header.session_info_length, "session length"))
-            .expect("fixture session region end overflow");
-        let frame_data_start = u64::try_from(preamble.len().max(variable_end).max(session_end))
-            .expect("fixture frame data offset does not fit u64");
-        let remaining = file_size
-            .checked_sub(frame_data_start)
-            .expect("fixture metadata extends past EOF");
-        let frame_size_u64 = u64::try_from(frame_size).expect("frame size does not fit u64");
-        assert_eq!(
-            remaining % frame_size_u64,
-            0,
-            "partial final frame in {}",
-            path.display()
-        );
-        let frame_count = usize::try_from(remaining / frame_size_u64)
-            .expect("fixture frame count does not fit usize");
+        let layout = IbtLayout::try_from_headers(
+            &header,
+            usize::try_from(file_size).expect("fixture length must fit usize"),
+        )
+        .expect("fixture physical layout must validate");
+        let frame_size = layout.frame_size();
+        let frame_count = layout.frame_count();
         if disk_header.record_count > 0 {
             assert_eq!(
-                usize::try_from(disk_header.record_count).expect("invalid record count"),
+                usize::try_from(disk_header.record_count)
+                    .expect("fixture record count must fit usize"),
                 frame_count,
                 "fixture disk record count differs from EOF-derived count"
             );
         }
-        let replay_bytes = frame_size_u64
-            .checked_mul(u64::try_from(frame_count).expect("frame count does not fit u64"))
+        let replay_bytes = (frame_size as u64)
+            .checked_mul(frame_count as u64)
             .expect("fixture replay byte count overflow");
         Self {
             name,

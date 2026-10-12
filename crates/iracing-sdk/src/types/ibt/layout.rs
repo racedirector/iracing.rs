@@ -9,7 +9,7 @@ use crate::{ByteRegion, FrameRegion, FramesRegion, IRacingSDKError, MetadataRegi
 /// length. It records byte locations only; it does not borrow or parse the
 /// bytes in those locations. Fixed header regions, optional metadata regions,
 /// and EOF-delimited frame geometry are available without re-reading the header.
-/// Both [`crate::ibt::IbtReader`] and inspection tools can use this description;
+/// Both [`crate::ibt::IbtFile`] and inspection tools can use this description;
 /// it is independent of replay cursors, telemetry field layouts, and formatting.
 /// All byte coordinates are source-relative and fit within [`Self::source_len`].
 ///
@@ -20,11 +20,11 @@ use crate::{ByteRegion, FrameRegion, FramesRegion, IRacingSDKError, MetadataRegi
 /// # Inspection
 ///
 /// ```no_run
-/// use iracing_sdk::ibt::IbtReader;
+/// use iracing_sdk::IbtFile;
 ///
 /// # fn inspect() -> iracing_sdk::Result<()> {
-/// let reader = IbtReader::open("telemetry.ibt")?;
-/// let layout = reader.layout();
+/// let file = IbtFile::open("telemetry.ibt")?;
+/// let layout = file.physical_layout();
 /// println!("source: {} bytes", layout.source_len());
 /// println!("header: {:?}", layout.header_region().as_range());
 /// println!("disk sub-header: {:?}", layout.disk_header_region().as_range());

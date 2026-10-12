@@ -30,7 +30,7 @@ manual-frame-adapter = [
   "--",
 ]
 
-ibt-subscribe = ["run", "-p", "iracing-sdk", "--example", "ibt-subscribe", "--"]
+ibt-derive = ["run", "-p", "iracing-sdk", "--example", "ibt-derive", "--"]
 
 live-subscribe = [
   "run",

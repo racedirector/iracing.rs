@@ -145,7 +145,7 @@ impl IbtFile {
         Self::from_source(Source::Owned(bytes.into()))
     }
 
-    pub(crate) fn from_source(source: Source) -> Result<Self> {
+    fn from_source(source: Source) -> Result<Self> {
         let preamble_len = size_of::<Header>() + size_of::<DiskSubHeader>();
         let bytes = source.get(0..preamble_len).ok_or_else(|| {
             IRacingSDKError::parse_error(

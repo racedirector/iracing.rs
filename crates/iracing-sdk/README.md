@@ -8,19 +8,23 @@ namespace.
 
 This crate provides:
 
-- Cross-platform `.ibt` indexed reads via `IbtReader` and replay via `IbtProvider`
-- Streaming adapter primitives via `FramePacket`, `Provider`, `IbtProvider`, `DynamicFrame`, `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, and `LayoutProvider`; `LiveProvider` is the Windows-only live source
-- Session YAML parsing via `SessionInfo::parse`; telemetry session policies handle source-specific updates
-- Type-safe telemetry extraction helpers (`TelemetryLayout`, `VarData`, `BitField`)
-- Windows shared-memory access (`WindowsConnection`) when building on Windows
+- One completed-recording model, `IbtFile`, with immutable metadata, direct frame/range access, and deterministic `IbtReplay`.
+- Source-independent telemetry layouts and decoding through `TelemetryLayout`, `VarData`, and `TelemetryValue`.
+- Typed and dynamic adapters through `FramePacket`, `FrameAdapter`, `AdapterValidation`, and `DynamicFrame`.
+- Session YAML decoding and parsing through `SessionInfoBytes` and `SessionInfo`.
+- Windows shared-memory acquisition, live providers/connections, and broadcast tools.
 
 ## Start Here
 
-1. Use `IbtProvider` for sequential replay, or `IbtReader` for indexed frames and metadata snapshots (all platforms).
-2. Use `Provider`/`IbtProvider` for frame-by-frame streaming; reach for `LiveProvider` on Windows when you want the live source.
-3. For typed rows or ad-hoc per-frame decoding, reach for `FrameAdapter` or `DynamicFrame`.
-4. Parse decoded session YAML with `SessionInfo::parse`; use telemetry session policies for live updates or IBT replay.
-5. On Windows, use `WindowsConnection` for live telemetry.
+1. Open a completed recording with `IbtFile::open(path)` or take ownership with `IbtFile::from_bytes(bytes)`.
+2. Inspect `header()`, `disk_header()`, `variable_headers()`, `session_info_bytes()`, `physical_layout()`, and `telemetry_layout()`.
+3. Read an indexed `frame(index)`, lazily traverse `frames(start..end)`, or own a replay cursor with `file.replay()`.
+4. Decode recorded frames directly, or call `frame.into_packet()` when using existing typed/dynamic packet adapters.
+5. On Windows, use `WindowsConnection` or `LiveConnection` for live telemetry.
+
+Mapped recordings must remain unchanged and untruncated until the owning file
+or replay drops. Use owned bytes when you cannot guarantee immutable storage.
+Opening a mapped file establishes metadata once without copying its frame region.
 
 ## Install
 
@@ -31,7 +35,7 @@ In this workspace, depend on the crate via a path dependency:
 iracing-sdk = { path = "../iracing-sdk" }
 ```
 
-If you’re consuming this crate outside the workspace, use a git dependency (or a published
+If you're consuming this crate outside the workspace, use a git dependency (or a published
 version if/when one exists):
 
 ```toml
@@ -39,58 +43,126 @@ version if/when one exists):
 iracing-sdk = { git = "https://github.com/racedirector/iracing.rs", package = "iracing-sdk" }
 ```
 
-Basic import:
-
-```rust
-use iracing_sdk::{AdapterValidation, DynamicFrame, FrameAdapter, ibt::IbtReader};
-```
-
-## Quick Start
-
-### Offline `.ibt` Replay (Cross-Platform)
+## Recorded Frame Access
 
 ```rust,no_run
-use iracing_sdk::{LayoutProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
+use iracing_sdk::IbtFile;
 
-async fn replay() -> iracing_sdk::Result<()> {
-    let mut provider = IbtProvider::open("telemetry.ibt")?;
-    let speed_info = provider
-        .layout()
-        .field_by_name("Speed").map(|(_, field)| field)
-        .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
-            context: "schema lookup".to_string(),
-            details: "missing Speed variable".to_string(),
-        })?
-        .clone();
+fn inspect() -> iracing_sdk::Result<()> {
+    let file = IbtFile::open("telemetry.ibt")?;
+    let first = file.frame(0)?;
+    println!("record {}: {:?}", first.index(), first.value("Speed")?);
+    for frame in file.frames(0..file.frame_count())? {
+        let frame = frame?;
+        println!("record {}: {:?}", frame.index(), frame.value("Speed")?);
+    }
+    Ok(())
+}
+```
 
-    while let Some(packet) = provider.next_frame().await? {
-        let speed_mps = f32::decode_field(packet.data(), &speed_info)?;
-        let _speed_kph = speed_mps * 3.6;
+Coordinates are zero-based `usize` physical record indices. Frame location is
+O(1), ranges are half-open and lazy, and independent iterators share no cursor.
+Range ends clamp to EOF; reversed bounds and starts beyond EOF fail. An iterator
+read error consumes that coordinate; direct access can retry it. Every `IbtFrame`
+retains the exact layout established by its file and owns its bytes after file drop.
+
+## Pull-Driven Replay
+
+```rust,no_run
+use iracing_sdk::IbtFile;
+
+fn replay() -> iracing_sdk::Result<()> {
+    let mut replay = IbtFile::open("telemetry.ibt")?.replay();
+    replay.set_range(10..20)?;
+    replay.seek(12)?;
+    while let Some(frame) = replay.next_frame()? {
+        println!("record {}", frame.index());
+    }
+    Ok(())
+}
+```
+
+`current_frame()` reads without advancing, `advance()` consumes one coordinate,
+and `next_frame()` advances only after a successful read. EOF persists until a
+seek or range reset. Replay has no wall-clock pacing or background subscription.
+`file()` borrows the recording; `into_file()` recovers it.
+
+## Session Parsing
+
+```rust,no_run
+use iracing_sdk::{IbtFile, schema::SessionInfo};
+
+fn session() -> iracing_sdk::Result<()> {
+    let file = IbtFile::open("telemetry.ibt")?;
+    if let Some(bytes) = file.session_info_bytes() {
+        let session = SessionInfo::try_from(bytes.clone())?;
+        println!("Track: {}", session.weekend_info.track_display_name);
+    }
+    Ok(())
+}
+```
+
+Session bytes preserve the complete advertised region, including padding.
+Decoding honors the declared encoding and NUL boundary; typed parsing applies
+the SDK's sanitization path. `sanitized_yaml()` returns cleaned text without
+parsing or reserializing it and rejects empty text; it does not validate YAML
+syntax. Session access is independent of traversal. See [session Rustdoc](src/schema/session/mod.rs)
+for decoding, sanitization, parser errors, and optional discovery.
+
+## Typed Recorded Rows
+
+```rust,no_run
+use iracing_sdk::{FrameAdapter, IRacingTelemetryFrame, IbtFile};
+
+#[derive(IRacingTelemetryFrame)]
+struct Row {
+    #[field_name = "Speed"]
+    #[fail_if_missing]
+    speed: f32,
+}
+
+fn rows() -> iracing_sdk::Result<()> {
+    let file = IbtFile::open("telemetry.ibt")?;
+    let validation = Row::validate_layout(file.telemetry_layout())?;
+    for frame in file.all_frames()? {
+        let packet = frame?.into_packet()?;
+        let row = Row::adapt(&packet, &validation);
+        println!("{} m/s", row.speed);
+    }
+    Ok(())
+}
+```
+
+The `derive` feature supplies the macro; handwritten adapters use the same
+validation/extraction contract. `IbtFrame::into_packet()` is the single recorded
+compatibility bridge: it shares bytes/layout and checks that the record index
+and signed session revision fit the packet's `u32` fields. Native recorded
+identity remains `usize` independently of those packet limits.
+
+## Handwritten Adapters
+
+```rust,no_run
+use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
+
+#[derive(serde::Serialize)]
+struct Row {
+    speed: f32,
+}
+
+impl FrameAdapter for Row {
+    fn validate_layout(layout: &std::sync::Arc<iracing_sdk::TelemetryLayout>) -> iracing_sdk::Result<AdapterValidation> {
+        let speed = AdapterValidation::resolve::<f32>(layout, "Speed", true)?.expect("required field");
+        Ok(AdapterValidation::new(std::sync::Arc::clone(layout), vec![FieldExtraction::Required(speed)]))
     }
 
-    Ok(())
+    fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
+        validation.ensure_packet(packet).expect("adapter layout mismatch");
+        Self { speed: validation.decode(packet, 0).expect("decode").expect("required field") }
+    }
 }
 ```
 
-### Session YAML Parsing
-
-Convert an acquired byte snapshot through the typed session boundary:
-
-```rust,no_run
-use iracing_sdk::{SessionInfoBytes, schema::SessionInfo};
-
-fn inspect(bytes: SessionInfoBytes) -> iracing_sdk::Result<()> {
-    let session = SessionInfo::try_from(bytes)?;
-    println!("Track: {}", session.weekend_info.track_display_name);
-    Ok(())
-}
-```
-
-See [session Rustdoc](src/schema/session/mod.rs) for decoding, sanitization,
-parser errors, and optional discovery. Source acquisition and runtime session
-publication have separate owners.
-
-### Live Telemetry (Windows Only)
+## Live Telemetry (Windows Only)
 
 ```rust,ignore
 use iracing_sdk::{WaitResult, WindowsConnection};
@@ -117,108 +189,64 @@ Ordinary absence (including baseline/reset ticks and exhausted consistency
 retries) returns `Ok(None)`; malformed live geometry or acquisition failures
 return `Err`. Use `header_snapshot()` for an owned header observation.
 
-### Streaming Adapters
-
-```rust,no_run
-use iracing_sdk::{AdapterValidation, FieldExtraction, FrameAdapter};
-
-#[derive(serde::Serialize)]
-struct Row {
-    speed: f32,
-}
-
-impl FrameAdapter for Row {
-    fn validate_layout(layout: &std::sync::Arc<iracing_sdk::TelemetryLayout>) -> iracing_sdk::Result<AdapterValidation> {
-        let speed = AdapterValidation::resolve::<f32>(layout, "Speed", true)?.expect("required field");
-        Ok(AdapterValidation::new(std::sync::Arc::clone(layout), vec![FieldExtraction::Required(speed)]))
-    }
-
-    fn adapt(packet: &iracing_sdk::FramePacket, validation: &AdapterValidation) -> Self {
-        validation.ensure_packet(packet).expect("adapter layout mismatch");
-        Self { speed: validation.decode(packet, 0).expect("decode").expect("required field") }
-    }
-}
-```
-
-## Features
+## Features and Platforms
 
 | Feature | Purpose |
 | --- | --- |
-| `codegen` | Enables JSON schema generation helpers such as `session_root_schema`. |
-| `derive` | Re-exports telemetry adapter derive macros from `iracing-sdk-derive`, including `IRacingTelemetryFrame`. |
-| `schema-discovery` | Enables collection/overlay of unknown session fields (used with `codegen`). |
-| `benchmark` | Enables benchmark targets. |
+| `derive` (default) | Re-export telemetry adapter derive macros. |
+| `test-utils` | Fixture helpers for downstream tests. |
+| `codegen` | JSON schema generation helpers. |
+| `schema-discovery` | Preserve and inspect unknown session fields. |
+| `benchmark` | Criterion targets and hidden delivery experiment infrastructure. |
 
-## Adapter Surface
+Recorded file/frame/replay access, session models, and adapters are portable.
+Actual live shared-memory acquisition and broadcast transport require Windows;
+`LiveConnection` retains a portable unsupported-platform builder stub.
+`Provider` remains source-independent and is used by the Windows live source.
 
-- `FramePacket` — raw frame payload plus tick, session version, and a shared telemetry layout.
-- `Provider` — frame source abstraction implemented by `IbtProvider`, with `LiveProvider` available only on Windows.
-- `FrameAdapter` — two-phase validation/extraction trait for typed rows.
-- `AdapterValidation`, `FieldExtraction`, `LayoutProvider` — adapter planning helpers.
-- `DynamicFrame` — by-name lookup helper for debugging and exploratory analysis.
+## Examples and CLI
 
-## Platform Matrix
+- `cargo ibt-read-frame --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `cargo manual-frame-adapter --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `cargo ibt-derive --ibt-path ./session.ibt --csv-output-path ./positions.csv`
+- `cargo enum-bitfields-ibt --ibt-path ./session.ibt`
+- Windows: `cargo live-subscribe --csv-output-path .\\positions.csv`
+- Windows: `cargo session-updates --output-dir .\\sessions`
+- Windows: `cargo session-updates --car-setup-only --output-dir .\\setups`
 
-| Capability | Linux/macOS | Windows |
-| --- | --- | --- |
-| `.ibt` replay (`IbtProvider`) | Yes | Yes |
-| Session parsing (`SessionInfo::parse`) | Yes | Yes |
-| `session schema type`, `session schema ibt`, and `session snapshot ibt` | Yes | Yes |
-| `session schema live` and `session snapshot live` | No | Yes |
-| Live shared memory (`WindowsConnection`) | No | Yes |
-| `live-subscribe` and `session-updates` examples / `live-to-csv`, `live-to-jsonl`, and `live-json-snapshot` bins | No | Yes |
+Omit `--output-dir` from `session-updates` to print the selected YAML payload to stdout.
 
-## Examples and Binaries
+The consolidated CLI lives in [`iracing-sdk-cli`](../iracing-sdk-cli):
 
-### Examples
+```text
+cargo iracing-sdk headers ibt --path ./session.ibt
+cargo iracing-sdk variables ibt --path ./session.ibt
+cargo iracing-sdk session snapshot ibt --path ./session.ibt
+cargo iracing-sdk session schema ibt --path ./session.ibt
+cargo iracing-sdk session discover ibt --path ./session.ibt
+cargo iracing-sdk telemetry snapshot ibt --path ./session.ibt --index 0 --format json
+cargo iracing-sdk telemetry convert --path ./session.ibt --format csv --output ./telemetry.csv
+```
 
-- `ibt-read-frame` reads and decodes recorded frames directly:
-  - `cargo ibt-read-frame --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `manual-frame-adapter` demonstrates a handwritten frame adapter:
-  - `cargo manual-frame-adapter --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `ibt-subscribe` subscribes to typed recorded frames (requires `derive`):
-  - `cargo ibt-subscribe --ibt-path ./session.ibt --csv-output-path ./positions.csv`
-- `live-subscribe` subscribes to typed live frames (Windows only; requires `derive`):
-  - `cargo live-subscribe --csv-output-path .\\positions.csv`
-- `enum-bitfields-ibt` decodes enum and bitfield values from a recording:
-  - `cargo enum-bitfields-ibt --ibt-path ./session.ibt`
-- `session-updates` observes session YAML revisions (Windows only):
-  - `cargo session-updates --output-dir .\\sessions`
-  - `cargo session-updates --car-setup-only --output-dir .\\setups`
-  - Omit `--output-dir` to print the selected YAML payload to stdout.
+Windows live session commands retain their acquisition behavior:
 
-### Binaries
+```text
+cargo iracing-sdk session schema live
+cargo iracing-sdk session discover live
+cargo iracing-sdk session snapshot live --output ./live-session.yaml
+```
 
 Broadcast commands are owned by [iracing-broadcast-cli](../iracing-broadcast-cli/src/lib.rs),
 with typed encoding and native dispatch in [iracing-broadcast-sdk](../iracing-broadcast-sdk/src/lib.rs).
-Use `cargo iracing-broadcast --help` for clap-derived syntax (Windows).
 
-- `session` (requires `codegen,schema-discovery`; the `cargo session` alias enables both):
-  - Type schema: `cargo session schema type`
-  - Schema from an IBT recording: `cargo session schema ibt --path ./session.ibt`
-  - Schema additions discovered from an IBT recording: `cargo session discover ibt --path ./session.ibt`
-  - Session snapshot from an IBT recording: `cargo session snapshot ibt --path ./session.ibt --output ./session.yaml`
-  - Live schema (Windows only): `cargo session schema live`
-  - Live schema additions (Windows only): `cargo session discover live`
-  - Live snapshot (Windows only): `cargo session snapshot live --output ./live-session.yaml`
-  - All subcommands default to YAML on stdout. Use `--output -` for explicit stdout, `--output <file>` for a file, or `--encoding json` / `--encoding json-pretty` for JSON. Diagnostics go to stderr.
-- `ibt-json-snapshot`:
-  - `cargo run -p iracing-sdk-cli --bin ibt-json-snapshot -- --ibt-path ./session.ibt --output-path ./frame.jsonl [--frame-number 0]`
-- `ibt-to-json`:
-  - `cargo run -p iracing-sdk-cli --bin ibt-to-json -- --ibt-path ./session.ibt --output-path ./telemetry.jsonl`
-- `live-to-csv` (Windows only):
-  - `cargo run -p iracing-sdk-cli --bin live-to-csv -- --output-path .\\live.csv`
-- `live-json-snapshot` (Windows only):
-  - `cargo run -p iracing-sdk-cli --bin live-json-snapshot -- --output-path .\\live-snapshot.jsonl`
-- `live-to-jsonl` (Windows only):
-  - `cargo run -p iracing-sdk-cli --bin live-to-jsonl -- --output-path .\\live.jsonl`
+Use generated `--help` for current formats, range selection, live commands, and
+broadcast composition. Session and document commands default to YAML on stdout;
+`--format` and `--output` select representation and destination.
 
-## Troubleshooting
+## Testing
 
-- Missing telemetry fixtures during tests:
-  - Generated fixtures live under `test-data/ibt/` and are listed in `test-data/ibt/manifest.json`.
-  - Run `cargo test-fixtures` from the repository root.
-- `live-*` tools fail on non-Windows:
-  - Live shared memory APIs are Windows-only.
-- No session snapshot available:
-  - `session snapshot` reports an error when the source contains no session information.
+Deterministic fixtures live under `test-data/ibt` and are inventoried by
+`manifest.json`. Run `cargo test-fixtures` to generate, verify, and check drift.
+Read [development checks](../../docs/development.md) for the broad gate, including
+feature-gated benchmark-infrastructure tests. Historical benchmark identifiers
+remain stable; they do not represent additional public recording models.

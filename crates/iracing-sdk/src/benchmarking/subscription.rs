@@ -14,7 +14,7 @@ use crate::{AdapterValidation, FrameAdapter, FramePacket};
 use super::coordinator::ReplayControl;
 
 /// A coordinated IBT subscription that acknowledges a frame when polled again.
-pub(crate) struct IbtSubscription<T> {
+pub(crate) struct AcknowledgedSubscription<T> {
     subscriber_id: u64,
     frames: WatchStream<Option<Arc<FramePacket>>>,
     controls: mpsc::UnboundedSender<ReplayControl>,
@@ -23,7 +23,7 @@ pub(crate) struct IbtSubscription<T> {
     _adapter: PhantomData<fn() -> T>,
 }
 
-impl<T> IbtSubscription<T> {
+impl<T> AcknowledgedSubscription<T> {
     pub(crate) fn new(
         subscriber_id: u64,
         frames: watch::Receiver<Option<Arc<FramePacket>>>,
@@ -41,7 +41,7 @@ impl<T> IbtSubscription<T> {
     }
 }
 
-impl<T> Stream for IbtSubscription<T>
+impl<T> Stream for AcknowledgedSubscription<T>
 where
     T: FrameAdapter,
 {
@@ -73,7 +73,7 @@ where
     }
 }
 
-impl<T> Drop for IbtSubscription<T> {
+impl<T> Drop for AcknowledgedSubscription<T> {
     fn drop(&mut self) {
         let _ = self.controls.send(ReplayControl::Leave {
             subscriber_id: self.subscriber_id,
@@ -82,4 +82,4 @@ impl<T> Drop for IbtSubscription<T> {
 }
 
 // The subscription has no pin-sensitive fields.
-impl<T> Unpin for IbtSubscription<T> {}
+impl<T> Unpin for AcknowledgedSubscription<T> {}

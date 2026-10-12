@@ -22,8 +22,10 @@ and session YAML files. It constructs headers through
 [iracing-irsdk wire types](../../crates/iracing-irsdk/src/lib.rs), whose adjacent
 ABI assertions/tests own exact representation.
 Its verifier checks manifest invariants, hashes, headers, frame geometry,
-variables, companion YAML, indexed source parsing through `IbtReader`, and
-complete replay through `IbtProvider`.
+variables, companion YAML, immutable file construction, every indexed/range
+frame through `IbtFile`, and complete `IbtReplay` traversal. Frame coordinates,
+bytes, and exact shared layout are compared with the independently checked source;
+replay EOF is checked repeatedly.
 
 `cargo test-fixtures` is the normal entry point. It:
 
@@ -72,7 +74,7 @@ skip a required integration test because data is absent. The best-effort
   layout and must not be combined with offsets from another snapshot.
 - Unit tests should construct minimal frames/schemas and use fake providers or
   ports.
-- SDK parser/reader integration tests should use deterministic fixtures through
+- SDK file/frame/replay integration tests should use deterministic fixtures through
   `iracing_sdk::test_utils`.
 - Broadcast application tests should fake internal ports; transport tests should
   exercise tonic over a real listener where platform gates permit.
@@ -89,6 +91,7 @@ cargo test-fixtures
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --keep-going -- -D warnings
 cargo test --workspace --all-targets
+cargo test -p iracing-sdk --features benchmark --lib benchmarking::
 ```
 
 The docs workflow conditionally runs doctests, rustdoc with warnings denied, and

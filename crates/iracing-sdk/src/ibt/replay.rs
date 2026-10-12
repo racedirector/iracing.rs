@@ -13,7 +13,7 @@ use std::ops::Range;
 /// The immutable-file requirement of [`IbtFile::open`] applies until the
 /// replay and any recovered file are dropped.
 pub struct IbtReplay {
-    pub(crate) file: IbtFile,
+    file: IbtFile,
     range: Range<usize>,
     position: usize,
 }

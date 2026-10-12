@@ -1,4 +1,3 @@
-//! High-level connections for recorded and live telemetry sources.
+//! High-level connections for live telemetry.
 
-pub mod ibt;
 pub mod live;

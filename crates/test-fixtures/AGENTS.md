@@ -37,8 +37,7 @@ shared-memory fixtures.
   ABI tests. `iracing-sdk` owns consuming parser and runtime validation.
 - This crate owns profiles, deterministic values, session YAML, IBT assembly,
   manifest serialization, hashing, verification orchestration, and drift checks.
-- Use `IbtReader` and sequential `IbtProvider` replay in verification so generated data is exercised as downstream
-  consumers read it. Do not replace it with only a second hand-written parser.
+- Use `IbtFile` direct traversal and `IbtReplay` in verification so every frame is exercised as downstream consumers read it. Preserve independent wire/hash/YAML checks and compare traversed bytes/layouts against that checked source; do not replace verification with only a second hand-written parser.
 - Live telemetry, shared memory, real capture rewriting, and schema discovery
   are out of scope.
 - Keep the crate `publish = false` and `dist = false`.

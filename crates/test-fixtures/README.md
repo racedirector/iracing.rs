@@ -81,7 +81,7 @@ views:
 - SHA-256 and exact file length;
 - typed SDK header and variable-header decoding;
 - companion YAML equality;
-- schema and complete frame iteration through `IbtProvider`, constructed from `IbtReader`.
+- immutable layout validation and every frame through `IbtFile` direct traversal and `IbtReplay`, including source-byte/layout identity and persistent EOF checks.
 
 Manifest paths must be repository-relative and cannot contain parent-directory
 components. This prevents a malformed manifest from escaping the supplied
@@ -111,7 +111,7 @@ types, counts, and frame size internally coherent.
 cargo test -p test-fixtures --all-targets
 cargo clippy -p test-fixtures --all-targets -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc -p test-fixtures --no-deps
-cargo test -p iracing-sdk --lib ibt::format::tests
+cargo test -p iracing-sdk --lib ibt::tests
 cargo test-fixtures verify
 ```
 
@@ -125,5 +125,5 @@ fixture change is present but not yet committed.
 - `src/main.rs` — Cargo-facing CLI.
 - `src/model.rs` — fixture profiles and manifest schema.
 - `src/generate.rs` — YAML, headers, frames, hashes, and artifact writes.
-- `src/verify.rs` — structural, manifest, YAML, and `IbtReader`/`IbtProvider` validation.
+- `src/verify.rs` — independent structural, manifest, wire/YAML checks plus `IbtFile`/`IbtReplay` validation.
 - `tests/cli.rs` — end-to-end command coverage against an isolated root.

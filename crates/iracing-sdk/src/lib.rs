@@ -12,10 +12,9 @@
 //! - Replay/offline path (cross-platform):
 //!   - [`ibt::IbtFile`] owns one complete recording and its immutable metadata/layouts
 //!   - [`ibt::IbtReplay`] owns pull-driven traversal over the file
-//!   - [`ibt::IbtReader`]
 //!   - [`types::TelemetryLayout`], [`types::VarData`]
 //! - Streaming adapter path:
-//!   - [`FramePacket`], [`provider::Provider`], [`providers::ibt::IbtProvider`], [`DynamicFrame`]
+//!   - [`FramePacket`], [`provider::Provider`], [`DynamicFrame`]
 //!   - [`FrameAdapter`], [`AdapterValidation`], [`FieldExtraction`], [`LayoutProvider`]
 //! - Session data path:
 //!   - [`schema::SessionInfo`] and [`schema::SessionInfo::parse`] for session YAML
@@ -28,12 +27,12 @@
 //! # Quick start
 //!
 //! ```rust,no_run
-//! use iracing_sdk::{LayoutProvider, VarData, provider::Provider, providers::ibt::IbtProvider};
+//! use iracing_sdk::{IbtFile, VarData};
 //!
-//! async fn replay() -> iracing_sdk::Result<()> {
-//!     let mut provider = IbtProvider::open("telemetry.ibt")?;
-//!     let speed_info = provider
-//!         .layout()
+//! fn replay() -> iracing_sdk::Result<()> {
+//!     let file = IbtFile::open("telemetry.ibt")?;
+//!     let speed_info = file
+//!         .telemetry_layout()
 //!         .field_by_name("Speed").map(|(_, field)| field)
 //!         .ok_or_else(|| iracing_sdk::IRacingSDKError::Parse {
 //!             context: "layout lookup".to_string(),
@@ -41,14 +40,22 @@
 //!         })?
 //!         .clone();
 //!
-//!     while let Some(packet) = provider.next_frame().await? {
-//!         let speed_mps = f32::decode_field(&packet.data(), &speed_info)?;
+//!     // Random-access traversal is lazy and independent of replay.
+//!     for frame in file.frames(0..file.frame_count())? {
+//!         let frame = frame?;
+//!         let _speed_mps = f32::decode_field(frame.bytes(), &speed_info)?;
+//!     }
+//!     let mut replay = file.replay();
+//!     while let Some(frame) = replay.next_frame()? {
+//!         let speed_mps = f32::decode_field(frame.bytes(), &speed_info)?;
 //!         let _speed_kph = speed_mps * 3.6;
 //!     }
-//!
 //!     Ok(())
 //! }
 //! ```
+//!
+//! Existing source-independent [`FrameAdapter`] implementations can consume
+//! recorded frames through [`IbtFrame::into_packet`] using the same shared layout.
 //!
 //! # Feature flags
 //!
@@ -109,7 +116,6 @@ pub mod windows;
 pub use windows::{Broadcast, BroadcastCommand, Connection as WindowsConnection};
 
 // Main API exports
-pub use connections::ibt::IbtConnection;
 pub use connections::live::LiveConnection;
-pub use ibt::{IbtFile, IbtFileFrames, IbtFrame};
+pub use ibt::{IbtFile, IbtFileFrames, IbtFrame, IbtReplay};
 pub use types::UpdateRate;

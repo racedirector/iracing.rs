@@ -26,6 +26,7 @@ const POLICIES: &[(&str, &[&str])] = &[
         "benchmark-delivery.yml",
         &[
             "crates/iracing-sdk/src/telemetry",
+            "crates/iracing-sdk/src/benchmarking",
             "crates/iracing-sdk/src/adapters",
             "crates/iracing-sdk/src/types",
         ],
@@ -116,6 +117,26 @@ pub fn check(root: &Path) -> Result<()> {
                 .collect::<Result<_>>()?;
             validate(root, &patterns, required).with_context(|| format!("{workflow}: {event}"))?;
         }
+    }
+    let quality: Value = serde_yaml_ng::from_str(&fs::read_to_string(
+        root.join(".github/workflows/quality.yml"),
+    )?)?;
+    validate_benchmark_tests(&quality)?;
+    Ok(())
+}
+
+// Compile-only benchmark checks cannot preserve the characterization tests moved
+// behind the benchmark feature. Keep their execution in both native CI cells.
+fn validate_benchmark_tests(yaml: &Value) -> Result<()> {
+    let steps = yaml["jobs"]["quality"]["steps"]
+        .as_sequence()
+        .context("missing quality verification steps")?;
+    if !steps.iter().any(|step| {
+        step["run"].as_str().is_some_and(|command| {
+            command.trim() == "cargo test -p iracing-sdk --features benchmark --lib benchmarking::"
+        })
+    }) {
+        bail!("quality CI must execute benchmark-feature library characterization tests");
     }
     Ok(())
 }
@@ -254,6 +275,22 @@ mod tests {
     #[test]
     fn current_policy() {
         check(Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn benchmark_characterization_cannot_be_replaced_by_compile_only_coverage() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let original = fs::read_to_string(root.join(".github/workflows/quality.yml")).unwrap();
+        validate_benchmark_tests(&serde_yaml_ng::from_str(&original).unwrap()).unwrap();
+        for replacement in [
+            "cargo bench -p iracing-sdk --features benchmark --no-run",
+            "cargo test -p iracing-sdk --lib benchmarking::",
+        ] {
+            let changed = original.replace(
+                "cargo test -p iracing-sdk --features benchmark --lib benchmarking::",
+                replacement,
+            );
+            assert!(validate_benchmark_tests(&serde_yaml_ng::from_str(&changed).unwrap()).is_err());
+        }
     }
     #[test]
     fn codspeed_identity_rejects_drift() {

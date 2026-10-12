@@ -10,6 +10,7 @@ on:
       - "crates/iracing-sdk/Cargo.toml"
       - "crates/iracing-sdk/src/adapters/**"
       - "crates/iracing-sdk/src/benchmarking.rs"
+      - "crates/iracing-sdk/src/benchmarking/**"
       - "crates/iracing-sdk/src/provider.rs"
       - "crates/iracing-sdk/src/stream/**"
       - "crates/iracing-sdk/src/telemetry/**"

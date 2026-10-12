@@ -7,7 +7,7 @@
 | `.ibt` parsing and direct replay | Yes | Yes |
 | Variable/frame/adapter types | Yes | Yes |
 | Session YAML models and parsing | Yes | Yes |
-| `IbtProvider` and `IbtConnection` | Yes | Yes |
+| `IbtFile`, `IbtFrame`, and `IbtReplay` | Yes | Yes |
 | Live shared-memory provider | No | Yes |
 | `LiveConnection` symbol | Stub/builder only | Full implementation |
 | Typed broadcast commands | Yes | Yes |
@@ -41,7 +41,7 @@ builds all targets, and distributable binaries must be listed under matching
 | `test-utils` | Expose fixture helpers for downstream tests without enabling benchmark targets. |
 | `codegen` | Add `schemars` derives/helpers and enable schema-generation binaries. |
 | `schema-discovery` | Preserve and inspect unknown session YAML fields. |
-| `benchmark` | Enable Criterion benchmark targets. |
+| `benchmark` | Enable Criterion targets and hidden delivery/acknowledgement experiment infrastructure. |
 
 Features are capabilities, not platform substitutes. In particular, live
 support is selected by `cfg(windows)`, not a Cargo `live` feature.

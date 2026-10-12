@@ -8,7 +8,10 @@ Register sibling checks in `xtask::check_repo`; keep their implementations scope
 
 Run `cargo xtask pre-push` for the sequential broad gate: repository checks,
 fixture regeneration/verification/drift, formatting, all-feature Clippy, workspace
-tests, and benchmark compilation. Cargo builds run sequentially to avoid shared
+tests, explicit benchmark-infrastructure tests, and benchmark compilation. The
+feature-gated unit step is `cargo test -p iracing-sdk --features benchmark --lib benchmarking::`;
+it preserves delivery/acknowledgement/session experiment coverage after production
+recorded consumers move to file/replay. Cargo builds run sequentially to avoid shared
 build-directory contention. Fixtures require Git LFS hydration. Docs/public API
 changes additionally require the matching commands in `AGENTS.md`/docs CI.
 

@@ -24,4 +24,4 @@ jobs:
       - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-irsdk --lib --all-features"
       - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib types::regions::"
       - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib types::ibt::layout::"
-      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib ibt::reader::source::tests::owned_reads_check_destination_and_available_bytes"
+      - run: "cargo +nightly-2026-10-01 miri test --locked -p iracing-sdk --lib source::ibt::tests::owned_reads_check_destination_and_available_bytes"

@@ -1,8 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use csv::Writer;
-use futures::StreamExt;
-use iracing_sdk::{IRacingTelemetryFrame, IbtConnection};
+use iracing_sdk::{FrameAdapter, IRacingTelemetryFrame, IbtFile};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -58,8 +57,7 @@ struct Row {
     is_in_pit_box: bool,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Logging initialization.
     // Default to TRACE unless RUST_LOG is set.
@@ -81,15 +79,13 @@ async fn main() -> Result<()> {
     // ------------------------------------------------------------
     // Open telemetry reader and CSV writer
     // ------------------------------------------------------------
-    let connection = IbtConnection::open(ibt_path).await?;
-    let mut stream = connection
-        .subscribe::<Row>()
-        .expect("Could not create subscription");
-    connection.start()?;
+    let file = IbtFile::open(ibt_path)?;
+    let validation = Row::validate_layout(file.telemetry_layout())?;
     let mut writer = Writer::from_path(&csv_output_path)?;
 
-    while let Some(frame) = stream.next().await {
-        writer.serialize(frame)?;
+    for frame in file.all_frames()? {
+        let packet = frame?.into_packet()?;
+        writer.serialize(Row::adapt(&packet, &validation))?;
     }
 
     writer.flush()?;
