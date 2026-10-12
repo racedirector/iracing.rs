@@ -1,5 +1,11 @@
 # Issue #141: mmap storage comparison
 
+Historical experiment report. The measurements and commands below describe the
+recorded base and working branch, not current targets or architecture. The
+measurement date and exact head SHA were not recorded here. For current setup
+and timing boundaries, follow the [benchmark sources](../../crates/iracing-sdk/benches/)
+and [operator guide](../../crates/iracing-sdk/benches/README.md).
+
 Base: #140 / PR #152, `5c976e4165617119df837b0e7c8d48db869724b0`.
 Head: working changes on `feature/issue-141`. Measured on Windows with
 rustc 1.97.1, release profile, on the same machine and fixtures. Benchmark

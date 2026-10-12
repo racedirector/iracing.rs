@@ -1,4 +1,9 @@
 //! Exact Rust representation of `irsdk_VarType`.
+//!
+//! Discriminants and [`VariableType::byte_size`] own raw storage vocabulary.
+//! Checked conversion rejects values outside declared variants, including the
+//! native enum's count sentinel. This module does not decode frame content or
+//! choose the Rust type used by higher-level telemetry APIs.
 
 use std::fmt;
 
@@ -27,7 +32,10 @@ pub enum VariableType {
     /// `irsdk_int`.
     #[cfg_attr(feature = "serde", serde(alias = "Int32"))]
     Integer = 2,
-    /// `irsdk_bitField`.
+    /// `irsdk_bitField`: four-byte little-endian raw bits.
+    ///
+    /// This storage kind does not imply a named flag family or generic Rust
+    /// wrapper. Interpretation belongs to the consuming field.
     BitField = 3,
     /// `irsdk_float`.
     #[cfg_attr(feature = "serde", serde(alias = "Float32"))]

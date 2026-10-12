@@ -1,3 +1,23 @@
+//! Windows mapping, scalar reads, native copies, and update-event lifetime.
+//!
+//! [`Source`] retains the view and mapping handle for synchronous access, and an
+//! independently shared event handle for waits. Source initialization records the
+//! first queried mapped region's extent; it does not validate the SDK header or
+//! establish simulator connection state. Checked scalar readers prove bounds
+//! and alignment. Unchecked readers/copies require callers to prove their exact
+//! range against that retained extent before pointer arithmetic.
+//!
+//! `FILE_MAP_READ` limits this process's permissions, not external mutation.
+//! Scalars use volatile reads and bulk copies use native `RtlMoveMemory` without
+//! Rust references into simulator memory. These operations do not make a header
+//! atomic or a frame coherent. The acquisition boundary owns publication checks
+//! around its copy; an update signal is not a snapshot lock.
+//!
+//! RAII and the local `Send`/`Sync` comments own resource obligations. Async waits
+//! move an event `Arc` into the blocking worker, so dropping the future does not
+//! close a handle still being waited on. Private mapping/event tests exercise
+//! those paths on Windows without certifying the external simulator protocol.
+
 use iracing_irsdk::constants::{IRSDK_DATAVALIDEVENTNAME, IRSDK_MEMMAPFILENAME};
 use std::{ptr::NonNull, sync::Arc, time::Duration};
 use widestring::U16CString;
@@ -20,7 +40,8 @@ use crate::{IRacingSDKError, Result};
 // Import the Windows implementation as an opaque external call. Unlike a
 // Rust memcpy intrinsic, the compiler cannot fold this into ordinary Rust
 // loads from memory which the simulator changes independently. The native
-// routine performs the bulk copy; publication checks belong to LiveReader.
+// routine performs the bulk copy; publication checks belong to the acquiring
+// connection, not this primitive source boundary.
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn RtlMoveMemory(
@@ -92,6 +113,11 @@ async fn wait_for_event_async(event: Arc<OwnedHandle>, timeout_ms: u32) -> Resul
 }
 
 #[derive(Debug)]
+/// Retained native view, mapping handle, event, and conservative readable extent.
+///
+/// No mapped slice or typed reference escapes this boundary. The private test
+/// constructor uses initialized page-file storage and records its requested
+/// extent; production records `VirtualQuery`'s first region at the mapped base.
 pub(crate) struct Source {
     view: MappedView,
     _mapping: OwnedHandle,
@@ -152,6 +178,10 @@ impl Source {
         }
     }
 
+    /// Open the named mapping/view/event and retain the queried extent.
+    ///
+    /// RAII releases partially acquired resources on error. This does not prove
+    /// that a complete SDK header fits or that the simulator is connected.
     pub fn try_connect() -> Result<Self> {
         let name = U16CString::from_str(IRSDK_MEMMAPFILENAME)?;
 
@@ -233,22 +263,31 @@ impl Source {
         }
     }
 
+    /// Extent against which callers must validate each unchecked access.
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Wait on the retained event with a finite, millisecond-truncated timeout.
+    ///
+    /// A signal is notification only, not a coherent telemetry snapshot.
     pub fn wait_for_update(&self, timeout: Duration) -> Result<WaitResult> {
         // INFINITE is u32::MAX; keep even enormous requested waits bounded.
         let timeout_ms = timeout.as_millis().min(u128::from(u32::MAX - 1)) as u32;
         wait_for_event(Arc::clone(&self.event), timeout_ms)
     }
 
+    /// Perform the same bounded wait in a worker that retains its own event Arc.
+    ///
+    /// Cancelling the future does not cancel an already running blocking wait.
     pub async fn wait_for_update_async(&self, timeout: Duration) -> Result<WaitResult> {
         // INFINITE is u32::MAX; keep even enormous requested waits bounded.
         let timeout_ms = timeout.as_millis().min(u128::from(u32::MAX - 1)) as u32;
         wait_for_event_async(Arc::clone(&self.event), timeout_ms).await
     }
 
+    /// Read one little-endian scalar, rejecting misalignment or out-of-bounds
+    /// geometry. This is one volatile observation, not a multi-field snapshot.
     pub(crate) fn read_i32(&self, offset: usize) -> Option<i32> {
         if !offset.is_multiple_of(align_of::<i32>())
             || offset.checked_add(size_of::<i32>())? > self.len()
@@ -281,6 +320,7 @@ impl Source {
         Ok(i32::from_le(bytes))
     }
 
+    /// Read one volatile byte after checking containment in the retained extent.
     pub(crate) fn read_u8(&self, offset: usize) -> Option<u8> {
         if !offset.is_multiple_of(align_of::<u8>())
             || offset.checked_add(size_of::<u8>())? > self.len()
@@ -321,6 +361,16 @@ impl Source {
         Ok(())
     }
 
+    /// Copy one native-layout value into aligned, owned storage.
+    ///
+    /// `FromBytes` establishes Rust bit-pattern validity, not SDK semantics or
+    /// snapshot coherence. The native byte copy does not require source
+    /// alignment for `T`. It does not swap bytes; interpretation follows the
+    /// target layout.
+    ///
+    /// # Safety
+    /// `offset + size_of::<T>()` must not overflow and must fit the retained
+    /// source. Callers separately establish any required publication consistency.
     pub(crate) unsafe fn copy_value_unchecked<T>(&self, offset: usize) -> Result<T>
     where
         T: zerocopy::FromBytes,

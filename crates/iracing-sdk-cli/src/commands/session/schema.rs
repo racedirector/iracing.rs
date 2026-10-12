@@ -7,6 +7,10 @@ use anyhow::{Context, Result};
 use iracing_sdk::IbtFile;
 use schemars::schema_for_value;
 
+#[cfg_attr(
+    doc,
+    doc = "Development contracts: [IBT](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-schema-ibt.md) and [Windows live](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-sdk-cli/docs/commands/session-schema-live.md)."
+)]
 #[derive(clap::Args, Debug)]
 pub(crate) struct Args {
     #[command(subcommand)]

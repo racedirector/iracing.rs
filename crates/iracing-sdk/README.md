@@ -35,7 +35,7 @@ In this workspace, depend on the crate via a path dependency:
 iracing-sdk = { path = "../iracing-sdk" }
 ```
 
-If you’re consuming this crate outside the workspace, use a git dependency (or a published
+If you're consuming this crate outside the workspace, use a git dependency (or a published
 version if/when one exists):
 
 ```toml
@@ -106,7 +106,8 @@ Session bytes preserve the complete advertised region, including padding.
 Decoding honors the declared encoding and NUL boundary; typed parsing applies
 the SDK's sanitization path. `sanitized_yaml()` returns cleaned text without
 parsing or reserializing it and rejects empty text; it does not validate YAML
-syntax. Session access is independent of traversal.
+syntax. Session access is independent of traversal. See [session Rustdoc](src/schema/session/mod.rs)
+for decoding, sanitization, parser errors, and optional discovery.
 
 ## Typed Recorded Rows
 
@@ -234,6 +235,9 @@ cargo iracing-sdk session schema live
 cargo iracing-sdk session discover live
 cargo iracing-sdk session snapshot live --output ./live-session.yaml
 ```
+
+Broadcast commands are owned by [iracing-broadcast-cli](../iracing-broadcast-cli/src/lib.rs),
+with typed encoding and native dispatch in [iracing-broadcast-sdk](../iracing-broadcast-sdk/src/lib.rs).
 
 Use generated `--help` for current formats, range selection, live commands, and
 broadcast composition. Session and document commands default to YAML on stdout;

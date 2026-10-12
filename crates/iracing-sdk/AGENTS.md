@@ -15,6 +15,7 @@
 - `ibt/`: recorded frames/ranges are cursor-free, indexed by zero-based `usize`, and located through `IbtLayout` in O(1). Empty ranges at EOF are valid; ends clamp to frame count, reversed ranges and starts beyond EOF fail. `IbtReplay` owns only sequential bounds/cursor/seek/EOF over the file, advances after successful reads, and has no clock or background subscription.
 - `types/ibt/`: `IbtLayout` is the canonical physical geometry validated from `Header` and source length without I/O. Use its region/offset/frame extent accessors rather than recalculating geometry. It knows no telemetry field semantics. `IbtFile` rejects frames without variable metadata but supports zero-frame recordings with empty metadata/layout. Source lengths must fit `usize` (4 GiB files are rejected on 32-bit targets).
 - `types/`: `TelemetryLayout`, `FieldLayout`, `VarData`, `FramePacket`, `DynamicFrame`, broadcast enums, incident helpers, and bitfield enums. Always decode telemetry via `VarData::decode_field` (little-endian) rather than manual slicing.
+- Session parsing/decoding ownership starts at [session Rustdoc](src/schema/session/mod.rs); runtime publication policy remains in [session_policy.rs](src/telemetry/session_policy.rs).
 - `schema/session/`: `SessionInfo::parse` deserializes decoded YAML; `SessionInfo::try_from(SessionInfoBytes)` follows SDK decoding/sanitization. Recorded consumers decide when to parse their immutable snapshot; live telemetry policy tracks session revisions.
 - Live schema discovery: use `WindowsConnection` for shared-memory access, `irsdk::{Header, VariableHeader}` for SDK wire layouts, and `TelemetryLayout` for variable metadata.
 - `providers/`: source-independent `Provider` and Windows `LiveProvider` supply streaming packets/session YAML. Recorded consumers use file/replay directly; no recorded provider facade remains.
@@ -22,7 +23,7 @@
 - `telemetry/`: source-independent frame loop and live delivery/session policies. `LatestDelivery` remains the live default. Recorded acknowledgement/backpressure/session experiments live only under feature-gated `benchmarking/`, with explicit unit-test coverage.
 - `adapters/`: `FrameAdapter`, `AdapterValidation`, `FieldExtraction`, `LayoutProvider` support typed per-frame extraction.
 - Live activation must validate the full fixed header before unchecked scalar reads. Preserve event ownership in blocking workers after async cancellation; private mapping/event tests run on Windows without the simulator.
-- `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code, and broadcast helpers. Keep everything behind `#[cfg(windows)]`.
+- `windows/`: `WindowsConnection`, `WaitResult`, shared-memory connection code. Keep everything behind `#[cfg(windows)]`.
 - `../iracing-sdk-cli/src/`: consolidated CLI; session schemas and discovery enable the SDK features through its dependency. Standalone variable, primitive, and car-setup generators are deferred.
 - `examples/`: cross-platform disk examples plus Windows live/broadcast examples.
 - `tests/`: integration and derive macro regression tests.
@@ -47,7 +48,7 @@
 ## Testing & Fixtures
 
 - Integration tests rely on `.ibt` fixtures from `test-data/ibt/`; use helpers in `test_utils` (`require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hard-coded paths.
-- For hand-built schemas, session data, frames, and benchmark inputs, start with the generated catalog in `../../docs/reference/README.md` instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult `primitives-schema.yml` for enum/bitflag domains.
+- For hand-built schemas, session data, frames, and benchmark inputs, start with the [reference provenance guide](../../docs/reference/README.md) instead of guessing iRacing names or shapes. Preserve the `frame_size`, offsets, types, and counts from one disk/live variable snapshot as a coherent layout; consult the owning [iracing-irsdk types](../iracing-irsdk/src/lib.rs) for enum/bitflag domains.
 - Benchmarks require `cargo bench -p iracing-sdk --features benchmark`.
 
 - Downstream fixture tests can enable the SDK's `test-utils` feature without enabling benchmark targets.
@@ -58,3 +59,5 @@ For proof-oriented unsafe/invariant audits, compose `rust-soundness-review` and
 `rust-unsafe-ffi`. Read `docs/architecture/unsafe-boundaries.md` from the workspace
 root; trace current producers and consumers and keep unimplemented proposals
 separate from current-source conclusions.
+
+Broadcast contracts live in [iracing-broadcast-sdk](../iracing-broadcast-sdk/src/lib.rs) and [iracing-broadcast-cli](../iracing-broadcast-cli/src/lib.rs); raw values live in iracing-irsdk.

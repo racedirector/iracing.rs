@@ -60,6 +60,11 @@ cases and large array/adapter controls receive the same evidence standard.
 
 ## Recorded study
 
+The following 2026-10-03 observations are historical evidence for the recorded
+revision and build inputs. They are not current performance characteristics or
+universal variance bounds. The retained JSON is measurement data, not an authored
+architecture contract; preserve its values and provenance when citing it.
+
 The initial frozen revision is
 `6d4a6cec2dbf77f3add8556f20a162d4362e97c8` (foundation PR #207,
 preserved on `codex/203-stability-baseline`). Later foundation changes tighten

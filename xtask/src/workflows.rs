@@ -1,3 +1,11 @@
+//! Repository checks for benchmark workflow coverage and build identity.
+//!
+//! Workflow files own execution matrices, pinned tools, inputs, and reporting;
+//! the policies and tests here reject missing coverage or identity drift. These
+//! checks do not measure performance or establish compatibility of external
+//! CodSpeed runtime environments. Source benchmark docs own timed boundaries;
+//! retained run records own revision-specific observations.
+
 use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobSetBuilder};
 use serde_yaml_ng::Value;

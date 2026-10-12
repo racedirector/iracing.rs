@@ -1,74 +1,29 @@
 # iracing-sdk-derive
 
-Procedural macros for generating typed telemetry adapters for `iracing-sdk`.
+Procedural macros for typed telemetry adapters, normally accessed through
+`iracing-sdk` with its `derive` feature.
 
-## Supported field attributes
-
-The `IRacingTelemetryFrame` derive macro recognizes these field-level attributes:
-
-- `#[field_name = "..."]`
-- `#[missing = "..."]`
-- `#[fail_if_missing]`
-- `#[calculated = "..."]`
-- `#[skip]`
-- `#[bitfield(name = "...", has = "...")]`
-- `#[bitfield_map(name = "...", decoder = "...")]`
-
-## Field strategies
-
-- Required field: `#[field_name = "Speed"]`
-- Optional field: `#[field_name = "Gear"]` on `Option<T>`
-- Defaulted field: `#[field_name = "Fuel"] #[missing = "100.0"]`
-- Critical field: `#[field_name = "Temp"] #[fail_if_missing]`
-- Calculated field: `#[calculated = "std::time::Instant::now()"]`
-- Skipped field: `#[skip]`
-- Bitfield flag check: `#[bitfield(name = "SessionFlags", has = "iracing_sdk::irsdk::SessionFlags::GREEN.bits()")]`
-- Bitfield decoder: `#[bitfield_map(name = "SessionFlags", decoder = "session_dq_scoring_invalid")]`
-
-## Example
+Start with the `IRacingTelemetryFrame` Rustdoc in [src/lib.rs](src/lib.rs)
+for current macro behavior. Build local API documentation with
+`cargo doc -p iracing-sdk-derive --no-deps --open`. A representative
+named-field input is:
 
 ```rust,ignore
-use iracing_sdk_derive::IRacingTelemetryFrame;
-
-fn session_dq_scoring_invalid(bits: iracing_sdk::BitField) -> bool {
-    iracing_sdk::irsdk::SessionFlags::from(bits)
-        .has_disqualification_scoring_invalid()
-}
-
-#[derive(IRacingTelemetryFrame, Debug)]
-struct CarData {
+#[derive(iracing_sdk_derive::IRacingTelemetryFrame)]
+struct Frame {
     #[field_name = "Speed"]
     speed: f32,
-
     #[field_name = "Gear"]
     gear: Option<i32>,
-
-    #[field_name = "FuelLevel"]
-    #[missing = "100.0"]
-    fuel: f32,
-
-    #[calculated = "std::time::Instant::now()"]
-    timestamp: std::time::Instant,
-
-    #[skip]
-    last_lap_time: f32,
-
-    #[bitfield(
-        name = "SessionFlags",
-        has = "iracing_sdk::irsdk::SessionFlags::GREEN.bits()"
-    )]
-    is_green: bool,
-
-    #[bitfield_map(
-        name = "SessionFlags",
-        decoder = "session_dq_scoring_invalid"
-    )]
-    dq_scoring_invalid: bool,
 }
 ```
 
-## Notes
+The [pass cases](tests/pass/) and [compile-fail cases](tests/ui/) own tested
+accepted/rejected forms and diagnostics; the [test runner](tests/ui.rs)
+selects those cases. The parser and generation code in [src/lib.rs](src/lib.rs)
+own their respective decisions. Keep exact syntax and diagnostic expectations
+with these executable owners rather than adding a second attribute matrix here.
 
-- `#[bitfield(..., has = "...")]` only accepts `bool` or `Option<bool>`.
-- `#[bitfield_map(..., decoder = "...")]` accepts any `T` or `Option<T>`.
-- Both bitfield forms decode the telemetry variable as `iracing_sdk::BitField` first.
+Run `cargo test -p iracing-sdk-derive` for parser and UI coverage, and
+`cargo test -p iracing-sdk-derive --doc` for public examples. Preserve generated
+`.stderr` expectations when changing documentation.

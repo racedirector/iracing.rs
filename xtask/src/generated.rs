@@ -1,3 +1,20 @@
+//! Reference artifact production and read-only verification.
+//!
+//! `outputs` is the deterministic output registry. It derives schemas from the
+//! owning workspace types using locked dependencies and serializes through JSON
+//! values before YAML. The provenance manifest in `docs/reference/generation.toml`
+//! classifies every retained YAML artifact and records authored source/context.
+//!
+//! Generated artifacts must match freshly produced bytes. Captured artifacts
+//! instead require a schema envelope and examples: unavailable raw inputs and
+//! capture revisions prevent a reproducibility claim. The checker requires exact
+//! manifest/YAML inventory agreement and never rewrites committed artifacts.
+//! Non-YAML historical samples are outside this check's scope.
+//!
+//! `generate` updates only registered deterministic outputs. Fixture generation
+//! belongs to the separate `test-fixtures` crate. Repository task composition and
+//! CI execution policy belong to `main.rs` and the workflow files, respectively.
+
 use anyhow::{Context, Result, bail};
 use schemars::schema_for;
 use serde::Deserialize;

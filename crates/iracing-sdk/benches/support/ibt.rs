@@ -1,4 +1,10 @@
 //! Storage-neutral IBT benchmark workload metadata and cache preparation.
+//!
+//! Workload geometry is derived from the wire preamble and physical file length,
+//! independently of the reader being measured. Cache preparation uses plain
+//! sequential file I/O outside timing. Results therefore describe warm-cache
+//! access, not cold-storage latency; the helper does not establish production
+//! parser acceptance or certify an arbitrary recording.
 
 use iracing_sdk::IbtLayout;
 use iracing_sdk::irsdk::{DiskSubHeader, Header};

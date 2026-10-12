@@ -3,7 +3,7 @@
 ## Purpose
 
 The workspace separates telemetry acquisition and decoding, derive-time adapter
-generation, simulation lifecycle probing, network broadcast control, shared test
+generation, simulation lifecycle probing, native broadcast control, shared test
 data, and end-user examples.
 
 ```text
@@ -52,12 +52,12 @@ contract:
 - Source-independent provider/adapter primitives and Windows live connections.
 - Background telemetry task orchestration and source-specific policies.
 - Session YAML cleanup, typed deserialization, caching, and schema discovery.
-- Windows shared-memory mapping, update waiting, and broadcast message packing.
+- Windows shared-memory mapping and update waiting.
 - CLI tools, schema generators, and crate-level examples.
 
 Code that understands a source, schema, session document, or runtime belongs
-here. Win32 transport remains here even though the portable command values it
-sends belong in `iracing-irsdk`.
+here. Broadcast operation encoding and native dispatch belong to
+[`iracing-broadcast-sdk`](../../crates/iracing-broadcast-sdk/src/lib.rs).
 
 ### `iracing-sdk-derive`
 
@@ -73,14 +73,9 @@ so consumers do not need tracing solely because of generated warning paths.
 
 ### `iracing-simulation`
 
-Owns simulation lifecycle checks that do not require telemetry:
-
-- a portable HTTP probe for the local `get_sim_status` endpoint;
-- a `SimStatusClient` injection seam;
-- a raw-`TcpStream` default client with a deliberately small parser;
-- Windows-only process enumeration for `iRacingSim64DX11.exe`.
-
-It does not own shared-memory telemetry or broadcast commands.
+Provides independent simulation-status probes. The
+[crate Rustdoc](../../crates/iracing-simulation/src/lib.rs) owns its boundary and
+links to HTTP and Windows process contracts.
 
 ### Workspace applications
 
@@ -95,9 +90,9 @@ The two CLI executables have separate composition roots and consumer-owned
 capability traits. Implementation invariants and initialization policy live in
 [`iracing-broadcast`'s application module](../../crates/iracing-broadcast-cli/src/application.rs)
 and [`iracing-sdk`'s application module](../../crates/iracing-sdk-cli/src/application/mod.rs).
-The broadcast command contract lives in `iracing-broadcast-cli`; the SDK CLI
-composes it alongside its own live command contracts without introducing an SDK
-dependency into the standalone broadcast CLI.
+The [broadcast command crate](../../crates/iracing-broadcast-cli/src/lib.rs)
+owns parsing and capability-based execution; follow the application modules for
+the resources each executable supplies.
 
 ## Primary runtime paths
 
@@ -122,26 +117,12 @@ iRacing shared memory + update event
   -> FrameAdapter or DynamicFrame
 ```
 
-Broadcast RPC:
+Broadcast command ownership is documented by the
+[SDK](../../crates/iracing-broadcast-sdk/src/lib.rs) and
+[CLI](../../crates/iracing-broadcast-cli/src/lib.rs). Raw wire values live in
+[`iracing-irsdk`](../../crates/iracing-irsdk/src/broadcast.rs).
 
-```text
-gRPC request
-  -> broadcast_service boundary mapping
-  -> BroadcastUseCases
-  -> command and observation ports
-  -> iracing-sdk Win32 broadcast + live telemetry/session data
-  -> observed snapshot or acknowledgement response
-```
-
-Simulation status:
-
-```text
-Simulation
-  -> SimStatusClient
-  -> GET /get_sim_status?object=simStatus
-  -> 2xx + body contains running:1
-  -> bool
-```
+Simulation status: see the [source-owned probe contracts](../../crates/iracing-simulation/src/lib.rs).
 
 ## Placement rules
 
@@ -149,13 +130,6 @@ Simulation
   `iracing-irsdk`.
 - Put source framing, file navigation, shared-memory transport, schema
   construction, session parsing, and runtime behavior in `iracing-sdk`.
-- Put public protocol changes in `broadcast.proto` before generated/service code.
-- Put orchestration that can be tested with fake ports in `broadcast_app`, not
-  tonic handlers or Win32 adapters.
-- Put external-boundary conversion in its adapter: protobuf conversion in
-  `broadcast_service`, SDK/live conversion in `broadcast_iracing`.
-- Put optional HTTP clients in simulation examples/dev-dependencies; preserve
-  the raw standard-library default path.
 - Put test-only fixture discovery in `iracing-sdk::test_utils` and fixture
   generation/verification in `crates/test-fixtures`.
 - Gate the smallest OS-dependent implementation unit. Do not hide portable data

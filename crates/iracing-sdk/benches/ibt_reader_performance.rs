@@ -24,6 +24,9 @@
 //!   on the spawned telemetry task before frames, within the timed drain.
 //! - `ibt_reader_random_frame_read` constructs the reader outside the timed routine,
 //!   then performs 1,024 deterministic `frame(index)` calls, including frame I/O.
+//!   The routine owns the reader by value, so its destruction is also inside
+//!   timing; returned frames are consumed and dropped there. Dividing a batch
+//!   delta by its read count does not isolate per-frame acquisition cost.
 //!
 //! Fixtures are sequentially prewarmed through plain file reads before each
 //! timed case. Results are warm-cache local storage measurements, not cold-open

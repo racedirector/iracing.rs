@@ -1,17 +1,10 @@
 # Tier-B build identity
 
-The deterministic workflow intentionally uses Rust **1.88.0** for benchmark
-code generation. This is a benchmark baseline choice, separate from the Rust
-1.88 minimum supported compiler contract. Updating the support range does not
-automatically update this compiler, and updating this compiler does not change
-the support range.
-
-The workflow preserves the three Tier-B targets and their timed boundaries:
-`var-data-extraction`, `adapter-performance`, and `aggregate-frame-parsing`.
-Its job summary and logs record `rustc -Vv` (including LLVM), Cargo, cargo-codspeed,
-the checked-out commit SHA, SHA-256 of `Cargo.lock`, target, profile, features,
-simulation mode, and the pinned CodSpeed action and runner. The runner is
-explicitly configured using the pinned action's `runner-version` input.
+Use the [deterministic workflow](../../.github/workflows/benchmarks-codspeed.yml)
+for the exact benchmark compiler, tools, runner, target, profile, features,
+simulation options, execution matrix, and emitted identity fields. These are
+benchmark build inputs; support/MSRV policy is a separate decision. The
+[workflow checks](../../xtask/src/workflows.rs) and their tests own enforcement.
 
 The summary describes repository-owned build inputs. It does not establish
 CodSpeed runtime-environment compatibility. Retain the job URL and run attempt

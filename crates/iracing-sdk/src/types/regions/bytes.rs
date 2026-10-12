@@ -2,6 +2,12 @@ use crate::{IRacingSDKError, Result};
 use std::ops::Range;
 
 /// Offset and length for a byte span within an SDK data source.
+///
+/// Construction proves that the exclusive end is representable in `usize`.
+/// Empty regions are valid, including at `usize::MAX`; they never overlap.
+/// The value is not bound to a source, address, alignment, or storage lifetime.
+/// Consumers establish containment against their actual retained source before
+/// access. Adjacent tests enforce overflow and half-open overlap behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ByteRegion {
     /// Start offset of the region, measured in bytes from the source origin.
@@ -12,6 +18,8 @@ pub struct ByteRegion {
 
 impl ByteRegion {
     /// Creates a new byte region.
+    ///
+    /// Accepts zero length. No source-length or alignment check is performed.
     ///
     /// # Errors
     ///

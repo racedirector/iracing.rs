@@ -1,4 +1,11 @@
 //! SDK value types used by the broadcast-message protocol.
+//!
+//! This module owns raw discriminants, argument words, and domain values.
+//! Sentinel values and signed focus selectors retain their SDK representation;
+//! adjacent conversion tests own accepted integer values. Typed operation
+//! encoding and native transport belong to `iracing-broadcast-sdk`, while
+//! operator vocabulary belongs to its CLI. Raw construction does not establish
+//! simulator readiness or acknowledge an operation.
 
 use super::macros::sdk_enum;
 

@@ -92,27 +92,20 @@ rule. The configured sibling `irsdk_1_20` source was unavailable when this
 foundation was implemented; verification against that exact version remains
 a review prerequisite before closing the foundation issue.
 
-## Session YAML path
+## Session YAML ownership
 
-`SessionInfoBytes` owns the complete captured region. Its `payload()` method
-borrows a `SessionInfoPayload` ending before the first NUL, preserving the original
-region without allocating. The payload detects `WeekendInfo.Encoding` and decodes
-the same bounded slice: declared UTF-8 uses replacement for malformed sequences,
-declared ISO-8859-1 maps each byte to its code point, and absent or unknown
-declarations use UTF-8 validation with an ISO-8859-1 fallback. Converting the
-buffer to `String` delegates to this payload decoder. Neither boundary nor
-encoding is cached; control-character cleanup and parsing remain subsequent operations.
+The [session module Rustdoc](../../crates/iracing-sdk/src/schema/session/mod.rs)
+owns the decoding/cleanup/deserialization boundary map. Its owning stages are:
 
-iRacing session data can contain control characters and non-UTF-8 bytes.
-`SessionInfoBytes` bounds and decodes the captured bytes; the internal
-`IRacingSessionString` removes invalid control characters and rejects empty
-text. Recorded consumers parse a retained snapshot with `SessionInfo::try_from`,
-or call `sanitized_yaml()` for decoded, cleaned text without parsing or
-reserializing it. The helper preserves remaining text and line endings but does
-not validate YAML syntax. Live acquisition
-continues to supply sanitized text. `SessionInfo::parse` deserializes that text
-into the typed session model.
-Keep decoding and sanitization in the source path.
+- [Session snapshots and payload decoding](../../crates/iracing-sdk/src/types/session_info_bytes.rs).
+- [Internal text sanitization](../../crates/iracing-sdk/src/types/iracing_session_string.rs).
+- [Typed deserialization and tests](../../crates/iracing-sdk/src/schema/session/mod.rs).
+- [Acquisition and parsed-provider composition](../../crates/iracing-sdk/src/provider.rs).
+
+Recorded consumers parse a retained snapshot with `SessionInfo::try_from`, or
+call `sanitized_yaml()` for decoded, cleaned text without parsing or
+reserializing it. Consult those owners for byte encoding, cleanup, absence, and
+error contracts. Parsing does not own runtime version tracking or publication.
 
 ## Caching and publication
 
@@ -128,39 +121,21 @@ it does not add a production session task to the file model.
 
 ## Typed session model
 
-`schema/session` decomposes `SessionInfo` into weekend, timing, driver, radio,
-camera, car setup, and session-data modules. Serde uses iRacing's PascalCase
-field naming.
+The [session types](../../crates/iracing-sdk/src/schema/session/mod.rs) and their
+serde attributes own known fields, required/defaulted sections, and optional
+unknown-field retention. [Discovery helpers](../../crates/iracing-sdk/src/schema/session/discovery.rs)
+own reporting; [parsing tests](../../crates/iracing-sdk/src/schema/session/tests.rs)
+exercise those boundaries. The [CLI session command source](../../crates/iracing-sdk-cli/src/commands/session/mod.rs)
+owns operator tools, rather than this architecture page.
 
-The `schema-discovery` feature adds flattened maps for unknown YAML fields and
-helpers that collect their paths, inferred types, and examples. This supports
-evolving the typed model without silently losing evidence of new simulator
-fields.
+## Reference provenance
 
-`cargo iracing-sdk session schema ibt --path <file.ibt>` and, on Windows,
-`cargo iracing-sdk session schema live` generate a schema from a captured typed value.
-Discovery maps serialize their keys inline in the appropriate domain, so
-unknown keys appear in the inferred schema and its example, not under an
-`unknown_fields` property. Both commands also include
-`x-iracing-unknown-fields`, a path-sorted report from `collect_unknown_fields`
-with types and examples. This extension is evidence for model updates, not a
-JSON Schema validation constraint. The report traverses unknown leaves; inspect
-the captured example for empty containers and full values.
-
-The repo skill `.agents/skills/update-session-schema/SKILL.md` guides capture
-selection, domain model updates, and verification.
-
-## Generated reference artifacts
-
-`docs/reference/*.yml` contains checked-in output from schema binaries:
-
-- baseline session, variable, and primitive schemas;
-- disk-derived variable schema;
-- live-derived variable and session schemas.
-
-These files are generated artifacts. Session schemas can be regenerated with `cargo iracing-sdk session schema`. Variable, primitive, and car-setup schema generators are deferred after removal of the standalone binaries; retain their existing reference artifacts. Live discovery requires Windows and an appropriate simulator state.
-
-`docs/reference/README.md` is the usage index for those artifacts.
+The [reference guide](../reference/README.md) explains how to use type-derived
+schemas and retained simulator captures. Its [manifest](../reference/generation.toml)
+owns YAML provenance and inventory; the [reference tooling](../../xtask/src/generated.rs)
+owns generation and verification. These artifacts provide model output or
+historical evidence, rather than an authored runtime architecture specification.
+Session contracts belong to the typed source model and its parsing tests.
 
 ## Change rules
 
@@ -175,11 +150,6 @@ These files are generated artifacts. Session schemas can be regenerated with `ca
   session policies, not individual consumers.
 
 
-Metadata acquisition is shared through the traits in `provider`:
-`SessionInformationBytesProvider` returns owned bytes or `Ok(None)` when
-absent, and its blanket `SessionInformationProvider` implementation decodes,
-sanitizes, and parses those bytes. `VariableHeadersProvider` returns owned
-headers, using an empty snapshot for absent metadata. Acquisition and parsing
-failures remain errors. Legacy buffer names and inherent metadata accessors
-are deprecated compatibility entry points; live legacy accessors still collapse
-errors to `None`, and the IBT legacy header accessor preserves `None` on absence.
+Metadata acquisition traits and their absence/error behavior are documented in
+[provider.rs](../../crates/iracing-sdk/src/provider.rs). Variable metadata and
+runtime schema contracts remain separate from session text parsing.

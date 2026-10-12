@@ -1,8 +1,18 @@
+//! Control-character cleanup between session byte decoding and deserialization.
+//!
+//! This boundary does not acquire bytes, cache versions, or repair YAML syntax.
+//! Tests below own cleanup ranges, preserved text, empty rejection, and the
+//! order of decoding before cleanup.
+
 use super::session_info_bytes::SessionInfoBytes;
 use crate::{IRacingSDKError, Result};
 use std::ops::Deref;
 
-/// Represents a sanitized session string from the iRacing SDK.
+/// Decoded session text with selected C0 control characters removed.
+///
+/// Removes U+0000–U+0008, U+000B–U+000C, and U+000E–U+001F, preserving
+/// tab, LF, CR, and all other characters. Rejects whitespace-only text after
+/// cleanup. This establishes neither YAML validity nor a parsed session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct IRacingSessionString(String);
 
@@ -31,6 +41,7 @@ impl TryFrom<&str> for IRacingSessionString {
 impl TryFrom<String> for IRacingSessionString {
     type Error = IRacingSDKError;
 
+    /// Clean decoded text, returning a `YAML preprocessing` parse error if empty.
     fn try_from(value: String) -> Result<Self> {
         // Filter out invalid control characters (\n, \r, \t are valid)
         let yaml: String = value
@@ -53,6 +64,7 @@ impl TryFrom<String> for IRacingSessionString {
 impl TryFrom<SessionInfoBytes> for IRacingSessionString {
     type Error = IRacingSDKError;
 
+    /// Decode the NUL-bounded session payload before applying text cleanup.
     fn try_from(value: SessionInfoBytes) -> Result<Self> {
         let decoded: String = value.into();
         decoded.try_into()

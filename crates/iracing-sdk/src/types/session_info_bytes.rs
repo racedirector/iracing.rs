@@ -1,3 +1,12 @@
+//! Source-neutral session snapshots and bounded text decoding.
+//!
+//! [`SessionInfoBytes`] owns the complete advertised region; [`SessionInfoPayload`]
+//! borrows its text prefix and owns encoding interpretation. Neither operation
+//! sanitizes control characters, parses YAML, or caches a session version. Typed
+//! conversion through [`crate::schema::SessionInfo`] composes those later stages.
+//! Tests below exercise ownership, padding, declarations, malformed text, and
+//! the distinction between decoding and sanitization.
+
 use crate::parse_utils::nul_terminated_bytes;
 
 /// Borrowed session bytes before the first NUL, without any UTF-8 or YAML validity guarantee.
@@ -52,6 +61,9 @@ impl SessionInfoPayload<'_> {
     ///
     /// Declared UTF-8 replaces malformed sequences. An absent or unknown
     /// declaration retains UTF-8-first decoding with an ISO-8859-1 fallback.
+    /// Declared ISO-8859-1 maps each byte directly to its Unicode code point.
+    /// Returns a newly owned string without rejecting empty text or validating
+    /// YAML; bytes beyond the payload boundary are never decoded.
     pub fn decode(&self) -> String {
         match self.encoding() {
             SessionInfoEncoding::Utf8 => String::from_utf8_lossy(self.bytes).into_owned(),

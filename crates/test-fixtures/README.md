@@ -34,30 +34,16 @@ other workspace tooling.
 
 ## IBT layout contract
 
-Generated recordings use this exact order:
+[Fixture assembly](src/generate.rs) owns the canonical sequence: main header,
+disk sub-header, variable-header array, session YAML, then telemetry frames.
+Raw representation and component ordering belong to
+[iracing-irsdk](../iracing-irsdk/src/lib.rs) and
+[IbtHeader](../iracing-irsdk/src/ibt_header.rs); adjacent ABI assertions/tests
+own exact sizes and offsets. Derive sizes from those wire types rather than
+maintaining another numeric layout table here. The main header and composite
+IBT preamble are distinct concepts.
 
-```text
-0..112                                      irsdk Header
-112..144                                    IBT DiskSubHeader
-144..(144 + variable_count * 144)           VariableHeader array
-session_info_offset..session_info_end        session YAML bytes
-session_info_end..EOF                        fixed-size telemetry frames
-```
-
-Important distinctions:
-
-- `size_of::<Header>()` is always **112 bytes**.
-- `size_of::<DiskSubHeader>()` is **32 bytes**.
-- The complete IBT preamble is therefore **144 bytes**.
-- `size_of::<VariableHeader>()` is **144 bytes**, and the first variable header
-  begins at offset 144—not 112.
-- The disk sub-header begins at offset 112 and must satisfy
-  `disk_sub_header_offset == var_header_offset - disk_sub_header_size`.
-
-Do not introduce a single ambiguous “header size” constant. The main SDK
-header and the composite IBT preamble are different concepts.
-
-The manifest remains schema version 1. Its legacy `live_header_prefix_size`
+The [manifest model](src/model.rs) and [verifier](src/verify.rs) own schema compatibility. The manifest remains schema version 1. Its legacy `live_header_prefix_size`
 field means the 112-byte main SDK header size in this fixture contract. The
 name is retained for compatibility even though this crate generates recorded
 IBT data only; live shared-memory behavior is out of scope.

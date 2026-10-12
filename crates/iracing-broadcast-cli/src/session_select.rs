@@ -15,7 +15,7 @@ use anyhow::{Result, anyhow, bail};
 /// name such as `race`, `practice`, `qualify`, or `heat`. Names are normalized
 /// during parsing to a compact key (lowercase alphanumerics, with common
 /// spelling aliases folded), and are later resolved against the live session
-/// list by [`resolve_session`].
+/// list by the command layer's session resolver.
 ///
 /// ```
 /// # use iracing_broadcast_cli::SessionSelector;

@@ -27,13 +27,14 @@ on commands, boundaries, and easy-to-miss constraints.
 
 - Integration tests use deterministic generated `.ibt` fixtures listed in `test-data/ibt/manifest.json`; for intentional profile changes, run `cargo test-fixtures check --no-drift-check`, review and stage the generated `.ibt`, YAML, and manifest artifacts, then run `cargo test-fixtures` as the clean-tree verification step after those changes are staged or committed.
 - Use helpers from `iracing_sdk::test_utils` (`require_ibt_fixtures`, `require_named_ibt_fixture`, `require_smallest_ibt_fixture`) instead of hardcoded paths so missing-fixture failures stay consistent.
-- Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` and the generated schemas it indexes. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use the session and primitive schemas for object shapes and legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
+- Before inventing telemetry variables, session fields, schemas, or synthetic frame layouts for tests and benchmarks, consult `docs/reference/README.md` for generated/captured provenance and usage guidance. Use the disk/live variable snapshots for real names, types, counts, units, and representative layouts; use session schemas for model shapes and iracing-irsdk source for legal enum/bitflag values. Keep a snapshot's `frame_size` and offsets together rather than combining capture-specific layouts.
 
 ## Workspace Map
 
 - `crates/iracing-irsdk`: dependency-light native SDK wire contract: fixed-layout headers, intrinsic byte decoding, constants, enums, flags, packed fields, and portable broadcast command values. Do not add IBT navigation, shared-memory access, schemas, session parsing, or runtime orchestration here.
 - `crates/iracing-sdk`: immutable `.ibt` ownership through `IbtFile`, direct recorded frame/replay access, schema/session parsing, source-independent providers/adapters, live connection and delivery/session policies, and Windows shared-memory access. Keep the platform-neutral live connection stub and typed command data portable; gate actual Win32/shared-memory transports with `#[cfg(windows)]`.
 - `crates/iracing-sdk-cli`: binary-only CLI and schema generator tools; its features forward to `iracing-sdk`.
+- Broadcast ownership: [SDK](crates/iracing-broadcast-sdk/src/lib.rs), [CLI](crates/iracing-broadcast-cli/src/lib.rs), and raw values in `iracing-irsdk`. Preserve these boundaries; clap owns syntax.
 - `crates/iracing-sdk-derive`: derive macros re-exported by `iracing-sdk` behind the `derive` feature.
 - `crates/iracing-simulation`: portable HTTP status probe plus Windows-only process enumeration.
 - `crates/test-fixtures`: unpublished Rust generator, verifier, and drift checker for deterministic `.ibt` fixtures.

@@ -6,7 +6,13 @@ use crate::{
     parse_utils::{read_wire_bytes, read_wire_bytes_from_io},
 };
 
-/// An iRacing SDK header.
+/// Native SDK `irsdk_header` representation.
+///
+/// Adjacent compile-time assertions and `header_layout_matches_iracing_abi`
+/// enforce its ABI; `header_wire_round_trip` checks byte preservation. Decoding,
+/// public field mutation, and deserialization do not validate source geometry.
+/// Range helpers perform only their documented arithmetic checks; they do not
+/// bind a range to a source or establish a stable externally written snapshot.
 #[repr(C)]
 #[derive(
     Debug,

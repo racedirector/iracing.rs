@@ -1,6 +1,12 @@
 use crate::{Result, parse_utils::read_wire_bytes};
 
-/// iRacing variable buffer information
+/// Native SDK telemetry-buffer descriptor, not ownership of buffer storage.
+///
+/// Adjacent ABI assertions and `variable_buffer_layout_matches_iracing_abi`
+/// enforce representation. Decoding and construction accept signed offsets and
+/// tick values without checking source bounds or external-writer coherence.
+/// Live transport code owns copy/recheck policy; this descriptor does not pin
+/// or stabilize simulator memory.
 #[repr(C)]
 #[derive(
     Debug,

@@ -5,6 +5,9 @@ immutable metadata/layout once. `IbtFile::from_bytes` intentionally owns the
 complete supplied recording. Historical target/group identifiers remain stable
 so CI can compare workload history across the #299 architecture migration.
 
+Current methodology is owned by the [memory diagnostic source](../../crates/iracing-sdk/benches/ibt_reader_measurement.rs);
+use the [operator guide](../../crates/iracing-sdk/benches/README.md) for current invocation.
+
 ## Reproduce
 
 From the repository root, with at least two real `.ibt` captures of 1 MiB or
@@ -92,7 +95,8 @@ the complete recording.
 Results below were captured after the historical seekable-file implementation
 on 2026-09-19 using an Apple Silicon macOS development machine. They precede the
 current mmap-backed file model and remain dated comparison evidence. Run the
-command above for current numbers on the review machine.
+command above for current numbers on the review machine. An exact measured
+revision and compiler version were not retained for that historical experiment.
 
 | Mode | File size | Frame size | Frames | Open | Retained heap | Peak open heap | Replay | Throughput |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -109,7 +113,7 @@ above 840 MiB/s in both runs. The expected in-memory replay advantage does not
 justify restoring recording-sized ownership. Current `open` uses mmap; this
 historical table does not measure that implementation.
 
-The acceptance signal is structural rather than a fixed timing threshold:
+The acceptance signal used for that experiment was structural rather than a fixed timing threshold:
 file-backed retained heap remains metadata-sized as recordings grow, whereas
 the memory baseline grows by at least the complete recording size. Filesystem
 cache may still grow with bytes read and is explicitly outside reader-owned

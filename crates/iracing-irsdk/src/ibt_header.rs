@@ -7,6 +7,8 @@ use crate::{DiskSubHeader, Error, Header, Result};
 /// Contains the SDK [`Header`] followed by the recording's [`DiskSubHeader`].
 /// Decoding copies the native-layout bytes into an owned value; it does not
 /// validate field values, offsets, record counts, or the rest of the file.
+/// Component types own their ABI assertions and tests. File geometry and
+/// frame-count policy belong to the consuming recording/layout implementation.
 #[repr(C)]
 #[derive(
     Debug,

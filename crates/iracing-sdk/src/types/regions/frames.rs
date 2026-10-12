@@ -4,6 +4,11 @@ use std::num::NonZeroUsize;
 use super::{ByteRegion, FrameRegion};
 
 /// Contiguous byte region containing zero or more fixed-size telemetry frames.
+///
+/// Construction proves a positive frame size and exact partition of the given
+/// span. It does not prove that the span fits any source or that its contents
+/// match a telemetry layout. Adjacent tests own empty-span, partition, and index
+/// boundary behavior.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FramesRegion {
     region: ByteRegion,
@@ -13,6 +18,9 @@ pub struct FramesRegion {
 
 impl FramesRegion {
     /// Creates a region containing fixed-size telemetry frames.
+    ///
+    /// An empty span produces zero frames when `frame_size` is positive. Source
+    /// containment remains the responsibility of the consumer of `region`.
     ///
     /// # Errors
     ///

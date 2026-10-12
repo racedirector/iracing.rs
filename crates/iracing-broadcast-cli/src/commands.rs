@@ -1,3 +1,11 @@
+//! Clap declarations and conversion from operator input to typed SDK operations.
+//!
+//! Exact syntax, defaults, and input constraints live on these declarations and
+//! in parser tests. Direct operations map into SDK commands without acquiring
+//! simulator resources. Session-time search resolves a session view before
+//! dispatch; the injected application owns acquisition and readiness policy.
+//! Wire encoding and SDK validation remain in `iracing-broadcast-sdk`.
+
 use crate::session_select::{SessionSelector, SessionTime, resolve_session};
 use crate::{BroadcastCommands, ReplaySessions};
 use anyhow::Result;
@@ -37,6 +45,10 @@ impl From<CameraStateArgs> for CameraState {
 #[derive(clap::Subcommand, Debug, Clone)]
 pub enum CameraCommand {
     /// Switch the camera position
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/camera/switch-position.md)."
+    )]
     SwitchPosition {
         #[arg(long)]
         position: u16,
@@ -46,6 +58,10 @@ pub enum CameraCommand {
         camera: u16,
     },
     /// Switch the camera number
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/camera/switch-number.md)."
+    )]
     SwitchNumber {
         #[arg(long)]
         car_number: String,
@@ -55,6 +71,10 @@ pub enum CameraCommand {
         camera: u16,
     },
     /// Set the camera state
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/camera/set-state.md)."
+    )]
     SetState(CameraStateArgs),
 }
 
@@ -82,6 +102,10 @@ impl From<CameraCommand> for BroadcastCommand {
 /// Direct replay wire operations, converted without live state.
 pub enum DirectReplayCommand {
     /// Set replay play speed
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/set-play-speed.md)."
+    )]
     SetPlaySpeed {
         #[arg(long)]
         speed: i16,
@@ -89,11 +113,19 @@ pub enum DirectReplayCommand {
         slow_motion: bool,
     },
     /// Search the replay for the given mode.
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/search.md)."
+    )]
     Search {
         #[arg(value_parser = replay_search_parser())]
         mode: ReplaySearchMode,
     },
     /// Set the replay play head
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/set-play-position.md)."
+    )]
     SetPlayPosition {
         #[arg(value_parser = replay_position_parser())]
         mode: ReplayPositionMode,
@@ -101,10 +133,26 @@ pub enum DirectReplayCommand {
         frame: u32,
     },
     /// Erase replay tape
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/erase.md)."
+    )]
     Erase,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/normal.md)."
+    )]
     Normal,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/slow16.md)."
+    )]
     Slow16,
     /// Pause the replay
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/pause.md)."
+    )]
     Pause,
 }
 
@@ -118,6 +166,10 @@ pub enum ReplayCommand {
     /// session name); `--time` is `SS`, `MM:SS`, or `HH:MM:SS`. Missing or
     /// ambiguous selectors are rejected with the available sessions listed;
     /// nothing is guessed.
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/replay/search-session-time.md)."
+    )]
     SearchSessionTime {
         /// Session number or name, resolved against live session metadata
         #[arg(long)]
@@ -186,17 +238,65 @@ impl From<DirectReplayCommand> for BroadcastCommand {
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq)]
 pub enum PitCommand {
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/clear.md)."
+    )]
     Clear,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/fuel.md)."
+    )]
     Fuel { gallons: u16 },
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/lf.md)."
+    )]
     Lf { psi: u16 },
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/rf.md)."
+    )]
     Rf { psi: u16 },
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/lr.md)."
+    )]
     Lr { psi: u16 },
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/rr.md)."
+    )]
     Rr { psi: u16 },
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/clear-tires.md)."
+    )]
     ClearTires,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/ws.md)."
+    )]
     Ws,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/fr.md)."
+    )]
     Fr,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/clear-ws.md)."
+    )]
     ClearWs,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/clear-fr.md)."
+    )]
     ClearFr,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/pit/clear-fuel.md)."
+    )]
     ClearFuel,
 }
 
@@ -226,12 +326,28 @@ impl From<PitCommand> for BroadcastCommand {
 #[derive(clap::Subcommand, Debug, Clone, PartialEq)]
 pub enum ChatCommand {
     /// Cancel chat input
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/chat/cancel.md)."
+    )]
     Cancel,
     /// Reply to the last received message
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/chat/reply.md)."
+    )]
     Reply,
     /// Open chat input
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/chat/begin.md)."
+    )]
     Begin,
     /// Send chat macro
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/chat/macro.md)."
+    )]
     Macro {
         #[arg(value_parser = clap::value_parser!(u16).range(1..=15))]
         index: u16,
@@ -254,7 +370,15 @@ impl From<ChatCommand> for BroadcastCommand {
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq)]
 pub enum TextureCommand {
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/textures/reload-all.md)."
+    )]
     ReloadAll,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/textures/reload-car.md)."
+    )]
     ReloadCar { car_idx: u16 },
 }
 
@@ -270,8 +394,20 @@ impl From<TextureCommand> for BroadcastCommand {
 
 #[derive(clap::Subcommand, Debug, Clone)]
 pub enum TelemetryCommand {
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/telemetry/start.md)."
+    )]
     Start,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/telemetry/stop.md)."
+    )]
     Stop,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/telemetry/restart.md)."
+    )]
     Restart,
 }
 
@@ -288,6 +424,10 @@ impl From<TelemetryCommand> for BroadcastCommand {
 
 #[derive(clap::Subcommand, Debug, Clone)]
 pub enum ForceFeedbackCommand {
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/ffb/max-force.md)."
+    )]
     MaxForce { nm: f32 },
 }
 
@@ -301,11 +441,35 @@ impl From<ForceFeedbackCommand> for BroadcastCommand {
 
 #[derive(clap::Subcommand, Debug, Clone)]
 pub enum VideoCommand {
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/screenshot.md)."
+    )]
     Screenshot,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/start.md)."
+    )]
     Start,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/stop.md)."
+    )]
     Stop,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/toggle.md)."
+    )]
     Toggle,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/show-timer.md)."
+    )]
     ShowTimer,
+    #[cfg_attr(
+        doc,
+        doc = "Development contract: [document](https://github.com/racedirector/iracing.rs/blob/main/crates/iracing-broadcast-cli/docs/commands/video/hide-timer.md)."
+    )]
     HideTimer,
 }
 

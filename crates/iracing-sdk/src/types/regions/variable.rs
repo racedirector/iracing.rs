@@ -6,6 +6,12 @@ use crate::{IRacingSDKError, Result};
 use super::ByteRegion;
 
 /// Frame-relative byte region occupied by one telemetry variable.
+///
+/// Guarantees depend on the constructor: `TryFrom<&VariableHeader>` validates
+/// dimensions and arithmetic without a frame bound, while [`Self::try_new`]
+/// and [`Self::try_from_header`] additionally check the supplied frame size.
+/// None checks variable names, field overlap, actual source storage, or decoded
+/// value validity. Adjacent tests own geometric edge cases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VariableRegion {
     region: ByteRegion,

@@ -1,13 +1,28 @@
 #![warn(missing_docs)]
-//! Access to the state of the iRacing simulation on a host PC.
+//! Independent probes for the iRacing simulation on a host PC.
 //!
-//! # Features
-//! - **Sim status**: Access to the sim running status via HTTP.
-//! - **Windows process detection**: Detect whether the iRacing executable is running.
+//! [`Simulation`] checks the HTTP status endpoint through a synchronous
+//! [`SimStatusClient`]. [`StdSimStatusClient`] provides the built-in TCP transport;
+//! applications can inject another client without introducing an HTTP runtime
+//! into the library. Construction stores configuration and performs no I/O.
 //!
-//! # Quick Start
+//! Windows builds also expose `is_iracing_process_running`, which checks
+//! executable presence independently of HTTP status. Process presence does not
+//! establish endpoint readiness or telemetry connectivity. Neither probe starts,
+//! stops, retries, or monitors the simulator; callers own lifecycle policy.
 //!
-//! See examples.
+//! # Usage
+//!
+//! ```no_run
+//! use iracing_simulation::Simulation;
+//!
+//! let simulation = Simulation::local();
+//! let running = simulation.check_sim_status();
+//! ```
+//!
+//! The crate's `examples/` directory demonstrates injected clients and polling.
+//! Method documentation owns response semantics; the implementation's unit tests
+//! exercise status handling and Windows executable-name matching.
 
 #[cfg(windows)]
 mod process;

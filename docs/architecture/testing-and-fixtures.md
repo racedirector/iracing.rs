@@ -18,8 +18,9 @@ test-data/
 ```
 
 The unpublished `test-fixtures` crate defines profiles and writes both `.ibt`
-and session YAML files. It constructs the 112-byte SDK header, 32-byte disk
-sub-header, and 144-byte variable headers through `iracing-irsdk` wire types.
+and session YAML files. It constructs headers through
+[iracing-irsdk wire types](../../crates/iracing-irsdk/src/lib.rs), whose adjacent
+ABI assertions/tests own exact representation.
 Its verifier checks manifest invariants, hashes, headers, frame geometry,
 variables, companion YAML, immutable file construction, every indexed/range
 frame through `IbtFile`, and complete `IbtReplay` traversal. Frame coordinates,
@@ -65,10 +66,11 @@ skip a required integration test because data is absent. The best-effort
 
 ## Test layering
 
-- Before designing synthetic telemetry or session inputs, use the generated
-  schema catalog in [`docs/reference/README.md`](../reference/README.md) to find
-  real variable names and metadata, session shapes, and primitive value
-  domains. A disk/live snapshot's offsets and `frame_size` form one captured
+- Before designing synthetic telemetry or session inputs, use the reference
+  provenance guide in [`docs/reference/README.md`](../reference/README.md) to find
+  real variable names and metadata and representative session shapes. Use
+  iracing-irsdk source for enum/flag value domains. A disk/live snapshot's offsets
+  and `frame_size` form one captured
   layout and must not be combined with offsets from another snapshot.
 - Unit tests should construct minimal frames/schemas and use fake providers or
   ports.

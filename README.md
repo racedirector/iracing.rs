@@ -17,27 +17,17 @@ Rust workspace for working with iRacing telemetry and simulation state:
 - [`crates/iracing-irsdk`](crates/iracing-irsdk) — dependency-light Rust representations of the native SDK wire contract: fixed-layout headers, variable metadata, constants, enums, flags, and broadcast command values.
 - [`crates/iracing-sdk`](crates/iracing-sdk) — completed recordings through `IbtFile`, indexed/lazy frame access and `IbtReplay`, session YAML parsing, telemetry decoding (`VarData`/`TelemetryLayout`), typed/dynamic adapters, and Windows live shared-memory telemetry tools.
 - [`crates/iracing-sdk-cli`](crates/iracing-sdk-cli) — the consolidated `iracing-sdk` CLI for telemetry export, snapshots, session schemas, and metadata.
+- [`crates/iracing-broadcast-sdk`](crates/iracing-broadcast-sdk/src/lib.rs) — typed broadcast operations and Windows native dispatch.
+- [`crates/iracing-broadcast-cli`](crates/iracing-broadcast-cli/src/lib.rs) — standalone and composable broadcast commands; clap owns command syntax.
 - [`crates/iracing-simulation`](crates/iracing-simulation) — dependency-light probe for iRacing’s `get_sim_status` endpoint (`Simulation`, `SimStatusClient`, `StdSimStatusClient`).
 - [`crates/test-fixtures`](crates/test-fixtures) — unpublished Rust tooling for deterministic `.ibt` fixture generation, verification, and drift checks.
 
-## Generated schema artifacts
+## Reference data
 
-Schema snapshots are checked in under [`docs/reference`](docs/reference). Do not hand-edit them.
-They are also the starting point when constructing test/benchmark schemas,
-session YAML, or simulated telemetry frames: consult the
-[`docs/reference` usage guide](docs/reference/README.md) before creating fields
-or values from memory. The disk/live artifacts record concrete observed
-layouts, so keep each snapshot's frame size and offsets together; do not assume
-that one capture is an exhaustive schema for every car and session.
-
-| Artifact | Purpose | Regenerate from workspace root |
-| --- | --- | --- |
-| [`docs/reference/session-schema.yml`](docs/reference/session-schema.yml) | Baseline schema for `iracing_sdk::schema::SessionInfo`. | `cargo iracing-sdk session schema type --output ./docs/reference/session-schema.yml` |
-| [`docs/reference/variable-schema.yml`](docs/reference/variable-schema.yml) | Historical variable metadata reference schema. | Generator deferred during CLI consolidation. |
-| [`docs/reference/primitives-schema.yml`](docs/reference/primitives-schema.yml) | `$defs` bank for `irsdk_*` primitive wrappers (enums/bitflags). | Generator deferred during CLI consolidation. |
-| [`docs/reference/disk-variable-schema.yml`](docs/reference/disk-variable-schema.yml) | Telemetry variable schema derived from `.ibt` headers. | Generator deferred during CLI consolidation. |
-| [`docs/reference/live-session-schema.yml`](docs/reference/live-session-schema.yml) | Schema generated from live session YAML. Windows-only. | `cargo iracing-sdk session schema live --output ./docs/reference/live-session-schema.yml` |
-| [`docs/reference/live-variable-schema.yml`](docs/reference/live-variable-schema.yml) | Schema generated from live telemetry variables. Windows-only. | Generator deferred during CLI consolidation. |
+The [reference guide](docs/reference/README.md) explains type-derived schemas,
+historical simulator captures, their provenance, and verification entry points.
+Consult it when constructing test or benchmark inputs; captured layouts are
+representative evidence and must retain coherent offsets and frame sizes.
 
 ## Getting Started
 
@@ -72,7 +62,6 @@ Defined in `.cargo/config.toml` for convenience:
 | `cargo iracing-sdk telemetry snapshot ibt --path <FILE.ibt> --index 0` | Capture one recorded telemetry frame. |
 | `cargo iracing-sdk telemetry snapshot live` | Capture one live telemetry frame (Windows). |
 | `cargo iracing-sdk session snapshot ibt --path <FILE.ibt>` | Extract session data from a recording. |
-| `cargo iracing-sdk session schema type` | Emit the baseline session schema. |
 | `cargo iracing-sdk session schema ibt --path <FILE.ibt>` | Generate session schema from a recording. |
 | `cargo iracing-sdk session schema live` | Generate live session schema (Windows). |
 | `cargo iracing-sdk variables ibt --path <FILE.ibt>` | Export variable metadata. |

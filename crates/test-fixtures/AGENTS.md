@@ -21,25 +21,20 @@ or commands.
 
 ## Non-Negotiable Layout
 
-- Main `Header`: 112 bytes at offset 0.
-- `DiskSubHeader`: 32 bytes at offset 112.
-- Composite IBT preamble and first variable-header offset: 144 bytes.
-- Each `VariableHeader`: 144 bytes.
-- Session YAML immediately follows the variable-header array; frames immediately
-  follow the YAML.
-
-Derive sizes from `size_of` on the SDK's zerocopy wire types. Never redefine SDK wire sizes as
-independent numeric constants, and never equate the 112-byte header with the
-144-byte IBT preamble.
+- Preserve the canonical assembly order owned by [the generator](src/generate.rs):
+  main header, disk sub-header, variable-header array, session YAML, then frames.
+- Derive sizes from `size_of` on the [iracing-irsdk wire types](../iracing-irsdk/src/lib.rs).
+  Their ABI assertions/tests own exact geometry; do not redefine independent
+  numeric constants or equate the main header with the composite IBT preamble.
 
 The manifest's `live_header_prefix_size` name is legacy. For schema version 1 it
-must remain present and equal 112 even though this crate does not generate live
+must remain present and equal 112, as enforced by [the verifier](src/verify.rs), even though this crate does not generate live
 shared-memory fixtures.
 
 ## Ownership Boundaries
 
-- `iracing-sdk` owns wire layouts, constructors, validation, and encoding for
-  SDK structs.
+- `iracing-irsdk` owns raw wire layouts, constructors, intrinsic decoding, and
+  ABI tests. `iracing-sdk` owns consuming parser and runtime validation.
 - This crate owns profiles, deterministic values, session YAML, IBT assembly,
   manifest serialization, hashing, verification orchestration, and drift checks.
 - Use `IbtFile` direct traversal and `IbtReplay` in verification so every frame is exercised as downstream consumers read it. Preserve independent wire/hash/YAML checks and compare traversed bytes/layouts against that checked source; do not replace verification with only a second hand-written parser.
