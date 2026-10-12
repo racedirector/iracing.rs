@@ -23,7 +23,7 @@ futures = { workspace = true }
 iracing-irsdk = { workspace = true }
 iracing-sdk = { version = "0.1.0", path = "../iracing-sdk", default-features = false }
 rand = "0.9"
-rand_chacha = "0.9"
+rand_chacha = "0.10"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
